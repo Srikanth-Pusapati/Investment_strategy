@@ -1,0 +1,17 @@
+# --- Core ---
+anthropic>=0.40.0          # Claude decision engine
+alpaca-py>=0.30.0          # brokerage: orders, positions, market data, news
+python-dotenv>=1.0.0       # load secrets from .env
+pydantic>=2.6.0            # typed models / validation
+
+# --- Signal data sources ---
+yfinance>=0.2.40           # free fundamentals fallback (EBITDA, financials)
+requests>=2.31.0           # generic HTTP for FMP / Quiver / FRED / Finnhub
+
+# --- Optional: read-only Robinhood import via official Agentic MCP ---
+# Official MCP endpoint (OAuth). READ tools only; never trades on Robinhood.
+mcp>=1.0.0
+
+# --- Utilities ---
+tenacity>=8.2.0            # retries with backoff for flaky APIs
+rich>=13.7.0               # readable console logging

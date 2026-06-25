@@ -1,0 +1,217 @@
+"""Shared data models that flow between the four stages.
+
+Signals (per symbol)  ->  Claude  ->  TradeProposal  ->  RiskManager  ->
+RiskDecision  ->  Alpaca order.  Positions/Account feed back as context.
+"""
+from __future__ import annotations
+
+from datetime import datetime, timezone
+from enum import Enum
+from typing import Any, Optional
+
+from pydantic import BaseModel, Field
+
+
+def _now() -> datetime:
+    return datetime.now(timezone.utc)
+
+
+# --------------------------------------------------------------------------- #
+# Signals
+# --------------------------------------------------------------------------- #
+class SignalKind(str, Enum):
+    FUNDAMENTALS = "fundamentals"
+    NEWS = "news"
+    CONGRESS = "congress"
+    MACRO = "macro"
+
+
+class Signal(BaseModel):
+    """One normalized observation about a symbol (or the market, for macro)."""
+    kind: SignalKind
+    symbol: Optional[str] = None          # None for market-wide macro signals
+    summary: str                          # human/LLM-readable one-liner
+    score: Optional[float] = None         # -1.0 (bearish) .. +1.0 (bullish)
+    data: dict[str, Any] = Field(default_factory=dict)  # raw provider payload
+    source: str = ""
+    as_of: datetime = Field(default_factory=_now)
+
+
+class SignalBundle(BaseModel):
+    """All signals relevant to a single symbol, plus shared market context."""
+    symbol: str
+    signals: list[Signal] = Field(default_factory=list)
+    market_context: list[Signal] = Field(default_factory=list)  # macro etc.
+
+
+# --------------------------------------------------------------------------- #
+# Decisions
+# --------------------------------------------------------------------------- #
+class Action(str, Enum):
+    BUY = "buy"
+    SELL = "sell"
+    HOLD = "hold"
+
+
+class Instrument(str, Enum):
+    """What kind of thing the proposal trades. Equity covers stocks AND ETFs
+    (an ETF is just a symbol). OPTION engages the defined-risk options path."""
+    EQUITY = "equity"
+    OPTION = "option"
+
+
+class OptionStrategy(str, Enum):
+    """Only DEFINED-RISK strategies are supported — max loss is known up front.
+    No naked selling. Bull/bear verticals cap both risk and reward."""
+    LONG_CALL = "long_call"
+    LONG_PUT = "long_put"
+    BULL_CALL_SPREAD = "bull_call_spread"   # buy lower call, sell higher call
+    BEAR_PUT_SPREAD = "bear_put_spread"     # buy higher put, sell lower put
+
+
+class OptionLeg(BaseModel):
+    """One leg of an options order. `right` is C/P, OCC-style symbol resolved
+    at execution from underlying+expiry+strike."""
+    expiry: str                # YYYY-MM-DD
+    strike: float
+    right: str                 # "call" | "put"
+    side: Action               # BUY or SELL (the leg direction)
+    ratio: int = 1             # contracts per unit of the strategy
+
+
+class TradeProposal(BaseModel):
+    """Claude's recommendation for a symbol. Sizing is a REQUEST, not a guarantee
+    — RiskManager has final say and may shrink or veto it."""
+    symbol: str                                 # underlying for options
+    action: Action
+    conviction: float = Field(ge=0.0, le=1.0)   # how strong the signal is
+    target_weight_pct: float = Field(ge=0.0, le=100.0)  # desired % of equity
+    stop_loss_pct: Optional[float] = None       # override default if set
+    take_profit_pct: Optional[float] = None
+    rationale: str                              # why — for the audit log
+    key_signals: list[str] = Field(default_factory=list)
+
+    # --- instrument / options (equity is the default) ---
+    instrument: Instrument = Instrument.EQUITY
+    option_strategy: Optional[OptionStrategy] = None
+    option_legs: list[OptionLeg] = Field(default_factory=list)
+    max_premium_usd: Optional[float] = None     # cap on debit paid for the play
+
+
+class RiskVerdict(str, Enum):
+    APPROVED = "approved"
+    RESIZED = "resized"      # approved but quantity reduced to fit limits
+    REJECTED = "rejected"
+
+
+class RiskDecision(BaseModel):
+    """RiskManager's final ruling on a proposal — what (if anything) executes."""
+    proposal: TradeProposal
+    verdict: RiskVerdict
+    approved_qty: float = 0.0          # shares to actually trade (0 if rejected)
+    approved_notional: float = 0.0     # dollar value
+    stop_loss_pct: float = 0.0
+    take_profit_pct: float = 0.0
+    reason: str = ""                   # why resized/rejected — for audit log
+    decided_at: datetime = Field(default_factory=_now)
+
+
+# --------------------------------------------------------------------------- #
+# Account / positions (normalized from Alpaca)
+# --------------------------------------------------------------------------- #
+class Position(BaseModel):
+    symbol: str
+    qty: float
+    avg_entry_price: float
+    current_price: float
+    market_value: float
+    unrealized_pl: float
+    unrealized_pl_pct: float
+
+
+class AccountSnapshot(BaseModel):
+    equity: float
+    last_equity: float          # equity at previous close — for day P/L
+    cash: float
+    buying_power: float
+    positions: list[Position] = Field(default_factory=list)
+    as_of: datetime = Field(default_factory=_now)
+
+    @property
+    def day_pl(self) -> float:
+        return self.equity - self.last_equity
+
+    @property
+    def day_pl_pct(self) -> float:
+        return (self.day_pl / self.last_equity * 100.0) if self.last_equity else 0.0
+
+    def position_for(self, symbol: str) -> Optional[Position]:
+        return next((p for p in self.positions if p.symbol == symbol), None)
+
+
+# --------------------------------------------------------------------------- #
+# Orders — generalized request the execution layer knows how to place
+# --------------------------------------------------------------------------- #
+class OrderType(str, Enum):
+    MARKET = "market"
+    LIMIT = "limit"
+    STOP = "stop"
+    STOP_LIMIT = "stop_limit"
+
+
+class TIF(str, Enum):
+    DAY = "day"
+    GTC = "gtc"          # good-till-canceled
+    IOC = "ioc"
+
+
+class OrderRequest(BaseModel):
+    """One concrete order for the broker. Either `qty` (whole or fractional) or
+    `notional` (dollar amount, enables fractional) — not both. Bracket levels are
+    optional and only valid for whole-share equity orders on Alpaca."""
+    symbol: str
+    side: Action
+    order_type: OrderType = OrderType.MARKET
+    tif: TIF = TIF.DAY
+    qty: Optional[float] = None
+    notional: Optional[float] = None        # dollar-based (fractional) order
+    limit_price: Optional[float] = None
+    stop_price: Optional[float] = None
+    # bracket exits (whole-share equity only)
+    take_profit_price: Optional[float] = None
+    stop_loss_price: Optional[float] = None
+
+    @property
+    def is_fractional(self) -> bool:
+        return self.notional is not None or (
+            self.qty is not None and self.qty != int(self.qty)
+        )
+
+
+# --------------------------------------------------------------------------- #
+# Benchmark / performance vs SPY/QQQ
+# --------------------------------------------------------------------------- #
+class BenchmarkStats(BaseModel):
+    """Account performance RELATIVE to a benchmark over a lookback window. The
+    point of the bot is excess return, not raw return — this is what we feed
+    Claude and what we judge ourselves on."""
+    benchmark: str                       # e.g. "QQQ"
+    period_days: int
+    account_return_pct: float
+    benchmark_return_pct: float
+    information_ratio: Optional[float] = None  # excess return / tracking error
+
+    @property
+    def excess_return_pct(self) -> float:
+        return self.account_return_pct - self.benchmark_return_pct
+
+
+# --------------------------------------------------------------------------- #
+# External (read-only) holdings — e.g. imported from Robinhood for context
+# --------------------------------------------------------------------------- #
+class ExternalHolding(BaseModel):
+    source: str                          # "robinhood"
+    symbol: str
+    qty: float
+    market_value: float
+    unrealized_pl_pct: Optional[float] = None
