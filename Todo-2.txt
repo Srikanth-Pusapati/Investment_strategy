@@ -21,12 +21,14 @@ How we differ (and why, deliberately):
   [DONE] Bull/Bear debate value imported CHEAPLY: prompt now has Claude reason
          through the strongest bull AND bear case internally before setting
          conviction (no extra agents/calls). See decision/prompts.py.
-  [NEXT] Reflection/memory loop (their best idea; == Todo 3.1 signal attribution):
-         join closed round-trips in the ledger to realized P&L + the key_signals
-         that drove entry, compute per-source hit-rate, and inject a terse
-         "lessons from recent closed trades" block into the decision prompt so the
-         model learns which signals actually predicted P&L. Needs round-trip P&L
-         tracking on top of the current append-only buy/sell ledger.
+  [DONE] Reflection/memory loop (their best idea; == Todo 3.1 signal attribution):
+         attribution.py reconstructs closed round-trips from the ledger, scores
+         each entry signal source by realized win-rate + avg P&L, and injects a
+         terse "## Track record" block into the decision prompt (trusted, outside
+         <market_data>). Ledger now stores entry_signals on buys + realized P&L on
+         exits; the WATCHDOG also records its stops/takes/trails/flattens so
+         attribution sees every close it controls. Known blind spot: exchange-side
+         bracket auto-fills (no code observes them). Tests: tests/test_attribution.py.
 
 Explicitly NOT adopting: LangGraph multi-call orchestration, LLM-debated risk
 (would weaken the deterministic safety core), per-ticker multi-agent fan-out
@@ -60,7 +62,8 @@ Grouped by impact:
 
 Decision quality
 
-Signal backtesting / attribution — you log trades + key_signals in the ledger but never measure which signals actually predicted P&L. Add a job that joins closed trades to their entry signals and reports hit-rate per source. This tells you which Quiver datasets to weight up and which to drop — closes the loop.
+[DONE] Signal backtesting / attribution — you log trades + key_signals in the ledger but never measure which signals actually predicted P&L. Add a job that joins closed trades to their entry signals and reports hit-rate per source. This tells you which Quiver datasets to weight up and which to drop — closes the loop.
+       -> Implemented in attribution.py + fed live into the decision prompt (see item 1 [DONE] note above). Per-source win-rate/avg-P&L now closes the loop automatically each cycle.
 Per-signal decay weighting in the prompt — formalize lag-based confidence so Claude isn't told a 45-day-old congress filing and a 1-day dark-pool print as equals.
 Earnings-blackout guard — block (or shrink) new buys N days before earnings; gap risk dwarfs your stop. You already pull fundamentals; the earnings date is the missing piece.
 Risk / sizing

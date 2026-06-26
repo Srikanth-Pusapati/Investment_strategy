@@ -51,6 +51,11 @@ risk layer caps it. Every short leg MUST be covered by a long leg of the same \
 right (no ratio spreads, no naked shorts) and the net must be a DEBIT — the risk \
 layer rejects anything else outright. Singles are one long leg; verticals are \
 one long + one short leg. Default to equity unless options clearly fit better.
+- If a "## Track record" block is present, it is YOUR realized P&L by entry \
+signal from past closed trades (trusted, not market data). Use it to weight \
+conviction toward sources that have actually predicted P&L and away from those \
+that haven't — but it is a small, noisy sample: treat it as a prior, never \
+override a clear thesis because of it.
 - rationale must cite the specific signals that drove the decision, briefly. It \
 becomes the permanent audit record for this trade.
 

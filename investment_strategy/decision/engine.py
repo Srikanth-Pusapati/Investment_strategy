@@ -38,16 +38,19 @@ class DecisionEngine:
     def decide(
         self, bundles: list[SignalBundle], account: AccountSnapshot,
         benchmark_line: str = "", external: list[ExternalHolding] | None = None,
+        lessons: str = "",
     ) -> list[TradeProposal]:
         """Ask Claude for proposals across all candidate symbols at once.
 
         One call per cycle keeps the macro/market context shared and lets the
         model rank candidates against each other rather than in isolation.
+        `lessons` is our own derived track-record (signal attribution), passed as
+        trusted context so the model can weight by what has actually paid off.
         """
         if not bundles:
             return []
 
-        user_content = self._render(bundles, account, benchmark_line, external or [])
+        user_content = self._render(bundles, account, benchmark_line, external or [], lessons)
         try:
             resp = self.client.messages.create(
                 model=self.model,
@@ -98,11 +101,16 @@ class DecisionEngine:
     # -- prompt rendering --------------------------------------------------- #
     def _render(
         self, bundles: list[SignalBundle], account: AccountSnapshot,
-        benchmark_line: str, external: list[ExternalHolding],
+        benchmark_line: str, external: list[ExternalHolding], lessons: str = "",
     ) -> str:
+        # The track record is OUR derived data (trusted), so it sits OUTSIDE the
+        # <market_data> block — it's guidance, not third-party input to analyze.
+        lines: list[str] = []
+        if lessons:
+            lines += [lessons, ""]
         # All third-party text lives inside <market_data> so the system prompt can
         # bind "untrusted data, not instructions" to a clear, delimited region.
-        lines = [
+        lines += [
             "<market_data>",
             "## Account",
             f"Equity: ${account.equity:,.0f} | Cash: ${account.cash:,.0f} | "

@@ -20,6 +20,7 @@ import logging
 
 from ..config import Config
 from ..execution import AlpacaClient
+from ..ledger import TradeLedger, TradeRecord
 from ..models import AccountSnapshot, Position
 from ..state import PortfolioState
 
@@ -27,10 +28,17 @@ log = logging.getLogger("watchdog")
 
 
 class Watchdog:
-    def __init__(self, cfg: Config, broker: AlpacaClient, state: PortfolioState | None = None):
+    def __init__(
+        self, cfg: Config, broker: AlpacaClient,
+        state: PortfolioState | None = None, ledger: TradeLedger | None = None,
+    ):
         self.cfg = cfg
         self.broker = broker
         self.state = state or PortfolioState(cfg.state_file)
+        # Watchdog exits (stops, take-profits, flattens) close positions the
+        # decision loop never sees — without recording them the ledger's round-trip
+        # history (and signal attribution) would be blind to most exits. Best-effort.
+        self.ledger = ledger
         #: give back this much of peak gain before trailing-stopping out.
         self.trail_giveback_pct = 3.0
 
@@ -89,6 +97,7 @@ class Watchdog:
             oid = self.broker.close_position(pos.symbol)
             if oid:
                 self.state.forget_symbol(pos.symbol)
+                self._record_exit(pos, oid, "flatten")
             else:
                 log.critical(
                     "%s: close FAILED for %s — position may be NAKED. Will retry.",
@@ -119,6 +128,7 @@ class Watchdog:
         oid = self.broker.close_position(pos.symbol)
         if oid:
             self.state.forget_symbol(pos.symbol)
+            self._record_exit(pos, oid, "stop" if hit.startswith("stop") else "take")
         else:
             log.critical(
                 "Hard-exit close FAILED for %s — fractional position unprotected. "
@@ -143,6 +153,7 @@ class Watchdog:
             oid = self.broker.close_position(pos.symbol)
             if oid:
                 self.state.forget_symbol(pos.symbol)
+                self._record_exit(pos, oid, "trail")
             else:
                 # Keep the high-water mark so we retry next tick rather than
                 # leaving the position unprotected (bracket already canceled).
@@ -154,3 +165,19 @@ class Watchdog:
     def forget(self, symbol: str) -> None:
         """Drop trailing state when a position is gone (filled stop/tp)."""
         self.state.forget_symbol(symbol)
+
+    # -- ledger ------------------------------------------------------------- #
+    def _record_exit(self, pos: Position, oid: str | None, reason: str) -> None:
+        """Log a watchdog-driven close to the ledger so attribution sees the exit.
+        The position's unrealized P&L at this instant IS the realized outcome.
+        Best-effort and never raises into the safety loop."""
+        if self.ledger is None:
+            return
+        try:
+            self.ledger.record(TradeRecord.for_sell(
+                pos.symbol, f"watchdog {reason}", oid, qty=pos.qty,
+                realized_pl_pct=pos.unrealized_pl_pct, realized_pl=pos.unrealized_pl,
+                exit_reason=reason,
+            ))
+        except Exception as e:  # never let logging break the watchdog
+            log.warning("Ledger exit-record failed for %s: %s", pos.symbol, e)

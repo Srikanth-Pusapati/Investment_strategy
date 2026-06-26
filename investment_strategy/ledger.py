@@ -54,8 +54,16 @@ class TradeRecord(BaseModel):
 
     rationale: str = ""               # why — the reason behind the purchase
     key_signals: list[str] = Field(default_factory=list)
+    # SignalKind values present in the bundle at entry (buys) — the attribution
+    # layer joins these to the round-trip's realized P&L to score each source.
+    entry_signals: list[str] = Field(default_factory=list)
+    # Realized outcome at close (sells/exits): the position's unrealized P&L at the
+    # moment we issued the close, which IS the realized result. None for buys.
+    realized_pl_pct: Optional[float] = None
+    realized_pl: Optional[float] = None
     verdict: str = ""                 # risk verdict: approved | resized
     risk_note: str = ""               # risk layer's sizing note
+    exit_reason: str = ""             # what closed it: decision | stop | take | trail | flatten
     option_strategy: Optional[str] = None
     order_id: Optional[str] = None
 
@@ -63,7 +71,7 @@ class TradeRecord(BaseModel):
     @classmethod
     def from_equity(
         cls, decision: RiskDecision, entry_price: float,
-        order_id: Optional[str],
+        order_id: Optional[str], entry_signals: Optional[list[str]] = None,
     ) -> "TradeRecord":
         p = decision.proposal
         cost = decision.approved_notional or (decision.approved_qty * entry_price)
@@ -79,6 +87,7 @@ class TradeRecord(BaseModel):
             stop_loss_pct=decision.stop_loss_pct,
             take_profit_price=tp_price, stop_loss_price=sl_price,
             rationale=p.rationale, key_signals=p.key_signals,
+            entry_signals=entry_signals or [],
             verdict=decision.verdict.value, risk_note=decision.reason,
             order_id=order_id,
         )
@@ -86,6 +95,7 @@ class TradeRecord(BaseModel):
     @classmethod
     def from_option(
         cls, decision: RiskDecision, premium: float, order_id: Optional[str],
+        entry_signals: Optional[list[str]] = None,
     ) -> "TradeRecord":
         p = decision.proposal
         return cls(
@@ -96,6 +106,7 @@ class TradeRecord(BaseModel):
             take_profit_pct=decision.take_profit_pct,
             stop_loss_pct=decision.stop_loss_pct,
             rationale=p.rationale, key_signals=p.key_signals,
+            entry_signals=entry_signals or [],
             verdict=decision.verdict.value, risk_note=decision.reason,
             option_strategy=p.option_strategy.value if p.option_strategy else None,
             order_id=order_id,
@@ -105,10 +116,14 @@ class TradeRecord(BaseModel):
     def for_sell(
         cls, symbol: str, rationale: str, order_id: Optional[str],
         qty: float = 0.0, key_signals: Optional[list[str]] = None,
+        realized_pl_pct: Optional[float] = None, realized_pl: Optional[float] = None,
+        exit_reason: str = "decision", instrument: str = "equity",
     ) -> "TradeRecord":
         return cls(
-            symbol=symbol, action="sell", instrument="equity", qty=qty,
+            symbol=symbol, action="sell", instrument=instrument, qty=qty,
             rationale=rationale, key_signals=key_signals or [], order_id=order_id,
+            realized_pl_pct=realized_pl_pct, realized_pl=realized_pl,
+            exit_reason=exit_reason,
         )
 
 
