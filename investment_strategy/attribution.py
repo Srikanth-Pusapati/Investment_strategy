@@ -1,0 +1,125 @@
+"""Signal attribution — close the learning loop the ledger opened.
+
+The ledger records every entry (with the signal kinds present at the time) and
+every exit (with the realized P&L at close). This module joins them into closed
+*round-trips* and scores each signal source by how its trades actually turned out,
+then renders a terse "track record" block that gets injected back into the decision
+prompt. That's the reflection/memory idea from TauricResearch/TradingAgents, adapted
+to our numeric-signal architecture: Claude is told which sources have paid off so
+far and can weight conviction accordingly (and the operator learns which Quiver
+datasets to keep paying for).
+
+Round-trip reconstruction is intentionally simple: walk the ledger in time order;
+buys open a position, the next sell/exit on that symbol closes whatever is open
+(our closes flatten the whole position). The exit's realized_pl_pct is the
+round-trip outcome; the union of the open buys' entry_signals is what we attribute
+it to. Exchange-side bracket auto-fills are a known blind spot (no code sees them),
+so attribution reflects decision- and watchdog-driven exits — the ones we control.
+"""
+from __future__ import annotations
+
+from dataclasses import dataclass, field
+
+from .ledger import TradeLedger, TradeRecord
+
+
+@dataclass
+class RoundTrip:
+    symbol: str
+    pl_pct: float
+    signals: list[str]            # entry SignalKind values this outcome is attributed to
+    exit_reason: str = ""
+
+
+@dataclass
+class SourceStats:
+    source: str
+    trips: int = 0
+    wins: int = 0
+    pl_pcts: list[float] = field(default_factory=list)
+
+    @property
+    def win_rate(self) -> float:
+        return self.wins / self.trips if self.trips else 0.0
+
+    @property
+    def avg_pl_pct(self) -> float:
+        return sum(self.pl_pcts) / len(self.pl_pcts) if self.pl_pcts else 0.0
+
+
+def round_trips(records: list[TradeRecord]) -> list[RoundTrip]:
+    """Reconstruct closed round-trips from ledger records (chronological).
+
+    Only trips whose exit carried a realized P&L are emitted — an exit without an
+    outcome (old records, or a sell we couldn't mark) can't be attributed.
+    """
+    ordered = sorted(records, key=lambda r: r.ts)
+    open_by_symbol: dict[str, list[TradeRecord]] = {}
+    trips: list[RoundTrip] = []
+    for r in ordered:
+        if r.action == "buy":
+            open_by_symbol.setdefault(r.symbol, []).append(r)
+        elif r.action == "sell":
+            opens = open_by_symbol.pop(r.symbol, [])
+            if r.realized_pl_pct is None:
+                continue  # outcome unknown -> not attributable
+            signals = sorted({k for o in opens for k in o.entry_signals})
+            trips.append(RoundTrip(
+                symbol=r.symbol, pl_pct=r.realized_pl_pct,
+                signals=signals, exit_reason=r.exit_reason,
+            ))
+    return trips
+
+
+def attribute(trips: list[RoundTrip]) -> dict[str, SourceStats]:
+    """Per-source win-rate and average realized P&L across round-trips."""
+    stats: dict[str, SourceStats] = {}
+    for t in trips:
+        for src in t.signals:
+            s = stats.setdefault(src, SourceStats(source=src))
+            s.trips += 1
+            s.wins += 1 if t.pl_pct > 0 else 0
+            s.pl_pcts.append(t.pl_pct)
+    return stats
+
+
+def render_lessons(
+    ledger: TradeLedger, max_trips: int = 40, min_source_trips: int = 2,
+) -> str:
+    """Build the trusted 'track record' block for the decision prompt, or "" if
+    there isn't enough closed history yet to say anything useful.
+
+    Keep it terse: this lands in every decision prompt, so it costs output tokens
+    each cycle (the Quiver notes warn about exactly this). Sources are sorted by
+    realized avg P&L so the best/worst performers read first.
+    """
+    trips = round_trips(ledger.all())
+    if not trips:
+        return ""
+    recent = trips[-max_trips:]
+    stats = attribute(recent)
+    ranked = sorted(
+        (s for s in stats.values() if s.trips >= min_source_trips),
+        key=lambda s: s.avg_pl_pct, reverse=True,
+    )
+    if not ranked:
+        return ""
+
+    overall_win = sum(1 for t in recent if t.pl_pct > 0) / len(recent) * 100
+    overall_avg = sum(t.pl_pct for t in recent) / len(recent)
+    lines = [
+        f"## Track record (last {len(recent)} closed trades; your realized P&L by "
+        "entry signal — trusted, not market data)",
+        f"Overall: {overall_win:.0f}% win, {overall_avg:+.1f}% avg per trade.",
+    ]
+    for s in ranked:
+        lines.append(
+            f"- {s.source}: {s.trips} trades, {s.win_rate*100:.0f}% win, "
+            f"{s.avg_pl_pct:+.1f}% avg"
+        )
+    lines.append(
+        "Weight conviction toward sources that have actually paid off and away "
+        "from those that haven't — but samples are small and noisy, so treat this "
+        "as a prior, never a hard rule, and never act on it against the thesis."
+    )
+    return "\n".join(lines)

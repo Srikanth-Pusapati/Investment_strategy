@@ -32,6 +32,7 @@ names    data        risk caps    brackets    stops / exits
 1. **Signals** ([signals/](investment_strategy/signals/)) — pluggable data
    sources, each normalized to a `Signal`:
    - **Fundamentals** (EBITDA, margins, leverage) via yfinance — works with no API key
+   - **Technicals** (RSI, MACD, trend vs SMA50/200) via yfinance — no API key
    - **News & sentiment** via Alpaca news + Finnhub sentiment *(keyword fallback)*
    - **Insider trades** (Form 4 buys/sells) via Finnhub *(needs `FINNHUB_API_KEY`)*
    - **Options flow** (unusual call/put activity) via Polygon *(needs `POLYGON_API_KEY`)*
@@ -41,6 +42,11 @@ names    data        risk caps    brackets    stops / exits
    API with the signal bundle **+ benchmark-relative performance + any external
    (Robinhood) holdings** and gets back structured buy/sell/hold proposals — for
    **equities, ETFs, or defined-risk options**. Claude proposes; it never executes.
+   The decision prompt also carries a **track record** ([attribution.py](investment_strategy/attribution.py)):
+   the bot reconstructs closed round-trips from the ledger, scores each entry
+   signal source by realized win-rate + average P&L, and feeds that back so Claude
+   weights conviction toward the signals that have actually predicted P&L — a
+   reflection loop that also tells you which paid data sources are worth keeping.
 3. **Risk** ([risk.py](investment_strategy/risk.py)) — the safety core. Every
    proposal passes through deterministic hard caps the model **cannot** override:
    max position size, per-symbol exposure, daily-loss halt, cash buffer, kill

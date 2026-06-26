@@ -21,6 +21,7 @@ def _now() -> datetime:
 # --------------------------------------------------------------------------- #
 class SignalKind(str, Enum):
     FUNDAMENTALS = "fundamentals"
+    TECHNICAL = "technical"   # price-action indicators (RSI, MACD, trend)
     NEWS = "news"
     INSIDER = "insider"
     CONGRESS = "congress"

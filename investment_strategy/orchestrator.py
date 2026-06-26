@@ -15,6 +15,7 @@ import os
 import threading
 import time
 
+from .attribution import render_lessons
 from .benchmark import BenchmarkTracker
 from .config import Config
 from .decision import DecisionEngine
@@ -46,11 +47,13 @@ class Orchestrator:
         # so peak equity, the drawdown halt, and the halt latch are consistent.
         self.state = PortfolioState(cfg.state_file)
         self.risk = RiskManager(cfg.risk, kill_switch=cfg.kill_switch, state=self.state)
-        self.watchdog = Watchdog(cfg, self.broker, state=self.state)
+        self.ledger = TradeLedger()
+        # The watchdog records its own exits (stops/take-profits/flattens) to the
+        # ledger so signal attribution sees every close, not just decision sells.
+        self.watchdog = Watchdog(cfg, self.broker, state=self.state, ledger=self.ledger)
         self.benchmark = BenchmarkTracker(cfg, self.broker, symbol=cfg.benchmark_symbol)
         self.robinhood = RobinhoodReader(cfg)
         self.options = OptionsHelper(cfg) if cfg.risk.options_enabled else None
-        self.ledger = TradeLedger()
         self.watchlist = watchlist or DEFAULT_WATCHLIST
         self._last_decision_at = 0.0
         # Serializes broker order mutations so the watchdog's emergency closes and
@@ -163,17 +166,34 @@ class Orchestrator:
         bench_stats = self.benchmark.compute()
         bench_line = self.benchmark.context_line(bench_stats)
         external = self.robinhood.holdings()
+        # Reflection loop: our realized P&L per entry signal, fed back so Claude can
+        # weight by what has actually paid off. Best-effort; never blocks a cycle.
+        lessons = self._lessons()
 
-        proposals = self.engine.decide(bundles, account, bench_line, external)
+        # The signal kinds present per symbol at decision time — recorded on each
+        # entry so closed round-trips can later be attributed back to their sources.
+        signal_kinds = {
+            b.symbol: sorted({s.kind.value for s in b.signals}) for b in bundles
+        }
+
+        proposals = self.engine.decide(bundles, account, bench_line, external, lessons)
         if not proposals:
             log.info("No actionable proposals this cycle.")
             return
 
         for proposal in proposals:
+            kinds = signal_kinds.get(proposal.symbol, [])
             if proposal.instrument is Instrument.OPTION:
-                self._handle_option(proposal, account)
+                self._handle_option(proposal, account, kinds)
             else:
-                self._handle_equity(proposal, account)
+                self._handle_equity(proposal, account, kinds)
+
+    def _lessons(self) -> str:
+        try:
+            return render_lessons(self.ledger)
+        except Exception as e:  # attribution must never break the trade loop
+            log.warning("Could not render track-record lessons: %s", e)
+            return ""
 
     def _inject_discovery(
         self, bundles: list[SignalBundle], discovered: list[Candidate]
@@ -219,7 +239,9 @@ class Orchestrator:
                 log.warning("Order %s (%s) still %s a full cycle later.", oid, symbol, status)
 
     # -- equity path -------------------------------------------------------- #
-    def _handle_equity(self, proposal: TradeProposal, account) -> None:
+    def _handle_equity(
+        self, proposal: TradeProposal, account, signal_kinds: list[str] | None = None
+    ) -> None:
         price = self.broker.latest_price(proposal.symbol)
         vol = self.broker.annualized_vol(proposal.symbol)
         pending = (
@@ -242,16 +264,22 @@ class Orchestrator:
                 held = account.position_for(proposal.symbol)
                 oid = self.broker.close_position(proposal.symbol)
                 self.watchdog.forget(proposal.symbol)
+                # The held position's unrealized P&L at close IS the realized
+                # outcome — record it so this round-trip is attributable.
                 self.ledger.record(TradeRecord.for_sell(
                     proposal.symbol, proposal.rationale, oid,
                     qty=held.qty if held else 0.0, key_signals=proposal.key_signals,
+                    realized_pl_pct=held.unrealized_pl_pct if held else None,
+                    realized_pl=held.unrealized_pl if held else None,
+                    exit_reason="decision",
                 ))
                 if oid:
                     self._pending_oids.append((oid, proposal.symbol))
             else:  # buy (approved or resized)
                 oid, fractional = self.broker.submit_from_decision(decision)
                 if oid:
-                    self.ledger.record(TradeRecord.from_equity(decision, price, oid))
+                    self.ledger.record(TradeRecord.from_equity(
+                        decision, price, oid, entry_signals=signal_kinds or []))
                     self._pending_oids.append((oid, proposal.symbol))
                     if fractional:
                         # Fractional orders carry no exchange-side bracket, so the
@@ -261,7 +289,9 @@ class Orchestrator:
                         )
 
     # -- options path (defined-risk, gated) -------------------------------- #
-    def _handle_option(self, proposal: TradeProposal, account) -> None:
+    def _handle_option(
+        self, proposal: TradeProposal, account, signal_kinds: list[str] | None = None
+    ) -> None:
         if self.options is None:
             log.info("Option proposal for %s ignored: options disabled.", proposal.symbol)
             return
@@ -278,5 +308,6 @@ class Orchestrator:
         with self._trade_lock:
             oid = self.broker.submit_option_legs(legs, qty=int(decision.approved_qty))
         if oid:
-            self.ledger.record(TradeRecord.from_option(decision, premium, oid))
+            self.ledger.record(TradeRecord.from_option(
+                decision, premium, oid, entry_signals=signal_kinds or []))
             self._pending_oids.append((oid, proposal.symbol))
