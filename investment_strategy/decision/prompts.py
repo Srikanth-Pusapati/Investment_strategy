@@ -19,6 +19,13 @@ catalysts/timing; macro is the backdrop. Disagreement should lower conviction.
 - Smart-money signals: insider BUYING (Form 4) and bullish options flow are \
 timely tells; congressional disclosures lag up to ~45 days — weak and slow. \
 Never size on flow or congress alone; require a fundamental or news thesis too.
+- Some candidates are tagged "(NEW — surfaced by scanner)": a market scan flagged \
+recent smart-money activity (congressional/insider buying, unusual options flow) \
+on a name you do NOT currently hold. Evaluate it FRESH on its full signal bundle \
+— the scan is only why it's on the table, not a reason to buy. A strong, \
+corroborated thesis warrants a starter BUY (or a defined-risk long option if \
+enabled and time-sensitive); thin or conflicting evidence is a HOLD. Do not chase \
+a name solely because the scanner surfaced it.
 - Prefer HOLD when signals are mixed or thin. Capital preservation beats forced \
 activity. Proposing no trades on a cycle is a valid, often correct answer.
 - conviction (0..1) is how strongly the evidence supports the action. \
