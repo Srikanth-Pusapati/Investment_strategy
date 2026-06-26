@@ -24,6 +24,8 @@ names    data        risk caps    brackets    stops / exits
    ideas can originate from the market instead of a hand-typed list:
    - **Insider Form-4 cluster buys** across all issuers via SEC EDGAR *(free)*
    - **Congressional buying** across all tickers via Quiver *(needs `QUIVER_API_KEY`)*
+   - **WallStreetBets mention surges** (retail momentum) via Quiver *(opt-in: add
+     `wallstreetbets` to `SCREENER_SOURCES`)*
    - **Unusual options flow** on the most-active names via Polygon *(needs `POLYGON_API_KEY`)*
 
    Candidates are deduped, confidence-weighted, ranked, and capped
@@ -37,7 +39,13 @@ names    data        risk caps    brackets    stops / exits
    - **Insider trades** (Form 4 buys/sells) via Finnhub *(needs `FINNHUB_API_KEY`)*
    - **Options flow** (unusual call/put activity) via Polygon *(needs `POLYGON_API_KEY`)*
    - **Congress/senator trades** via Quiver *(needs `QUIVER_API_KEY`; lag ~45d)*
+   - **Off-exchange / dark-pool short volume** via Quiver *(needs `QUIVER_API_KEY`;
+     ~1d lag — the most timely Quiver signal)*
    - **Macro** (rates, unemployment, yield curve) via FRED *(needs `FRED_API_KEY`)*
+
+   Quiver-backed sources share one [per-cycle-cached client](investment_strategy/signals/quiver_client.py)
+   so each live feed is pulled once per cycle and serves both the signal and scan
+   layers (no double-pull, with 429 backoff) — adding more Quiver datasets is cheap.
 2. **Decision** ([decision/](investment_strategy/decision/)) — calls the Claude
    API with the signal bundle **+ benchmark-relative performance + any external
    (Robinhood) holdings** and gets back structured buy/sell/hold proposals — for

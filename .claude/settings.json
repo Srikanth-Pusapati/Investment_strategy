@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(.venv/bin/python tests/test_quiver_datasets.py)",
+      "Bash(.venv/bin/python -c ' *)"
+    ]
+  }
+}

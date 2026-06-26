@@ -27,8 +27,12 @@ Technicals confirm or veto timing — don't buy a strong fundamental thesis into
 clear downtrend/overbought reading without acknowledging it; a fundamental thesis \
 with momentum behind it (uptrend + bullish MACD) is the higher-conviction setup.
 - Smart-money signals: insider BUYING (Form 4) and bullish options flow are \
-timely tells; congressional disclosures lag up to ~45 days — weak and slow. \
-Never size on flow or congress alone; require a fundamental or news thesis too.
+timely tells; off-exchange/dark-pool short volume is the MOST timely (~1-day lag) \
+but noisy positioning read — high short volume leans bearish, but much of it is \
+market-maker hedging, so treat it as timing, not thesis; congressional \
+disclosures lag up to ~45 days — weak and slow. Weight each by its lag: a 1-day \
+dark-pool print may move conviction more than a 45-day congress filing. Never \
+size on flow, dark-pool, or congress alone; require a fundamental or news thesis too.
 - Some candidates are tagged "(NEW — surfaced by scanner)": a market scan flagged \
 recent smart-money activity (congressional/insider buying, unusual options flow) \
 on a name you do NOT currently hold. Evaluate it FRESH on its full signal bundle \

@@ -68,6 +68,20 @@ quiver) + ScreenerAggregator(cfg, quiver) sharing one instance. Tests:
 tests/test_quiver_client.py (cache dedupe, new_cycle refresh, disabled, 429 mapping,
 congress scoring from the shared feed).
 
+[DONE 2026-06-26] First two datasets added on the shared client:
+- OFF-EXCHANGE / dark-pool short volume -> signals/offexchange.py (SignalKind.
+  OFFEXCHANGE; per-symbol short_vol/total ratio, damped ±0.6; ~1d lag, weighted up
+  vs congress in the prompt). Registered in SignalAggregator.
+- WALLSTREETBETS mention surges -> screener/wallstreetbets_feed.py (self-calibrated
+  by mention volume vs the busiest name; bullish by default, sentiment-signed).
+  Registered in the screener _REGISTRY + _QUIVER_SCREENERS; opt-in via SCREENER_SOURCES.
+- Both parse fields DEFENSIVELY (alternate key names) and SKIP unusable rows rather
+  than guess. Tests: tests/test_quiver_datasets.py (13 cases, MOCKED feeds — market
+  closed for the weekend). *** VERIFY the live JSON field names against Quiver docs
+  and trim the candidate key lists in each file before trusting these in live mode. ***
+Still untapped (same trivial pattern): govcontracts (signal), senate/house split,
+lobbying, 13F.
+
 ADDING A DATASET IS NOW TRIVIAL (the infra is in place):
 - screener: subclass Screener; in scan() call self.quiver.live("<dataset>"); add the
   class to screener/aggregator._REGISTRY and (if Quiver-backed) _QUIVER_SCREENERS so

@@ -14,6 +14,7 @@ from .insider import InsiderProvider
 from .insider_edgar import EdgarInsiderProvider
 from .macro import MacroProvider
 from .news import NewsProvider
+from .offexchange import OffExchangeProvider
 from .options_flow import OptionsFlowProvider
 from .quiver_client import QuiverClient
 from .technical import TechnicalProvider
@@ -31,6 +32,7 @@ class SignalAggregator:
             TechnicalProvider(cfg),       # RSI, MACD, trend (yfinance; no key)
             NewsProvider(cfg),            # headlines + sentiment (finnhub/VADER)
             CongressProvider(cfg, self.quiver),  # congressional trades (Quiver; if key)
+            OffExchangeProvider(cfg, self.quiver),  # dark-pool short vol (Quiver; ~1d lag)
             InsiderProvider(cfg),         # Form 4 insider via Finnhub (if key)
             EdgarInsiderProvider(cfg),    # Form 4 insider via SEC EDGAR (free; no key)
             OptionsFlowProvider(cfg),     # unusual options activity
