@@ -1,10 +1,12 @@
 """News & sentiment signals.
 
 Headlines come from Alpaca's news API (Benzinga-backed) — same credentials you
-already have. Sentiment is scored two ways:
+already have. Sentiment is scored in priority order:
   - If FINNHUB_API_KEY is set, use Finnhub's news-sentiment score (model-based,
     aggregated across many sources) — the preferred path.
-  - Otherwise fall back to a lightweight keyword pass on the headlines.
+  - Else, if the vaderSentiment package is installed, score the headlines with
+    VADER (free, local, lexicon-based — no API key, no network).
+  - Else, fall back to a lightweight keyword pass on the headlines.
 Claude still reads the actual headlines, so it can override a noisy score.
 """
 from __future__ import annotations
@@ -22,6 +24,20 @@ log = logging.getLogger("signals")
 _BULLISH = {"beat", "surge", "soar", "upgrade", "record", "growth", "rally", "wins"}
 _BEARISH = {"miss", "plunge", "downgrade", "lawsuit", "probe", "cut", "warns", "falls"}
 _FINNHUB_SENTIMENT = "https://finnhub.io/api/v1/news-sentiment"
+
+# Lazy VADER singleton: None = not tried yet, False = unavailable, else analyzer.
+_VADER: object | None = None
+
+
+def _vader_analyzer():
+    global _VADER
+    if _VADER is None:
+        try:
+            from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
+            _VADER = SentimentIntensityAnalyzer()
+        except Exception:
+            _VADER = False
+    return _VADER or None
 
 
 class NewsProvider(SignalProvider):
@@ -45,7 +61,11 @@ class NewsProvider(SignalProvider):
 
             score, src = self._finnhub_sentiment(symbol)
             if score is None:
-                score, src = self._keyword_sentiment(headlines), "keyword"
+                vscore = self._vader_sentiment(headlines)
+                if vscore is not None:
+                    score, src = vscore, "vader"
+                else:
+                    score, src = self._keyword_sentiment(headlines), "keyword"
 
             signals.append(Signal(
                 kind=SignalKind.NEWS,
@@ -76,6 +96,16 @@ class NewsProvider(SignalProvider):
         except Exception as e:
             log.debug("finnhub sentiment failed for %s: %s", symbol, e)
             return None, ""
+
+    @staticmethod
+    def _vader_sentiment(headlines: list[str]) -> float | None:
+        """Mean VADER compound score over the headlines, already in [-1, 1].
+        Returns None if vaderSentiment isn't installed (caller falls back)."""
+        analyzer = _vader_analyzer()
+        if analyzer is None or not headlines:
+            return None
+        scores = [analyzer.polarity_scores(h)["compound"] for h in headlines]
+        return round(sum(scores) / len(scores), 3)
 
     @staticmethod
     def _keyword_sentiment(headlines: list[str]) -> float:

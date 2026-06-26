@@ -11,6 +11,7 @@ from .base import SignalProvider
 from .congress import CongressProvider
 from .fundamentals import FundamentalsProvider
 from .insider import InsiderProvider
+from .insider_edgar import EdgarInsiderProvider
 from .macro import MacroProvider
 from .news import NewsProvider
 from .options_flow import OptionsFlowProvider
@@ -22,9 +23,10 @@ class SignalAggregator:
     def __init__(self, cfg: Config):
         self.per_symbol: list[SignalProvider] = [
             FundamentalsProvider(cfg),    # EBITDA, margins, leverage
-            NewsProvider(cfg),            # headlines + model sentiment
-            CongressProvider(cfg),        # congressional trades (slow)
-            InsiderProvider(cfg),         # Form 4 insider buys/sells
+            NewsProvider(cfg),            # headlines + sentiment (finnhub/VADER)
+            CongressProvider(cfg),        # congressional trades (Quiver; if key)
+            InsiderProvider(cfg),         # Form 4 insider via Finnhub (if key)
+            EdgarInsiderProvider(cfg),    # Form 4 insider via SEC EDGAR (free; no key)
             OptionsFlowProvider(cfg),     # unusual options activity
         ]
         self.market_wide: list[SignalProvider] = [MacroProvider(cfg)]

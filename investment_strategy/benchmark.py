@@ -64,7 +64,10 @@ class BenchmarkTracker:
                 period=f"{max(1, self.period_days)}D", timeframe="1D",
             )
             hist = self.broker.trading.get_portfolio_history(req)
-            return [float(v) for v in (hist.equity or []) if v is not None]
+            # Drop None and non-positive points: a freshly funded account has
+            # leading 0.0 equity samples, which would divide-by-zero in the
+            # return and information-ratio math below.
+            return [float(v) for v in (hist.equity or []) if v is not None and float(v) > 0.0]
         except Exception as e:
             log.warning("portfolio history failed: %s", e)
             return []

@@ -22,6 +22,7 @@ def _now() -> datetime:
 class SignalKind(str, Enum):
     FUNDAMENTALS = "fundamentals"
     NEWS = "news"
+    INSIDER = "insider"
     CONGRESS = "congress"
     MACRO = "macro"
 

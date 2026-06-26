@@ -6,7 +6,8 @@ pydantic>=2.6.0            # typed models / validation
 
 # --- Signal data sources ---
 yfinance>=0.2.40           # free fundamentals fallback (EBITDA, financials)
-requests>=2.31.0           # generic HTTP for FMP / Quiver / FRED / Finnhub
+requests>=2.31.0           # generic HTTP for FMP / Quiver / FRED / Finnhub / SEC EDGAR
+vaderSentiment>=3.3.2      # free local news-sentiment scoring (no API key)
 
 # --- Optional: read-only Robinhood import via official Agentic MCP ---
 # Official MCP endpoint (OAuth). READ tools only; never trades on Robinhood.
