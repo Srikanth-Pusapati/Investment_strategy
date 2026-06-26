@@ -17,6 +17,7 @@ from .benchmark import BenchmarkTracker
 from .config import Config
 from .decision import DecisionEngine
 from .execution import AlpacaClient, OptionsHelper
+from .ledger import TradeLedger, TradeRecord
 from .models import Instrument, RiskVerdict, TradeProposal
 from .monitor import Watchdog
 from .portfolio import RobinhoodReader
@@ -41,6 +42,7 @@ class Orchestrator:
         self.benchmark = BenchmarkTracker(cfg, self.broker, symbol=cfg.benchmark_symbol)
         self.robinhood = RobinhoodReader(cfg)
         self.options = OptionsHelper(cfg) if cfg.risk.options_enabled else None
+        self.ledger = TradeLedger()
         self.watchlist = watchlist or DEFAULT_WATCHLIST
         self._last_decision_at = 0.0
 
@@ -107,10 +109,17 @@ class Orchestrator:
             return
         if proposal.action.value == "sell":
             self.broker.cancel_open_orders_for(proposal.symbol)
-            self.broker.close_position(proposal.symbol)
+            held = account.position_for(proposal.symbol)
+            oid = self.broker.close_position(proposal.symbol)
             self.watchdog.forget(proposal.symbol)
+            self.ledger.record(TradeRecord.for_sell(
+                proposal.symbol, proposal.rationale, oid,
+                qty=held.qty if held else 0.0, key_signals=proposal.key_signals,
+            ))
         else:  # buy (approved or resized) -> bracket order
-            self.broker.submit_from_decision(decision)
+            oid = self.broker.submit_from_decision(decision)
+            if oid:
+                self.ledger.record(TradeRecord.from_equity(decision, price, oid))
 
     # -- options path (defined-risk, gated) -------------------------------- #
     def _handle_option(self, proposal: TradeProposal, account) -> None:
@@ -127,4 +136,6 @@ class Orchestrator:
         if decision.verdict == RiskVerdict.REJECTED:
             return
         legs = self.options.build_legs(proposal)
-        self.broker.submit_option_legs(legs, qty=int(decision.approved_qty))
+        oid = self.broker.submit_option_legs(legs, qty=int(decision.approved_qty))
+        if oid:
+            self.ledger.record(TradeRecord.from_option(decision, premium, oid))
