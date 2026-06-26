@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import json
 import logging
+import threading
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -36,6 +37,9 @@ class PortfolioState:
         self.halt_reason: str = ""
         self.halted_at: str | None = None
         self.high_water: dict[str, float] = {}
+        # The watchdog (its own thread) and the decision/risk path both touch this
+        # state. A reentrant lock keeps reads/writes and the file save consistent.
+        self._lock = threading.RLock()
         self._load()
 
     # -- persistence -------------------------------------------------------- #
@@ -78,9 +82,10 @@ class PortfolioState:
     # -- equity high-water / drawdown -------------------------------------- #
     def update_equity(self, equity: float) -> None:
         """Ratchet the all-time-high equity. Persists only on a new high."""
-        if equity > self.peak_equity:
-            self.peak_equity = equity
-            self._save()
+        with self._lock:
+            if equity > self.peak_equity:
+                self.peak_equity = equity
+                self._save()
 
     def drawdown_pct(self, equity: float) -> float:
         """Peak-to-current drawdown as a positive % (0 if at/above peak)."""
@@ -90,33 +95,38 @@ class PortfolioState:
 
     # -- the halt latch ----------------------------------------------------- #
     def latch_halt(self, reason: str) -> None:
-        if not self.halted:
-            log.critical("LATCHING HALT: %s", reason)
-        self.halted = True
-        self.halt_reason = reason
-        self.halted_at = datetime.now(timezone.utc).isoformat()
-        self._save()
+        with self._lock:
+            if not self.halted:
+                log.critical("LATCHING HALT: %s", reason)
+            self.halted = True
+            self.halt_reason = reason
+            self.halted_at = datetime.now(timezone.utc).isoformat()
+            self._save()
 
     def clear_halt(self) -> None:
-        self.halted = False
-        self.halt_reason = ""
-        self.halted_at = None
-        self._save()
+        with self._lock:
+            self.halted = False
+            self.halt_reason = ""
+            self.halted_at = None
+            self._save()
 
     # -- per-symbol trailing high-water ------------------------------------ #
     def get_high_water(self, symbol: str) -> float:
         return self.high_water.get(symbol, 0.0)
 
     def set_high_water(self, symbol: str, value: float) -> None:
-        if value != self.high_water.get(symbol):
-            self.high_water[symbol] = value
-            self._save()
+        with self._lock:
+            if value != self.high_water.get(symbol):
+                self.high_water[symbol] = value
+                self._save()
 
     def forget_symbol(self, symbol: str) -> None:
-        if self.high_water.pop(symbol, None) is not None:
-            self._save()
+        with self._lock:
+            if self.high_water.pop(symbol, None) is not None:
+                self._save()
 
     def clear_high_water(self) -> None:
-        if self.high_water:
-            self.high_water.clear()
-            self._save()
+        with self._lock:
+            if self.high_water:
+                self.high_water.clear()
+                self._save()

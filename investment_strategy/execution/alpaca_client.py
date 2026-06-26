@@ -214,6 +214,20 @@ class AlpacaClient:
                 except Exception as e:
                     log.warning("cancel order %s failed: %s", o.id, e)
 
+    def order_fill(self, order_id: str) -> tuple[str, float, float]:
+        """(status, filled_qty, qty) for an order — for post-hoc fill reconciliation.
+        Returns ('unknown', 0, 0) if the order can't be fetched."""
+        try:
+            o = self.trading.get_order_by_id(order_id)
+            return (
+                str(getattr(o, "status", "")),
+                float(getattr(o, "filled_qty", 0) or 0),
+                float(getattr(o, "qty", 0) or 0),
+            )
+        except Exception as e:
+            log.warning("order_fill(%s) failed: %s", order_id, e)
+            return ("unknown", 0.0, 0.0)
+
     def open_buy_notional(self, symbol: str) -> float:
         """$ value of OPEN (unfilled) BUY orders for `symbol`. The risk layer
         counts this against the per-symbol exposure cap so repeated decision

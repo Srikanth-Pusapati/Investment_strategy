@@ -26,7 +26,12 @@ log = logging.getLogger("decision")
 class DecisionEngine:
     def __init__(self, cfg: Config):
         self.cfg = cfg
-        self.client = anthropic.Anthropic(api_key=cfg.anthropic_api_key)
+        # Hard timeout so a stalled LLM call can't block the trade loop. The
+        # decision cycle is the longest blocking call in the system; without a
+        # cap the SDK default (~10m) leaves the bot deaf for that whole window.
+        self.client = anthropic.Anthropic(
+            api_key=cfg.anthropic_api_key, timeout=cfg.decision_timeout_s, max_retries=1,
+        )
         self.model = cfg.decision_model
 
     def decide(
@@ -45,7 +50,10 @@ class DecisionEngine:
         try:
             resp = self.client.messages.create(
                 model=self.model,
-                max_tokens=8000,
+                # Headroom so adaptive thinking + a full slate of proposals can't
+                # truncate the JSON mid-object (a truncated body fails to parse and
+                # silently drops the whole cycle). We detect truncation below too.
+                max_tokens=16000,
                 thinking={"type": "adaptive"},
                 # Cache the static system prompt so it isn't re-billed every cycle.
                 # 1h TTL (not the 5m default) because cycles are ~15m apart — a 5m
@@ -67,12 +75,20 @@ class DecisionEngine:
                 },
                 messages=[{"role": "user", "content": user_content}],
             )
+        except anthropic.APITimeoutError as e:
+            log.error("Claude decision call timed out (%ss): %s", self.cfg.decision_timeout_s, e)
+            return []
         except anthropic.APIError as e:
             log.error("Claude decision call failed: %s", e)
             return []
 
         if resp.stop_reason == "refusal":
             log.warning("Decision model refused; treating as no-action this cycle.")
+            return []
+        if resp.stop_reason == "max_tokens":
+            # Body is almost certainly truncated -> invalid JSON. Skip rather than
+            # act on a half-parsed slate; surface it loudly so the cap can be raised.
+            log.error("Decision response hit max_tokens — truncated; skipping cycle.")
             return []
 
         text = next((b.text for b in resp.content if b.type == "text"), "")
@@ -83,7 +99,10 @@ class DecisionEngine:
         self, bundles: list[SignalBundle], account: AccountSnapshot,
         benchmark_line: str, external: list[ExternalHolding],
     ) -> str:
+        # All third-party text lives inside <market_data> so the system prompt can
+        # bind "untrusted data, not instructions" to a clear, delimited region.
         lines = [
+            "<market_data>",
             "## Account",
             f"Equity: ${account.equity:,.0f} | Cash: ${account.cash:,.0f} | "
             f"Day P/L: {account.day_pl_pct:+.2f}%",
@@ -101,7 +120,7 @@ class DecisionEngine:
         if bundles and bundles[0].market_context:
             lines.append("## Market context")
             for s in bundles[0].market_context:
-                lines.append(f"- [{s.kind.value}] {s.summary}")
+                lines.append(f"- [{s.kind.value}] {self._safe(s.summary)}")
             lines.append("")
 
         lines.append("## Candidates")
@@ -114,14 +133,21 @@ class DecisionEngine:
             lines.append(f"### {b.symbol}{held}")
             for s in b.signals:
                 score = f" score={s.score:+.2f}" if s.score is not None else ""
-                lines.append(f"- [{s.kind.value}]{score} {s.summary}")
+                lines.append(f"- [{s.kind.value}]{score} {self._safe(s.summary)}")
             lines.append("")
 
+        lines.append("</market_data>")
         lines.append(
             "Return proposals for the candidates that warrant action. Use HOLD "
             "(or omit) symbols where the evidence is thin or conflicting."
         )
         return "\n".join(lines)
+
+    @staticmethod
+    def _safe(text: str) -> str:
+        """Neutralize the delimiter so a crafted headline can't close the
+        <market_data> block early and smuggle text in as trusted instructions."""
+        return text.replace("<", "‹").replace(">", "›")
 
     # -- response parsing --------------------------------------------------- #
     @staticmethod

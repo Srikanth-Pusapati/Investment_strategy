@@ -65,6 +65,7 @@ class Config:
     anthropic_api_key: str
     decision_model: str
     decision_effort: str
+    decision_timeout_s: float        # hard cap on the LLM decision call
 
     fmp_api_key: str
     finnhub_api_key: str
@@ -137,6 +138,7 @@ def load_config() -> Config:
             in {"low", "medium", "high", "xhigh", "max"}
             else "medium"
         ),
+        decision_timeout_s=_f("DECISION_TIMEOUT_SECONDS", 90.0),
         fmp_api_key=os.getenv("FMP_API_KEY", ""),
         finnhub_api_key=os.getenv("FINNHUB_API_KEY", ""),
         quiver_api_key=os.getenv("QUIVER_API_KEY", ""),
