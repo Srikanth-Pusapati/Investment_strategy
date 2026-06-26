@@ -13,22 +13,37 @@ from .config import RiskLimits
 from .models import (
     AccountSnapshot,
     Action,
+    OptionStrategy,
     RiskDecision,
     RiskVerdict,
     TradeProposal,
 )
+from .state import PortfolioState
 
 log = logging.getLogger("risk")
 
+# When realized volatility is unavailable we must NOT default to the largest
+# allowed size — a data outage is exactly when to be cautious. Size as if the
+# name were quite volatile so vol-targeting shrinks the position.
+_ASSUMED_VOL_WHEN_UNKNOWN = 0.60
+
 
 class RiskManager:
-    def __init__(self, limits: RiskLimits, kill_switch: bool = False):
+    def __init__(
+        self, limits: RiskLimits, kill_switch: bool = False,
+        state: PortfolioState | None = None,
+    ):
         self.limits = limits
         self.kill_switch = kill_switch
+        # Shared, persisted risk memory (peak equity, halt latch). A default
+        # instance keeps unit tests and ad-hoc use working without wiring.
+        self.state = state or PortfolioState()
 
     # -- top-level halts ---------------------------------------------------- #
     def trading_halted(self, account: AccountSnapshot) -> tuple[bool, str]:
         """Account-wide reasons to block ALL new buying. Sells/exits still allowed."""
+        if self.state.halted:
+            return True, f"HALT LATCH set: {self.state.halt_reason}"
         if self.kill_switch:
             return True, "KILL_SWITCH is on — no new positions."
         loss_pct = -account.day_pl_pct  # positive number when losing
@@ -36,6 +51,14 @@ class RiskManager:
             return True, (
                 f"Daily loss {loss_pct:.2f}% >= limit "
                 f"{self.limits.max_daily_loss_pct:.2f}% — halting new buys."
+            )
+        # Peak-to-trough drawdown does NOT reset daily — this catches the slow
+        # bleed that the daily-loss limit structurally misses.
+        dd = self.state.drawdown_pct(account.equity)
+        if dd >= self.limits.max_drawdown_pct:
+            return True, (
+                f"Drawdown {dd:.2f}% from peak ${self.state.peak_equity:,.0f} "
+                f">= limit {self.limits.max_drawdown_pct:.2f}% — halting new buys."
             )
         if len(account.positions) >= self.limits.max_open_positions:
             return True, (
@@ -46,16 +69,18 @@ class RiskManager:
     # -- per-proposal evaluation ------------------------------------------- #
     def evaluate(
         self, proposal: TradeProposal, account: AccountSnapshot, price: float,
-        volatility: float | None = None,
+        volatility: float | None = None, pending_buy_notional: float = 0.0,
     ) -> RiskDecision:
         """`price` is the current market price for proposal.symbol. `volatility`
         is the symbol's annualized realized vol (fraction, e.g. 0.45) used for
-        vol-targeted sizing. Both from the execution client. Required for buys."""
+        vol-targeted sizing. `pending_buy_notional` is the $ of already-open
+        (unfilled) BUY orders for this symbol, so repeated cycles can't stack
+        duplicate buys past the exposure cap. All from the execution client."""
         if proposal.action is Action.HOLD:
             return self._reject(proposal, "HOLD — no action.")
         if proposal.action is Action.SELL:
             return self._evaluate_sell(proposal, account)
-        return self._evaluate_buy(proposal, account, price, volatility)
+        return self._evaluate_buy(proposal, account, price, volatility, pending_buy_notional)
 
     # -- survival-first sizing: vol-targeted, fractional-Kelly -------------- #
     def _sized_weight_pct(self, conviction: float, volatility: float | None) -> float:
@@ -64,10 +89,10 @@ class RiskManager:
         spread across names. The hard max_position_pct still bounds the result."""
         if self.limits.kelly_fraction <= 0:
             return self.limits.max_position_pct   # sizing model disabled
-        vol_ratio = 1.0
-        if volatility and volatility > 0:
-            target = self.limits.target_annual_vol_pct / 100.0
-            vol_ratio = min(target / volatility, 1.5)   # cap upsizing on calm names
+        # Fail SAFE on missing vol: assume a high vol so we size DOWN, not up.
+        vol = volatility if (volatility and volatility > 0) else _ASSUMED_VOL_WHEN_UNKNOWN
+        target = self.limits.target_annual_vol_pct / 100.0
+        vol_ratio = min(target / vol, 1.5)   # cap upsizing on calm names
         sized_frac = self.limits.kelly_fraction * conviction * vol_ratio
         return sized_frac * 100.0
 
@@ -89,7 +114,7 @@ class RiskManager:
     # -- buys: the heavily-guarded path ------------------------------------ #
     def _evaluate_buy(
         self, proposal: TradeProposal, account: AccountSnapshot, price: float,
-        volatility: float | None = None,
+        volatility: float | None = None, pending_buy_notional: float = 0.0,
     ) -> RiskDecision:
         halted, why = self.trading_halted(account)
         if halted:
@@ -102,6 +127,15 @@ class RiskManager:
         if price <= 0:
             return self._reject(proposal, "No current price available.")
 
+        # Liquidity guard: refuse cheap/illiquid names where market orders bleed
+        # to slippage and stops gap straight through.
+        if price < self.limits.min_trade_price_usd:
+            return self._reject(
+                proposal,
+                f"Price ${price:.2f} below min ${self.limits.min_trade_price_usd:.2f} "
+                f"(liquidity guard).",
+            )
+
         # 1) Take the SMALLEST of: what the LLM wants, what vol-targeted
         #    fractional-Kelly sizing allows, and the hard single-position cap.
         sized_pct = self._sized_weight_pct(proposal.conviction, volatility)
@@ -110,16 +144,21 @@ class RiskManager:
         )
         target_notional = equity * (weight_pct / 100.0)
 
-        # 2) Respect total per-symbol exposure (existing holding counts).
+        # 2) Respect total per-symbol exposure. Count BOTH the filled holding
+        #    AND any open (unfilled) buy orders — otherwise repeated decision
+        #    cycles stack duplicate buys before the first one fills and blow
+        #    past the cap.
         existing = account.position_for(proposal.symbol)
         existing_val = existing.market_value if existing else 0.0
+        committed_val = existing_val + max(0.0, pending_buy_notional)
         max_symbol_val = equity * (self.limits.max_symbol_exposure_pct / 100.0)
-        room = max_symbol_val - existing_val
+        room = max_symbol_val - committed_val
         if room <= 0:
             return self._reject(
                 proposal,
                 f"Already at/over {self.limits.max_symbol_exposure_pct:.0f}% "
-                f"exposure cap for {proposal.symbol}.",
+                f"exposure cap for {proposal.symbol} "
+                f"(held ${existing_val:,.0f} + pending ${pending_buy_notional:,.0f}).",
             )
         target_notional = min(target_notional, room)
 
@@ -172,8 +211,15 @@ class RiskManager:
             return self._reject(proposal, "KILL_SWITCH is on — no new positions.")
         if proposal.option_strategy is None or not proposal.option_legs:
             return self._reject(proposal, "Option proposal missing strategy/legs.")
+        ok, why = self._legs_are_defined_risk(proposal)
+        if not ok:
+            return self._reject(proposal, why)
         if est_premium_per_contract <= 0:
-            return self._reject(proposal, "No premium estimate for option.")
+            # A debit means net premium PAID; <=0 means a net credit, i.e. a
+            # short-premium structure whose max loss is NOT the debit. Refuse.
+            return self._reject(
+                proposal, "Net credit / no debit — not a bounded-loss debit play."
+            )
 
         equity = account.equity
         cap = equity * (self.limits.max_option_premium_pct / 100.0)
@@ -197,6 +243,43 @@ class RiskManager:
             approved_notional=spent,
             reason=f"{contracts} contract(s), ${spent:,.0f} debit (cap ${cap:,.0f}).",
         )
+
+    # -- option structure safety ------------------------------------------- #
+    @staticmethod
+    def _legs_are_defined_risk(proposal: TradeProposal) -> tuple[bool, str]:
+        """Verify the legs actually CAN'T lose more than the debit, instead of
+        trusting the declared strategy. The danger is a short leg that isn't
+        fully covered by a long leg of the same right (a naked or ratio short =
+        unbounded / large loss). Invariant: per right (call/put), total long
+        contracts must be >= total short contracts. Also require exactly the
+        legs each named strategy should have."""
+        legs = proposal.option_legs
+        long_calls = sum(l.ratio for l in legs if l.right.lower().startswith("c") and l.side is Action.BUY)
+        short_calls = sum(l.ratio for l in legs if l.right.lower().startswith("c") and l.side is Action.SELL)
+        long_puts = sum(l.ratio for l in legs if l.right.lower().startswith("p") and l.side is Action.BUY)
+        short_puts = sum(l.ratio for l in legs if l.right.lower().startswith("p") and l.side is Action.SELL)
+
+        if short_calls > long_calls:
+            return False, (
+                f"Uncovered short calls ({short_calls} short > {long_calls} long) "
+                f"— unbounded risk, refused."
+            )
+        if short_puts > long_puts:
+            return False, (
+                f"Uncovered short puts ({short_puts} short > {long_puts} long) "
+                f"— large risk, refused."
+            )
+
+        # Shape check per declared strategy so a mislabeled structure is caught.
+        strat = proposal.option_strategy
+        n = len(legs)
+        if strat in (OptionStrategy.LONG_CALL, OptionStrategy.LONG_PUT):
+            if n != 1 or legs[0].side is not Action.BUY:
+                return False, f"{strat.value} must be a single long leg."
+        elif strat in (OptionStrategy.BULL_CALL_SPREAD, OptionStrategy.BEAR_PUT_SPREAD):
+            if n != 2 or long_calls + long_puts < 1 or short_calls + short_puts < 1:
+                return False, f"{strat.value} must be one long + one short leg."
+        return True, ""
 
     # -- helpers ------------------------------------------------------------ #
     @staticmethod

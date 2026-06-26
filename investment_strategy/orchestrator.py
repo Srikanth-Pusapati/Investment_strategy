@@ -11,6 +11,7 @@ gated by the kill switch and the market being open.
 from __future__ import annotations
 
 import logging
+import os
 import time
 
 from .benchmark import BenchmarkTracker
@@ -23,6 +24,7 @@ from .monitor import Watchdog
 from .portfolio import RobinhoodReader
 from .risk import RiskManager
 from .signals import SignalAggregator
+from .state import PortfolioState
 
 log = logging.getLogger("orchestrator")
 
@@ -37,8 +39,11 @@ class Orchestrator:
         self.broker = AlpacaClient(cfg)
         self.signals = SignalAggregator(cfg)
         self.engine = DecisionEngine(cfg)
-        self.risk = RiskManager(cfg.risk, kill_switch=cfg.kill_switch)
-        self.watchdog = Watchdog(cfg, self.broker)
+        # One persisted risk-state instance shared by the risk gate and watchdog
+        # so peak equity, the drawdown halt, and the halt latch are consistent.
+        self.state = PortfolioState(cfg.state_file)
+        self.risk = RiskManager(cfg.risk, kill_switch=cfg.kill_switch, state=self.state)
+        self.watchdog = Watchdog(cfg, self.broker, state=self.state)
         self.benchmark = BenchmarkTracker(cfg, self.broker, symbol=cfg.benchmark_symbol)
         self.robinhood = RobinhoodReader(cfg)
         self.options = OptionsHelper(cfg) if cfg.risk.options_enabled else None
@@ -56,6 +61,7 @@ class Orchestrator:
         )
         while True:
             try:
+                self._refresh_runtime_controls()
                 self.watchdog.check_once()
                 if self._decision_due():
                     self.run_decision_cycle()
@@ -69,6 +75,18 @@ class Orchestrator:
 
     def _decision_due(self) -> bool:
         return (time.monotonic() - self._last_decision_at) >= self.cfg.decision_interval_s
+
+    def _refresh_runtime_controls(self) -> None:
+        """Let an operator halt NEW buys WITHOUT a restart by creating the
+        kill-switch file. Startup KILL_SWITCH stays in effect regardless."""
+        file_kill = os.path.exists(self.cfg.kill_switch_file)
+        desired = self.cfg.kill_switch or file_kill
+        if desired != self.risk.kill_switch:
+            log.warning(
+                "Kill switch -> %s (file=%s).", "ON" if desired else "off",
+                self.cfg.kill_switch_file if file_kill else "n/a",
+            )
+        self.risk.kill_switch = desired
 
     # -- the slow cycle ----------------------------------------------------- #
     def run_decision_cycle(self) -> None:
@@ -99,7 +117,11 @@ class Orchestrator:
     def _handle_equity(self, proposal: TradeProposal, account) -> None:
         price = self.broker.latest_price(proposal.symbol)
         vol = self.broker.annualized_vol(proposal.symbol)
-        decision = self.risk.evaluate(proposal, account, price, vol)
+        pending = (
+            self.broker.open_buy_notional(proposal.symbol)
+            if proposal.action.value == "buy" else 0.0
+        )
+        decision = self.risk.evaluate(proposal, account, price, vol, pending)
         log.info(
             "%s %s -> %s: %s | %s",
             proposal.action.value.upper(), proposal.symbol,

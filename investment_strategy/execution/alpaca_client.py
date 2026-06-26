@@ -214,6 +214,33 @@ class AlpacaClient:
                 except Exception as e:
                     log.warning("cancel order %s failed: %s", o.id, e)
 
+    def open_buy_notional(self, symbol: str) -> float:
+        """$ value of OPEN (unfilled) BUY orders for `symbol`. The risk layer
+        counts this against the per-symbol exposure cap so repeated decision
+        cycles can't stack duplicate buys before the first one fills."""
+        try:
+            price = self.latest_price(symbol)
+            total = 0.0
+            for o in self.trading.get_orders():
+                if o.symbol != symbol:
+                    continue
+                if not str(getattr(o, "side", "")).lower().endswith("buy"):
+                    continue
+                # Prefer explicit notional, else remaining qty * (limit or last).
+                notional = getattr(o, "notional", None)
+                if notional:
+                    total += float(notional)
+                    continue
+                qty = float(getattr(o, "qty", 0) or 0)
+                filled = float(getattr(o, "filled_qty", 0) or 0)
+                remaining = max(0.0, qty - filled)
+                ref = float(getattr(o, "limit_price", 0) or 0) or price
+                total += remaining * ref
+            return total
+        except Exception as e:
+            log.warning("open_buy_notional(%s) failed: %s", symbol, e)
+            return 0.0
+
     # -- builders / mapping ------------------------------------------------- #
     def _build_equity_request(self, o: OrderRequest, bracketed: bool):
         common = dict(

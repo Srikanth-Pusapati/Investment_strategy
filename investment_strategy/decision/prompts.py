@@ -30,7 +30,10 @@ idea's volatility and conviction. Tighter stops for lower-conviction trades.
 propose ONLY defined-risk structures — long_call, long_put, bull_call_spread, \
 bear_put_spread — by setting instrument="option", option_strategy, and \
 option_legs (expiry YYYY-MM-DD, strike, right, side). Max loss is the debit; the \
-risk layer caps it. Default to equity unless options clearly fit better.
+risk layer caps it. Every short leg MUST be covered by a long leg of the same \
+right (no ratio spreads, no naked shorts) and the net must be a DEBIT — the risk \
+layer rejects anything else outright. Singles are one long leg; verticals are \
+one long + one short leg. Default to equity unless options clearly fit better.
 - rationale must cite the specific signals that drove the decision, briefly. It \
 becomes the permanent audit record for this trade.
 
