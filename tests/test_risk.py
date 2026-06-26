@@ -36,6 +36,8 @@ def _limits(**over) -> RiskLimits:
         max_open_positions=15,
         min_cash_buffer_pct=10.0,
         min_trade_price_usd=5.0,
+        fractional_enabled=True,
+        min_order_usd=1.0,
         default_stop_loss_pct=5.0,
         default_take_profit_pct=12.0,
         kelly_fraction=0.5,
@@ -113,6 +115,32 @@ def test_symbol_exposure_cap_counts_pending():
     d = rm.evaluate(_buy(), acct, price=100.0, volatility=0.25, pending_buy_notional=1000.0)
     assert d.verdict is RiskVerdict.REJECTED
     assert "exposure cap" in d.reason.lower()
+
+
+def test_fractional_buy_under_one_share():
+    # Small account: 5% of $2,000 = $100 budget on a $300 stock -> sub-share.
+    rm = RiskManager(_limits(kelly_fraction=0.0))  # use the full position cap
+    acct = _account(equity=2_000.0, cash=2_000.0, buying_power=2_000.0, last_equity=2_000.0)
+    d = rm.evaluate(_buy(), acct, price=300.0, volatility=0.3)
+    assert d.verdict in (RiskVerdict.APPROVED, RiskVerdict.RESIZED), d.reason
+    assert 0 < d.approved_qty < 1, d.approved_qty           # fractional
+    assert abs(d.approved_notional - 100.0) < 1.0, d.approved_notional
+
+
+def test_fractional_disabled_rejects_sub_share():
+    rm = RiskManager(_limits(fractional_enabled=False, kelly_fraction=0.0))
+    acct = _account(equity=2_000.0, cash=2_000.0, buying_power=2_000.0, last_equity=2_000.0)
+    d = rm.evaluate(_buy(), acct, price=300.0, volatility=0.3)  # $100 budget < $300
+    assert d.verdict is RiskVerdict.REJECTED
+
+
+def test_min_order_floor_rejects_dust():
+    # Budget below the min order $ -> not worth placing even fractionally.
+    rm = RiskManager(_limits(min_order_usd=50.0, kelly_fraction=0.0, max_position_pct=1.0))
+    acct = _account(equity=2_000.0, cash=2_000.0, buying_power=2_000.0, last_equity=2_000.0)
+    d = rm.evaluate(_buy(), acct, price=300.0, volatility=0.3)  # 1% of 2k = $20 < $50
+    assert d.verdict is RiskVerdict.REJECTED
+    assert "min order" in d.reason.lower()
 
 
 # --------------------------------------------------------------------------- #

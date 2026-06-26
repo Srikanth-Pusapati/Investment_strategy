@@ -168,12 +168,24 @@ class RiskManager:
         deployable = min(deployable, account.buying_power)
         target_notional = min(target_notional, deployable)
 
-        if target_notional < price:  # can't even afford one share
-            return self._reject(
-                proposal, "Insufficient deployable cash after buffers/caps."
-            )
-
-        qty = float(int(target_notional / price))  # whole shares, conservative
+        # 4) Convert the capped dollar budget into a quantity. With fractional
+        #    enabled (small accounts) we can deploy any budget >= the min order;
+        #    otherwise we floor to whole shares and need at least one. Execution
+        #    decides whole-share-bracket vs. fractional-notional from this qty.
+        if self.limits.fractional_enabled:
+            if target_notional < self.limits.min_order_usd:
+                return self._reject(
+                    proposal,
+                    f"Budget ${target_notional:,.2f} below min order "
+                    f"${self.limits.min_order_usd:.2f} after buffers/caps.",
+                )
+            qty = round(target_notional / price, 6)  # fractional shares
+        else:
+            if target_notional < price:  # can't even afford one whole share
+                return self._reject(
+                    proposal, "Insufficient deployable cash after buffers/caps."
+                )
+            qty = float(int(target_notional / price))  # whole shares, conservative
         if qty <= 0:
             return self._reject(proposal, "Sizing rounded to zero shares.")
 

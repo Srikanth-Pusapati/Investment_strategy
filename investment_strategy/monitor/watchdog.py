@@ -46,9 +46,13 @@ class Watchdog:
 
         live = {p.symbol for p in account.positions}
         for pos in account.positions:
+            # Hard stop/take first — fractional positions have no exchange bracket,
+            # so this loop is their ONLY hard-exit enforcement.
+            if self._enforce_hard_exits(pos):
+                continue
             self._update_trailing_stop(pos)
-        # Drop trailing state for positions that are gone (filled stop/tp/sell).
-        for sym in list(self.state.high_water):
+        # Drop tracking for positions that are gone (filled stop/tp/sell).
+        for sym in set(self.state.high_water) | set(self.state.exits):
             if sym not in live:
                 self.state.forget_symbol(sym)
 
@@ -90,6 +94,37 @@ class Watchdog:
                     "%s: close FAILED for %s — position may be NAKED. Will retry.",
                     why, pos.symbol,
                 )
+
+    # -- hard stop / take-profit for fractional (unbracketed) positions ---- #
+    def _enforce_hard_exits(self, pos: Position) -> bool:
+        """Close `pos` if it has breached the stop/take registered for it (only
+        fractional positions are registered — whole-share buys use an exchange
+        bracket). Returns True if a close was issued so the caller skips trailing."""
+        exits = self.state.get_exits(pos.symbol)
+        if not exits:
+            return False
+        stop_pct = exits.get("stop_pct", 0.0)
+        take_pct = exits.get("take_pct", 0.0)
+        hit = None
+        if stop_pct > 0 and pos.unrealized_pl_pct <= -stop_pct:
+            hit = f"stop -{stop_pct:.1f}%"
+        elif take_pct > 0 and pos.unrealized_pl_pct >= take_pct:
+            hit = f"take +{take_pct:.1f}%"
+        if not hit:
+            return False
+        log.info(
+            "Hard %s hit on %s (now %.1f%%). Closing fractional position.",
+            hit, pos.symbol, pos.unrealized_pl_pct,
+        )
+        oid = self.broker.close_position(pos.symbol)
+        if oid:
+            self.state.forget_symbol(pos.symbol)
+        else:
+            log.critical(
+                "Hard-exit close FAILED for %s — fractional position unprotected. "
+                "Will retry.", pos.symbol,
+            )
+        return True
 
     # -- per-position trailing stop ---------------------------------------- #
     def _update_trailing_stop(self, pos: Position) -> None:

@@ -63,6 +63,18 @@ def test_high_water_round_trip_and_forget():
     assert s3.get_high_water("AAPL") == 0.0
 
 
+def test_exits_round_trip_and_cleared_by_forget():
+    path = _tmp()
+    s1 = PortfolioState(path=path)
+    s1.register_exits("NVDA", stop_pct=5.0, take_pct=12.0)
+    s2 = PortfolioState(path=path)  # survives restart
+    ex = s2.get_exits("NVDA")
+    assert ex == {"stop_pct": 5.0, "take_pct": 12.0}
+    s2.forget_symbol("NVDA")  # closing a position must clear its hard exits
+    s3 = PortfolioState(path=path)
+    assert s3.get_exits("NVDA") is None
+
+
 def test_corrupt_state_does_not_crash():
     path = _tmp()
     with open(path, "w", encoding="utf-8") as fh:

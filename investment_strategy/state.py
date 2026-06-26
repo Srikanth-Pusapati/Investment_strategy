@@ -37,6 +37,10 @@ class PortfolioState:
         self.halt_reason: str = ""
         self.halted_at: str | None = None
         self.high_water: dict[str, float] = {}
+        # Hard stop / take-profit targets (% from entry) for FRACTIONAL positions,
+        # which have no exchange-side bracket. The watchdog enforces these. Keyed
+        # by symbol: {"stop_pct": float, "take_pct": float}.
+        self.exits: dict[str, dict[str, float]] = {}
         # The watchdog (its own thread) and the decision/risk path both touch this
         # state. A reentrant lock keeps reads/writes and the file save consistent.
         self._lock = threading.RLock()
@@ -53,6 +57,11 @@ class PortfolioState:
             self.halt_reason = str(d.get("halt_reason", ""))
             self.halted_at = d.get("halted_at")
             self.high_water = {k: float(v) for k, v in d.get("high_water", {}).items()}
+            self.exits = {
+                k: {"stop_pct": float(v.get("stop_pct", 0.0)),
+                    "take_pct": float(v.get("take_pct", 0.0))}
+                for k, v in d.get("exits", {}).items()
+            }
             if self.halted:
                 log.warning("Loaded LATCHED HALT from state: %s", self.halt_reason)
         except Exception as e:  # corrupt state must not crash startup
@@ -70,6 +79,7 @@ class PortfolioState:
                         "halt_reason": self.halt_reason,
                         "halted_at": self.halted_at,
                         "high_water": self.high_water,
+                        "exits": self.exits,
                     },
                     indent=2,
                 ),
@@ -122,7 +132,9 @@ class PortfolioState:
 
     def forget_symbol(self, symbol: str) -> None:
         with self._lock:
-            if self.high_water.pop(symbol, None) is not None:
+            dropped = self.high_water.pop(symbol, None) is not None
+            dropped |= self.exits.pop(symbol, None) is not None
+            if dropped:
                 self._save()
 
     def clear_high_water(self) -> None:
@@ -130,3 +142,14 @@ class PortfolioState:
             if self.high_water:
                 self.high_water.clear()
                 self._save()
+
+    # -- hard exits for fractional positions (no exchange bracket) ---------- #
+    def register_exits(self, symbol: str, stop_pct: float, take_pct: float) -> None:
+        """Record the hard stop / take-profit (% from entry) the watchdog must
+        enforce for a fractional position that can't carry an exchange bracket."""
+        with self._lock:
+            self.exits[symbol] = {"stop_pct": float(stop_pct), "take_pct": float(take_pct)}
+            self._save()
+
+    def get_exits(self, symbol: str) -> dict[str, float] | None:
+        return self.exits.get(symbol)

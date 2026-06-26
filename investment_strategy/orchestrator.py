@@ -218,11 +218,17 @@ class Orchestrator:
                 ))
                 if oid:
                     self._pending_oids.append((oid, proposal.symbol))
-            else:  # buy (approved or resized) -> bracket order
-                oid = self.broker.submit_from_decision(decision)
+            else:  # buy (approved or resized)
+                oid, fractional = self.broker.submit_from_decision(decision)
                 if oid:
                     self.ledger.record(TradeRecord.from_equity(decision, price, oid))
                     self._pending_oids.append((oid, proposal.symbol))
+                    if fractional:
+                        # Fractional orders carry no exchange-side bracket, so the
+                        # watchdog enforces the hard stop / take-profit instead.
+                        self.state.register_exits(
+                            proposal.symbol, decision.stop_loss_pct, decision.take_profit_pct,
+                        )
 
     # -- options path (defined-risk, gated) -------------------------------- #
     def _handle_option(self, proposal: TradeProposal, account) -> None:

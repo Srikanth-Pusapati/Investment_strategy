@@ -157,22 +157,45 @@ class AlpacaClient:
         log.info("Ladder %s %s: %d rungs %.2f–%.2f", side.value, symbol, len(ids), low, high)
         return ids
 
-    def submit_from_decision(self, decision: RiskDecision) -> Optional[str]:
-        """Convenience: build a bracket BUY from a risk-approved equity decision."""
+    def submit_from_decision(self, decision: RiskDecision) -> tuple[Optional[str], bool]:
+        """Build a BUY from a risk-approved equity decision.
+
+        Returns (order_id, is_fractional). When at least one WHOLE share is
+        affordable we submit a whole-share BRACKET order so the stop/take-profit
+        live at the exchange (survives a process crash) and drop any sub-share
+        remainder. Below one share — only reachable on small accounts with
+        fractional enabled — we submit a dollar-NOTIONAL order, which Alpaca will
+        not let us bracket; the caller must register a watchdog stop instead."""
         if decision.verdict not in (RiskVerdict.APPROVED, RiskVerdict.RESIZED):
-            return None
+            return None, False
         symbol = decision.proposal.symbol
         price = self.latest_price(symbol)
         if price <= 0:
-            log.warning("Skip %s: no price for bracket levels.", symbol)
-            return None
+            log.warning("Skip %s: no price for order/bracket levels.", symbol)
+            return None, False
+
+        whole = int(decision.approved_qty)
+        if whole >= 1:
+            order = OrderRequest(
+                symbol=symbol, side=Action.BUY, order_type=OrderType.MARKET,
+                qty=float(whole),
+                take_profit_price=round(price * (1 + decision.take_profit_pct / 100.0), 2),
+                stop_loss_price=round(price * (1 - decision.stop_loss_pct / 100.0), 2),
+            )
+            return self.submit(order), False
+
+        # Sub-share: fractional dollar-notional order, no exchange bracket.
+        if not self.cfg.risk.fractional_enabled:
+            log.warning("Skip %s: under one share and fractional disabled.", symbol)
+            return None, False
+        notional = round(decision.approved_notional, 2)
+        if notional < self.cfg.risk.min_order_usd:
+            log.warning("Skip %s: notional $%.2f below min order.", symbol, notional)
+            return None, False
         order = OrderRequest(
-            symbol=symbol, side=Action.BUY, order_type=OrderType.MARKET,
-            qty=decision.approved_qty,
-            take_profit_price=round(price * (1 + decision.take_profit_pct / 100.0), 2),
-            stop_loss_price=round(price * (1 - decision.stop_loss_pct / 100.0), 2),
+            symbol=symbol, side=Action.BUY, order_type=OrderType.MARKET, notional=notional,
         )
-        return self.submit(order)
+        return self.submit(order), True
 
     # -- write: options (defined-risk) ------------------------------------- #
     def submit_option_legs(
