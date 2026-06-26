@@ -99,6 +99,26 @@ and a full decision cycle runs every `DECISION_INTERVAL_SECONDS` while the marke
 is open. Set the candidate universe with `WATCHLIST=AAPL,MSFT,NVDA` (current
 holdings are always re-evaluated too).
 
+## Trade dashboard
+
+Every order the bot executes is appended to a local **trade ledger**
+(`state/trades.jsonl`, gitignored) with its full decision context — executed
+date, volume, cost invested, conviction, the planned exit (take-profit /
+stop-loss levels), and Claude's rationale + key signals (the *reason behind the
+purchase*). Exits here are **price-triggered brackets, not calendar dates**, so
+the dashboard shows the TP/SL targets as the "assumed sell" levels.
+
+Render a self-contained HTML dashboard (summary cards, capital-per-symbol and
+cumulative-invested charts, and a full trade table — no external/JS dependencies):
+
+```bash
+python -m investment_strategy.dashboard --open      # write dashboard.html + open it
+python -m investment_strategy.dashboard --no-live   # offline (skip live-price P/L)
+```
+
+With Alpaca keys present it best-effort enriches open positions with the live
+price to show unrealized P/L; without them it still renders the full ledger.
+
 ## Safety — read this
 
 - **Paper first.** `TRADING_MODE=paper` (default) trades fake money against the
@@ -122,7 +142,9 @@ and survival-first sizing are in place; the risk core (hard caps, vol sizing,
 options premium gate) is unit-tested. Before real use:
 - Get the optional keys (`FINNHUB_API_KEY`, `POLYGON_API_KEY`) to activate the
   insider + options-flow + model-sentiment signals.
-- Add persistence/audit logging of every `RiskDecision` and order.
+- Executed orders are now persisted to a trade ledger (`state/trades.jsonl`) and
+  visualized via `python -m investment_strategy.dashboard`; extend it to also log
+  *rejected* `RiskDecision`s for a full audit trail.
 - **Backtest** the decision logic against historical data before trusting sizing.
 - Options: start with `OPTIONS_ENABLED=off`, paper-test the equity loop first,
   then enable with a small `MAX_OPTION_PREMIUM_PCT`.

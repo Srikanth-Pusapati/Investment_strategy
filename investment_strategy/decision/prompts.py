@@ -57,10 +57,15 @@ PROPOSALS_SCHEMA = {
                     "key_signals": {"type": "array", "items": {"type": "string"}},
                     "instrument": {"type": "string", "enum": ["equity", "option"]},
                     "option_strategy": {
-                        "type": ["string", "null"],
-                        "enum": [
-                            "long_call", "long_put",
-                            "bull_call_spread", "bear_put_spread", None,
+                        "anyOf": [
+                            {
+                                "type": "string",
+                                "enum": [
+                                    "long_call", "long_put",
+                                    "bull_call_spread", "bear_put_spread",
+                                ],
+                            },
+                            {"type": "null"},
                         ],
                     },
                     "option_legs": {

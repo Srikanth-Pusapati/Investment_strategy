@@ -16,6 +16,9 @@ venv/
 # ---- Secrets & local state (NEVER COMMIT) ----
 .env
 .env.*
-!.env.example
+.env.example
 *.log
 state/
+
+# ---- Generated artifacts ----
+dashboard.html
