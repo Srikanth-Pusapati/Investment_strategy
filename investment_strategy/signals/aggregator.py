@@ -15,6 +15,7 @@ from .insider_edgar import EdgarInsiderProvider
 from .macro import MacroProvider
 from .news import NewsProvider
 from .options_flow import OptionsFlowProvider
+from .technical import TechnicalProvider
 
 log = logging.getLogger("signals")
 
@@ -23,6 +24,7 @@ class SignalAggregator:
     def __init__(self, cfg: Config):
         self.per_symbol: list[SignalProvider] = [
             FundamentalsProvider(cfg),    # EBITDA, margins, leverage
+            TechnicalProvider(cfg),       # RSI, MACD, trend (yfinance; no key)
             NewsProvider(cfg),            # headlines + sentiment (finnhub/VADER)
             CongressProvider(cfg),        # congressional trades (Quiver; if key)
             InsiderProvider(cfg),         # Form 4 insider via Finnhub (if key)

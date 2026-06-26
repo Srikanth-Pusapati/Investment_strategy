@@ -32,6 +32,7 @@ names    data        risk caps    brackets    stops / exits
 1. **Signals** ([signals/](investment_strategy/signals/)) — pluggable data
    sources, each normalized to a `Signal`:
    - **Fundamentals** (EBITDA, margins, leverage) via yfinance — works with no API key
+   - **Technicals** (RSI, MACD, trend vs SMA50/200) via yfinance — no API key
    - **News & sentiment** via Alpaca news + Finnhub sentiment *(keyword fallback)*
    - **Insider trades** (Form 4 buys/sells) via Finnhub *(needs `FINNHUB_API_KEY`)*
    - **Options flow** (unusual call/put activity) via Polygon *(needs `POLYGON_API_KEY`)*
