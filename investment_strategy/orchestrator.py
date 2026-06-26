@@ -27,6 +27,7 @@ from .portfolio import RobinhoodReader
 from .risk import RiskManager
 from .screener import ScreenerAggregator
 from .signals import SignalAggregator
+from .signals.quiver_client import QuiverClient
 from .state import PortfolioState
 
 log = logging.getLogger("orchestrator")
@@ -40,8 +41,12 @@ class Orchestrator:
     def __init__(self, cfg: Config, watchlist: list[str] | None = None):
         self.cfg = cfg
         self.broker = AlpacaClient(cfg)
-        self.signals = SignalAggregator(cfg)
-        self.screeners = ScreenerAggregator(cfg)
+        # One Quiver client shared by the signal and screener layers so each live
+        # feed (congress, etc.) is pulled at most once per cycle, not once per
+        # layer — the double-pull fix that keeps us under Quiver's rate limit.
+        self.quiver = QuiverClient(cfg.quiver_api_key)
+        self.signals = SignalAggregator(cfg, self.quiver)
+        self.screeners = ScreenerAggregator(cfg, self.quiver)
         self.engine = DecisionEngine(cfg)
         # One persisted risk-state instance shared by the risk gate and watchdog
         # so peak equity, the drawdown halt, and the halt latch are consistent.
@@ -151,6 +156,9 @@ class Orchestrator:
             return
 
         self._reconcile_fills()
+        # Fresh Quiver data this cycle, but pulled once and shared by the signal
+        # and screener layers (both read the same cached live feeds).
+        self.quiver.new_cycle()
         account = self.broker.get_account()
 
         # Watchlist + current holdings are always evaluated; the scanner widens

@@ -57,6 +57,28 @@ Weight by lag in the score, not just presence. Congress (~45d lag) should never 
 MAX_DISCOVERED_CANDIDATES=12 is your backpressure valve on the screener fan-out. As you add screeners, corroboration (a name flagged by congress + dark-pool + WSB) auto-ranks to the top via score summing in screener/aggregator.py:60 — good. Keep the cap modest.
 Concrete first step I'd recommend: build signals/quiver_client.py — a shared client with Bearer auth, tenacity retry + 429 backoff (already a dep), and a per-cycle response cache keyed by (dataset, symbol). Then refactor the two existing congress callers onto it, then add offexchange and wallstreetbets. That's the cleanest path that also fixes the double-pull.
 
+[DONE 2026-06-26] signals/quiver_client.py shipped: QuiverClient with Bearer auth,
+tenacity 429/network backoff, and a per-cycle cache keyed by request path.
+new_cycle() is called at the top of each decision cycle (orchestrator) so data is
+fresh per cycle but pulled ONCE and shared. Both congress callers refactored onto
+it — the signal layer now reads the per-symbol view out of the SAME cached
+live/congresstrading feed the screener uses (no more per-symbol historical fan-out;
+congress is fetched at most once per cycle total). Wired via SignalAggregator(cfg,
+quiver) + ScreenerAggregator(cfg, quiver) sharing one instance. Tests:
+tests/test_quiver_client.py (cache dedupe, new_cycle refresh, disabled, 429 mapping,
+congress scoring from the shared feed).
+
+ADDING A DATASET IS NOW TRIVIAL (the infra is in place):
+- screener: subclass Screener; in scan() call self.quiver.live("<dataset>"); add the
+  class to screener/aggregator._REGISTRY and (if Quiver-backed) _QUIVER_SCREENERS so
+  it gets the shared client.
+- signal: subclass SignalProvider taking (cfg, quiver); in fetch() read
+  self.quiver.live("<dataset>") and filter by symbol; add to SignalAggregator.
+- VERIFY THE RESPONSE SCHEMA against Quiver docs before scoring (field names differ
+  per dataset). Next datasets, ranked: offexchange (dark-pool, ~1d, signal+screener),
+  wallstreetbets (screener), govcontracts (signal). safe_fetch/safe_scan already make
+  a wrong endpoint degrade to [], so each can be added + paper-tested independently.
+
 3. Next improvements to the model
 Grouped by impact:
 
