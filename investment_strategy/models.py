@@ -25,6 +25,7 @@ class SignalKind(str, Enum):
     INSIDER = "insider"
     CONGRESS = "congress"
     MACRO = "macro"
+    DISCOVERY = "discovery"   # why a symbol was surfaced by the market scanner
 
 
 class Signal(BaseModel):
@@ -43,6 +44,29 @@ class SignalBundle(BaseModel):
     symbol: str
     signals: list[Signal] = Field(default_factory=list)
     market_context: list[Signal] = Field(default_factory=list)  # macro etc.
+
+
+class Candidate(BaseModel):
+    """A ticker surfaced by the market scanner BEFORE any per-symbol signals are
+    gathered. The scanner discovers *which* names to evaluate; the signal layer
+    then scores them and Claude decides. `score` is the combined smart-money lean
+    (-1 bearish .. +1 bullish); `sources` lists which screeners flagged it."""
+    symbol: str
+    sources: list[str] = Field(default_factory=list)
+    reason: str                          # human/LLM-readable "why surfaced"
+    score: float = 0.0
+
+    def to_signal(self) -> Signal:
+        """Render as a DISCOVERY signal so the candidate's rationale rides through
+        the normal bundle -> prompt -> ledger path, and so a discovered name with
+        no other signals still carries at least one (and isn't dropped by gather)."""
+        return Signal(
+            kind=SignalKind.DISCOVERY,
+            symbol=self.symbol,
+            summary=self.reason,
+            score=self.score,
+            source="+".join(self.sources) or "scanner",
+        )
 
 
 # --------------------------------------------------------------------------- #

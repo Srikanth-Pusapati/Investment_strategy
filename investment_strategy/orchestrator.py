@@ -20,10 +20,11 @@ from .config import Config
 from .decision import DecisionEngine
 from .execution import AlpacaClient, OptionsHelper
 from .ledger import TradeLedger, TradeRecord
-from .models import Instrument, RiskVerdict, TradeProposal
+from .models import Candidate, Instrument, RiskVerdict, SignalBundle, TradeProposal
 from .monitor import Watchdog
 from .portfolio import RobinhoodReader
 from .risk import RiskManager
+from .screener import ScreenerAggregator
 from .signals import SignalAggregator
 from .state import PortfolioState
 
@@ -39,6 +40,7 @@ class Orchestrator:
         self.cfg = cfg
         self.broker = AlpacaClient(cfg)
         self.signals = SignalAggregator(cfg)
+        self.screeners = ScreenerAggregator(cfg)
         self.engine = DecisionEngine(cfg)
         # One persisted risk-state instance shared by the risk gate and watchdog
         # so peak equity, the drawdown halt, and the halt latch are consistent.
@@ -147,9 +149,17 @@ class Orchestrator:
 
         self._reconcile_fills()
         account = self.broker.get_account()
-        symbols = sorted(set(self.watchlist) | {p.symbol for p in account.positions})
+
+        # Watchlist + current holdings are always evaluated; the scanner widens
+        # this with NEW smart-money names so buy ideas can originate from the
+        # market, not just a hand-typed list. Everything still flows through the
+        # same signals -> decide -> risk path below.
+        base = set(self.watchlist) | {p.symbol for p in account.positions}
+        discovered = self.screeners.scan(exclude=base) if self.cfg.screener.enabled else []
+        symbols = sorted(base | {c.symbol for c in discovered})
 
         bundles = self.signals.gather(symbols)
+        self._inject_discovery(bundles, discovered)
         bench_stats = self.benchmark.compute()
         bench_line = self.benchmark.context_line(bench_stats)
         external = self.robinhood.holdings()
@@ -164,6 +174,26 @@ class Orchestrator:
                 self._handle_option(proposal, account)
             else:
                 self._handle_equity(proposal, account)
+
+    def _inject_discovery(
+        self, bundles: list[SignalBundle], discovered: list[Candidate]
+    ) -> None:
+        """Attach each scanner candidate's 'why' as a leading DISCOVERY signal so
+        Claude sees why a name surfaced. Names that gathered no other signals get
+        a fresh bundle (gather drops empty ones) so they're still evaluated."""
+        if not discovered:
+            return
+        by_symbol = {b.symbol: b for b in bundles}
+        context = bundles[0].market_context if bundles else []
+        for cand in discovered:
+            bundle = by_symbol.get(cand.symbol)
+            if bundle is None:
+                bundle = SignalBundle(
+                    symbol=cand.symbol, signals=[], market_context=context
+                )
+                by_symbol[cand.symbol] = bundle
+                bundles.append(bundle)
+            bundle.signals.insert(0, cand.to_signal())
 
     # -- fill reconciliation ------------------------------------------------ #
     def _reconcile_fills(self) -> None:

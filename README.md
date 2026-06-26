@@ -10,14 +10,25 @@ watchdog standing between the model and your money.
 
 ## How it works
 
-Four loosely-coupled stages:
+Five loosely-coupled stages:
 
 ```
-SIGNALS ──▶ DECISION ──▶ EXECUTE ──▶ MONITOR
-ingest      Claude +     Alpaca      24/5 watchdog
-data        risk caps    brackets    stops / exits
+SCAN ──▶ SIGNALS ──▶ DECISION ──▶ EXECUTE ──▶ MONITOR
+find     ingest      Claude +     Alpaca      24/5 watchdog
+names    data        risk caps    brackets    stops / exits
 ```
 
+0. **Scan** ([screener/](investment_strategy/screener/)) — the discovery layer.
+   Before any per-symbol work, it scans the market for **smart-money** activity and
+   surfaces NEW candidate tickers (on top of `WATCHLIST` + current holdings), so buy
+   ideas can originate from the market instead of a hand-typed list:
+   - **Insider Form-4 cluster buys** across all issuers via SEC EDGAR *(free)*
+   - **Congressional buying** across all tickers via Quiver *(needs `QUIVER_API_KEY`)*
+   - **Unusual options flow** on the most-active names via Polygon *(needs `POLYGON_API_KEY`)*
+
+   Candidates are deduped, confidence-weighted, ranked, and capped
+   (`MAX_DISCOVERED_CANDIDATES`); each then flows through the exact same signal →
+   Claude → **RiskManager** → execute path below. Gate it with `SCREENER_ENABLED`.
 1. **Signals** ([signals/](investment_strategy/signals/)) — pluggable data
    sources, each normalized to a `Signal`:
    - **Fundamentals** (EBITDA, margins, leverage) via yfinance — works with no API key

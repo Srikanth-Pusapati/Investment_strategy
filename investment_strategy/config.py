@@ -57,6 +57,18 @@ class RiskLimits:
 
 
 @dataclass(frozen=True)
+class ScreenerConfig:
+    """Market-discovery layer: scans for smart-money activity and surfaces NEW
+    candidate tickers BEFORE the per-symbol signal layer runs. Bounded so a wide
+    scan can't blow up API spend or the decision prompt."""
+    enabled: bool                    # master gate for the discovery scan
+    sources: tuple[str, ...]         # which screeners to run (congress/insider/options_flow)
+    max_candidates: int              # hard cap on discovered names per cycle
+    min_score: float                 # drop candidates whose |smart-money score| is below this
+    options_flow_scan_limit: int     # size of the most-actives pool the flow screener scans
+
+
+@dataclass(frozen=True)
 class Config:
     mode: TradingMode
     kill_switch: bool
@@ -96,6 +108,7 @@ class Config:
     state_file: str
 
     risk: RiskLimits
+    screener: ScreenerConfig
 
     @property
     def is_live(self) -> bool:
@@ -178,6 +191,19 @@ def load_config() -> Config:
             target_annual_vol_pct=_f("TARGET_ANNUAL_VOL_PCT", 25.0),
             options_enabled=_flag("OPTIONS_ENABLED"),
             max_option_premium_pct=_f("MAX_OPTION_PREMIUM_PCT", 1.0),
+        ),
+        screener=ScreenerConfig(
+            enabled=_flag("SCREENER_ENABLED", "on"),
+            sources=tuple(
+                s.strip().lower()
+                for s in os.getenv(
+                    "SCREENER_SOURCES", "congress,insider,options_flow"
+                ).split(",")
+                if s.strip()
+            ),
+            max_candidates=_i("MAX_DISCOVERED_CANDIDATES", 12),
+            min_score=_f("SCREENER_MIN_SCORE", 0.2),
+            options_flow_scan_limit=_i("OPTIONS_FLOW_SCAN_LIMIT", 40),
         ),
     )
 

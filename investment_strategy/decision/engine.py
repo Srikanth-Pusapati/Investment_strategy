@@ -16,6 +16,7 @@ from ..models import (
     AccountSnapshot,
     ExternalHolding,
     SignalBundle,
+    SignalKind,
     TradeProposal,
 )
 from .prompts import PROPOSALS_SCHEMA, SYSTEM_PROMPT
@@ -126,11 +127,13 @@ class DecisionEngine:
         lines.append("## Candidates")
         for b in bundles:
             pos = account.position_for(b.symbol)
-            held = (
-                f" (HELD: {pos.qty:g} sh, {pos.unrealized_pl_pct:+.1f}%)"
-                if pos else ""
-            )
-            lines.append(f"### {b.symbol}{held}")
+            if pos:
+                tag = f" (HELD: {pos.qty:g} sh, {pos.unrealized_pl_pct:+.1f}%)"
+            elif any(s.kind is SignalKind.DISCOVERY for s in b.signals):
+                tag = " (NEW — surfaced by scanner)"
+            else:
+                tag = ""
+            lines.append(f"### {b.symbol}{tag}")
             for s in b.signals:
                 score = f" score={s.score:+.2f}" if s.score is not None else ""
                 lines.append(f"- [{s.kind.value}]{score} {self._safe(s.summary)}")
