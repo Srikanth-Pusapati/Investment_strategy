@@ -38,8 +38,14 @@ class RiskLimits:
     max_position_pct: float          # max % equity in a single NEW position
     max_symbol_exposure_pct: float   # max total % equity per symbol
     max_daily_loss_pct: float        # halt new trades past this day loss
+    max_drawdown_pct: float          # halt new buys past this PEAK-to-trough DD
+    equity_floor_usd: float          # liquidate + latch halt below this equity (0=off)
     max_open_positions: int          # cap concurrent holdings
     min_cash_buffer_pct: float       # never deploy below this cash reserve
+    min_trade_price_usd: float       # refuse buys below this price (liquidity guard)
+    # --- fractional shares (for small accounts) ---
+    fractional_enabled: bool         # allow sub-share notional buys (no exchange bracket)
+    min_order_usd: float             # smallest $ order worth placing (Alpaca min is $1)
     default_stop_loss_pct: float     # bracket stop distance
     default_take_profit_pct: float   # bracket take-profit distance
     # --- survival-first sizing (vol-targeted, fractional-Kelly style) ---
@@ -62,6 +68,7 @@ class Config:
     anthropic_api_key: str
     decision_model: str
     decision_effort: str
+    decision_timeout_s: float        # hard cap on the LLM decision call
 
     fmp_api_key: str
     finnhub_api_key: str
@@ -81,6 +88,12 @@ class Config:
 
     decision_interval_s: int
     monitor_interval_s: int
+
+    # Runtime control plane — checked every loop so you can intervene WITHOUT
+    # restarting. Creating kill_switch_file halts new buys; state_file persists
+    # the drawdown high-water mark and the halt latch across restarts.
+    kill_switch_file: str
+    state_file: str
 
     risk: RiskLimits
 
@@ -128,6 +141,7 @@ def load_config() -> Config:
             in {"low", "medium", "high", "xhigh", "max"}
             else "medium"
         ),
+        decision_timeout_s=_f("DECISION_TIMEOUT_SECONDS", 90.0),
         fmp_api_key=os.getenv("FMP_API_KEY", ""),
         finnhub_api_key=os.getenv("FINNHUB_API_KEY", ""),
         quiver_api_key=os.getenv("QUIVER_API_KEY", ""),
@@ -145,12 +159,19 @@ def load_config() -> Config:
         benchmark_symbol=os.getenv("BENCHMARK_SYMBOL", "QQQ").upper(),
         decision_interval_s=_i("DECISION_INTERVAL_SECONDS", 900),
         monitor_interval_s=_i("MONITOR_INTERVAL_SECONDS", 30),
+        kill_switch_file=os.getenv("KILL_SWITCH_FILE", "state/KILL"),
+        state_file=os.getenv("STATE_FILE", "state/risk_state.json"),
         risk=RiskLimits(
             max_position_pct=_f("MAX_POSITION_PCT", 5.0),
             max_symbol_exposure_pct=_f("MAX_SYMBOL_EXPOSURE_PCT", 10.0),
             max_daily_loss_pct=_f("MAX_DAILY_LOSS_PCT", 3.0),
+            max_drawdown_pct=_f("MAX_DRAWDOWN_PCT", 15.0),
+            equity_floor_usd=_f("EQUITY_FLOOR_USD", 0.0),
             max_open_positions=_i("MAX_OPEN_POSITIONS", 15),
             min_cash_buffer_pct=_f("MIN_CASH_BUFFER_PCT", 10.0),
+            min_trade_price_usd=_f("MIN_TRADE_PRICE_USD", 5.0),
+            fractional_enabled=_flag("FRACTIONAL_ENABLED", "on"),
+            min_order_usd=_f("MIN_ORDER_USD", 1.0),
             default_stop_loss_pct=_f("DEFAULT_STOP_LOSS_PCT", 5.0),
             default_take_profit_pct=_f("DEFAULT_TAKE_PROFIT_PCT", 12.0),
             kelly_fraction=_f("KELLY_FRACTION", 0.5),
