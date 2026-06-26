@@ -8,6 +8,8 @@ from __future__ import annotations
 
 import os
 import sys
+import tempfile
+import uuid
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -24,6 +26,16 @@ from investment_strategy.models import (
 )
 from investment_strategy.risk import RiskManager
 from investment_strategy.state import PortfolioState
+
+
+def _rm(limits, *, kill_switch=False, state=None) -> RiskManager:
+    """Build a RiskManager with ISOLATED risk state. Without this, the default
+    PortfolioState() reads the real state/risk_state.json, whose persisted peak
+    equity leaks a false ~98% drawdown into small-account tests."""
+    if state is None:
+        p = os.path.join(tempfile.gettempdir(), f"_rm_test_{uuid.uuid4().hex}.json")
+        state = PortfolioState(path=p)
+    return RiskManager(limits, kill_switch=kill_switch, state=state)
 
 
 def _limits(**over) -> RiskLimits:
@@ -75,7 +87,7 @@ def _buy(symbol="AAPL", conviction=1.0, weight=100.0) -> TradeProposal:
 # Equity buys
 # --------------------------------------------------------------------------- #
 def test_buy_clamped_to_max_position_pct():
-    rm = RiskManager(_limits(kelly_fraction=0.0))  # disable kelly -> max cap path
+    rm = _rm(_limits(kelly_fraction=0.0))  # disable kelly -> max cap path
     d = rm.evaluate(_buy(weight=100.0), _account(), price=100.0, volatility=0.3)
     assert d.verdict in (RiskVerdict.APPROVED, RiskVerdict.RESIZED), d.reason
     # max_position_pct=5% of 100k = $5k -> 50 shares at $100
@@ -84,7 +96,7 @@ def test_buy_clamped_to_max_position_pct():
 
 
 def test_missing_vol_sizes_down_not_up():
-    rm = RiskManager(_limits())
+    rm = _rm(_limits())
     with_vol = rm.evaluate(_buy(), _account(), price=100.0, volatility=0.25)
     no_vol = rm.evaluate(_buy(), _account(), price=100.0, volatility=None)
     # Unknown vol assumes a HIGH vol (0.60) so the size must not exceed the known
@@ -93,7 +105,7 @@ def test_missing_vol_sizes_down_not_up():
 
 
 def test_min_trade_price_guard():
-    rm = RiskManager(_limits(min_trade_price_usd=5.0))
+    rm = _rm(_limits(min_trade_price_usd=5.0))
     d = rm.evaluate(_buy(), _account(), price=2.0, volatility=0.3)
     assert d.verdict is RiskVerdict.REJECTED
     assert "liquidity" in d.reason.lower() or "below min" in d.reason.lower()
@@ -101,7 +113,7 @@ def test_min_trade_price_guard():
 
 def test_cash_buffer_respected():
     # Almost no deployable cash: 10% buffer of 100k = 10k reserved, only 10.5k cash.
-    rm = RiskManager(_limits())
+    rm = _rm(_limits())
     acct = _account(cash=10_500.0, buying_power=10_500.0)
     d = rm.evaluate(_buy(), acct, price=100.0, volatility=0.25)
     # Deployable ~= 500 -> at most 5 shares ($500), well under the position cap.
@@ -109,7 +121,7 @@ def test_cash_buffer_respected():
 
 
 def test_symbol_exposure_cap_counts_pending():
-    rm = RiskManager(_limits(max_symbol_exposure_pct=10.0))
+    rm = _rm(_limits(max_symbol_exposure_pct=10.0))
     # Already holding $9k of a 10k cap, plus $1k pending -> no room left.
     acct = _account(positions=[_pos(qty=90, price=100.0)])  # $9k held
     d = rm.evaluate(_buy(), acct, price=100.0, volatility=0.25, pending_buy_notional=1000.0)
@@ -119,7 +131,7 @@ def test_symbol_exposure_cap_counts_pending():
 
 def test_fractional_buy_under_one_share():
     # Small account: 5% of $2,000 = $100 budget on a $300 stock -> sub-share.
-    rm = RiskManager(_limits(kelly_fraction=0.0))  # use the full position cap
+    rm = _rm(_limits(kelly_fraction=0.0))  # use the full position cap
     acct = _account(equity=2_000.0, cash=2_000.0, buying_power=2_000.0, last_equity=2_000.0)
     d = rm.evaluate(_buy(), acct, price=300.0, volatility=0.3)
     assert d.verdict in (RiskVerdict.APPROVED, RiskVerdict.RESIZED), d.reason
@@ -128,7 +140,7 @@ def test_fractional_buy_under_one_share():
 
 
 def test_fractional_disabled_rejects_sub_share():
-    rm = RiskManager(_limits(fractional_enabled=False, kelly_fraction=0.0))
+    rm = _rm(_limits(fractional_enabled=False, kelly_fraction=0.0))
     acct = _account(equity=2_000.0, cash=2_000.0, buying_power=2_000.0, last_equity=2_000.0)
     d = rm.evaluate(_buy(), acct, price=300.0, volatility=0.3)  # $100 budget < $300
     assert d.verdict is RiskVerdict.REJECTED
@@ -136,7 +148,7 @@ def test_fractional_disabled_rejects_sub_share():
 
 def test_min_order_floor_rejects_dust():
     # Budget below the min order $ -> not worth placing even fractionally.
-    rm = RiskManager(_limits(min_order_usd=50.0, kelly_fraction=0.0, max_position_pct=1.0))
+    rm = _rm(_limits(min_order_usd=50.0, kelly_fraction=0.0, max_position_pct=1.0))
     acct = _account(equity=2_000.0, cash=2_000.0, buying_power=2_000.0, last_equity=2_000.0)
     d = rm.evaluate(_buy(), acct, price=300.0, volatility=0.3)  # 1% of 2k = $20 < $50
     assert d.verdict is RiskVerdict.REJECTED
@@ -147,7 +159,7 @@ def test_min_order_floor_rejects_dust():
 # Account-wide halts
 # --------------------------------------------------------------------------- #
 def test_daily_loss_halts_new_buys():
-    rm = RiskManager(_limits(max_daily_loss_pct=3.0))
+    rm = _rm(_limits(max_daily_loss_pct=3.0))
     acct = _account(equity=96_000.0, last_equity=100_000.0)  # -4% day
     d = rm.evaluate(_buy(), acct, price=100.0, volatility=0.25)
     assert d.verdict is RiskVerdict.REJECTED
@@ -157,7 +169,7 @@ def test_daily_loss_halts_new_buys():
 def test_drawdown_halts_new_buys():
     state = PortfolioState(path="/tmp/_does_not_persist_dd.json")
     state.peak_equity = 100_000.0
-    rm = RiskManager(_limits(max_drawdown_pct=15.0), state=state)
+    rm = _rm(_limits(max_drawdown_pct=15.0), state=state)
     acct = _account(equity=80_000.0, last_equity=80_000.0)  # 20% off peak
     d = rm.evaluate(_buy(), acct, price=100.0, volatility=0.25)
     assert d.verdict is RiskVerdict.REJECTED
@@ -165,7 +177,7 @@ def test_drawdown_halts_new_buys():
 
 
 def test_kill_switch_blocks_buys_but_not_sells():
-    rm = RiskManager(_limits(), kill_switch=True)
+    rm = _rm(_limits(), kill_switch=True)
     buy = rm.evaluate(_buy(), _account(), price=100.0, volatility=0.25)
     assert buy.verdict is RiskVerdict.REJECTED
     acct = _account(positions=[_pos()])
@@ -178,7 +190,7 @@ def test_kill_switch_blocks_buys_but_not_sells():
 
 
 def test_max_open_positions_halt():
-    rm = RiskManager(_limits(max_open_positions=2))
+    rm = _rm(_limits(max_open_positions=2))
     acct = _account(positions=[_pos("AAPL"), _pos("MSFT")])
     d = rm.evaluate(_buy("NVDA"), acct, price=100.0, volatility=0.25)
     assert d.verdict is RiskVerdict.REJECTED
@@ -189,7 +201,7 @@ def test_max_open_positions_halt():
 # Sells
 # --------------------------------------------------------------------------- #
 def test_sell_without_position_rejected():
-    rm = RiskManager(_limits())
+    rm = _rm(_limits())
     d = rm.evaluate(
         TradeProposal(symbol="AAPL", action=Action.SELL, conviction=1.0,
                       target_weight_pct=0.0, rationale="exit"),
@@ -199,7 +211,7 @@ def test_sell_without_position_rejected():
 
 
 def test_sell_approves_full_held_qty():
-    rm = RiskManager(_limits())
+    rm = _rm(_limits())
     acct = _account(positions=[_pos(qty=37.0)])
     d = rm.evaluate(
         TradeProposal(symbol="AAPL", action=Action.SELL, conviction=1.0,
@@ -222,7 +234,7 @@ def _opt(strategy, legs) -> TradeProposal:
 
 
 def test_options_disabled_rejected():
-    rm = RiskManager(_limits(options_enabled=False))
+    rm = _rm(_limits(options_enabled=False))
     p = _opt(OptionStrategy.LONG_CALL,
              [OptionLeg(expiry="2026-07-17", strike=200, right="call", side=Action.BUY)])
     d = rm.evaluate_option(p, _account(), est_premium_per_contract=2.0)
@@ -230,7 +242,7 @@ def test_options_disabled_rejected():
 
 
 def test_naked_short_call_rejected():
-    rm = RiskManager(_limits(options_enabled=True))
+    rm = _rm(_limits(options_enabled=True))
     p = _opt(OptionStrategy.BULL_CALL_SPREAD,
              [OptionLeg(expiry="2026-07-17", strike=210, right="call", side=Action.SELL)])
     d = rm.evaluate_option(p, _account(), est_premium_per_contract=2.0)
@@ -239,7 +251,7 @@ def test_naked_short_call_rejected():
 
 
 def test_net_credit_rejected():
-    rm = RiskManager(_limits(options_enabled=True))
+    rm = _rm(_limits(options_enabled=True))
     p = _opt(OptionStrategy.LONG_CALL,
              [OptionLeg(expiry="2026-07-17", strike=200, right="call", side=Action.BUY)])
     d = rm.evaluate_option(p, _account(), est_premium_per_contract=-1.0)  # credit
@@ -247,7 +259,7 @@ def test_net_credit_rejected():
 
 
 def test_defined_risk_spread_approved_and_premium_capped():
-    rm = RiskManager(_limits(options_enabled=True, max_option_premium_pct=1.0))
+    rm = _rm(_limits(options_enabled=True, max_option_premium_pct=1.0))
     legs = [
         OptionLeg(expiry="2026-07-17", strike=200, right="call", side=Action.BUY),
         OptionLeg(expiry="2026-07-17", strike=210, right="call", side=Action.SELL),
