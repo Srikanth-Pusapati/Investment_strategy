@@ -19,3 +19,6 @@ venv/
 .env.example
 *.log
 state/
+
+# ---- Generated artifacts ----
+dashboard.html
