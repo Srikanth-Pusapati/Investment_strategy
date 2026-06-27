@@ -96,8 +96,21 @@ congress scoring from the shared feed).
   clean 40-char token and works. But naive shell parsing (cut/grep) keeps the comment
   and sends a malformed token -> HTTP 500. Use scripts/inspect_quiver.py (load_dotenv)
   to probe, not raw curl one-liners.
-Still untapped (same trivial pattern, all likely need a higher tier — check first):
-govcontracts (signal), senate/house split, lobbying, 13F.
+[TIER MAP 2026-06-27] scripts/quiver_access.py probes every dataset's access on
+the current token (Hobbyist Monthly). Results:
+  HAVE (paid, usable now): congresstrading, senatetrading, housetrading,
+    offexchange, govcontracts, govcontractsall, lobbying, flights
+  NEED UPGRADE (403): wallstreetbets, insiders, sec13f/sec13fchanges (13F),
+    patentdrift, twitter
+Untapped but ALREADY PAID — wire these next (ranked):
+  1. govcontracts — hard future-revenue catalyst per ticker (HIGH value). AVAILABLE.
+  2. senatetrading + housetrading — finer than aggregate congress; some members
+     outperform. AVAILABLE.
+  3. lobbying — slow regulatory-tailwind tell (weak). AVAILABLE.
+  4. flights — corporate-jet tracking, occasional M&A hint (niche). AVAILABLE.
+Note: Quiver `insiders` needs upgrade, but we already get insider data FREE via
+Finnhub + SEC EDGAR — no loss. 13F + WSB would need a plan bump.
+Re-run scripts/quiver_access.py after any plan change to refresh this map.
 
 ADDING A DATASET IS NOW TRIVIAL (the infra is in place):
 - screener: subclass Screener; in scan() call self.quiver.live("<dataset>"); add the
