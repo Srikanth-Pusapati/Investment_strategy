@@ -90,6 +90,16 @@ def test_offexchange_alternate_field_names():
     assert abs(prov.fetch(["T"])[0].data["short_ratio"] - 0.6) < 1e-9
 
 
+def test_offexchange_real_live_schema_row():
+    # Exact row shape from live/offexchange (verified 2026-06-26).
+    feed = [{"Ticker": "ADTX", "Date": "2026-06-22",
+             "OTC_Short": 439923174, "OTC_Total": 859031869, "DPI": 0.51211508}]
+    prov = OffExchangeProvider(_cfg(), _FakeQuiver({"offexchange": feed}))
+    sig = prov.fetch(["ADTX"])[0]
+    assert abs(sig.data["short_ratio"] - 0.512) < 1e-3   # ~51% short -> mild bearish
+    assert sig.score < 0 and sig.data["dpi"] == 0.51211508
+
+
 def test_offexchange_ignores_unwanted_symbols():
     feed = [{"Ticker": "ZZZ", "Date": "2099-01-05", "Sht_Vol": 70, "Tot_Vol": 100}]
     prov = OffExchangeProvider(_cfg(), _FakeQuiver({"offexchange": feed}))

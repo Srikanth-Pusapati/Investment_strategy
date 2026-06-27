@@ -2,7 +2,9 @@
   "permissions": {
     "allow": [
       "Bash(.venv/bin/python tests/test_quiver_datasets.py)",
-      "Bash(.venv/bin/python -c ' *)"
+      "Bash(.venv/bin/python -c ' *)",
+      "Bash(.venv/bin/python scripts/inspect_quiver.py)",
+      "Bash(.venv/bin/python -m pytest tests/test_quiver_datasets.py -q)"
     ]
   }
 }

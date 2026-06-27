@@ -113,6 +113,12 @@ class QuiverClient:
         if r.status_code == 429:
             log.info("Quiver 429 on %s — backing off.", path)
             raise _Retryable("rate limited (429)")
+        if r.status_code == 403:
+            # Dataset not on the current plan — log loudly ONCE-ish so an opt-in
+            # source isn't mistaken for "configured but silently empty".
+            log.warning("Quiver %s HTTP 403 — not on your plan: %s",
+                        path, r.text[:120].strip())
+            return []
         if r.status_code != 200:
             log.debug("Quiver %s HTTP %s", path, r.status_code)
             return []

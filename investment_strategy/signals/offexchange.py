@@ -12,10 +12,10 @@ The lean is deliberately damped (capped at ±0.6) because off-exchange short vol
 is noisy — much of it is market-maker hedging of retail flow, not directional
 conviction — so it's a timing/positioning tell, never a standalone thesis.
 
-SCHEMA NOTE: field names are parsed defensively (several candidate keys) because
-the exact Quiver payload isn't pinned here — VERIFY against the live response and
-trim the candidate lists once confirmed. A row that yields neither a short ratio
-nor a DPI is skipped (degrades to no signal), never guessed.
+SCHEMA: verified against live live/offexchange on 2026-06-26 — a row is
+{"Ticker", "Date", "OTC_Short", "OTC_Total", "DPI"} (DPI ≈ OTC_Short/OTC_Total).
+Parsing stays defensive (confirmed keys first, alternates kept) and a row that
+yields neither a short ratio nor a DPI is skipped, never guessed.
 """
 from __future__ import annotations
 
@@ -26,9 +26,9 @@ from ..models import Signal, SignalKind
 from .base import SignalProvider
 from .quiver_client import QuiverClient
 
-# Candidate field names (first present wins). Trim once the live schema is confirmed.
-_SHORT_KEYS = ("Sht_Vol", "ShortVolume", "short_volume", "OTC_Short")
-_TOTAL_KEYS = ("Tot_Vol", "TotalVolume", "total_volume", "OTC_Total")
+# Confirmed live keys first; alternates kept as a cheap hedge against schema drift.
+_SHORT_KEYS = ("OTC_Short", "Sht_Vol", "ShortVolume", "short_volume")
+_TOTAL_KEYS = ("OTC_Total", "Tot_Vol", "TotalVolume", "total_volume")
 _DPI_KEYS = ("DPI", "DarkPoolIndex", "dpi")
 _DATE_KEYS = ("Date", "date")
 _TICKER_KEYS = ("Ticker", "ticker", "Symbol")

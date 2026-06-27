@@ -76,11 +76,28 @@ congress scoring from the shared feed).
   by mention volume vs the busiest name; bullish by default, sentiment-signed).
   Registered in the screener _REGISTRY + _QUIVER_SCREENERS; opt-in via SCREENER_SOURCES.
 - Both parse fields DEFENSIVELY (alternate key names) and SKIP unusable rows rather
-  than guess. Tests: tests/test_quiver_datasets.py (13 cases, MOCKED feeds — market
-  closed for the weekend). *** VERIFY the live JSON field names against Quiver docs
-  and trim the candidate key lists in each file before trusting these in live mode. ***
-Still untapped (same trivial pattern): govcontracts (signal), senate/house split,
-lobbying, 13F.
+  than guess. Tests: tests/test_quiver_datasets.py.
+
+[VERIFIED LIVE 2026-06-26] Probed the real API (scripts/inspect_quiver.py):
+- OFF-EXCHANGE confirmed working: live row = {Ticker, Date, OTC_Short, OTC_Total,
+  DPI}; DPI ≈ OTC_Short/OTC_Total. Parser keys updated (confirmed first). Ran the
+  provider end-to-end on real data — sensible readings (e.g. NVDA 32% short ->
+  +0.21 buy-side lean; GME 61% -> -0.13 short pressure), one shared pull serves all
+  symbols. Real sample locked into the tests.
+- CONGRESS confirmed: live keys include Ticker/Transaction/TransactionDate (+ReportDate,
+  ExcessReturn, etc.) — existing parser matches, no change.
+- WALLSTREETBETS -> HTTP 403 "Upgrade your subscription plan to access this dataset."
+  NOT on the current Quiver plan. The screener stays registered (opt-in) but is inert
+  until upgraded; the client now logs a clear 403 "not on your plan" warning instead
+  of silent-empty. To enable: upgrade the Quiver tier, then add wallstreetbets to
+  SCREENER_SOURCES.
+- KEY GOTCHA (not a bug in the app): .env has an inline comment after QUIVER_API_KEY
+  (`KEY=xxx # quiverquant.com (...)`). python-dotenv strips it, so the app gets the
+  clean 40-char token and works. But naive shell parsing (cut/grep) keeps the comment
+  and sends a malformed token -> HTTP 500. Use scripts/inspect_quiver.py (load_dotenv)
+  to probe, not raw curl one-liners.
+Still untapped (same trivial pattern, all likely need a higher tier — check first):
+govcontracts (signal), senate/house split, lobbying, 13F.
 
 ADDING A DATASET IS NOW TRIVIAL (the infra is in place):
 - screener: subclass Screener; in scan() call self.quiver.live("<dataset>"); add the
