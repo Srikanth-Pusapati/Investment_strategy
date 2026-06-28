@@ -1,144 +1,87 @@
-***1. Go through https://github.com/TauricResearch/TradingAgents
-for all the relevence on how its designed and how our current model differs
-how we can improve our model based on that Trading Agent work done*****
+================================================================================
+ACTIVE TODO  (completed items moved to completed.txt)
+================================================================================
+Reference infra that's already in place:
+- Shared per-cycle Quiver client: signals/quiver_client.py (Bearer auth, 429
+  backoff, per-cycle cache). new_cycle() at top of each decision cycle.
+- safe_fetch / safe_scan make a flaky/wrong endpoint degrade to [] (no crash).
+- Adding a dataset is now trivial:
+  * screener: subclass Screener; in scan() call self.quiver.live("<dataset>");
+    add to screener/aggregator._REGISTRY and (if Quiver-backed) _QUIVER_SCREENERS.
+  * signal: subclass SignalProvider(cfg, quiver); in fetch() read
+    self.quiver.live("<dataset>") and filter by symbol; add to SignalAggregator.
+  * VERIFY THE RESPONSE SCHEMA against Quiver docs / scripts/inspect_quiver.py
+    before scoring (field names differ per dataset).
+Cross-cutting cautions when adding datasets:
+- Token cost scales with signals (every dataset lands in the Opus prompt). Keep
+  each provider's summary terse; rely on the numeric score, don't dump payloads.
+- Weight by lag in the score, not just presence. Congress (~45d) must not move
+  size like off-exchange (~1d). Apply the cluster-saturation discipline per set.
+- MAX_DISCOVERED_CANDIDATES=12 is the screener backpressure valve; keep it modest.
+  Corroboration (a name flagged by multiple sources) auto-ranks via score summing
+  in screener/aggregator.py.
 
---- ANALYSIS + PROGRESS (2026-06-26) ---
-TradingAgents design: LLM analyst team (Fundamentals/Sentiment/News/Technical)
--> Bull vs Bear researcher DEBATE (N rounds) -> Trader -> LLM risk team ->
-Portfolio Manager. LangGraph, many LLM calls/ticker. Persistent memory at
-~/.tradingagents/memory: realized return + alpha vs SPY reflected back into the
-PM prompt each run.
+--------------------------------------------------------------------------------
+A. WIRE THE UNTAPPED ALREADY-PAID QUIVER DATASETS  (ranked; all AVAILABLE now)
+--------------------------------------------------------------------------------
+[DONE 2026-06-28] 1. govcontracts (signal) — signals/govcontracts.py
+       (SignalKind.GOVCONTRACTS). Reads the shared live/govcontractsall feed
+       (recent dated awards: Ticker/Date/action_date/Amount/Agency/Description).
+       BULLISH-ONLY (an award is good news; absence isn't bad) — a saturating
+       award-count lean (1-e^-n/6, discriminates 1..50+ awards) + a top-end bump
+       for large total $, capped ±0.4 (size vs revenue unknown). 120d lookback.
+       Registered in SignalAggregator; prompt teaches it as a hard-but-slow
+       revenue catalyst. Verified live (BAH $390M/50 awards ranks top). Defensive
+       Amount parsing ($ / commas / string). Tests: test_quiver_datasets.py.
+[ ] 2. senatetrading + housetrading (signal) — finer than aggregate congress;
+       some members outperform. Endpoints live/senatetrading, live/housetrading.
+       Lag ~45d (weight accordingly).
+[ ] 3. lobbying (signal, weak) — slow regulatory-tailwind tell. live/lobbying.
+       Lag: weeks.
+[ ] 4. flights (signal, niche) — corporate-jet tracking, occasional M&A hint.
+       live/flights.
+   Blocked on plan upgrade (do NOT start until tier bumped): wallstreetbets
+   screener (already coded, inert), 13F institutional changes, twitter, insiders
+   (skip — we get insider data free via Finnhub + SEC EDGAR).
 
-How we differ (and why, deliberately):
-- They use LLM agents per analyst; we use NUMERIC SignalProviders + ONE Claude
-  call. Far cheaper in tokens (Todo item 2 warns about exactly this).
-- They DEBATE risk with LLM personas; we use a DETERMINISTIC risk core the LLM
-  cannot override. For real money this is a safety SUPERIORITY, not a gap — keep.
-- Genuine gaps we adopted from them:
-  [DONE] Technical analyst -> signals/technical.py (RSI/MACD/trend, yfinance, no
-         key). Registered in signals/aggregator.py; SignalKind.TECHNICAL added;
-         unit-tested in tests/test_technical.py (indicator math).
-  [DONE] Bull/Bear debate value imported CHEAPLY: prompt now has Claude reason
-         through the strongest bull AND bear case internally before setting
-         conviction (no extra agents/calls). See decision/prompts.py.
-  [DONE] Reflection/memory loop (their best idea; == Todo 3.1 signal attribution):
-         attribution.py reconstructs closed round-trips from the ledger, scores
-         each entry signal source by realized win-rate + avg P&L, and injects a
-         terse "## Track record" block into the decision prompt (trusted, outside
-         <market_data>). Ledger now stores entry_signals on buys + realized P&L on
-         exits; the WATCHDOG also records its stops/takes/trails/flattens so
-         attribution sees every close it controls. Known blind spot: exchange-side
-         bracket auto-fills (no code observes them). Tests: tests/test_attribution.py.
+--------------------------------------------------------------------------------
+B. DECISION QUALITY
+--------------------------------------------------------------------------------
+[ ] 5. Per-signal decay weighting in the prompt — formalize lag-based confidence
+       so Claude isn't told a 45-day-old congress filing and a 1-day dark-pool
+       print as equals. (Ties into weighting note above.)
+[DONE 2026-06-28] 6. Earnings-blackout guard — earnings.py EarningsCalendar
+       (yfinance next-earnings date, per-cycle cached, fails OPEN on unknown).
+       RiskLimits.earnings_blackout_days (env EARNINGS_BLACKOUT_DAYS, default 3;
+       0=off). risk._evaluate_buy REJECTS new buys within N days of the report
+       (gap risk dwarfs the stop); sells/exits never blacked out. Orchestrator
+       sources days-to-earnings for buys and passes it to risk.evaluate. The gate
+       itself stays deterministic/network-free. Tests: test_risk.py (6 cases),
+       test_earnings.py (date math, future-only, caching, fail-open).
 
-Explicitly NOT adopting: LangGraph multi-call orchestration, LLM-debated risk
-(would weaken the deterministic safety core), per-ticker multi-agent fan-out
-(token cost).
---- end analysis ---
+--------------------------------------------------------------------------------
+C. RISK / SIZING
+--------------------------------------------------------------------------------
+[ ] 7. Correlation-aware exposure cap — caps are per-symbol today, but
+       AAPL+MSFT+NVDA+GOOGL+META (default watchlist) are ~one tech-beta bet. Add
+       a sector/correlation cap so vol-targeting doesn't quietly concentrate.
+[ ] 8. Regime filter — gate aggressiveness on a market-regime read (SPY vs
+       200dma, VIX via the macro provider). Cut gross exposure in risk-off
+       regimes automatically.
 
-2. Quiver — getting the most out of your paid tier
-What you use today: only congressional trading — per-symbol historical (signals/congress.py) + the cross-ticker live feed (screener/congress_feed.py). That's ~10% of what you're paying for.
+--------------------------------------------------------------------------------
+D. OPERATIONAL
+--------------------------------------------------------------------------------
+[ ] 9. Backtest harness — no way to replay the strategy on history. Even a coarse
+       one (signals -> proposals -> simulated fills) would let you tune
+       KELLY_FRACTION, TARGET_ANNUAL_VOL_PCT, and stop/take before risking capital.
+[ ] 10. Alerting — the watchdog logs CRITICAL on failed closes (naked position)
+        but nothing pages you. Wire those to a notification (Gmail is available).
 
-The architecture makes adding datasets trivial — subclass SignalProvider (scores a known symbol) or Screener (discovers new symbols), and the safe_fetch/safe_scan wrapper guarantees a flaky endpoint returns [] instead of crashing the loop. Register in the relevant aggregator.
-
-Highest-value Quiver datasets to add, ranked by signal/timeliness:
-
-Dataset	Endpoint	Layer	Why	Lag
-Off-exchange / dark-pool short vol	live/offexchange	signal + screener	Most timely Quiver data (daily); institutional short pressure	~1 day
-WallStreetBets mentions	live/wallstreetbets	screener	Retail momentum/squeeze early-warning	~1 day
-Gov contracts	live/govcontracts	signal	Hard future-revenue catalyst per ticker	days
-Senate/House split	live/senatetrading,housetrading	signal	Some members outperform; finer than aggregate congress	~45d
-Lobbying spend	live/lobbying	signal (weak)	Slow regulatory-tailwind tell	weeks
-13F institutional changes	historical/sec13f...	signal (slow)	"Smart money" positioning	quarterly
-Caps / how to proceed (this is the important part):
-
-Rate limits are the real constraint. Quiver paid tiers are typically ~300 req/min. Your current code already has an inefficiency: congress is pulled twice (per-symbol historical fan-out in the signal layer and the live cross-ticker feed in the screener). The live feed already contains the per-symbol data. Fix: one shared, cached Quiver client — pull the live/bulk feed once per cycle, serve both layers from it. This is the single most important change before adding 5 more datasets, or you'll hit 429s.
-Prompt-token cost scales with signals. Every dataset you add lands in the decision prompt → more Opus output tokens (your dominant cost via DECISION_EFFORT). Keep each provider's summary terse and rely on the numeric score; don't dump raw payloads.
-Weight by lag in the score, not just presence. Congress (~45d lag) should never move size like off-exchange (~1d). The code already does cluster-saturation weighting for congress — apply the same discipline per dataset.
-MAX_DISCOVERED_CANDIDATES=12 is your backpressure valve on the screener fan-out. As you add screeners, corroboration (a name flagged by congress + dark-pool + WSB) auto-ranks to the top via score summing in screener/aggregator.py:60 — good. Keep the cap modest.
-Concrete first step I'd recommend: build signals/quiver_client.py — a shared client with Bearer auth, tenacity retry + 429 backoff (already a dep), and a per-cycle response cache keyed by (dataset, symbol). Then refactor the two existing congress callers onto it, then add offexchange and wallstreetbets. That's the cleanest path that also fixes the double-pull.
-
-[DONE 2026-06-26] signals/quiver_client.py shipped: QuiverClient with Bearer auth,
-tenacity 429/network backoff, and a per-cycle cache keyed by request path.
-new_cycle() is called at the top of each decision cycle (orchestrator) so data is
-fresh per cycle but pulled ONCE and shared. Both congress callers refactored onto
-it — the signal layer now reads the per-symbol view out of the SAME cached
-live/congresstrading feed the screener uses (no more per-symbol historical fan-out;
-congress is fetched at most once per cycle total). Wired via SignalAggregator(cfg,
-quiver) + ScreenerAggregator(cfg, quiver) sharing one instance. Tests:
-tests/test_quiver_client.py (cache dedupe, new_cycle refresh, disabled, 429 mapping,
-congress scoring from the shared feed).
-
-[DONE 2026-06-26] First two datasets added on the shared client:
-- OFF-EXCHANGE / dark-pool short volume -> signals/offexchange.py (SignalKind.
-  OFFEXCHANGE; per-symbol short_vol/total ratio, damped ±0.6; ~1d lag, weighted up
-  vs congress in the prompt). Registered in SignalAggregator.
-- WALLSTREETBETS mention surges -> screener/wallstreetbets_feed.py (self-calibrated
-  by mention volume vs the busiest name; bullish by default, sentiment-signed).
-  Registered in the screener _REGISTRY + _QUIVER_SCREENERS; opt-in via SCREENER_SOURCES.
-- Both parse fields DEFENSIVELY (alternate key names) and SKIP unusable rows rather
-  than guess. Tests: tests/test_quiver_datasets.py.
-
-[VERIFIED LIVE 2026-06-26] Probed the real API (scripts/inspect_quiver.py):
-- OFF-EXCHANGE confirmed working: live row = {Ticker, Date, OTC_Short, OTC_Total,
-  DPI}; DPI ≈ OTC_Short/OTC_Total. Parser keys updated (confirmed first). Ran the
-  provider end-to-end on real data — sensible readings (e.g. NVDA 32% short ->
-  +0.21 buy-side lean; GME 61% -> -0.13 short pressure), one shared pull serves all
-  symbols. Real sample locked into the tests.
-- CONGRESS confirmed: live keys include Ticker/Transaction/TransactionDate (+ReportDate,
-  ExcessReturn, etc.) — existing parser matches, no change.
-- WALLSTREETBETS -> HTTP 403 "Upgrade your subscription plan to access this dataset."
-  NOT on the current Quiver plan. The screener stays registered (opt-in) but is inert
-  until upgraded; the client now logs a clear 403 "not on your plan" warning instead
-  of silent-empty. To enable: upgrade the Quiver tier, then add wallstreetbets to
-  SCREENER_SOURCES.
-- KEY GOTCHA (not a bug in the app): .env has an inline comment after QUIVER_API_KEY
-  (`KEY=xxx # quiverquant.com (...)`). python-dotenv strips it, so the app gets the
-  clean 40-char token and works. But naive shell parsing (cut/grep) keeps the comment
-  and sends a malformed token -> HTTP 500. Use scripts/inspect_quiver.py (load_dotenv)
-  to probe, not raw curl one-liners.
-[TIER MAP 2026-06-27] scripts/quiver_access.py probes every dataset's access on
-the current token (Hobbyist Monthly). Results:
-  HAVE (paid, usable now): congresstrading, senatetrading, housetrading,
-    offexchange, govcontracts, govcontractsall, lobbying, flights
-  NEED UPGRADE (403): wallstreetbets, insiders, sec13f/sec13fchanges (13F),
-    patentdrift, twitter
-Untapped but ALREADY PAID — wire these next (ranked):
-  1. govcontracts — hard future-revenue catalyst per ticker (HIGH value). AVAILABLE.
-  2. senatetrading + housetrading — finer than aggregate congress; some members
-     outperform. AVAILABLE.
-  3. lobbying — slow regulatory-tailwind tell (weak). AVAILABLE.
-  4. flights — corporate-jet tracking, occasional M&A hint (niche). AVAILABLE.
-Note: Quiver `insiders` needs upgrade, but we already get insider data FREE via
-Finnhub + SEC EDGAR — no loss. 13F + WSB would need a plan bump.
-Re-run scripts/quiver_access.py after any plan change to refresh this map.
-
-ADDING A DATASET IS NOW TRIVIAL (the infra is in place):
-- screener: subclass Screener; in scan() call self.quiver.live("<dataset>"); add the
-  class to screener/aggregator._REGISTRY and (if Quiver-backed) _QUIVER_SCREENERS so
-  it gets the shared client.
-- signal: subclass SignalProvider taking (cfg, quiver); in fetch() read
-  self.quiver.live("<dataset>") and filter by symbol; add to SignalAggregator.
-- VERIFY THE RESPONSE SCHEMA against Quiver docs before scoring (field names differ
-  per dataset). Next datasets, ranked: offexchange (dark-pool, ~1d, signal+screener),
-  wallstreetbets (screener), govcontracts (signal). safe_fetch/safe_scan already make
-  a wrong endpoint degrade to [], so each can be added + paper-tested independently.
-
-3. Next improvements to the model
-Grouped by impact:
-
-Decision quality
-
-[DONE] Signal backtesting / attribution — you log trades + key_signals in the ledger but never measure which signals actually predicted P&L. Add a job that joins closed trades to their entry signals and reports hit-rate per source. This tells you which Quiver datasets to weight up and which to drop — closes the loop.
-       -> Implemented in attribution.py + fed live into the decision prompt (see item 1 [DONE] note above). Per-source win-rate/avg-P&L now closes the loop automatically each cycle.
-Per-signal decay weighting in the prompt — formalize lag-based confidence so Claude isn't told a 45-day-old congress filing and a 1-day dark-pool print as equals.
-Earnings-blackout guard — block (or shrink) new buys N days before earnings; gap risk dwarfs your stop. You already pull fundamentals; the earnings date is the missing piece.
-Risk / sizing
-4. Correlation-aware exposure cap — your caps are per-symbol, but AAPL+MSFT+NVDA+GOOGL+META (your default watchlist) are ~one tech beta bet. Add a sector/correlation cap so vol-targeting doesn't quietly concentrate.
-5. Regime filter — gate aggressiveness on a market-regime read (e.g. SPY vs 200dma, VIX level via your macro provider). Cut gross exposure in risk-off regimes automatically.
-
-Operational
-6. Backtest harness — there's no way to replay the strategy on history. Even a coarse one (signals → proposals → simulated fills) would let you tune KELLY_FRACTION, TARGET_ANNUAL_VOL_PCT, and stop/take before risking capital.
-7. Alerting — the watchdog logs CRITICAL on failed closes (naked position) but nothing pages you. Wire those to a notification (you have Gmail available).
-
-Want me to start on the shared Quiver client + double-pull fix (item 2's first step, also unblocks adding datasets), or the signal-attribution report (item 3.1, which tells you where to spend Quiver effort)? I'd do the Quiver client first.
-
+--------------------------------------------------------------------------------
+DONE this round: A.1 govcontracts signal + B.6 earnings-blackout guard.
+Suggested next: B.5 (per-signal decay weighting — formalize the lag confidence the
+prompt already gestures at, now that govcontracts adds another lag tier) then
+C.7 (correlation-aware exposure cap — the default watchlist is ~one tech beta).
+A.2 senate/house is lower value: it overlaps the existing congress signal (same
+live/congresstrading direction) so wire it only if you want per-member granularity.

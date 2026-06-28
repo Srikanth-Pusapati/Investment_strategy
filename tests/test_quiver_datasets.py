@@ -17,8 +17,19 @@ from types import SimpleNamespace
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+from datetime import date, timedelta
+
 from investment_strategy.screener.wallstreetbets_feed import WallStreetBetsScreener
+from investment_strategy.signals.govcontracts import GovContractsProvider
 from investment_strategy.signals.offexchange import OffExchangeProvider
+
+
+def _recent(days_ago=10):
+    return (date.today() - timedelta(days=days_ago)).isoformat()
+
+
+def _old(days_ago=400):
+    return (date.today() - timedelta(days=days_ago)).isoformat()
 
 
 class _FakeQuiver:
@@ -104,6 +115,83 @@ def test_offexchange_ignores_unwanted_symbols():
     feed = [{"Ticker": "ZZZ", "Date": "2099-01-05", "Sht_Vol": 70, "Tot_Vol": 100}]
     prov = OffExchangeProvider(_cfg(), _FakeQuiver({"offexchange": feed}))
     assert prov.fetch(["AAPL"]) == []
+
+
+# --------------------------------------------------------------------------- #
+# Government contracts signal (bullish-only catalyst)
+# --------------------------------------------------------------------------- #
+def test_govcontracts_recent_award_is_bullish():
+    feed = [{"Ticker": "LMT", "Date": _recent(), "Amount": "5000000"}]
+    prov = GovContractsProvider(_cfg(), _FakeQuiver({"govcontractsall": feed}))
+    sig = prov.fetch(["LMT"])[0]
+    assert sig.score > 0                        # award -> bullish lean
+    assert sig.data["awards"] == 1
+    assert sig.data["total_usd"] == 5_000_000.0
+
+
+def test_govcontracts_never_negative():
+    # Even with many awards the score is bullish-only and capped.
+    feed = [{"Ticker": "RTX", "Date": _recent(), "Amount": 1_000} for _ in range(20)]
+    prov = GovContractsProvider(_cfg(), _FakeQuiver({"govcontractsall": feed}))
+    sig = prov.fetch(["RTX"])[0]
+    assert 0 < sig.score <= 0.4                 # capped at _MAX_LEAN, never < 0
+
+
+def test_govcontracts_more_awards_score_higher():
+    one = [{"Ticker": "A", "Date": _recent(), "Amount": 1000}]
+    three = [{"Ticker": "A", "Date": _recent(), "Amount": 1000} for _ in range(3)]
+    p1 = GovContractsProvider(_cfg(), _FakeQuiver({"govcontractsall": one}))
+    p3 = GovContractsProvider(_cfg(), _FakeQuiver({"govcontractsall": three}))
+    assert p3.fetch(["A"])[0].score > p1.fetch(["A"])[0].score
+
+
+def test_govcontracts_ignores_old_awards():
+    feed = [{"Ticker": "GD", "Date": _old(), "Amount": 9_000_000}]
+    prov = GovContractsProvider(_cfg(), _FakeQuiver({"govcontractsall": feed}))
+    assert prov.fetch(["GD"]) == []             # outside 120d lookback
+
+
+def test_govcontracts_skips_zero_or_missing_amount():
+    feed = [
+        {"Ticker": "X", "Date": _recent(), "Amount": 0},
+        {"Ticker": "X", "Date": _recent()},     # no amount at all
+    ]
+    prov = GovContractsProvider(_cfg(), _FakeQuiver({"govcontractsall": feed}))
+    assert prov.fetch(["X"]) == []
+
+
+def test_govcontracts_parses_messy_amount_and_action_date():
+    # Real feed: Amount may be "$1,234,567.89"; Date may be absent (action_date).
+    feed = [{"Ticker": "BA", "action_date": _recent(), "Amount": "$1,234,567.89"}]
+    prov = GovContractsProvider(_cfg(), _FakeQuiver({"govcontractsall": feed}))
+    sig = prov.fetch(["BA"])[0]
+    assert abs(sig.data["total_usd"] - 1_234_567.89) < 1e-6
+
+
+def test_govcontracts_dollar_bump_lifts_large_awards():
+    small = [{"Ticker": "A", "Date": _recent(), "Amount": 1_000}]
+    big = [{"Ticker": "A", "Date": _recent(), "Amount": 100_000_000}]
+    p_small = GovContractsProvider(_cfg(), _FakeQuiver({"govcontractsall": small}))
+    p_big = GovContractsProvider(_cfg(), _FakeQuiver({"govcontractsall": big}))
+    # Same award count, but the large-dollar bump makes big score higher.
+    assert p_big.fetch(["A"])[0].score > p_small.fetch(["A"])[0].score
+
+
+def test_govcontracts_real_live_schema_row():
+    # Exact key set from live/govcontractsall (verified 2026-06-28); extra fields
+    # (Agency, Description, action_date) must be ignored, Amount read as a number.
+    feed = [{"Ticker": "ACN", "Date": _recent(), "action_date": _recent(),
+             "Amount": 48700000.0, "Agency": "Department of Defense",
+             "Description": "PROFESSIONAL SERVICES"}]
+    prov = GovContractsProvider(_cfg(), _FakeQuiver({"govcontractsall": feed}))
+    sig = prov.fetch(["ACN"])[0]
+    assert sig.score > 0 and sig.data["total_usd"] == 48_700_000.0
+
+
+def test_govcontracts_ignores_unwanted_symbols():
+    feed = [{"Ticker": "ZZZ", "Date": _recent(), "Amount": 5_000_000}]
+    prov = GovContractsProvider(_cfg(), _FakeQuiver({"govcontractsall": feed}))
+    assert prov.fetch(["LMT"]) == []
 
 
 # --------------------------------------------------------------------------- #

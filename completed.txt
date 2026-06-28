@@ -1,0 +1,98 @@
+================================================================================
+COMPLETED WORK  (moved from Todo-2.txt)
+================================================================================
+
+--- 1. TradingAgents review (TauricResearch/TradingAgents) — DONE 2026-06-26 ---
+Goal: study how TradingAgents is designed, how our model differs, and what to
+adopt.
+
+TradingAgents design: LLM analyst team (Fundamentals/Sentiment/News/Technical)
+-> Bull vs Bear researcher DEBATE (N rounds) -> Trader -> LLM risk team ->
+Portfolio Manager. LangGraph, many LLM calls/ticker. Persistent memory at
+~/.tradingagents/memory: realized return + alpha vs SPY reflected back into the
+PM prompt each run.
+
+How we differ (and why, deliberately):
+- They use LLM agents per analyst; we use NUMERIC SignalProviders + ONE Claude
+  call. Far cheaper in tokens (Todo item 2 warns about exactly this).
+- They DEBATE risk with LLM personas; we use a DETERMINISTIC risk core the LLM
+  cannot override. For real money this is a safety SUPERIORITY, not a gap — keep.
+- Genuine gaps we adopted from them:
+  [DONE] Technical analyst -> signals/technical.py (RSI/MACD/trend, yfinance, no
+         key). Registered in signals/aggregator.py; SignalKind.TECHNICAL added;
+         unit-tested in tests/test_technical.py (indicator math).
+  [DONE] Bull/Bear debate value imported CHEAPLY: prompt now has Claude reason
+         through the strongest bull AND bear case internally before setting
+         conviction (no extra agents/calls). See decision/prompts.py.
+  [DONE] Reflection/memory loop (their best idea; == Todo 3.1 signal attribution):
+         attribution.py reconstructs closed round-trips from the ledger, scores
+         each entry signal source by realized win-rate + avg P&L, and injects a
+         terse "## Track record" block into the decision prompt (trusted, outside
+         <market_data>). Ledger now stores entry_signals on buys + realized P&L on
+         exits; the WATCHDOG also records its stops/takes/trails/flattens so
+         attribution sees every close it controls. Known blind spot: exchange-side
+         bracket auto-fills (no code observes them). Tests: tests/test_attribution.py.
+
+Explicitly NOT adopting: LangGraph multi-call orchestration, LLM-debated risk
+(would weaken the deterministic safety core), per-ticker multi-agent fan-out
+(token cost).
+
+--- 2. Quiver paid-tier — shared client + first datasets — DONE 2026-06-26/27 ---
+
+[DONE 2026-06-26] signals/quiver_client.py shipped: QuiverClient with Bearer auth,
+tenacity 429/network backoff, and a per-cycle cache keyed by request path.
+new_cycle() is called at the top of each decision cycle (orchestrator) so data is
+fresh per cycle but pulled ONCE and shared. Both congress callers refactored onto
+it — the signal layer now reads the per-symbol view out of the SAME cached
+live/congresstrading feed the screener uses (no more per-symbol historical fan-out;
+congress is fetched at most once per cycle total). Wired via SignalAggregator(cfg,
+quiver) + ScreenerAggregator(cfg, quiver) sharing one instance. Tests:
+tests/test_quiver_client.py (cache dedupe, new_cycle refresh, disabled, 429 mapping,
+congress scoring from the shared feed). [This also fixed the congress double-pull.]
+
+[DONE 2026-06-26] First two datasets added on the shared client:
+- OFF-EXCHANGE / dark-pool short volume -> signals/offexchange.py (SignalKind.
+  OFFEXCHANGE; per-symbol short_vol/total ratio, damped ±0.6; ~1d lag, weighted up
+  vs congress in the prompt). Registered in SignalAggregator.
+- WALLSTREETBETS mention surges -> screener/wallstreetbets_feed.py (self-calibrated
+  by mention volume vs the busiest name; bullish by default, sentiment-signed).
+  Registered in the screener _REGISTRY + _QUIVER_SCREENERS; opt-in via SCREENER_SOURCES.
+  NOTE: WSB is 403 on the current plan (see tier map) — registered but inert until upgrade.
+- Both parse fields DEFENSIVELY (alternate key names) and SKIP unusable rows rather
+  than guess. Tests: tests/test_quiver_datasets.py.
+
+[VERIFIED LIVE 2026-06-26] Probed the real API (scripts/inspect_quiver.py):
+- OFF-EXCHANGE confirmed working: live row = {Ticker, Date, OTC_Short, OTC_Total,
+  DPI}; DPI ≈ OTC_Short/OTC_Total. Parser keys updated (confirmed first). Ran the
+  provider end-to-end on real data — sensible readings (e.g. NVDA 32% short ->
+  +0.21 buy-side lean; GME 61% -> -0.13 short pressure), one shared pull serves all
+  symbols. Real sample locked into the tests.
+- CONGRESS confirmed: live keys include Ticker/Transaction/TransactionDate (+ReportDate,
+  ExcessReturn, etc.) — existing parser matches, no change.
+- WALLSTREETBETS -> HTTP 403 "Upgrade your subscription plan to access this dataset."
+  NOT on the current Quiver plan. The screener stays registered (opt-in) but is inert
+  until upgraded; the client now logs a clear 403 "not on your plan" warning instead
+  of silent-empty. To enable: upgrade the Quiver tier, then add wallstreetbets to
+  SCREENER_SOURCES.
+- KEY GOTCHA (not a bug in the app): .env has an inline comment after QUIVER_API_KEY
+  (`KEY=xxx # quiverquant.com (...)`). python-dotenv strips it, so the app gets the
+  clean 40-char token and works. But naive shell parsing (cut/grep) keeps the comment
+  and sends a malformed token -> HTTP 500. Use scripts/inspect_quiver.py (load_dotenv)
+  to probe, not raw curl one-liners.
+
+[TIER MAP 2026-06-27] scripts/quiver_access.py probes every dataset's access on
+the current token (Hobbyist Monthly). Results:
+  HAVE (paid, usable now): congresstrading, senatetrading, housetrading,
+    offexchange, govcontracts, govcontractsall, lobbying, flights
+  NEED UPGRADE (403): wallstreetbets, insiders, sec13f/sec13fchanges (13F),
+    patentdrift, twitter
+Note: Quiver `insiders` needs upgrade, but we already get insider data FREE via
+Finnhub + SEC EDGAR — no loss. 13F + WSB would need a plan bump.
+Re-run scripts/quiver_access.py after any plan change to refresh this map.
+
+--- 3.1 Signal backtesting / attribution — DONE ---
+You logged trades + key_signals in the ledger but never measured which signals
+predicted P&L. Implemented in attribution.py: joins closed trades to their entry
+signals and reports hit-rate + avg-P&L per source, fed live into the decision
+prompt (see item 1 reflection-loop note). Per-source win-rate now closes the loop
+automatically each cycle — tells you which Quiver datasets to weight up / drop.

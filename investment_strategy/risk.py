@@ -70,17 +70,22 @@ class RiskManager:
     def evaluate(
         self, proposal: TradeProposal, account: AccountSnapshot, price: float,
         volatility: float | None = None, pending_buy_notional: float = 0.0,
+        days_to_earnings: int | None = None,
     ) -> RiskDecision:
         """`price` is the current market price for proposal.symbol. `volatility`
         is the symbol's annualized realized vol (fraction, e.g. 0.45) used for
         vol-targeted sizing. `pending_buy_notional` is the $ of already-open
         (unfilled) BUY orders for this symbol, so repeated cycles can't stack
-        duplicate buys past the exposure cap. All from the execution client."""
+        duplicate buys past the exposure cap. `days_to_earnings` is calendar days
+        until the symbol's next earnings report (None if unknown) for the
+        earnings-blackout guard. All from the execution client."""
         if proposal.action is Action.HOLD:
             return self._reject(proposal, "HOLD — no action.")
         if proposal.action is Action.SELL:
             return self._evaluate_sell(proposal, account)
-        return self._evaluate_buy(proposal, account, price, volatility, pending_buy_notional)
+        return self._evaluate_buy(
+            proposal, account, price, volatility, pending_buy_notional, days_to_earnings
+        )
 
     # -- survival-first sizing: vol-targeted, fractional-Kelly -------------- #
     def _sized_weight_pct(self, conviction: float, volatility: float | None) -> float:
@@ -115,10 +120,26 @@ class RiskManager:
     def _evaluate_buy(
         self, proposal: TradeProposal, account: AccountSnapshot, price: float,
         volatility: float | None = None, pending_buy_notional: float = 0.0,
+        days_to_earnings: int | None = None,
     ) -> RiskDecision:
         halted, why = self.trading_halted(account)
         if halted:
             return self._reject(proposal, why)
+
+        # Earnings-blackout guard: refuse NEW buys within N days of a scheduled
+        # report. Gap risk through the print dwarfs the stop, so a tight stop gives
+        # false comfort. Fail OPEN — only block on a date we actually have.
+        blackout = self.limits.earnings_blackout_days
+        if (
+            blackout > 0
+            and days_to_earnings is not None
+            and 0 <= days_to_earnings <= blackout
+        ):
+            return self._reject(
+                proposal,
+                f"Earnings in {days_to_earnings}d (<= {blackout}d blackout) — "
+                "gap risk dwarfs the stop; no new buy.",
+            )
 
         equity = account.equity
         if equity <= 0:
