@@ -96,3 +96,23 @@ predicted P&L. Implemented in attribution.py: joins closed trades to their entry
 signals and reports hit-rate + avg-P&L per source, fed live into the decision
 prompt (see item 1 reflection-loop note). Per-source win-rate now closes the loop
 automatically each cycle — tells you which Quiver datasets to weight up / drop.
+
+--- A.1 Government-contracts signal — DONE 2026-06-28 ---
+signals/govcontracts.py (SignalKind.GOVCONTRACTS). Reads the shared
+live/govcontractsall feed (recent dated awards: Ticker/Date/action_date/Amount/
+Agency/Description). BULLISH-ONLY (an award is good news; absence isn't bad) — a
+saturating award-count lean (1-e^-n/6, discriminates 1..50+ awards) + a top-end
+bump for large total $, capped +/-0.4 (size vs revenue unknown). 120d lookback,
+Date->action_date fallback, defensive Amount parsing ($/commas/strings).
+Registered in SignalAggregator; decision prompt teaches it as a hard-but-slow
+revenue catalyst. Verified live (BAH $390M/50 awards ranks top; scores spread
+0.23-0.40). Tests: tests/test_quiver_datasets.py. PR #6.
+
+--- B.6 Earnings-blackout guard — DONE 2026-06-28 ---
+earnings.py EarningsCalendar (yfinance next-earnings date, per-cycle cached,
+fails OPEN on unknown — never blocks on missing data). New
+RiskLimits.earnings_blackout_days (env EARNINGS_BLACKOUT_DAYS, default 3; 0=off);
+risk._evaluate_buy REJECTS new buys within N days of a report (gap risk dwarfs the
+stop); sells/exits never blacked out. Orchestrator sources days-to-earnings for
+buys and passes it to risk.evaluate; the gate stays deterministic/network-free.
+Tests: tests/test_risk.py (6 cases) + tests/test_earnings.py. PR #6.
