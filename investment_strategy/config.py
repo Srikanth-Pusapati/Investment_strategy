@@ -37,6 +37,8 @@ class RiskLimits:
     """Hard caps enforced by RiskManager. The LLM cannot exceed these."""
     max_position_pct: float          # max % equity in a single NEW position
     max_symbol_exposure_pct: float   # max total % equity per symbol
+    max_gross_exposure_pct: float    # max total deployed across ALL names (<=100 = no leverage)
+    max_sector_exposure_pct: float   # max total % equity in one sector (concentration cap)
     max_daily_loss_pct: float        # halt new trades past this day loss
     max_drawdown_pct: float          # halt new buys past this PEAK-to-trough DD
     equity_floor_usd: float          # liquidate + latch halt below this equity (0=off)
@@ -185,6 +187,10 @@ def load_config() -> Config:
         risk=RiskLimits(
             max_position_pct=_f("MAX_POSITION_PCT", 5.0),
             max_symbol_exposure_pct=_f("MAX_SYMBOL_EXPOSURE_PCT", 10.0),
+            # 100 = never deploy beyond equity (no margin/leverage). On a margin
+            # account this is the explicit no-leverage guard; set <100 to hold back.
+            max_gross_exposure_pct=_f("MAX_GROSS_EXPOSURE_PCT", 100.0),
+            max_sector_exposure_pct=_f("MAX_SECTOR_EXPOSURE_PCT", 30.0),
             max_daily_loss_pct=_f("MAX_DAILY_LOSS_PCT", 3.0),
             max_drawdown_pct=_f("MAX_DRAWDOWN_PCT", 15.0),
             equity_floor_usd=_f("EQUITY_FLOOR_USD", 0.0),

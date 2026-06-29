@@ -20,8 +20,12 @@ HONEST CONSTRAINTS (read before "keep it from going below principal")
     we can still trade post-IPO names the scanner finds.
   - Options need ~$2–3k to be usable (1 contract ≈ $100–500 premium; the 1%
     premium cap on $1k = $10, buys nothing). Small accounts = equity/ETF/fractional.
-  - MARGIN amplifies losses + triggers PDT — DON'T use it on the small account.
-    Run the small live float as a CASH account (no leverage, no PDT rule).
+  - ACCOUNT TYPE (decided 2026-06-29): Alpaca is MARGIN-ONLY (no cash account), so
+    the small live float is a margin account. Consequences handled in code:
+      * PDT guard (1.1) is now ESSENTIAL — it pauses new buys at the day-trade line.
+      * NO-LEVERAGE gross cap (1.7) pins total deployment to <=100% of equity so we
+        never trade on the ~2x margin buying power (no borrowed money).
+    Margin is available but we deliberately don't use it.
   - Tiny accounts: spread/slippage dominate; the edge must clear costs.
 
 CAPITAL-PRESERVATION STACK (what keeps the account afloat)
@@ -59,10 +63,18 @@ PHASE 1 — Small-account live safety  (HIGHEST — the "don't blow up" stack)
         settled cash so we don't trip good-faith/free-riding violations. Alpaca's
         buying_power already reflects settled funds, so this is a smaller follow-up.
         DOC: run the small live account as a CASH account (PDT-exempt, no leverage).
-[ ] 1.2 Set EQUITY_FLOOR_USD (was Y3/E.16) — the latched flatten+halt floor is
-        OFF by default. For $1000 set ~$850. THE catastrophe backstop.
-[ ] 1.3 Correlation / sector concentration cap (C.7) — discovery can surface ~one
-        beta; cap sector/correlated exposure so vol-targeting can't concentrate.
+[DONE 2026-06-29] 1.2 EQUITY_FLOOR_USD now in .env (=85000 for the $100k paper
+        account; the latched flatten+halt catastrophe floor). FOR LIVE: change to
+        ~85% of the live float (e.g. 850 for $1000). Plus MAX_DRAWDOWN_PCT,
+        MIN_TRADE_PRICE_USD, EARNINGS_BLACKOUT_DAYS, PDT_* now surfaced in .env.
+[DONE 2026-06-29 -> completed.txt] 1.3 Correlation / sector concentration cap.
+        MAX_SECTOR_EXPOSURE_PCT (default 30) caps total $ per sector; sectors.py
+        SectorMap (yfinance, per-cycle cached, fails open) supplies the sector, the
+        orchestrator sums holdings per sector, risk enforces. Tests: test_risk.py.
+[DONE 2026-06-29 -> completed.txt] 1.7 NO-LEVERAGE gross-exposure cap (NEW, from the
+        margin-account decision). MAX_GROSS_EXPOSURE_PCT (default 100) caps total
+        deployed across ALL names to <=equity, so the bot never uses Alpaca's ~2x
+        margin buying power. Tests: test_risk.py.
 [ ] 1.4 Regime filter (C.8) — gate gross exposure on SPY vs 200dma + VIX; cut size
         in risk-off automatically.
 [ ] 1.5 Small-account sizing + per-trade $-loss cap + cost/slippage floor (E.14).
@@ -132,18 +144,19 @@ LOWER VALUE / SKIP unless a thesis calls for it
 --------------------------------------------------------------------------------
 RANKED NEXT STEPS (2026-06-29)
 --------------------------------------------------------------------------------
- 1. 1.3  Correlation / sector cap           (last real risk hole before live)
- 2. 1.4  Regime filter
- 3. 1.5  Small-account sizing + $-loss cap + cost floor
- 4. 1.1b Cash-account settlement awareness (T+1)  (small follow-up to 1.1)
- 5. 2.1  Backtest harness                   (gate before real money / data buys)
- 6. 2.2  Data-subscription decision         (informed by 2.1)
- 7. 3.1  Lag-decay weighting · 4.1 Alerting · then Phase 5 (after the legal gate)
- NOTE: 1.2 Set EQUITY_FLOOR_USD is a CONFIG value only you can choose (e.g. ~85%
- of the live float). Already wired; just set it in .env before going live.
+ 1. 1.4  Regime filter                      (cut gross exposure in risk-off)
+ 2. 1.5  Small-account sizing + per-trade $-loss cap + cost/slippage floor
+ 3. 2.1  Backtest harness                   (gate before real money / data buys)
+ 4. 2.2  Data-subscription decision         (informed by 2.1)
+ 5. 3.1  Lag-decay weighting · 4.1 Alerting · then Phase 5 (after the legal gate)
+ NOTE: 1.1b cash-account settlement is now MOOT (Alpaca margin-only). Margin
+ settlement is handled by the broker; the no-leverage cap (1.7) + PDT guard cover it.
+ LIVE PREP: before funding live, change EQUITY_FLOOR_USD to ~85% of the float and
+ swap ALPACA keys + ALPACA_BASE_URL + TRADING_MODE=live.
 
 DONE (-> completed.txt): A.1 govcontracts, B.6 earnings-blackout (PR #6);
 E.11 account P&L tracker, E.12 empty watchlist, E.13 live dashboard;
-0.1 watchlist removal, 1.1 PDT guard.
-RECOMMENDED NEXT: 1.3 correlation/sector cap — the last real risk hole; discovery
-can surface several correlated names, and nothing caps that today.
+0.1 watchlist removal, 1.1 PDT guard, 1.2 equity floor in .env, 1.3 sector cap,
+1.7 no-leverage gross cap.
+RECOMMENDED NEXT: 1.4 regime filter — scale gross exposure down automatically in
+risk-off markets (SPY<200dma / high VIX), then 1.5 small-account sizing.

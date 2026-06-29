@@ -101,6 +101,7 @@ class RiskManager:
         self, proposal: TradeProposal, account: AccountSnapshot, price: float,
         volatility: float | None = None, pending_buy_notional: float = 0.0,
         days_to_earnings: int | None = None,
+        sector: str | None = None, sector_exposure_usd: float = 0.0,
     ) -> RiskDecision:
         """`price` is the current market price for proposal.symbol. `volatility`
         is the symbol's annualized realized vol (fraction, e.g. 0.45) used for
@@ -108,13 +109,16 @@ class RiskManager:
         (unfilled) BUY orders for this symbol, so repeated cycles can't stack
         duplicate buys past the exposure cap. `days_to_earnings` is calendar days
         until the symbol's next earnings report (None if unknown) for the
-        earnings-blackout guard. All from the execution client."""
+        earnings-blackout guard. `sector` is the symbol's sector and
+        `sector_exposure_usd` is the $ already held in that sector, for the sector
+        concentration cap. All from the execution client / orchestrator."""
         if proposal.action is Action.HOLD:
             return self._reject(proposal, "HOLD — no action.")
         if proposal.action is Action.SELL:
             return self._evaluate_sell(proposal, account)
         return self._evaluate_buy(
-            proposal, account, price, volatility, pending_buy_notional, days_to_earnings
+            proposal, account, price, volatility, pending_buy_notional,
+            days_to_earnings, sector, sector_exposure_usd,
         )
 
     # -- survival-first sizing: vol-targeted, fractional-Kelly -------------- #
@@ -151,6 +155,7 @@ class RiskManager:
         self, proposal: TradeProposal, account: AccountSnapshot, price: float,
         volatility: float | None = None, pending_buy_notional: float = 0.0,
         days_to_earnings: int | None = None,
+        sector: str | None = None, sector_exposure_usd: float = 0.0,
     ) -> RiskDecision:
         halted, why = self.trading_halted(account)
         if halted:
@@ -212,6 +217,35 @@ class RiskManager:
                 f"(held ${existing_val:,.0f} + pending ${pending_buy_notional:,.0f}).",
             )
         target_notional = min(target_notional, room)
+
+        # 2b) Sector concentration cap — keep the discovery scanner from quietly
+        #     stacking several correlated names (e.g. all big-tech) into one bet.
+        #     sector_exposure_usd is the $ already held in this name's sector.
+        if sector and self.limits.max_sector_exposure_pct > 0:
+            max_sector_val = equity * (self.limits.max_sector_exposure_pct / 100.0)
+            sector_room = max_sector_val - max(0.0, sector_exposure_usd)
+            if sector_room <= 0:
+                return self._reject(
+                    proposal,
+                    f"At/over {self.limits.max_sector_exposure_pct:.0f}% sector cap "
+                    f"for '{sector}' (held ${sector_exposure_usd:,.0f}).",
+                )
+            target_notional = min(target_notional, sector_room)
+
+        # 2c) No-leverage gross cap — never let TOTAL deployed exceed this % of
+        #     equity. On a margin account (Alpaca offers ~2x buying power) this is
+        #     the explicit guard that we never trade with borrowed money.
+        gross_held = sum(p.market_value for p in account.positions)
+        max_gross_val = equity * (self.limits.max_gross_exposure_pct / 100.0)
+        gross_room = max_gross_val - gross_held - max(0.0, pending_buy_notional)
+        if gross_room <= 0:
+            return self._reject(
+                proposal,
+                f"At/over {self.limits.max_gross_exposure_pct:.0f}% gross-exposure "
+                f"cap (deployed ${gross_held:,.0f} of ${max_gross_val:,.0f}; "
+                "no leverage).",
+            )
+        target_notional = min(target_notional, gross_room)
 
         # 3) Respect the cash buffer — never spend the reserve.
         min_cash = equity * (self.limits.min_cash_buffer_pct / 100.0)

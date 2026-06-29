@@ -27,6 +27,7 @@ from .monitor import Watchdog
 from .portfolio import RobinhoodReader
 from .risk import RiskManager
 from .screener import ScreenerAggregator
+from .sectors import SectorMap
 from .signals import SignalAggregator
 from .signals.quiver_client import QuiverClient
 from .state import PortfolioState
@@ -54,6 +55,8 @@ class Orchestrator:
         # Per-cycle-cached next-earnings lookup feeding the risk earnings-blackout
         # guard (one lookup per symbol per cycle; advisory, fails open).
         self.earnings = EarningsCalendar()
+        # Per-cycle-cached sector lookup feeding the risk sector-concentration cap.
+        self.sectors = SectorMap()
         self.engine = DecisionEngine(cfg)
         # One persisted risk-state instance shared by the risk gate and watchdog
         # so peak equity, the drawdown halt, and the halt latch are consistent.
@@ -181,6 +184,7 @@ class Orchestrator:
         # and screener layers (both read the same cached live feeds).
         self.quiver.new_cycle()
         self.earnings.new_cycle()
+        self.sectors.new_cycle()
         self._record_equity_snapshot()
         account = self.broker.get_account()
 
@@ -231,6 +235,20 @@ class Orchestrator:
             generate(Path(self.cfg.dashboard_file), live=True)
         except Exception as e:
             log.warning("Dashboard refresh failed: %s", e)
+
+    def _sector_context(self, symbol: str, account) -> tuple[str | None, float]:
+        """(sector of `symbol`, $ already held in that sector) for the risk
+        sector-concentration cap. Best-effort — a lookup miss returns (None, 0)
+        so the cap is simply skipped for that name."""
+        try:
+            sector = self.sectors.sector_for(symbol)
+            if not sector:
+                return None, 0.0
+            held = {p.symbol: p.market_value for p in account.positions}
+            return sector, self.sectors.exposure_by_sector(held).get(sector, 0.0)
+        except Exception as e:
+            log.warning("sector context for %s failed: %s", symbol, e)
+            return None, 0.0
 
     def _record_equity_snapshot(self) -> None:
         """Persist a once-per-day account P&L snapshot (true total return from the
@@ -298,12 +316,15 @@ class Orchestrator:
         vol = self.broker.annualized_vol(proposal.symbol)
         is_buy = proposal.action.value == "buy"
         pending = self.broker.open_buy_notional(proposal.symbol) if is_buy else 0.0
-        # Only the blackout-relevant path (new buys) needs the earnings lookup.
+        # Only the buy path needs the earnings + sector context.
         days_to_earnings = (
             self.earnings.days_until_earnings(proposal.symbol) if is_buy else None
         )
+        sector, sector_exposure = self._sector_context(proposal.symbol, account) \
+            if is_buy else (None, 0.0)
         decision = self.risk.evaluate(
-            proposal, account, price, vol, pending, days_to_earnings
+            proposal, account, price, vol, pending, days_to_earnings,
+            sector, sector_exposure,
         )
         log.info(
             "%s %s -> %s: %s | %s",

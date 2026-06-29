@@ -42,6 +42,8 @@ def _limits(**over) -> RiskLimits:
     base = dict(
         max_position_pct=5.0,
         max_symbol_exposure_pct=10.0,
+        max_gross_exposure_pct=100.0,
+        max_sector_exposure_pct=30.0,
         max_daily_loss_pct=3.0,
         max_drawdown_pct=15.0,
         equity_floor_usd=0.0,
@@ -245,6 +247,66 @@ def test_earnings_blackout_does_not_block_sells():
         acct, price=100.0, days_to_earnings=1,
     )
     assert d.verdict is RiskVerdict.APPROVED   # exits are never blacked out
+
+
+# --------------------------------------------------------------------------- #
+# No-leverage gross-exposure cap (margin safety)
+# --------------------------------------------------------------------------- #
+def test_gross_cap_blocks_when_fully_deployed():
+    # 100% gross cap, already holding ~equity in positions -> no room, reject.
+    rm = _rm(_limits(max_gross_exposure_pct=100.0))
+    acct = _account(equity=10_000.0, cash=10_000.0, buying_power=20_000.0,
+                    last_equity=10_000.0,
+                    positions=[_pos("MSFT", qty=100, price=100.0)])  # $10k held
+    d = rm.evaluate(_buy("NVDA"), acct, price=100.0, volatility=0.25)
+    assert d.verdict is RiskVerdict.REJECTED
+    assert "gross" in d.reason.lower() or "leverage" in d.reason.lower()
+
+
+def test_gross_cap_does_not_use_margin_buying_power():
+    # buying_power is 2x equity (margin), but the gross cap pins deployment to
+    # equity: ~half already held leaves room only up to equity, not 2x.
+    rm = _rm(_limits(max_gross_exposure_pct=100.0, max_position_pct=100.0,
+                     min_cash_buffer_pct=0.0, kelly_fraction=0.0))
+    acct = _account(equity=10_000.0, cash=10_000.0, buying_power=20_000.0,
+                    last_equity=10_000.0,
+                    positions=[_pos("MSFT", qty=80, price=100.0)])  # $8k held
+    d = rm.evaluate(_buy("NVDA", weight=100.0), acct, price=100.0, volatility=0.25)
+    # Room = 10k - 8k = 2k, never the 12k that 2x buying power would allow.
+    assert d.approved_notional <= 2_000.0 + 1e-6
+
+
+# --------------------------------------------------------------------------- #
+# Sector concentration cap
+# --------------------------------------------------------------------------- #
+def test_sector_cap_blocks_when_sector_full():
+    rm = _rm(_limits(max_sector_exposure_pct=30.0))
+    acct = _account(equity=10_000.0, last_equity=10_000.0)  # 30% cap = $3k per sector
+    d = rm.evaluate(_buy("NVDA"), acct, price=100.0, volatility=0.25,
+                    sector="Technology", sector_exposure_usd=3_000.0)
+    assert d.verdict is RiskVerdict.REJECTED
+    assert "sector" in d.reason.lower()
+
+
+def test_sector_cap_limits_partial_room():
+    rm = _rm(_limits(max_sector_exposure_pct=30.0, max_position_pct=100.0,
+                     kelly_fraction=0.0, min_cash_buffer_pct=0.0))
+    acct = _account(equity=10_000.0, cash=10_000.0, buying_power=10_000.0,
+                    last_equity=10_000.0)
+    d = rm.evaluate(_buy("NVDA", weight=100.0), acct, price=100.0, volatility=0.25,
+                    sector="Technology", sector_exposure_usd=2_500.0)
+    # 30% of 10k = 3k; 2.5k already in sector -> only $500 of room.
+    assert d.approved_notional <= 500.0 + 1e-6
+
+
+def test_sector_cap_skipped_when_sector_unknown():
+    rm = _rm(_limits(max_sector_exposure_pct=30.0, kelly_fraction=0.0))
+    acct = _account(equity=10_000.0, cash=10_000.0, buying_power=10_000.0,
+                    last_equity=10_000.0)
+    # sector=None -> cap skipped; normal position cap applies.
+    d = rm.evaluate(_buy("NVDA"), acct, price=100.0, volatility=0.25,
+                    sector=None, sector_exposure_usd=9_999.0)
+    assert d.verdict in (RiskVerdict.APPROVED, RiskVerdict.RESIZED)
 
 
 # --------------------------------------------------------------------------- #
