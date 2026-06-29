@@ -1,153 +1,146 @@
 ================================================================================
-ACTIVE TODO  (completed items moved to completed.txt)
+ACTIVE TODO   (completed items live in completed.txt)
+Reprioritized 2026-06-29 around the product vision below.
 ================================================================================
-Reference infra that's already in place:
-- Shared per-cycle Quiver client: signals/quiver_client.py (Bearer auth, 429
-  backoff, per-cycle cache). new_cycle() at top of each decision cycle.
-- safe_fetch / safe_scan make a flaky/wrong endpoint degrade to [] (no crash).
-- Adding a dataset is now trivial:
-  * screener: subclass Screener; in scan() call self.quiver.live("<dataset>");
-    add to screener/aggregator._REGISTRY and (if Quiver-backed) _QUIVER_SCREENERS.
-  * signal: subclass SignalProvider(cfg, quiver); in fetch() read
-    self.quiver.live("<dataset>") and filter by symbol; add to SignalAggregator.
-  * VERIFY THE RESPONSE SCHEMA against Quiver docs / scripts/inspect_quiver.py
-    before scoring (field names differ per dataset).
-Cross-cutting cautions when adding datasets:
-- Token cost scales with signals (every dataset lands in the Opus prompt). Keep
-  each provider's summary terse; rely on the numeric score, don't dump payloads.
-- Weight by lag in the score, not just presence. Congress (~45d) must not move
-  size like off-exchange (~1d). Apply the cluster-saturation discipline per set.
-- MAX_DISCOVERED_CANDIDATES=12 is the screener backpressure valve; keep it modest.
-  Corroboration (a name flagged by multiple sources) auto-ranks via score summing
-  in screener/aggregator.py.
+
+THE MODEL (vision)
+  Scanner -> Decision -> Execute -> Monitor.  Fully DISCOVERY-DRIVEN; NO watchlist.
+  - Scanner surfaces interesting/new names from signals.
+  - Decision (Claude + deterministic risk) judges worth-buying + size.
+  - Execute places the trade for the sized amount.
+  - Monitor (watchdog) holds/sells to realize profit or cap loss.
+  Paper account: $100k.  Live account: $100–$1000 only (scale up from a track
+  record, never risk it all).
+  NORTH STAR: multi-user — several people run the model on THEIR OWN accounts.
+
+HONEST CONSTRAINTS (read before "keep it from going below principal")
+  - No strategy can GUARANTEE you never drop below principal — gaps/halts/fast
+    crashes jump through stops. Goal = SMALL, BOUNDED, SURVIVABLE losses.
+  - IPOs: NOT available via Alpaca's API (no new-issue allocation). Out of scope;
+    we can still trade post-IPO names the scanner finds.
+  - Options need ~$2–3k to be usable (1 contract ≈ $100–500 premium; the 1%
+    premium cap on $1k = $10, buys nothing). Small accounts = equity/ETF/fractional.
+  - MARGIN amplifies losses + triggers PDT — DON'T use it on the small account.
+    Run the small live float as a CASH account (no leverage, no PDT rule).
+  - Tiny accounts: spread/slippage dominate; the edge must clear costs.
+
+CAPITAL-PRESERVATION STACK (what keeps the account afloat)
+  IN PLACE: %-based position/exposure/daily-loss/peak-drawdown caps; vol-targeted
+    fractional-Kelly sizing; exchange brackets (stop+take); watchdog (emergency
+    flatten, trailing stops, hard stops for fractional, latched equity floor);
+    fractional shares; defined-risk-only options (premium-capped, no naked/short);
+    kill switch; paper/live interlock; earnings-blackout guard; account P&L tracker.
+  TO ADD: see Phase 1.
+
+Reference infra in place:
+- Shared per-cycle Quiver client (Bearer auth, 429 backoff, cache).
+- safe_fetch/safe_scan degrade a flaky/wrong endpoint to [] (no crash).
+- Adding a signal/screener is trivial (subclass + register; verify schema first).
+- Deterministic, well-tested risk core the LLM cannot override (the safety core).
+- Account P&L truth = Alpaca account (status.py), NOT the ledger.
 
 ################################################################################
-# CODE AUDIT 2026-06-28 — red / yellow / green flags
-# (full reasoning lives in chat; the actionable items are sections E + below)
+PHASE 0 — Make the model match the vision (small, do first)
 ################################################################################
-RED (fix before real money):
- R1. [RESOLVED E.11] No consolidated account-status / P&L view -> status.py reads
-     the Alpaca account (total return net of deposits, realized, unrealized, day).
- R2. [RESOLVED E.12] Empty watchlist silently traded megacaps -> resolve_watchlist
-     now distinguishes unset (default) from explicit ""/NONE (start flat).
- R3. [RESOLVED via E.11] Ledger realized P&L undercounts exchange-side bracket
-     auto-fills -> the P&L tracker reads the ACCOUNT (equity vs capital), not the
-     ledger, so it's complete. (Optional E.15 still backfills bracket exits into
-     the ledger for attribution.)
+[ ] 0.1 Remove the WATCHLIST concept entirely (discovery-only). Deprecate
+        DEFAULT_WATCHLIST; default to screener-only; held positions are still
+        always re-evaluated (base = open positions ∪ discovered). Since discovery
+        is now the SOLE funnel, treat scanner quality as the top signal priority.
+        (Builds on E.12, which already supports an empty watchlist.)
 
-YELLOW (works, but risky/incomplete):
- Y1. [RESOLVED E.13] Dashboard was a manual, ledger-only one-shot -> now shows real
-     account cards and auto-regenerates each cycle when DASHBOARD_FILE is set.
- Y2. Whole-share buys DROP the sub-share remainder (to allow an exchange bracket).
-     On a $1k account approved 1.8sh -> buys 1 (–44% under-deployed). Revisit the
-     small-account path. -> item E.14.
- Y3. EQUITY_FLOOR_USD defaults 0 (off) — the flatten+latch catastrophe guard is
-     disabled until set. Must set it for a live $100–$1000 account. -> item E.16.
- Y4. No correlation/concentration cap (see C.7); megacaps are ~one beta.
- Y5. No alerting on CRITICAL naked-position close failures (see D.10).
+################################################################################
+PHASE 1 — Small-account live safety  (HIGHEST — the "don't blow up" stack)
+################################################################################
+[ ] 1.1 PDT / day-trade guard + CASH-ACCOUNT mode (NEW, critical for <$25k).
+        Read account.pattern_day_trader + daytrade_count; block a new opening
+        trade that would breach the 4-day-trades/5-days line while equity<$25k.
+        Add cash-account settlement awareness (T+1) so we don't trip good-faith /
+        free-riding violations reusing unsettled proceeds. Document: small live
+        account MUST be a cash account.
+[ ] 1.2 Set EQUITY_FLOOR_USD (was Y3/E.16) — the latched flatten+halt floor is
+        OFF by default. For $1000 set ~$850. THE catastrophe backstop.
+[ ] 1.3 Correlation / sector concentration cap (C.7) — discovery can surface ~one
+        beta; cap sector/correlated exposure so vol-targeting can't concentrate.
+[ ] 1.4 Regime filter (C.8) — gate gross exposure on SPY vs 200dma + VIX; cut size
+        in risk-off automatically.
+[ ] 1.5 Small-account sizing + per-trade $-loss cap + cost/slippage floor (E.14).
+        Bound absolute $ at risk per trade; skip dust orders where friction eats
+        the edge; prefer fractional+watchdog over dropping the sub-share remainder;
+        re-check MAX_OPEN_POSITIONS vs min order on a tiny float.
+[ ] 1.6 (optional) Core-ETF allocation mode — hold a broad/low-vol ETF core with
+        satellite single-name picks to structurally cut single-name blow-up risk.
 
-GREEN (genuinely solid — keep, don't regress):
- + Deterministic, well-tested risk core the LLM can't override.
- + Watchdog defense-in-depth: latched halt, equity floor, trailing stops, retries
-   on failed closes, records its exits to the ledger.
- + Persisted peak-equity drawdown (survives restart), atomic state writes, locks.
- + Next-cycle fill reconciliation catches rejects/partials.
- + Prompt-injection hardening (delimited+neutralized market_data).
- + Shared cached Quiver client (rate-limit safe) + defensive parsing everywhere.
- + Paper/live interlock blocks live-pointed-at-paper (and vice-versa).
+################################################################################
+PHASE 2 — Prove the edge BEFORE spending money
+################################################################################
+[ ] 2.1 Backtest harness (D.9) — replay scanner->signals->proposals->simulated
+        fills on history. The GATE before risking real money or buying data; lets
+        you tune KELLY_FRACTION, TARGET_ANNUAL_VOL_PCT, stops, and measure edge.
+[ ] 2.2 Data-subscription evaluation (NEW) — decide AFTER the backtest/attribution
+        shows what pays. Ranked ROI:
+          1. Reliable fundamentals + earnings (FMP or Finnhub paid) — thesis +
+             earnings-guard quality; yfinance is free but flaky. Hooks exist
+             (FMP_API_KEY/FINNHUB_API_KEY).
+          2. Better market data (Polygon paid / Alpaca SIP) — full-market real-time
+             + clean history for honest backtests + whole-market scanning.
+          3. Quiver tier up — unlocks WSB/13F (incremental; insiders already free).
+        Discipline: don't pay for data before you can measure it helps.
 
---------------------------------------------------------------------------------
-E. ACCOUNT VISIBILITY & LIVE-READINESS  (NEW from audit — HIGHEST priority)
---------------------------------------------------------------------------------
-[DONE 2026-06-29 -> completed.txt] 11. Account-status / P&L tracker (R1+R3, Q#5).
-        status.py: compute_status() reads the Alpaca ACCOUNT; total_return =
-        equity - base_value - net_cashflows (backs out funding + deposits),
-        realized = total_return - unrealized. `python -m investment_strategy.status`
-        report + state/equity_history.jsonl daily snapshots (snapshotted each cycle).
-[DONE 2026-06-29 -> completed.txt] 12. Empty / screener-only watchlist (R2, Q#4).
-        resolve_watchlist(): unset->default, ""/NONE->[] (start flat), else parse.
-        Orchestrator preserves an explicit [] and warns if empty + screener off.
-[DONE 2026-06-29 -> completed.txt] 13. Dashboard wired into the live loop (Y1, Q#6).
-        Real "Account (live)" cards (equity, today/unrealized/realized, total return)
-        from item 11; auto-regenerates after every decision tick when DASHBOARD_FILE
-        is set.
-[ ] 14. Small-account sizing path (addresses Y2) — for a $100–$1000 live float,
-        prefer fractional + watchdog stops over dropping the sub-share remainder,
-        or document the deploy-loss tradeoff. Re-check MAX_OPEN_POSITIONS vs
-        per-name min order on a tiny float.
-[ ] 15. (optional) Backfill exchange-side bracket exits into the ledger (poll
-        Alpaca closed positions / account activities) so attribution + ledger
-        realized P&L stop undercounting. Lower priority once item 11 reads the
-        account directly.
-[ ] 16. LIVE-CUTOVER CHECKLIST (your Q#4) — when flipping to real money:
-        - Start with WATCHLIST empty (screener-only) [needs item 12].
-        - Fund $100 first, scale up only after a clean track record; risk caps are
-          % based so they scale down automatically (5%/pos, 10%/symbol).
-        - SET EQUITY_FLOOR_USD (e.g. ~85% of float) — it's 0/off by default (Y3).
-        - DELETE state/risk_state.json before cutover so a stale peak_equity can't
-          trip an instant drawdown halt; archive state/trades.jsonl for a clean
-          track record (paper trades shouldn't pollute live attribution).
-        - Confirm ALPACA_BASE_URL=https://api.alpaca.markets + TRADING_MODE=live
-          (the interlock enforces this pairing).
+################################################################################
+PHASE 3 — Decision quality
+################################################################################
+[ ] 3.1 Per-signal lag-decay weighting (B.5) — formalize lag-based confidence so a
+        45d congress filing and a 1d dark-pool print aren't weighted equally.
+[ ] 3.2 Swap yfinance fundamentals/earnings for the paid feed once chosen (2.2).
 
---------------------------------------------------------------------------------
-A. WIRE THE UNTAPPED ALREADY-PAID QUIVER DATASETS  (ranked; all AVAILABLE now)
---------------------------------------------------------------------------------
-[DONE 2026-06-28 -> completed.txt] 1. govcontracts signal. Shipped in PR #6.
-[ ] 2. senatetrading + housetrading (signal) — finer than aggregate congress;
-       some members outperform. Endpoints live/senatetrading, live/housetrading.
-       Lag ~45d (weight accordingly).
-[ ] 3. lobbying (signal, weak) — slow regulatory-tailwind tell. live/lobbying.
-       Lag: weeks.
-[ ] 4. flights (signal, niche) — corporate-jet tracking, occasional M&A hint.
-       live/flights.
-   Blocked on plan upgrade (do NOT start until tier bumped): wallstreetbets
-   screener (already coded, inert), 13F institutional changes, twitter, insiders
-   (skip — we get insider data free via Finnhub + SEC EDGAR).
+################################################################################
+PHASE 4 — Operational
+################################################################################
+[ ] 4.1 Alerting (D.10) — page on watchdog CRITICAL (naked position after a failed
+        close). Gmail is available.
+[ ] 4.2 Backfill exchange-side bracket exits into the ledger (E.15) — so attribution
+        stops undercounting (account-level P&L already complete via status.py).
 
---------------------------------------------------------------------------------
-B. DECISION QUALITY
---------------------------------------------------------------------------------
-[ ] 5. Per-signal decay weighting in the prompt — formalize lag-based confidence
-       so Claude isn't told a 45-day-old congress filing and a 1-day dark-pool
-       print as equals. (Ties into weighting note above.)
-[DONE 2026-06-28 -> completed.txt] 6. Earnings-blackout guard. Shipped in PR #6.
+################################################################################
+PHASE 5 — MULTI-USER / MULTI-TENANT (north star; design now, build later)
+################################################################################
+Principle: signals/scanner are GLOBAL (compute once); decision-sizing, risk,
+execution, monitoring are PER-ACCOUNT. Current architecture is already well-suited
+(pure signals; file-path-parameterized state/ledger).
+[ ] 5.1 Account abstraction — (id, broker creds, risk profile, state/ledger/equity
+        paths, kill switch) threaded through orchestrator/risk/ledger/status.
+[ ] 5.2 Shared signal cycle -> fan out per-account decide/risk/execute/monitor.
+[ ] 5.3 Per-account isolation of risk_state/trades/equity_history/kill switch.
+[ ] 5.4 Secure per-user secrets store (multiple broker keys can't sit in flat .env).
+[ ] 5.5 Cost attribution — amortize/meter shared LLM+data cost per user.
+[ ] 5.6 REGULATORY/LEGAL gate (NON-CODE, resolve FIRST) — trading others' money may
+        require IA/broker-dealer registration depending on jurisdiction/arrangement.
+        Each person running their OWN instance w/ their OWN keys (self-opt-in) is a
+        different posture than managing funds for them. Settle the legal model
+        before building 5.1–5.5; it shapes the design.
+
+################################################################################
+LOWER VALUE / SKIP unless a thesis calls for it
+################################################################################
+[ ] A.2 senatetrading + housetrading (overlaps the existing congress signal).
+[ ] A.3 lobbying (weak, slow).   [ ] A.4 flights (niche M&A hint).
+   Plan-upgrade-blocked: wallstreetbets (coded, inert), 13F, twitter; insiders
+   skipped (free via Finnhub + SEC EDGAR).
 
 --------------------------------------------------------------------------------
-C. RISK / SIZING
+RANKED NEXT STEPS (2026-06-29)
 --------------------------------------------------------------------------------
-[ ] 7. Correlation-aware exposure cap — caps are per-symbol today, but
-       AAPL+MSFT+NVDA+GOOGL+META (default watchlist) are ~one tech-beta bet. Add
-       a sector/correlation cap so vol-targeting doesn't quietly concentrate.
-[ ] 8. Regime filter — gate aggressiveness on a market-regime read (SPY vs
-       200dma, VIX via the macro provider). Cut gross exposure in risk-off
-       regimes automatically.
+ 1. 0.1  Remove the watchlist concept (align to the vision; small)
+ 2. 1.1  PDT guard + cash-account mode      (biggest missing safety item)
+ 3. 1.2  Set EQUITY_FLOOR_USD               (config + confirm value)
+ 4. 1.3  Correlation / sector cap
+ 5. 1.4  Regime filter
+ 6. 1.5  Small-account sizing + $-loss cap + cost floor
+ 7. 2.1  Backtest harness                   (gate before real money / data buys)
+ 8. 2.2  Data-subscription decision         (informed by 2.1)
+ 9. 3.1  Lag-decay weighting · 4.1 Alerting · then Phase 5 (after the legal gate)
 
---------------------------------------------------------------------------------
-D. OPERATIONAL
---------------------------------------------------------------------------------
-[ ] 9. Backtest harness — no way to replay the strategy on history. Even a coarse
-       one (signals -> proposals -> simulated fills) would let you tune
-       KELLY_FRACTION, TARGET_ANNUAL_VOL_PCT, and stop/take before risking capital.
-[ ] 10. Alerting — the watchdog logs CRITICAL on failed closes (naked position)
-        but nothing pages you. Wire those to a notification (Gmail is available).
-
---------------------------------------------------------------------------------
-RANKED NEXT STEPS (re-ranked 2026-06-29; live-readiness first)
---------------------------------------------------------------------------------
- 1. C.7   Correlation-aware exposure cap     (Y4 — megacaps are one beta)
- 2. E.16  Live-cutover checklist (mostly doc) + set EQUITY_FLOOR_USD (Y3)
- 3. E.14  Small-account sizing path          (Y2 — sub-share remainder dropped)
- 4. C.8   Regime filter
- 5. B.5   Per-signal lag-decay weighting     (cheap decision-quality win)
- 6. D.10  Alerting on naked-position failures (Y5)
- 7. E.15  Backfill exchange-side bracket exits into the ledger (lower priority now
-          that E.11 reads realized P&L from the account directly)
- 8. D.9   Backtest harness                   (highest effort; a project)
-Lower value / skip for now: A.2 senate/house (overlaps congress), A.3 lobbying,
-A.4 flights. Wire only if a specific thesis calls for them.
-
-DONE this round (-> completed.txt): E.11 account tracker + E.12 empty watchlist +
-E.13 dashboard wiring. (Prev round: A.1 govcontracts + B.6 earnings-blackout, PR #6.)
-Recommended next: C.7 (correlation cap) — the last real risk hole before live; then
-the E.16 cutover checklist when you're ready to fund the live account.
+DONE (-> completed.txt): A.1 govcontracts, B.6 earnings-blackout (PR #6);
+E.11 account P&L tracker, E.12 empty watchlist, E.13 live dashboard.
+RECOMMENDED NEXT: Phase 0.1 (watchlist removal) + 1.1 (PDT/cash-account guard) —
+together they lock in the discovery-only model and the #1 small-account safety gap.
