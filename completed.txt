@@ -116,3 +116,39 @@ risk._evaluate_buy REJECTS new buys within N days of a report (gap risk dwarfs t
 stop); sells/exits never blacked out. Orchestrator sources days-to-earnings for
 buys and passes it to risk.evaluate; the gate stays deterministic/network-free.
 Tests: tests/test_risk.py (6 cases) + tests/test_earnings.py. PR #6.
+
+--- E.11 Account-status / P&L tracker — DONE 2026-06-29 ---
+status.py: the honest "are we up or down?" view, sourced from the Alpaca ACCOUNT
+(the ledger can't answer it — exchange-side bracket auto-fills never pass through
+our code, so ledger realized P&L structurally undercounts). compute_status():
+  total_return = equity - base_value - net_cashflows   (backs out initial funding
+                 AND later deposits/withdrawals; from Alpaca portfolio history)
+  unrealized   = sum of open positions' unrealized P&L
+  realized     = total_return - unrealized             (identity, no fill replay)
+  day_pl       = equity - last_equity
+New AlpacaClient.portfolio_basis() -> (base_value, net_cashflows). Verified live
+(equity 100,044 / capital 100,000 -> +44 total, +6 realized; matched by hand).
+`python -m investment_strategy.status` prints the report; EquityHistory persists a
+once-per-day snapshot to state/equity_history.jsonl (snapshotted each decision
+cycle by the orchestrator). Fails OPEN: if portfolio history is unavailable,
+total/realized are None but day P&L + unrealized still render.
+Tests: tests/test_status.py (identity, deposits backed out, down account, fail-open).
+
+--- E.12 Empty / screener-only watchlist — DONE 2026-06-29 ---
+__main__.resolve_watchlist(): UNSET (None) -> orchestrator default list; explicit
+"" or "NONE" -> [] (start flat; trade only screener-discovered names — the
+live-cutover mode); else parse+uppercase. Orchestrator now does
+`DEFAULT_WATCHLIST if watchlist is None else watchlist` (was `watchlist or
+DEFAULT`, which silently traded megacaps on an empty list) and warns if the
+watchlist is empty AND the screener is disabled (nothing to trade).
+Tests: tests/test_status.py (unset/empty/NONE/parse cases).
+
+--- E.13 Dashboard wired into the live loop — DONE 2026-06-29 ---
+dashboard.py now renders a real "Account (live)" card row (equity, today's P&L,
+unrealized, total return + realized — net of deposits) from compute_status(),
+above the ledger "invested" cards (relabeled "Ledger (bot orders)"). _live_enrichment()
+pulls prices AND account status in one Alpaca pass; the panel shows even with zero
+trades (useful for an empty-watchlist live start). New DASHBOARD_FILE env: when set,
+the orchestrator regenerates that HTML after every decision tick so the live
+tracker stays fresh (off by default). Manual CLI unchanged
+(python -m investment_strategy.dashboard).

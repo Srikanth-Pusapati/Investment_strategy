@@ -26,23 +26,18 @@ Cross-cutting cautions when adding datasets:
 # (full reasoning lives in chat; the actionable items are sections E + below)
 ################################################################################
 RED (fix before real money):
- R1. No consolidated account-status / P&L view. We record trades + the benchmark
-     tracker pulls Alpaca equity history, but nothing answers "am I net up or
-     down, realized + unrealized, vs deposits." -> item E.11.
- R2. Empty watchlist is NOT supported. __main__ and Orchestrator both do
-     `watchlist or DEFAULT_WATCHLIST`, so a blank WATCHLIST silently trades the 7
-     megacaps. The live plan (start empty / screener-only) won't work as-is.
-     -> item E.12.
- R3. Realized P&L is structurally incomplete in the ledger: exchange-side BRACKET
-     auto-fills (the common happy-path exit for whole-share buys) are never
-     observed, so ledger realized_pl AND attribution undercount. Any P&L report
-     must read the Alpaca ACCOUNT (equity vs net deposits), not just the ledger.
-     -> folded into E.11 (+ optional E.15 to backfill bracket exits).
+ R1. [RESOLVED E.11] No consolidated account-status / P&L view -> status.py reads
+     the Alpaca account (total return net of deposits, realized, unrealized, day).
+ R2. [RESOLVED E.12] Empty watchlist silently traded megacaps -> resolve_watchlist
+     now distinguishes unset (default) from explicit ""/NONE (start flat).
+ R3. [RESOLVED via E.11] Ledger realized P&L undercounts exchange-side bracket
+     auto-fills -> the P&L tracker reads the ACCOUNT (equity vs capital), not the
+     ledger, so it's complete. (Optional E.15 still backfills bracket exits into
+     the ledger for attribution.)
 
 YELLOW (works, but risky/incomplete):
- Y1. Dashboard is a MANUAL one-shot CLI (python -m investment_strategy.dashboard),
-     not wired into the loop and ledger-only — it goes stale instantly in live and
-     never shows real account equity/cash/realized P&L. -> item E.13.
+ Y1. [RESOLVED E.13] Dashboard was a manual, ledger-only one-shot -> now shows real
+     account cards and auto-regenerates each cycle when DASHBOARD_FILE is set.
  Y2. Whole-share buys DROP the sub-share remainder (to allow an exchange bracket).
      On a $1k account approved 1.8sh -> buys 1 (–44% under-deployed). Revisit the
      small-account path. -> item E.14.
@@ -64,20 +59,18 @@ GREEN (genuinely solid — keep, don't regress):
 --------------------------------------------------------------------------------
 E. ACCOUNT VISIBILITY & LIVE-READINESS  (NEW from audit — HIGHEST priority)
 --------------------------------------------------------------------------------
-[ ] 11. Account-status / P&L tracker (addresses R1+R3, your Q#5). Source of truth
-        = the Alpaca ACCOUNT, not the ledger: equity vs net deposits (true total
-        return), cash, today's P&L, open unrealized, and realized-to-date. A
-        `python -m investment_strategy.status` report + persisted daily equity
-        snapshot so the curve survives. Ledger stays the "why"; Alpaca is the
-        "how much."
-[ ] 12. Support an EMPTY / screener-only watchlist (addresses R2, your Q#4).
-        Distinguish "unset -> default list" from "explicitly empty -> trade only
-        what the screener discovers." e.g. WATCHLIST="" or WATCHLIST=NONE => []
-        and DON'T fall back. Needed before live so you truly start flat.
-[ ] 13. Wire the dashboard into the live loop (addresses Y1, your Q#6). Either
-        regenerate dashboard.html at the end of each decision cycle (or on a timer)
-        AND add real account cards (equity, cash, realized + unrealized P&L) from
-        item 11 — so it reflects the ACCOUNT, not just ledger "invested" totals.
+[DONE 2026-06-29 -> completed.txt] 11. Account-status / P&L tracker (R1+R3, Q#5).
+        status.py: compute_status() reads the Alpaca ACCOUNT; total_return =
+        equity - base_value - net_cashflows (backs out funding + deposits),
+        realized = total_return - unrealized. `python -m investment_strategy.status`
+        report + state/equity_history.jsonl daily snapshots (snapshotted each cycle).
+[DONE 2026-06-29 -> completed.txt] 12. Empty / screener-only watchlist (R2, Q#4).
+        resolve_watchlist(): unset->default, ""/NONE->[] (start flat), else parse.
+        Orchestrator preserves an explicit [] and warns if empty + screener off.
+[DONE 2026-06-29 -> completed.txt] 13. Dashboard wired into the live loop (Y1, Q#6).
+        Real "Account (live)" cards (equity, today/unrealized/realized, total return)
+        from item 11; auto-regenerates after every decision tick when DASHBOARD_FILE
+        is set.
 [ ] 14. Small-account sizing path (addresses Y2) — for a $100–$1000 live float,
         prefer fractional + watchdog stops over dropping the sub-share remainder,
         or document the deploy-loss tradeoff. Re-check MAX_OPEN_POSITIONS vs
@@ -140,20 +133,21 @@ D. OPERATIONAL
         but nothing pages you. Wire those to a notification (Gmail is available).
 
 --------------------------------------------------------------------------------
-RANKED NEXT STEPS (re-ranked after the 2026-06-28 audit; live-readiness first)
+RANKED NEXT STEPS (re-ranked 2026-06-29; live-readiness first)
 --------------------------------------------------------------------------------
- 1. E.11  Account-status / P&L tracker      (R1+R3, Q#5 — "are we +ve or -ve")
- 2. E.12  Empty / screener-only watchlist   (R2, Q#4 — start flat in live)
- 3. E.13  Dashboard wired into the loop      (Y1, Q#6 — live tracker stays fresh)
- 4. C.7   Correlation-aware exposure cap     (Y4 — megacaps are one beta)
- 5. E.16  Live-cutover checklist + E.14/E.16 small-account + EQUITY_FLOOR
- 6. C.8   Regime filter
- 7. B.5   Per-signal lag-decay weighting     (cheap decision-quality win)
- 8. D.10  Alerting on naked-position failures (Y5)
- 9. D.9   Backtest harness                   (highest effort; a project)
+ 1. C.7   Correlation-aware exposure cap     (Y4 — megacaps are one beta)
+ 2. E.16  Live-cutover checklist (mostly doc) + set EQUITY_FLOOR_USD (Y3)
+ 3. E.14  Small-account sizing path          (Y2 — sub-share remainder dropped)
+ 4. C.8   Regime filter
+ 5. B.5   Per-signal lag-decay weighting     (cheap decision-quality win)
+ 6. D.10  Alerting on naked-position failures (Y5)
+ 7. E.15  Backfill exchange-side bracket exits into the ledger (lower priority now
+          that E.11 reads realized P&L from the account directly)
+ 8. D.9   Backtest harness                   (highest effort; a project)
 Lower value / skip for now: A.2 senate/house (overlaps congress), A.3 lobbying,
 A.4 flights. Wire only if a specific thesis calls for them.
 
-DONE last round (-> completed.txt): A.1 govcontracts + B.6 earnings-blackout (PR #6).
-Recommended next: E.11 then E.12 — together they give you a true account view and
-let you start live flat. Both are prerequisites to trusting the dashboard (E.13).
+DONE this round (-> completed.txt): E.11 account tracker + E.12 empty watchlist +
+E.13 dashboard wiring. (Prev round: A.1 govcontracts + B.6 earnings-blackout, PR #6.)
+Recommended next: C.7 (correlation cap) — the last real risk hole before live; then
+the E.16 cutover checklist when you're ready to fund the live account.

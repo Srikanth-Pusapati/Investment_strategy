@@ -33,14 +33,21 @@ def main() -> int:
         logging.getLogger("main").error("Copy .env.example to .env and fill it in.")
         return 1
 
-    watchlist_env = os.getenv("WATCHLIST")
-    watchlist = (
-        [s.strip().upper() for s in watchlist_env.split(",") if s.strip()]
-        if watchlist_env else None
-    )
-
-    Orchestrator(cfg, watchlist=watchlist).run()
+    Orchestrator(cfg, watchlist=resolve_watchlist(os.getenv("WATCHLIST"))).run()
     return 0
+
+
+def resolve_watchlist(env_value: str | None) -> list[str] | None:
+    """Map the WATCHLIST env var to a watchlist.
+
+    None  (unset)                 -> None  => orchestrator uses its default list.
+    ""    or "NONE" (explicit)    -> []    => start flat; trade only screener finds.
+    "AAPL,msft"                   -> ["AAPL", "MSFT"].
+    """
+    if env_value is None:
+        return None
+    cleaned = [s.strip().upper() for s in env_value.split(",") if s.strip()]
+    return [] if cleaned in ([], ["NONE"]) else cleaned
 
 
 if __name__ == "__main__":

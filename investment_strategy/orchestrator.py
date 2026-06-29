@@ -30,6 +30,7 @@ from .screener import ScreenerAggregator
 from .signals import SignalAggregator
 from .signals.quiver_client import QuiverClient
 from .state import PortfolioState
+from .status import EquityHistory, compute_status
 
 log = logging.getLogger("orchestrator")
 
@@ -63,7 +64,19 @@ class Orchestrator:
         self.benchmark = BenchmarkTracker(cfg, self.broker, symbol=cfg.benchmark_symbol)
         self.robinhood = RobinhoodReader(cfg)
         self.options = OptionsHelper(cfg) if cfg.risk.options_enabled else None
-        self.watchlist = watchlist or DEFAULT_WATCHLIST
+        # None => unset => use the default list. An EXPLICIT empty list means
+        # "start flat; trade only what the screener discovers" (live-cutover mode)
+        # — preserve it rather than falling back to the megacap defaults.
+        self.watchlist = DEFAULT_WATCHLIST if watchlist is None else watchlist
+        if not self.watchlist and not cfg.screener.enabled:
+            log.warning(
+                "Watchlist is EMPTY and the screener is disabled — there is "
+                "nothing to evaluate. Set WATCHLIST or enable the screener."
+            )
+        elif not self.watchlist:
+            log.info("Empty watchlist — trading only screener-discovered names.")
+        # Persisted daily equity snapshots so the account P&L curve survives restarts.
+        self.equity_history = EquityHistory()
         self._last_decision_at = 0.0
         # Serializes broker order mutations so the watchdog's emergency closes and
         # the decision cycle's order placement can't interleave (e.g. double-close).
@@ -101,6 +114,7 @@ class Orchestrator:
                 self._refresh_runtime_controls()
                 if self._decision_due():
                     self.run_decision_cycle()
+                    self._refresh_dashboard()
                     self._last_decision_at = time.monotonic()
             except KeyboardInterrupt:
                 log.info("Interrupted — exiting.")
@@ -164,6 +178,7 @@ class Orchestrator:
         # and screener layers (both read the same cached live feeds).
         self.quiver.new_cycle()
         self.earnings.new_cycle()
+        self._record_equity_snapshot()
         account = self.broker.get_account()
 
         # Watchlist + current holdings are always evaluated; the scanner widens
@@ -200,6 +215,27 @@ class Orchestrator:
                 self._handle_option(proposal, account, kinds)
             else:
                 self._handle_equity(proposal, account, kinds)
+
+    def _refresh_dashboard(self) -> None:
+        """Regenerate the live dashboard HTML after a cycle so the tracker stays
+        fresh (off unless DASHBOARD_FILE is set). Best-effort; never blocks."""
+        if not self.cfg.dashboard_file:
+            return
+        try:
+            from pathlib import Path
+
+            from .dashboard import generate
+            generate(Path(self.cfg.dashboard_file), live=True)
+        except Exception as e:
+            log.warning("Dashboard refresh failed: %s", e)
+
+    def _record_equity_snapshot(self) -> None:
+        """Persist a once-per-day account P&L snapshot (true total return from the
+        Alpaca account, not the ledger). Best-effort; never blocks a cycle."""
+        try:
+            self.equity_history.snapshot(compute_status(self.broker))
+        except Exception as e:
+            log.warning("Could not record equity snapshot: %s", e)
 
     def _lessons(self) -> str:
         try:

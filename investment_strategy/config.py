@@ -107,6 +107,7 @@ class Config:
     # the drawdown high-water mark and the halt latch across restarts.
     kill_switch_file: str
     state_file: str
+    dashboard_file: str              # auto-regen this HTML each cycle ("" = off)
 
     risk: RiskLimits
     screener: ScreenerConfig
@@ -175,6 +176,7 @@ def load_config() -> Config:
         monitor_interval_s=_i("MONITOR_INTERVAL_SECONDS", 30),
         kill_switch_file=os.getenv("KILL_SWITCH_FILE", "state/KILL"),
         state_file=os.getenv("STATE_FILE", "state/risk_state.json"),
+        dashboard_file=os.getenv("DASHBOARD_FILE", "").strip(),
         risk=RiskLimits(
             max_position_pct=_f("MAX_POSITION_PCT", 5.0),
             max_symbol_exposure_pct=_f("MAX_SYMBOL_EXPOSURE_PCT", 10.0),

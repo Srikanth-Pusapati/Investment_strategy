@@ -22,6 +22,7 @@ from alpaca.data.timeframe import TimeFrame
 from alpaca.trading.client import TradingClient
 from alpaca.trading.enums import OrderClass, OrderSide, TimeInForce
 from alpaca.trading.requests import (
+    GetPortfolioHistoryRequest,
     LimitOrderRequest,
     MarketOrderRequest,
     OptionLegRequest,
@@ -102,6 +103,33 @@ class AlpacaClient:
 
     def is_market_open(self) -> bool:
         return bool(self.trading.get_clock().is_open)
+
+    def portfolio_basis(self) -> Optional[tuple[float, float]]:
+        """(base_value, net_cashflows) since account inception, for true
+        total-return math: total_return = equity - base_value - net_cashflows
+        (so it backs out both the initial funding AND any later deposits/
+        withdrawals — the honest "are we up or down" number). None if the
+        portfolio-history call fails. Best-effort, never raises."""
+        try:
+            acct = self.trading.get_account()
+            created = acct.created_at
+            if not isinstance(created, datetime):
+                created = datetime.fromisoformat(str(created))
+            req = GetPortfolioHistoryRequest(
+                start=created.astimezone(timezone.utc), timeframe="1D",
+            )
+            hist = self.trading.get_portfolio_history(req)
+            base = float(hist.base_value or 0.0)
+            net_cf = 0.0
+            for v in (hist.cashflow or {}).values():
+                if isinstance(v, (list, tuple)):
+                    net_cf += sum(float(x or 0) for x in v)
+                else:
+                    net_cf += float(v or 0)
+            return base, net_cf
+        except Exception as e:
+            log.warning("portfolio_basis failed: %s", e)
+            return None
 
     # -- write: generalized order ------------------------------------------ #
     def submit(self, order: OrderRequest) -> Optional[str]:

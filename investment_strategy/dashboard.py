@@ -27,6 +27,7 @@ from pathlib import Path
 from typing import Optional
 
 from .ledger import TradeLedger, TradeRecord
+from .status import AccountStatus
 
 log = logging.getLogger("dashboard")
 
@@ -45,23 +46,32 @@ _AMBER = "#d29922"
 # --------------------------------------------------------------------------- #
 # Optional live enrichment
 # --------------------------------------------------------------------------- #
-def _latest_prices(symbols: set[str]) -> dict[str, float]:
-    """Best-effort current prices via Alpaca. Returns {} if anything is missing."""
-    if not symbols:
-        return {}
+def _live_enrichment(
+    symbols: set[str],
+) -> tuple[dict[str, float], Optional[AccountStatus]]:
+    """Best-effort live data via Alpaca: current prices for ledger symbols AND the
+    real account status (equity, P&L, total return). Returns ({}, None) if Alpaca
+    is unavailable so the dashboard still renders the ledger offline."""
     try:
         from .config import load_config
         from .execution import AlpacaClient
+        from .status import compute_status
+
         broker = AlpacaClient(load_config())
-        out: dict[str, float] = {}
+        prices: dict[str, float] = {}
         for s in symbols:
             px = broker.latest_price(s)
             if px > 0:
-                out[s] = px
-        return out
+                prices[s] = px
+        try:
+            status = compute_status(broker)
+        except Exception as e:  # account read shouldn't sink price enrichment
+            log.info("Account status unavailable (%s).", e)
+            status = None
+        return prices, status
     except Exception as e:
-        log.info("Live price enrichment skipped (%s).", e)
-        return {}
+        log.info("Live enrichment skipped (%s).", e)
+        return {}, None
 
 
 # --------------------------------------------------------------------------- #
@@ -243,7 +253,39 @@ def _table(rows: list[_Row]) -> str:
     return f"<table><thead>{head}</thead><tbody>{''.join(body)}</tbody></table>"
 
 
-def build_html(records: list[TradeRecord], prices: dict[str, float]) -> str:
+def _account_panel(status: Optional[AccountStatus]) -> str:
+    """Cards for the REAL Alpaca account (truth), distinct from the ledger-derived
+    'invested' cards below. Omitted entirely when the account can't be read."""
+    if status is None:
+        return ""
+    cards = [
+        _card("Account equity", f"${status.equity:,.0f}",
+              f"${status.cash:,.0f} cash · {status.n_positions} open"),
+        _card("Today's P&L", f"{'+' if status.day_pl >= 0 else ''}${status.day_pl:,.0f}",
+              f"{status.day_pl_pct:+.2f}%",
+              tone="up" if status.day_pl >= 0 else "down"),
+        _card("Unrealized P&L",
+              f"{'+' if status.unrealized_pl >= 0 else ''}${status.unrealized_pl:,.0f}",
+              "open positions",
+              tone="up" if status.unrealized_pl >= 0 else "down"),
+    ]
+    if status.total_return is not None:
+        up = status.is_up
+        cards.append(_card(
+            "Total return", f"{'+' if up else ''}${status.total_return:,.0f}",
+            f"{status.total_return_pct:+.2f}% · realized "
+            f"{'+' if (status.realized_pl or 0) >= 0 else ''}${status.realized_pl:,.0f} "
+            f"· net of deposits",
+            tone="up" if up else "down",
+        ))
+    return ("<h2 class='section'>Account (live)</h2>"
+            f"<div class='cards'>{''.join(cards)}</div>")
+
+
+def build_html(
+    records: list[TradeRecord], prices: dict[str, float],
+    account: Optional[AccountStatus] = None,
+) -> str:
     rows = [_Row(r, prices.get(r.symbol)) for r in records]
     buys = [r for r in records if r.action == "buy"]
 
@@ -292,6 +334,7 @@ def build_html(records: list[TradeRecord], prices: dict[str, float]) -> str:
 
     generated = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     return _PAGE.format(
+        account_panel=_account_panel(account),
         cards="".join(cards),
         bar=bar,
         area=area,
@@ -314,6 +357,8 @@ h1{font-size:22px;margin:0 0 2px}
 .card-lbl{color:%(mute)s;font-size:12px;text-transform:uppercase;letter-spacing:.04em}
 .card-val{font-size:26px;font-weight:650;margin-top:4px}
 .card-sub{color:%(mute)s;font-size:12px;margin-top:4px}
+.section{font-size:13px;color:%(mute)s;text-transform:uppercase;letter-spacing:.04em;
+  font-weight:600;margin:8px 0 12px}
 .grid2{display:grid;grid-template-columns:1fr 1.4fr;gap:18px;margin-bottom:28px}
 @media(max-width:880px){.grid2{grid-template-columns:1fr}}
 .panel{background:%(card)s;border:1px solid %(grid)s;border-radius:12px;padding:18px}
@@ -359,6 +404,8 @@ _PAGE = """<!doctype html>
 <h1>📈 Trade Dashboard</h1>
 <p class="sub">Every order the bot has executed — what, when, how much, the planned
 exit, and why. Exits are price-triggered brackets (TP/SL), not calendar dates.</p>
+{account_panel}
+<h2 class="section">Ledger (bot orders)</h2>
 <div class="cards">{cards}</div>
 <div class="grid2">
   <div class="panel"><h2>Capital deployed per symbol</h2>{bar}</div>
@@ -378,8 +425,8 @@ def generate(
 ) -> Path:
     ledger = TradeLedger(ledger_path) if ledger_path else TradeLedger()
     records = ledger.all()
-    prices = _latest_prices({r.symbol for r in records}) if live and records else {}
-    out.write_text(build_html(records, prices), encoding="utf-8")
+    prices, account = _live_enrichment({r.symbol for r in records}) if live else ({}, None)
+    out.write_text(build_html(records, prices, account), encoding="utf-8")
     log.info("Wrote dashboard with %d trades -> %s", len(records), out)
     return out
 
