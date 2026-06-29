@@ -25,6 +25,8 @@ class SignalKind(str, Enum):
     NEWS = "news"
     INSIDER = "insider"
     CONGRESS = "congress"
+    OFFEXCHANGE = "offexchange"  # dark-pool / off-exchange short volume (~1d lag)
+    GOVCONTRACTS = "govcontracts"  # federal contract awards (revenue catalyst; days lag)
     MACRO = "macro"
     DISCOVERY = "discovery"   # why a symbol was surfaced by the market scanner
 

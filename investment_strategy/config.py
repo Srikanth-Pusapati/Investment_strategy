@@ -43,6 +43,7 @@ class RiskLimits:
     max_open_positions: int          # cap concurrent holdings
     min_cash_buffer_pct: float       # never deploy below this cash reserve
     min_trade_price_usd: float       # refuse buys below this price (liquidity guard)
+    earnings_blackout_days: int      # block NEW buys within this many days of earnings (0=off)
     # --- fractional shares (for small accounts) ---
     fractional_enabled: bool         # allow sub-share notional buys (no exchange bracket)
     min_order_usd: float             # smallest $ order worth placing (Alpaca min is $1)
@@ -183,6 +184,7 @@ def load_config() -> Config:
             max_open_positions=_i("MAX_OPEN_POSITIONS", 15),
             min_cash_buffer_pct=_f("MIN_CASH_BUFFER_PCT", 10.0),
             min_trade_price_usd=_f("MIN_TRADE_PRICE_USD", 5.0),
+            earnings_blackout_days=_i("EARNINGS_BLACKOUT_DAYS", 3),
             fractional_enabled=_flag("FRACTIONAL_ENABLED", "on"),
             min_order_usd=_f("MIN_ORDER_USD", 1.0),
             default_stop_loss_pct=_f("DEFAULT_STOP_LOSS_PCT", 5.0),

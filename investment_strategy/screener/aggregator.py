@@ -12,10 +12,12 @@ import logging
 
 from ..config import Config
 from ..models import Candidate
+from ..signals.quiver_client import QuiverClient
 from .base import Screener
 from .congress_feed import CongressFeedScreener
 from .insider_feed import InsiderFeedScreener
 from .options_flow_feed import OptionsFlowScreener
+from .wallstreetbets_feed import WallStreetBetsScreener
 
 log = logging.getLogger("screener")
 
@@ -24,19 +26,26 @@ _REGISTRY: dict[str, type[Screener]] = {
     "congress": CongressFeedScreener,
     "insider": InsiderFeedScreener,
     "options_flow": OptionsFlowScreener,
+    "wallstreetbets": WallStreetBetsScreener,
 }
+# Quiver-backed screeners take the shared client so they reuse the signal layer's
+# cached live-feed pull instead of fetching it a second time.
+_QUIVER_SCREENERS: set[type[Screener]] = {CongressFeedScreener, WallStreetBetsScreener}
 
 
 class ScreenerAggregator:
-    def __init__(self, cfg: Config):
+    def __init__(self, cfg: Config, quiver: QuiverClient | None = None):
         self.cfg = cfg
+        self.quiver = quiver or QuiverClient(cfg.quiver_api_key)
         self.screeners: list[Screener] = []
         for src in cfg.screener.sources:
             cls = _REGISTRY.get(src)
             if cls is None:
                 log.warning("Unknown screener source %r; ignoring.", src)
                 continue
-            self.screeners.append(cls(cfg))
+            self.screeners.append(
+                cls(cfg, self.quiver) if cls in _QUIVER_SCREENERS else cls(cfg)
+            )
 
     def scan(self, exclude: set[str] | None = None) -> list[Candidate]:
         """Discover candidate symbols, excluding names already being evaluated

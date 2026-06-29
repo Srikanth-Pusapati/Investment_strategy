@@ -48,6 +48,7 @@ def _limits(**over) -> RiskLimits:
         max_open_positions=15,
         min_cash_buffer_pct=10.0,
         min_trade_price_usd=5.0,
+        earnings_blackout_days=3,
         fractional_enabled=True,
         min_order_usd=1.0,
         default_stop_loss_pct=5.0,
@@ -195,6 +196,51 @@ def test_max_open_positions_halt():
     d = rm.evaluate(_buy("NVDA"), acct, price=100.0, volatility=0.25)
     assert d.verdict is RiskVerdict.REJECTED
     assert "max open positions" in d.reason.lower()
+
+
+# --------------------------------------------------------------------------- #
+# Earnings-blackout guard
+# --------------------------------------------------------------------------- #
+def test_earnings_blackout_blocks_buy_inside_window():
+    rm = _rm(_limits(earnings_blackout_days=3))
+    d = rm.evaluate(_buy(), _account(), price=100.0, volatility=0.25, days_to_earnings=2)
+    assert d.verdict is RiskVerdict.REJECTED
+    assert "earnings" in d.reason.lower()
+
+
+def test_earnings_blackout_blocks_on_report_day():
+    rm = _rm(_limits(earnings_blackout_days=3))
+    d = rm.evaluate(_buy(), _account(), price=100.0, volatility=0.25, days_to_earnings=0)
+    assert d.verdict is RiskVerdict.REJECTED
+
+
+def test_earnings_blackout_allows_buy_outside_window():
+    rm = _rm(_limits(earnings_blackout_days=3))
+    d = rm.evaluate(_buy(), _account(), price=100.0, volatility=0.25, days_to_earnings=10)
+    assert d.verdict in (RiskVerdict.APPROVED, RiskVerdict.RESIZED)
+
+
+def test_earnings_blackout_fails_open_when_date_unknown():
+    rm = _rm(_limits(earnings_blackout_days=3))
+    d = rm.evaluate(_buy(), _account(), price=100.0, volatility=0.25, days_to_earnings=None)
+    assert d.verdict in (RiskVerdict.APPROVED, RiskVerdict.RESIZED)
+
+
+def test_earnings_blackout_disabled_when_zero():
+    rm = _rm(_limits(earnings_blackout_days=0))
+    d = rm.evaluate(_buy(), _account(), price=100.0, volatility=0.25, days_to_earnings=1)
+    assert d.verdict in (RiskVerdict.APPROVED, RiskVerdict.RESIZED)
+
+
+def test_earnings_blackout_does_not_block_sells():
+    rm = _rm(_limits(earnings_blackout_days=3))
+    acct = _account(positions=[_pos(qty=10.0)])
+    d = rm.evaluate(
+        TradeProposal(symbol="AAPL", action=Action.SELL, conviction=1.0,
+                      target_weight_pct=0.0, rationale="exit"),
+        acct, price=100.0, days_to_earnings=1,
+    )
+    assert d.verdict is RiskVerdict.APPROVED   # exits are never blacked out
 
 
 # --------------------------------------------------------------------------- #

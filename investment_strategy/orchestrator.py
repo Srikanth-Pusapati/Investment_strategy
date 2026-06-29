@@ -19,6 +19,7 @@ from .attribution import render_lessons
 from .benchmark import BenchmarkTracker
 from .config import Config
 from .decision import DecisionEngine
+from .earnings import EarningsCalendar
 from .execution import AlpacaClient, OptionsHelper
 from .ledger import TradeLedger, TradeRecord
 from .models import Candidate, Instrument, RiskVerdict, SignalBundle, TradeProposal
@@ -27,6 +28,7 @@ from .portfolio import RobinhoodReader
 from .risk import RiskManager
 from .screener import ScreenerAggregator
 from .signals import SignalAggregator
+from .signals.quiver_client import QuiverClient
 from .state import PortfolioState
 
 log = logging.getLogger("orchestrator")
@@ -40,8 +42,15 @@ class Orchestrator:
     def __init__(self, cfg: Config, watchlist: list[str] | None = None):
         self.cfg = cfg
         self.broker = AlpacaClient(cfg)
-        self.signals = SignalAggregator(cfg)
-        self.screeners = ScreenerAggregator(cfg)
+        # One Quiver client shared by the signal and screener layers so each live
+        # feed (congress, etc.) is pulled at most once per cycle, not once per
+        # layer — the double-pull fix that keeps us under Quiver's rate limit.
+        self.quiver = QuiverClient(cfg.quiver_api_key)
+        self.signals = SignalAggregator(cfg, self.quiver)
+        self.screeners = ScreenerAggregator(cfg, self.quiver)
+        # Per-cycle-cached next-earnings lookup feeding the risk earnings-blackout
+        # guard (one lookup per symbol per cycle; advisory, fails open).
+        self.earnings = EarningsCalendar()
         self.engine = DecisionEngine(cfg)
         # One persisted risk-state instance shared by the risk gate and watchdog
         # so peak equity, the drawdown halt, and the halt latch are consistent.
@@ -151,6 +160,10 @@ class Orchestrator:
             return
 
         self._reconcile_fills()
+        # Fresh Quiver data this cycle, but pulled once and shared by the signal
+        # and screener layers (both read the same cached live feeds).
+        self.quiver.new_cycle()
+        self.earnings.new_cycle()
         account = self.broker.get_account()
 
         # Watchlist + current holdings are always evaluated; the scanner widens
@@ -244,11 +257,15 @@ class Orchestrator:
     ) -> None:
         price = self.broker.latest_price(proposal.symbol)
         vol = self.broker.annualized_vol(proposal.symbol)
-        pending = (
-            self.broker.open_buy_notional(proposal.symbol)
-            if proposal.action.value == "buy" else 0.0
+        is_buy = proposal.action.value == "buy"
+        pending = self.broker.open_buy_notional(proposal.symbol) if is_buy else 0.0
+        # Only the blackout-relevant path (new buys) needs the earnings lookup.
+        days_to_earnings = (
+            self.earnings.days_until_earnings(proposal.symbol) if is_buy else None
         )
-        decision = self.risk.evaluate(proposal, account, price, vol, pending)
+        decision = self.risk.evaluate(
+            proposal, account, price, vol, pending, days_to_earnings
+        )
         log.info(
             "%s %s -> %s: %s | %s",
             proposal.action.value.upper(), proposal.symbol,

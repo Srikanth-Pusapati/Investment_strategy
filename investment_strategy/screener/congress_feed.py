@@ -12,15 +12,13 @@ import logging
 from collections import defaultdict
 from datetime import datetime, timedelta, timezone
 
-import requests
-
 from ..config import Config
 from ..models import Candidate
+from ..signals.quiver_client import QuiverClient
 from .base import Screener
 
 log = logging.getLogger("screener")
 
-_LIVE_URL = "https://api.quiverquant.com/beta/live/congresstrading"
 _LOOKBACK_DAYS = 60
 _CLUSTER_FULL = 4        # filings at which buy/sell conviction saturates to full weight
 
@@ -28,24 +26,22 @@ _CLUSTER_FULL = 4        # filings at which buy/sell conviction saturates to ful
 class CongressFeedScreener(Screener):
     name = "congress"
 
-    def __init__(self, cfg: Config):
+    def __init__(self, cfg: Config, quiver: QuiverClient | None = None):
         self.cfg = cfg
+        self.quiver = quiver or QuiverClient(cfg.quiver_api_key)
 
     @property
     def enabled(self) -> bool:
-        return bool(self.cfg.quiver_api_key)
+        return self.quiver.enabled
 
     def scan(self) -> list[Candidate]:
-        headers = {"Authorization": f"Bearer {self.cfg.quiver_api_key}"}
-        r = requests.get(_LIVE_URL, headers=headers, timeout=20)
-        if r.status_code != 200:
-            log.debug("congress live feed HTTP %s", r.status_code)
-            return []
+        # Shared, cached pull — the signal layer reads this same response.
+        feed = self.quiver.live("congresstrading")
 
         cutoff = datetime.now(timezone.utc) - timedelta(days=_LOOKBACK_DAYS)
         buys: dict[str, int] = defaultdict(int)
         sells: dict[str, int] = defaultdict(int)
-        for t in r.json() or []:
+        for t in feed:
             sym = (t.get("Ticker") or "").strip().upper()
             if not sym or not self._recent(t.get("TransactionDate"), cutoff):
                 continue

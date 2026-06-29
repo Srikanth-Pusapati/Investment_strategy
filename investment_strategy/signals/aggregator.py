@@ -10,23 +10,31 @@ from ..models import SignalBundle
 from .base import SignalProvider
 from .congress import CongressProvider
 from .fundamentals import FundamentalsProvider
+from .govcontracts import GovContractsProvider
 from .insider import InsiderProvider
 from .insider_edgar import EdgarInsiderProvider
 from .macro import MacroProvider
 from .news import NewsProvider
+from .offexchange import OffExchangeProvider
 from .options_flow import OptionsFlowProvider
+from .quiver_client import QuiverClient
 from .technical import TechnicalProvider
 
 log = logging.getLogger("signals")
 
 
 class SignalAggregator:
-    def __init__(self, cfg: Config):
+    def __init__(self, cfg: Config, quiver: QuiverClient | None = None):
+        # One shared Quiver client so every Quiver-backed provider (and the
+        # screener, when handed the same instance) pulls each live feed once.
+        self.quiver = quiver or QuiverClient(cfg.quiver_api_key)
         self.per_symbol: list[SignalProvider] = [
             FundamentalsProvider(cfg),    # EBITDA, margins, leverage
             TechnicalProvider(cfg),       # RSI, MACD, trend (yfinance; no key)
             NewsProvider(cfg),            # headlines + sentiment (finnhub/VADER)
-            CongressProvider(cfg),        # congressional trades (Quiver; if key)
+            CongressProvider(cfg, self.quiver),  # congressional trades (Quiver; if key)
+            OffExchangeProvider(cfg, self.quiver),  # dark-pool short vol (Quiver; ~1d lag)
+            GovContractsProvider(cfg, self.quiver),  # federal contract awards (Quiver; catalyst)
             InsiderProvider(cfg),         # Form 4 insider via Finnhub (if key)
             EdgarInsiderProvider(cfg),    # Form 4 insider via SEC EDGAR (free; no key)
             OptionsFlowProvider(cfg),     # unusual options activity
