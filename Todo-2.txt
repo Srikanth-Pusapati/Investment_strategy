@@ -42,21 +42,23 @@ Reference infra in place:
 ################################################################################
 PHASE 0 — Make the model match the vision (small, do first)
 ################################################################################
-[ ] 0.1 Remove the WATCHLIST concept entirely (discovery-only). Deprecate
-        DEFAULT_WATCHLIST; default to screener-only; held positions are still
-        always re-evaluated (base = open positions ∪ discovered). Since discovery
-        is now the SOLE funnel, treat scanner quality as the top signal priority.
-        (Builds on E.12, which already supports an empty watchlist.)
+[DONE 2026-06-29 -> completed.txt] 0.1 Removed the WATCHLIST concept.
+        DEFAULT_WATCHLIST is now [] (discovery-only); held positions still always
+        re-evaluated. Scanner quality is now the sole funnel = top signal priority.
 
 ################################################################################
 PHASE 1 — Small-account live safety  (HIGHEST — the "don't blow up" stack)
 ################################################################################
-[ ] 1.1 PDT / day-trade guard + CASH-ACCOUNT mode (NEW, critical for <$25k).
-        Read account.pattern_day_trader + daytrade_count; block a new opening
-        trade that would breach the 4-day-trades/5-days line while equity<$25k.
-        Add cash-account settlement awareness (T+1) so we don't trip good-faith /
-        free-riding violations reusing unsettled proceeds. Document: small live
-        account MUST be a cash account.
+[DONE 2026-06-29 -> completed.txt] 1.1 PDT / day-trade guard (the margin case).
+        AccountSnapshot now carries pattern_day_trader + daytrade_count; risk
+        ._pdt_block() blocks NEW buys when a <$25k account is PDT-flagged or at the
+        day-trade line (closing always allowed). Inert on cash accounts (exempt) and
+        >=$25k. Surfaced in the status report. Config: PDT_GUARD_ENABLED,
+        MAX_DAY_TRADES_UNDER_25K. Tests: test_risk.py (7 cases).
+        STILL OPEN (1.1b): cash-account settlement awareness (T+1) — only deploy
+        settled cash so we don't trip good-faith/free-riding violations. Alpaca's
+        buying_power already reflects settled funds, so this is a smaller follow-up.
+        DOC: run the small live account as a CASH account (PDT-exempt, no leverage).
 [ ] 1.2 Set EQUITY_FLOOR_USD (was Y3/E.16) — the latched flatten+halt floor is
         OFF by default. For $1000 set ~$850. THE catastrophe backstop.
 [ ] 1.3 Correlation / sector concentration cap (C.7) — discovery can surface ~one
@@ -130,17 +132,18 @@ LOWER VALUE / SKIP unless a thesis calls for it
 --------------------------------------------------------------------------------
 RANKED NEXT STEPS (2026-06-29)
 --------------------------------------------------------------------------------
- 1. 0.1  Remove the watchlist concept (align to the vision; small)
- 2. 1.1  PDT guard + cash-account mode      (biggest missing safety item)
- 3. 1.2  Set EQUITY_FLOOR_USD               (config + confirm value)
- 4. 1.3  Correlation / sector cap
- 5. 1.4  Regime filter
- 6. 1.5  Small-account sizing + $-loss cap + cost floor
- 7. 2.1  Backtest harness                   (gate before real money / data buys)
- 8. 2.2  Data-subscription decision         (informed by 2.1)
- 9. 3.1  Lag-decay weighting · 4.1 Alerting · then Phase 5 (after the legal gate)
+ 1. 1.3  Correlation / sector cap           (last real risk hole before live)
+ 2. 1.4  Regime filter
+ 3. 1.5  Small-account sizing + $-loss cap + cost floor
+ 4. 1.1b Cash-account settlement awareness (T+1)  (small follow-up to 1.1)
+ 5. 2.1  Backtest harness                   (gate before real money / data buys)
+ 6. 2.2  Data-subscription decision         (informed by 2.1)
+ 7. 3.1  Lag-decay weighting · 4.1 Alerting · then Phase 5 (after the legal gate)
+ NOTE: 1.2 Set EQUITY_FLOOR_USD is a CONFIG value only you can choose (e.g. ~85%
+ of the live float). Already wired; just set it in .env before going live.
 
 DONE (-> completed.txt): A.1 govcontracts, B.6 earnings-blackout (PR #6);
-E.11 account P&L tracker, E.12 empty watchlist, E.13 live dashboard.
-RECOMMENDED NEXT: Phase 0.1 (watchlist removal) + 1.1 (PDT/cash-account guard) —
-together they lock in the discovery-only model and the #1 small-account safety gap.
+E.11 account P&L tracker, E.12 empty watchlist, E.13 live dashboard;
+0.1 watchlist removal, 1.1 PDT guard.
+RECOMMENDED NEXT: 1.3 correlation/sector cap — the last real risk hole; discovery
+can surface several correlated names, and nothing caps that today.

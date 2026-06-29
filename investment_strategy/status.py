@@ -53,6 +53,8 @@ class AccountStatus(BaseModel):
     total_return: Optional[float] = None       # equity - capital_in (net of deposits)
     total_return_pct: Optional[float] = None
     realized_pl: Optional[float] = None        # total_return - unrealized_pl
+    pattern_day_trader: bool = False           # PDT-flagged (margin accounts)
+    daytrade_count: int = 0                    # day trades in trailing 5 business days
 
     @property
     def is_up(self) -> Optional[bool]:
@@ -88,6 +90,8 @@ def compute_status(broker) -> AccountStatus:
         total_return=total_return,
         total_return_pct=total_return_pct,
         realized_pl=realized,
+        pattern_day_trader=account.pattern_day_trader,
+        daytrade_count=account.daytrade_count,
     )
 
 
@@ -179,6 +183,18 @@ def render_report(status: AccountStatus) -> str:
             "",
             "  TOTAL RETURN   n/a (portfolio history unavailable this run)",
         ]
+    # PDT status matters only for a sub-$25k account that can day-trade (margin).
+    if status.equity < 25_000:
+        if status.pattern_day_trader:
+            lines.append(
+                f"\n  ⚠ PDT-FLAGGED under $25k (day-trades 5d: {status.daytrade_count}) "
+                "— opening restricted. Use a CASH account."
+            )
+        elif status.daytrade_count:
+            lines.append(
+                f"\n  Day-trades (5d): {status.daytrade_count} "
+                "(PDT flag at 4 on a margin account under $25k)"
+            )
     return "\n".join(lines)
 
 

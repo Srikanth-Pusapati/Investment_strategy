@@ -71,6 +71,8 @@ class AlpacaClient:
             cash=float(a.cash),
             buying_power=float(a.buying_power),
             positions=positions,
+            pattern_day_trader=bool(getattr(a, "pattern_day_trader", False)),
+            daytrade_count=int(getattr(a, "daytrade_count", 0) or 0),
         )
 
     def latest_price(self, symbol: str) -> float:

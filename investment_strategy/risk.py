@@ -27,6 +27,11 @@ log = logging.getLogger("risk")
 # name were quite volatile so vol-targeting shrinks the position.
 _ASSUMED_VOL_WHEN_UNKNOWN = 0.60
 
+# FINRA Pattern-Day-Trader minimum equity. Below this, a margin account that day
+# trades too often gets flagged and restricted to closing-only. Cash accounts are
+# exempt (they report pattern_day_trader=False / daytrade_count=0).
+_PDT_MIN_EQUITY = 25_000.0
+
 
 class RiskManager:
     def __init__(
@@ -63,6 +68,31 @@ class RiskManager:
         if len(account.positions) >= self.limits.max_open_positions:
             return True, (
                 f"At max open positions ({self.limits.max_open_positions})."
+            )
+        pdt_block, pdt_why = self._pdt_block(account)
+        if pdt_block:
+            return True, pdt_why
+        return False, ""
+
+    # -- pattern-day-trader guard (small margin accounts) ------------------- #
+    def _pdt_block(self, account: AccountSnapshot) -> tuple[bool, str]:
+        """Block NEW opening buys when a sub-$25k MARGIN account is at/over the PDT
+        line, so an incidental same-day stop can't flag it and freeze it to
+        closing-only. Cash accounts report pattern_day_trader=False / daytrade
+        count 0, so this is inert for them (the recommended setup for small size)."""
+        if not self.limits.pdt_guard_enabled or account.equity >= _PDT_MIN_EQUITY:
+            return False, ""
+        if account.pattern_day_trader:
+            return True, (
+                f"PDT-flagged under ${_PDT_MIN_EQUITY:,.0f} "
+                f"(equity ${account.equity:,.0f}) — opening new positions is "
+                "restricted. Use a CASH account for small balances (PDT-exempt)."
+            )
+        if account.daytrade_count >= self.limits.max_day_trades_under_25k:
+            return True, (
+                f"{account.daytrade_count} day-trades in 5d at the PDT line under "
+                f"${_PDT_MIN_EQUITY:,.0f} — pausing new buys to avoid a "
+                "pattern-day-trader flag (closing still allowed)."
             )
         return False, ""
 

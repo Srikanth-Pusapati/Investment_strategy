@@ -49,6 +49,8 @@ def _limits(**over) -> RiskLimits:
         min_cash_buffer_pct=10.0,
         min_trade_price_usd=5.0,
         earnings_blackout_days=3,
+        pdt_guard_enabled=True,
+        max_day_trades_under_25k=3,
         fractional_enabled=True,
         min_order_usd=1.0,
         default_stop_loss_pct=5.0,
@@ -63,10 +65,12 @@ def _limits(**over) -> RiskLimits:
 
 
 def _account(equity=100_000.0, cash=100_000.0, buying_power=100_000.0,
-             last_equity=100_000.0, positions=None) -> AccountSnapshot:
+             last_equity=100_000.0, positions=None,
+             pattern_day_trader=False, daytrade_count=0) -> AccountSnapshot:
     return AccountSnapshot(
         equity=equity, last_equity=last_equity, cash=cash,
         buying_power=buying_power, positions=positions or [],
+        pattern_day_trader=pattern_day_trader, daytrade_count=daytrade_count,
     )
 
 
@@ -241,6 +245,73 @@ def test_earnings_blackout_does_not_block_sells():
         acct, price=100.0, days_to_earnings=1,
     )
     assert d.verdict is RiskVerdict.APPROVED   # exits are never blacked out
+
+
+# --------------------------------------------------------------------------- #
+# Pattern-Day-Trader guard (small margin accounts)
+# --------------------------------------------------------------------------- #
+def test_pdt_flagged_under_25k_blocks_buys():
+    rm = _rm(_limits())
+    acct = _account(equity=1_000.0, cash=1_000.0, buying_power=1_000.0,
+                    last_equity=1_000.0, pattern_day_trader=True)
+    d = rm.evaluate(_buy(), acct, price=100.0, volatility=0.25)
+    assert d.verdict is RiskVerdict.REJECTED
+    assert "pdt" in d.reason.lower() or "cash account" in d.reason.lower()
+
+
+def test_pdt_daytrade_count_at_limit_blocks_buys():
+    rm = _rm(_limits(max_day_trades_under_25k=3))
+    acct = _account(equity=1_000.0, cash=1_000.0, buying_power=1_000.0,
+                    last_equity=1_000.0, daytrade_count=3)
+    d = rm.evaluate(_buy(), acct, price=100.0, volatility=0.25)
+    assert d.verdict is RiskVerdict.REJECTED
+    assert "day-trade" in d.reason.lower()
+
+
+def test_pdt_guard_inert_below_limit():
+    rm = _rm(_limits(max_day_trades_under_25k=3))
+    acct = _account(equity=1_000.0, cash=1_000.0, buying_power=1_000.0,
+                    last_equity=1_000.0, daytrade_count=2)
+    d = rm.evaluate(_buy(), acct, price=100.0, volatility=0.25)
+    assert d.verdict in (RiskVerdict.APPROVED, RiskVerdict.RESIZED)
+
+
+def test_pdt_guard_inert_at_or_above_25k():
+    # A $25k+ account is not PDT-restricted even if flagged.
+    rm = _rm(_limits())
+    acct = _account(equity=30_000.0, cash=30_000.0, buying_power=30_000.0,
+                    last_equity=30_000.0, pattern_day_trader=True, daytrade_count=9)
+    d = rm.evaluate(_buy(), acct, price=100.0, volatility=0.25)
+    assert d.verdict in (RiskVerdict.APPROVED, RiskVerdict.RESIZED)
+
+
+def test_pdt_guard_cash_account_unaffected():
+    # Cash account: pattern_day_trader=False, daytrade_count=0 -> inert.
+    rm = _rm(_limits())
+    acct = _account(equity=500.0, cash=500.0, buying_power=500.0,
+                    last_equity=500.0)
+    d = rm.evaluate(_buy(), acct, price=100.0, volatility=0.25)
+    assert d.verdict in (RiskVerdict.APPROVED, RiskVerdict.RESIZED)
+
+
+def test_pdt_guard_can_be_disabled():
+    rm = _rm(_limits(pdt_guard_enabled=False))
+    acct = _account(equity=1_000.0, cash=1_000.0, buying_power=1_000.0,
+                    last_equity=1_000.0, pattern_day_trader=True)
+    d = rm.evaluate(_buy(), acct, price=100.0, volatility=0.25)
+    assert d.verdict in (RiskVerdict.APPROVED, RiskVerdict.RESIZED)
+
+
+def test_pdt_does_not_block_sells():
+    rm = _rm(_limits())
+    acct = _account(equity=1_000.0, cash=1_000.0, buying_power=1_000.0,
+                    last_equity=1_000.0, pattern_day_trader=True, positions=[_pos(qty=5.0)])
+    d = rm.evaluate(
+        TradeProposal(symbol="AAPL", action=Action.SELL, conviction=1.0,
+                      target_weight_pct=0.0, rationale="exit"),
+        acct, price=100.0,
+    )
+    assert d.verdict is RiskVerdict.APPROVED   # closing always allowed
 
 
 # --------------------------------------------------------------------------- #

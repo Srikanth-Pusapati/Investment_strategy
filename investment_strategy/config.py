@@ -44,6 +44,11 @@ class RiskLimits:
     min_cash_buffer_pct: float       # never deploy below this cash reserve
     min_trade_price_usd: float       # refuse buys below this price (liquidity guard)
     earnings_blackout_days: int      # block NEW buys within this many days of earnings (0=off)
+    # Pattern-Day-Trader guard for small MARGIN accounts (<$25k). Cash accounts are
+    # exempt and stay inert. Blocks NEW opening buys near/over the PDT line so an
+    # incidental same-day stop can't get the account flagged + restricted.
+    pdt_guard_enabled: bool
+    max_day_trades_under_25k: int    # pause new buys once day-trades in 5d hit this
     # --- fractional shares (for small accounts) ---
     fractional_enabled: bool         # allow sub-share notional buys (no exchange bracket)
     min_order_usd: float             # smallest $ order worth placing (Alpaca min is $1)
@@ -187,6 +192,8 @@ def load_config() -> Config:
             min_cash_buffer_pct=_f("MIN_CASH_BUFFER_PCT", 10.0),
             min_trade_price_usd=_f("MIN_TRADE_PRICE_USD", 5.0),
             earnings_blackout_days=_i("EARNINGS_BLACKOUT_DAYS", 3),
+            pdt_guard_enabled=_flag("PDT_GUARD_ENABLED", "on"),
+            max_day_trades_under_25k=_i("MAX_DAY_TRADES_UNDER_25K", 3),
             fractional_enabled=_flag("FRACTIONAL_ENABLED", "on"),
             min_order_usd=_f("MIN_ORDER_USD", 1.0),
             default_stop_loss_pct=_f("DEFAULT_STOP_LOSS_PCT", 5.0),

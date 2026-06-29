@@ -152,3 +152,26 @@ trades (useful for an empty-watchlist live start). New DASHBOARD_FILE env: when 
 the orchestrator regenerates that HTML after every decision tick so the live
 tracker stays fresh (off by default). Manual CLI unchanged
 (python -m investment_strategy.dashboard).
+
+--- 0.1 Removed the watchlist concept (discovery-only) — DONE 2026-06-29 ---
+DEFAULT_WATCHLIST is now [] (was 7 megacaps). The model is discovery-driven: the
+scanner surfaces names each cycle and current holdings are always re-evaluated, so
+there is no standing universe. An explicit WATCHLIST can still force-include names
+(testing) but isn't part of the design. Orchestrator warns only if there's no
+watchlist AND the screener is disabled (nothing to discover). Scanner quality is
+now the sole funnel -> the top signal-investment priority.
+
+--- 1.1 Pattern-Day-Trader guard — DONE 2026-06-29 ---
+Small MARGIN accounts (<$25k) that day-trade 4+ times in 5 business days get
+flagged PDT and restricted to closing-only — and an incidental same-day watchdog
+stop counts as a day trade. AccountSnapshot now carries pattern_day_trader +
+daytrade_count (from Alpaca get_account). risk._pdt_block() blocks NEW opening buys
+when a sub-$25k account is already PDT-flagged OR at the day-trade line
+(MAX_DAY_TRADES_UNDER_25K, default 3); closing is always allowed. Inert for cash
+accounts (pattern_day_trader=False/daytrade_count=0 -> exempt; the recommended
+small-account setup) and for >=$25k. Toggle via PDT_GUARD_ENABLED. PDT status shown
+in the account report under $25k. Tests: test_risk.py (7 cases: flagged, at-limit,
+below-limit, >=25k, cash-account, disabled, sells-not-blocked).
+FOLLOW-UP (1.1b, open): cash-account T+1 settlement awareness (deploy only settled
+cash). RECOMMENDATION: run the small live float as a CASH account — PDT-exempt and
+unleveraged, so $100-$1000 works without the $25k margin minimum.

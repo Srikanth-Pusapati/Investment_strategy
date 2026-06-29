@@ -34,9 +34,11 @@ from .status import EquityHistory, compute_status
 
 log = logging.getLogger("orchestrator")
 
-# Default candidate universe. Override with the WATCHLIST env var (comma list).
-# Current holdings are always added so existing positions get re-evaluated.
-DEFAULT_WATCHLIST = ["AAPL", "MSFT", "NVDA", "AMZN", "GOOGL", "META", "TSLA"]
+# The model is DISCOVERY-DRIVEN: there is no standing watchlist. The scanner
+# surfaces names each cycle and current holdings are always re-evaluated, so the
+# default universe is EMPTY. An explicit WATCHLIST (comma list) can still be set to
+# force-include names (e.g. for testing), but it is not part of the design.
+DEFAULT_WATCHLIST: list[str] = []
 
 
 class Orchestrator:
@@ -64,17 +66,18 @@ class Orchestrator:
         self.benchmark = BenchmarkTracker(cfg, self.broker, symbol=cfg.benchmark_symbol)
         self.robinhood = RobinhoodReader(cfg)
         self.options = OptionsHelper(cfg) if cfg.risk.options_enabled else None
-        # None => unset => use the default list. An EXPLICIT empty list means
-        # "start flat; trade only what the screener discovers" (live-cutover mode)
-        # — preserve it rather than falling back to the megacap defaults.
+        # Discovery-driven by design: default (unset) is no standing watchlist.
+        # An explicit list can still force-include names; otherwise we trade only
+        # what the scanner discovers plus whatever we currently hold.
         self.watchlist = DEFAULT_WATCHLIST if watchlist is None else watchlist
         if not self.watchlist and not cfg.screener.enabled:
             log.warning(
-                "Watchlist is EMPTY and the screener is disabled — there is "
-                "nothing to evaluate. Set WATCHLIST or enable the screener."
+                "No watchlist AND the screener is disabled — there is nothing to "
+                "discover or evaluate. Enable SCREENER_ENABLED (the model is "
+                "discovery-driven) or set WATCHLIST to force-include names."
             )
         elif not self.watchlist:
-            log.info("Empty watchlist — trading only screener-discovered names.")
+            log.info("Discovery-driven mode: trading scanner-found names + holdings.")
         # Persisted daily equity snapshots so the account P&L curve survives restarts.
         self.equity_history = EquityHistory()
         self._last_decision_at = 0.0

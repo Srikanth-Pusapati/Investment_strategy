@@ -163,6 +163,10 @@ class AccountSnapshot(BaseModel):
     cash: float
     buying_power: float
     positions: list[Position] = Field(default_factory=list)
+    # Pattern-Day-Trader status (margin accounts only; a cash account stays
+    # False/0 and is exempt). Feeds the risk PDT guard for small accounts.
+    pattern_day_trader: bool = False   # already flagged as a PDT
+    daytrade_count: int = 0            # day trades in the trailing 5 business days
     as_of: datetime = Field(default_factory=_now)
 
     @property
