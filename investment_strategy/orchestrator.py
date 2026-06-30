@@ -26,6 +26,7 @@ from .models import Candidate, Instrument, RiskVerdict, SignalBundle, TradePropo
 from .monitor import Watchdog
 from .portfolio import RobinhoodReader
 from .risk import RiskManager
+from .regime import RegimeReader
 from .screener import ScreenerAggregator
 from .sectors import SectorMap
 from .signals import SignalAggregator
@@ -57,6 +58,9 @@ class Orchestrator:
         self.earnings = EarningsCalendar()
         # Per-cycle-cached sector lookup feeding the risk sector-concentration cap.
         self.sectors = SectorMap()
+        # Per-cycle market-regime read; scales position size down in risk-off.
+        self.regime = RegimeReader()
+        self._regime_mult = 1.0   # set each cycle from the regime read
         self.engine = DecisionEngine(cfg)
         # One persisted risk-state instance shared by the risk gate and watchdog
         # so peak equity, the drawdown halt, and the halt latch are consistent.
@@ -149,9 +153,9 @@ class Orchestrator:
     def _warn_on_weak_safety_config(self) -> None:
         """Loudly flag safety nets that are disabled, so an off-by-default setting
         isn't mistaken for a configured-and-safe one."""
-        if self.cfg.risk.equity_floor_usd <= 0:
+        if self.cfg.risk.equity_floor_pct <= 0:
             log.warning(
-                "EQUITY_FLOOR_USD is 0 (off) — the latched liquidate-and-halt "
+                "EQUITY_FLOOR_PCT is 0 (off) — the latched liquidate-and-halt "
                 "catastrophe guard is DISABLED. Set it before trading real size."
             )
         if self.cfg.robinhood_enabled and self.cfg.robinhood_mcp_token:
@@ -185,6 +189,13 @@ class Orchestrator:
         self.quiver.new_cycle()
         self.earnings.new_cycle()
         self.sectors.new_cycle()
+        self.regime.new_cycle()
+        if self.cfg.risk.regime_filter_enabled:
+            regime = self.regime.assess()
+            self._regime_mult = regime.multiplier
+            log.info("Market regime: %s", regime.reason)
+        else:
+            self._regime_mult = 1.0
         self._record_equity_snapshot()
         account = self.broker.get_account()
 
@@ -324,7 +335,7 @@ class Orchestrator:
             if is_buy else (None, 0.0)
         decision = self.risk.evaluate(
             proposal, account, price, vol, pending, days_to_earnings,
-            sector, sector_exposure,
+            sector, sector_exposure, self._regime_mult,
         )
         log.info(
             "%s %s -> %s: %s | %s",

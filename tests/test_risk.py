@@ -44,9 +44,10 @@ def _limits(**over) -> RiskLimits:
         max_symbol_exposure_pct=10.0,
         max_gross_exposure_pct=100.0,
         max_sector_exposure_pct=30.0,
+        regime_filter_enabled=True,
         max_daily_loss_pct=3.0,
         max_drawdown_pct=15.0,
-        equity_floor_usd=0.0,
+        equity_floor_pct=0.0,
         max_open_positions=15,
         min_cash_buffer_pct=10.0,
         min_trade_price_usd=5.0,
@@ -247,6 +248,28 @@ def test_earnings_blackout_does_not_block_sells():
         acct, price=100.0, days_to_earnings=1,
     )
     assert d.verdict is RiskVerdict.APPROVED   # exits are never blacked out
+
+
+# --------------------------------------------------------------------------- #
+# Market-regime sizing multiplier
+# --------------------------------------------------------------------------- #
+def test_regime_multiplier_scales_size_down():
+    rm = _rm(_limits(kelly_fraction=0.0))  # position-cap path: 5% of 100k = $5k
+    full = rm.evaluate(_buy(), _account(), price=100.0, volatility=0.3, regime_multiplier=1.0)
+    half = rm.evaluate(_buy(), _account(), price=100.0, volatility=0.3, regime_multiplier=0.5)
+    assert abs(half.approved_notional - full.approved_notional * 0.5) < 100.0
+
+
+def test_regime_multiplier_cannot_inflate_above_cap():
+    rm = _rm(_limits(kelly_fraction=0.0))
+    d = rm.evaluate(_buy(), _account(), price=100.0, volatility=0.3, regime_multiplier=5.0)
+    assert d.approved_notional <= 5_000.0 + 1e-6   # clamped to <=1, still capped
+
+
+def test_regime_filter_disabled_ignores_multiplier():
+    rm = _rm(_limits(regime_filter_enabled=False, kelly_fraction=0.0))
+    d = rm.evaluate(_buy(), _account(), price=100.0, volatility=0.3, regime_multiplier=0.1)
+    assert abs(d.approved_notional - 5_000.0) < 1e-6   # full size despite 0.1
 
 
 # --------------------------------------------------------------------------- #

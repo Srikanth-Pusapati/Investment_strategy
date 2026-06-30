@@ -204,3 +204,23 @@ live float, e.g. 850 for $1000), MAX_GROSS_EXPOSURE_PCT, MAX_SECTOR_EXPOSURE_PCT
 EARNINGS_BLACKOUT_DAYS, PDT_GUARD_ENABLED/MAX_DAY_TRADES_UNDER_25K, FRACTIONAL_ENABLED,
 plus MAX_DRAWDOWN_PCT/MIN_TRADE_PRICE_USD and DASHBOARD_FILE=dashboard.html (live
 tracker auto-refresh).
+
+--- 1.2b Equity floor converted to a PERCENTAGE — DONE 2026-06-30 ---
+EQUITY_FLOOR_USD (absolute $) -> EQUITY_FLOOR_PCT (% of the PEAK high-water mark),
+default 60 (= flatten + latch after a 40% drawdown from peak). As a % it
+auto-scales to any account size, so paper ($100k) and live ($100-$1000) need no
+re-tuning. watchdog._equity_floor_breached now computes floor = peak_equity * pct/100
+(peak is updated first each tick, so it's >= current equity). Consistent escalation
+with MAX_DRAWDOWN_PCT (halt new buys at 15% off peak) -> floor flattens at 40% off
+peak. Tests: test_watchdog.py (breached/not/scales-with-peak/off-at-zero).
+
+--- 1.4 Market-regime filter — DONE 2026-06-30 ---
+regime.py RegimeReader turns the market backdrop into a 0.25..1.0 RISK MULTIPLIER:
+trend (SPY vs 200dma: above=1.0, below=0.5) x fear (VIX <20=1.0, 20-30=0.7, >30=0.4),
+floored at 0.25. risk._evaluate_buy scales position size by it (clamped to [0,1] so
+it can only REDUCE, never inflate; REGIME_FILTER_ENABLED toggle). Orchestrator
+assesses once per cycle (per-cycle cached, yfinance SPY+VIX, keyless), logs the
+regime, and passes the multiplier to every buy. FAILS OPEN to 1.0 if data is
+unavailable. Verified live (SPY 744 > 200dma 688, VIX 17 -> risk-on x1.0). Tests:
+test_regime.py (risk-on/neutral/risk-off/floor/fail-open/cache) + test_risk.py
+(scales down, can't inflate, disabled).

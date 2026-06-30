@@ -39,9 +39,10 @@ class RiskLimits:
     max_symbol_exposure_pct: float   # max total % equity per symbol
     max_gross_exposure_pct: float    # max total deployed across ALL names (<=100 = no leverage)
     max_sector_exposure_pct: float   # max total % equity in one sector (concentration cap)
+    regime_filter_enabled: bool      # scale position size by market regime (SPY/200dma + VIX)
     max_daily_loss_pct: float        # halt new trades past this day loss
     max_drawdown_pct: float          # halt new buys past this PEAK-to-trough DD
-    equity_floor_usd: float          # liquidate + latch halt below this equity (0=off)
+    equity_floor_pct: float          # liquidate + latch halt below this % of PEAK equity (0=off)
     max_open_positions: int          # cap concurrent holdings
     min_cash_buffer_pct: float       # never deploy below this cash reserve
     min_trade_price_usd: float       # refuse buys below this price (liquidity guard)
@@ -191,9 +192,13 @@ def load_config() -> Config:
             # account this is the explicit no-leverage guard; set <100 to hold back.
             max_gross_exposure_pct=_f("MAX_GROSS_EXPOSURE_PCT", 100.0),
             max_sector_exposure_pct=_f("MAX_SECTOR_EXPOSURE_PCT", 30.0),
+            regime_filter_enabled=_flag("REGIME_FILTER_ENABLED", "on"),
             max_daily_loss_pct=_f("MAX_DAILY_LOSS_PCT", 3.0),
             max_drawdown_pct=_f("MAX_DRAWDOWN_PCT", 15.0),
-            equity_floor_usd=_f("EQUITY_FLOOR_USD", 0.0),
+            # % of the PEAK high-water mark; below it the watchdog flattens + latches
+            # a halt. As a % it auto-scales to any account size (paper or live) — no
+            # need to re-tune a dollar value. 0 = off.
+            equity_floor_pct=_f("EQUITY_FLOOR_PCT", 60.0),
             max_open_positions=_i("MAX_OPEN_POSITIONS", 15),
             min_cash_buffer_pct=_f("MIN_CASH_BUFFER_PCT", 10.0),
             min_trade_price_usd=_f("MIN_TRADE_PRICE_USD", 5.0),

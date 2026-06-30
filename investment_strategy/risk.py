@@ -102,6 +102,7 @@ class RiskManager:
         volatility: float | None = None, pending_buy_notional: float = 0.0,
         days_to_earnings: int | None = None,
         sector: str | None = None, sector_exposure_usd: float = 0.0,
+        regime_multiplier: float = 1.0,
     ) -> RiskDecision:
         """`price` is the current market price for proposal.symbol. `volatility`
         is the symbol's annualized realized vol (fraction, e.g. 0.45) used for
@@ -111,14 +112,15 @@ class RiskManager:
         until the symbol's next earnings report (None if unknown) for the
         earnings-blackout guard. `sector` is the symbol's sector and
         `sector_exposure_usd` is the $ already held in that sector, for the sector
-        concentration cap. All from the execution client / orchestrator."""
+        concentration cap. `regime_multiplier` (0..1) scales position size down in a
+        risk-off market backdrop. All from the execution client / orchestrator."""
         if proposal.action is Action.HOLD:
             return self._reject(proposal, "HOLD — no action.")
         if proposal.action is Action.SELL:
             return self._evaluate_sell(proposal, account)
         return self._evaluate_buy(
             proposal, account, price, volatility, pending_buy_notional,
-            days_to_earnings, sector, sector_exposure_usd,
+            days_to_earnings, sector, sector_exposure_usd, regime_multiplier,
         )
 
     # -- survival-first sizing: vol-targeted, fractional-Kelly -------------- #
@@ -156,6 +158,7 @@ class RiskManager:
         volatility: float | None = None, pending_buy_notional: float = 0.0,
         days_to_earnings: int | None = None,
         sector: str | None = None, sector_exposure_usd: float = 0.0,
+        regime_multiplier: float = 1.0,
     ) -> RiskDecision:
         halted, why = self.trading_halted(account)
         if halted:
@@ -199,6 +202,12 @@ class RiskManager:
             proposal.target_weight_pct, sized_pct, self.limits.max_position_pct
         )
         target_notional = equity * (weight_pct / 100.0)
+
+        # 1b) Market-regime scaling — shrink size in a risk-off backdrop (SPY below
+        #     its 200dma / elevated VIX). 1.0 in a calm uptrend; clamped to [0,1]
+        #     so it can only ever REDUCE size, never inflate it.
+        if self.limits.regime_filter_enabled:
+            target_notional *= max(0.0, min(1.0, regime_multiplier))
 
         # 2) Respect total per-symbol exposure. Count BOTH the filled holding
         #    AND any open (unfilled) buy orders — otherwise repeated decision
