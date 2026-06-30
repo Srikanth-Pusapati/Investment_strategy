@@ -37,13 +37,25 @@ class RiskLimits:
     """Hard caps enforced by RiskManager. The LLM cannot exceed these."""
     max_position_pct: float          # max % equity in a single NEW position
     max_symbol_exposure_pct: float   # max total % equity per symbol
+    max_gross_exposure_pct: float    # max total deployed across ALL names (<=100 = no leverage)
+    max_sector_exposure_pct: float   # max total % equity in one sector (concentration cap)
+    regime_filter_enabled: bool      # scale position size by market regime (SPY/200dma + VIX)
     max_daily_loss_pct: float        # halt new trades past this day loss
     max_drawdown_pct: float          # halt new buys past this PEAK-to-trough DD
-    equity_floor_usd: float          # liquidate + latch halt below this equity (0=off)
+    equity_floor_pct: float          # liquidate + latch halt below this % of PEAK equity (0=off)
     max_open_positions: int          # cap concurrent holdings
     min_cash_buffer_pct: float       # never deploy below this cash reserve
     min_trade_price_usd: float       # refuse buys below this price (liquidity guard)
     earnings_blackout_days: int      # block NEW buys within this many days of earnings (0=off)
+    # Pattern-Day-Trader guard for small MARGIN accounts (<$25k). Cash accounts are
+    # exempt and stay inert. Blocks NEW opening buys near/over the PDT line so an
+    # incidental same-day stop can't get the account flagged + restricted.
+    pdt_guard_enabled: bool
+    max_day_trades_under_25k: int    # pause new buys once day-trades in 5d hit this
+    # --- small-account survival: per-trade $-risk cap + cost/slippage floor ---
+    max_trade_risk_pct: float        # cap $ at risk (notional*stop%) per trade as % equity (0=off)
+    est_slippage_pct: float          # one-way spread+slippage estimate, % of notional (0=off)
+    min_edge_ratio: float            # take-profit must beat round-trip cost by this multiple
     # --- fractional shares (for small accounts) ---
     fractional_enabled: bool         # allow sub-share notional buys (no exchange bracket)
     min_order_usd: float             # smallest $ order worth placing (Alpaca min is $1)
@@ -107,6 +119,7 @@ class Config:
     # the drawdown high-water mark and the halt latch across restarts.
     kill_switch_file: str
     state_file: str
+    dashboard_file: str              # auto-regen this HTML each cycle ("" = off)
 
     risk: RiskLimits
     screener: ScreenerConfig
@@ -175,16 +188,36 @@ def load_config() -> Config:
         monitor_interval_s=_i("MONITOR_INTERVAL_SECONDS", 30),
         kill_switch_file=os.getenv("KILL_SWITCH_FILE", "state/KILL"),
         state_file=os.getenv("STATE_FILE", "state/risk_state.json"),
+        dashboard_file=os.getenv("DASHBOARD_FILE", "").strip(),
         risk=RiskLimits(
             max_position_pct=_f("MAX_POSITION_PCT", 5.0),
             max_symbol_exposure_pct=_f("MAX_SYMBOL_EXPOSURE_PCT", 10.0),
+            # 100 = never deploy beyond equity (no margin/leverage). On a margin
+            # account this is the explicit no-leverage guard; set <100 to hold back.
+            max_gross_exposure_pct=_f("MAX_GROSS_EXPOSURE_PCT", 100.0),
+            max_sector_exposure_pct=_f("MAX_SECTOR_EXPOSURE_PCT", 30.0),
+            regime_filter_enabled=_flag("REGIME_FILTER_ENABLED", "on"),
             max_daily_loss_pct=_f("MAX_DAILY_LOSS_PCT", 3.0),
             max_drawdown_pct=_f("MAX_DRAWDOWN_PCT", 15.0),
-            equity_floor_usd=_f("EQUITY_FLOOR_USD", 0.0),
+            # % of the PEAK high-water mark; below it the watchdog flattens + latches
+            # a halt. As a % it auto-scales to any account size (paper or live) — no
+            # need to re-tune a dollar value. 0 = off.
+            equity_floor_pct=_f("EQUITY_FLOOR_PCT", 60.0),
             max_open_positions=_i("MAX_OPEN_POSITIONS", 15),
             min_cash_buffer_pct=_f("MIN_CASH_BUFFER_PCT", 10.0),
             min_trade_price_usd=_f("MIN_TRADE_PRICE_USD", 5.0),
             earnings_blackout_days=_i("EARNINGS_BLACKOUT_DAYS", 3),
+            pdt_guard_enabled=_flag("PDT_GUARD_ENABLED", "on"),
+            max_day_trades_under_25k=_i("MAX_DAY_TRADES_UNDER_25K", 3),
+            # The classic "risk 1% of the account per trade" rule. Bounds the
+            # ABSOLUTE $ lost if the stop fires, independent of the % weight; as a
+            # % it auto-scales from the $100 live float to the $100k paper book.
+            max_trade_risk_pct=_f("MAX_TRADE_RISK_PCT", 1.0),
+            # Estimated one-way friction (bid/ask spread + slippage) as % of
+            # notional. Round-trip cost = 2x this; a profit target that can't beat
+            # it by MIN_EDGE_RATIO is negative-expectancy on entry and refused.
+            est_slippage_pct=_f("EST_SLIPPAGE_PCT", 0.10),
+            min_edge_ratio=_f("MIN_EDGE_RATIO", 2.0),
             fractional_enabled=_flag("FRACTIONAL_ENABLED", "on"),
             min_order_usd=_f("MIN_ORDER_USD", 1.0),
             default_stop_loss_pct=_f("DEFAULT_STOP_LOSS_PCT", 5.0),

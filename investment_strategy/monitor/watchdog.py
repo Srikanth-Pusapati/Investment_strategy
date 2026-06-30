@@ -66,11 +66,18 @@ class Watchdog:
 
     # -- hard equity floor (latched) --------------------------------------- #
     def _equity_floor_breached(self, account: AccountSnapshot) -> bool:
-        floor = self.cfg.risk.equity_floor_usd
-        if floor <= 0 or account.equity > floor:
+        # Floor is a % of the PEAK high-water mark (auto-scales to any account
+        # size). update_equity() ran first this tick, so peak >= current equity.
+        pct = self.cfg.risk.equity_floor_pct
+        peak = self.state.peak_equity
+        if pct <= 0 or peak <= 0:
+            return False
+        floor = peak * (pct / 100.0)
+        if account.equity > floor:
             return False
         self.state.latch_halt(
-            f"Equity ${account.equity:,.0f} <= floor ${floor:,.0f}. "
+            f"Equity ${account.equity:,.0f} <= floor ${floor:,.0f} "
+            f"({pct:.0f}% of peak ${peak:,.0f}). "
             f"Flattened and halted; clear {self.cfg.state_file} to resume."
         )
         self._flatten_all(account, "EQUITY FLOOR")

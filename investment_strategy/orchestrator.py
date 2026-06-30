@@ -26,16 +26,21 @@ from .models import Candidate, Instrument, RiskVerdict, SignalBundle, TradePropo
 from .monitor import Watchdog
 from .portfolio import RobinhoodReader
 from .risk import RiskManager
+from .regime import RegimeReader
 from .screener import ScreenerAggregator
+from .sectors import SectorMap
 from .signals import SignalAggregator
 from .signals.quiver_client import QuiverClient
 from .state import PortfolioState
+from .status import EquityHistory, compute_status
 
 log = logging.getLogger("orchestrator")
 
-# Default candidate universe. Override with the WATCHLIST env var (comma list).
-# Current holdings are always added so existing positions get re-evaluated.
-DEFAULT_WATCHLIST = ["AAPL", "MSFT", "NVDA", "AMZN", "GOOGL", "META", "TSLA"]
+# The model is DISCOVERY-DRIVEN: there is no standing watchlist. The scanner
+# surfaces names each cycle and current holdings are always re-evaluated, so the
+# default universe is EMPTY. An explicit WATCHLIST (comma list) can still be set to
+# force-include names (e.g. for testing), but it is not part of the design.
+DEFAULT_WATCHLIST: list[str] = []
 
 
 class Orchestrator:
@@ -51,6 +56,11 @@ class Orchestrator:
         # Per-cycle-cached next-earnings lookup feeding the risk earnings-blackout
         # guard (one lookup per symbol per cycle; advisory, fails open).
         self.earnings = EarningsCalendar()
+        # Per-cycle-cached sector lookup feeding the risk sector-concentration cap.
+        self.sectors = SectorMap()
+        # Per-cycle market-regime read; scales position size down in risk-off.
+        self.regime = RegimeReader()
+        self._regime_mult = 1.0   # set each cycle from the regime read
         self.engine = DecisionEngine(cfg)
         # One persisted risk-state instance shared by the risk gate and watchdog
         # so peak equity, the drawdown halt, and the halt latch are consistent.
@@ -63,7 +73,20 @@ class Orchestrator:
         self.benchmark = BenchmarkTracker(cfg, self.broker, symbol=cfg.benchmark_symbol)
         self.robinhood = RobinhoodReader(cfg)
         self.options = OptionsHelper(cfg) if cfg.risk.options_enabled else None
-        self.watchlist = watchlist or DEFAULT_WATCHLIST
+        # Discovery-driven by design: default (unset) is no standing watchlist.
+        # An explicit list can still force-include names; otherwise we trade only
+        # what the scanner discovers plus whatever we currently hold.
+        self.watchlist = DEFAULT_WATCHLIST if watchlist is None else watchlist
+        if not self.watchlist and not cfg.screener.enabled:
+            log.warning(
+                "No watchlist AND the screener is disabled — there is nothing to "
+                "discover or evaluate. Enable SCREENER_ENABLED (the model is "
+                "discovery-driven) or set WATCHLIST to force-include names."
+            )
+        elif not self.watchlist:
+            log.info("Discovery-driven mode: trading scanner-found names + holdings.")
+        # Persisted daily equity snapshots so the account P&L curve survives restarts.
+        self.equity_history = EquityHistory()
         self._last_decision_at = 0.0
         # Serializes broker order mutations so the watchdog's emergency closes and
         # the decision cycle's order placement can't interleave (e.g. double-close).
@@ -101,6 +124,7 @@ class Orchestrator:
                 self._refresh_runtime_controls()
                 if self._decision_due():
                     self.run_decision_cycle()
+                    self._refresh_dashboard()
                     self._last_decision_at = time.monotonic()
             except KeyboardInterrupt:
                 log.info("Interrupted — exiting.")
@@ -129,9 +153,9 @@ class Orchestrator:
     def _warn_on_weak_safety_config(self) -> None:
         """Loudly flag safety nets that are disabled, so an off-by-default setting
         isn't mistaken for a configured-and-safe one."""
-        if self.cfg.risk.equity_floor_usd <= 0:
+        if self.cfg.risk.equity_floor_pct <= 0:
             log.warning(
-                "EQUITY_FLOOR_USD is 0 (off) — the latched liquidate-and-halt "
+                "EQUITY_FLOOR_PCT is 0 (off) — the latched liquidate-and-halt "
                 "catastrophe guard is DISABLED. Set it before trading real size."
             )
         if self.cfg.robinhood_enabled and self.cfg.robinhood_mcp_token:
@@ -140,6 +164,22 @@ class Orchestrator:
                 "trade-capable token could place orders if misused. Use a "
                 "read-scoped token."
             )
+        # Tiny-float sanity: if the per-name budget after the position cap can't
+        # clear the min order, the bot can never fill MAX_OPEN_POSITIONS slots and
+        # will sit in cash. Surface it once at startup rather than silently.
+        try:
+            account = self.broker.get_account()
+            r = self.cfg.risk
+            per_name_budget = account.equity * (r.max_position_pct / 100.0)
+            if r.fractional_enabled and per_name_budget < r.min_order_usd:
+                log.warning(
+                    "Tiny float: %.0f%% position cap on $%.0f equity = $%.2f/name, "
+                    "below the $%.2f min order — no buys will size. Lower "
+                    "MIN_ORDER_USD or raise MAX_POSITION_PCT for this account.",
+                    r.max_position_pct, account.equity, per_name_budget, r.min_order_usd,
+                )
+        except Exception:  # noqa: BLE001 — a startup advisory must never crash boot
+            log.debug("Tiny-float config check skipped (account unavailable).")
 
     def _refresh_runtime_controls(self) -> None:
         """Let an operator halt NEW buys WITHOUT a restart by creating the
@@ -164,6 +204,15 @@ class Orchestrator:
         # and screener layers (both read the same cached live feeds).
         self.quiver.new_cycle()
         self.earnings.new_cycle()
+        self.sectors.new_cycle()
+        self.regime.new_cycle()
+        if self.cfg.risk.regime_filter_enabled:
+            regime = self.regime.assess()
+            self._regime_mult = regime.multiplier
+            log.info("Market regime: %s", regime.reason)
+        else:
+            self._regime_mult = 1.0
+        self._record_equity_snapshot()
         account = self.broker.get_account()
 
         # Watchlist + current holdings are always evaluated; the scanner widens
@@ -200,6 +249,41 @@ class Orchestrator:
                 self._handle_option(proposal, account, kinds)
             else:
                 self._handle_equity(proposal, account, kinds)
+
+    def _refresh_dashboard(self) -> None:
+        """Regenerate the live dashboard HTML after a cycle so the tracker stays
+        fresh (off unless DASHBOARD_FILE is set). Best-effort; never blocks."""
+        if not self.cfg.dashboard_file:
+            return
+        try:
+            from pathlib import Path
+
+            from .dashboard import generate
+            generate(Path(self.cfg.dashboard_file), live=True)
+        except Exception as e:
+            log.warning("Dashboard refresh failed: %s", e)
+
+    def _sector_context(self, symbol: str, account) -> tuple[str | None, float]:
+        """(sector of `symbol`, $ already held in that sector) for the risk
+        sector-concentration cap. Best-effort — a lookup miss returns (None, 0)
+        so the cap is simply skipped for that name."""
+        try:
+            sector = self.sectors.sector_for(symbol)
+            if not sector:
+                return None, 0.0
+            held = {p.symbol: p.market_value for p in account.positions}
+            return sector, self.sectors.exposure_by_sector(held).get(sector, 0.0)
+        except Exception as e:
+            log.warning("sector context for %s failed: %s", symbol, e)
+            return None, 0.0
+
+    def _record_equity_snapshot(self) -> None:
+        """Persist a once-per-day account P&L snapshot (true total return from the
+        Alpaca account, not the ledger). Best-effort; never blocks a cycle."""
+        try:
+            self.equity_history.snapshot(compute_status(self.broker))
+        except Exception as e:
+            log.warning("Could not record equity snapshot: %s", e)
 
     def _lessons(self) -> str:
         try:
@@ -259,12 +343,15 @@ class Orchestrator:
         vol = self.broker.annualized_vol(proposal.symbol)
         is_buy = proposal.action.value == "buy"
         pending = self.broker.open_buy_notional(proposal.symbol) if is_buy else 0.0
-        # Only the blackout-relevant path (new buys) needs the earnings lookup.
+        # Only the buy path needs the earnings + sector context.
         days_to_earnings = (
             self.earnings.days_until_earnings(proposal.symbol) if is_buy else None
         )
+        sector, sector_exposure = self._sector_context(proposal.symbol, account) \
+            if is_buy else (None, 0.0)
         decision = self.risk.evaluate(
-            proposal, account, price, vol, pending, days_to_earnings
+            proposal, account, price, vol, pending, days_to_earnings,
+            sector, sector_exposure, self._regime_mult,
         )
         log.info(
             "%s %s -> %s: %s | %s",

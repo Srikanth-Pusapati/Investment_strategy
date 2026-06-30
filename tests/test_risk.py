@@ -42,13 +42,21 @@ def _limits(**over) -> RiskLimits:
     base = dict(
         max_position_pct=5.0,
         max_symbol_exposure_pct=10.0,
+        max_gross_exposure_pct=100.0,
+        max_sector_exposure_pct=30.0,
+        regime_filter_enabled=True,
         max_daily_loss_pct=3.0,
         max_drawdown_pct=15.0,
-        equity_floor_usd=0.0,
+        equity_floor_pct=0.0,
         max_open_positions=15,
         min_cash_buffer_pct=10.0,
         min_trade_price_usd=5.0,
         earnings_blackout_days=3,
+        pdt_guard_enabled=True,
+        max_day_trades_under_25k=3,
+        max_trade_risk_pct=1.0,
+        est_slippage_pct=0.10,
+        min_edge_ratio=2.0,
         fractional_enabled=True,
         min_order_usd=1.0,
         default_stop_loss_pct=5.0,
@@ -63,10 +71,12 @@ def _limits(**over) -> RiskLimits:
 
 
 def _account(equity=100_000.0, cash=100_000.0, buying_power=100_000.0,
-             last_equity=100_000.0, positions=None) -> AccountSnapshot:
+             last_equity=100_000.0, positions=None,
+             pattern_day_trader=False, daytrade_count=0) -> AccountSnapshot:
     return AccountSnapshot(
         equity=equity, last_equity=last_equity, cash=cash,
         buying_power=buying_power, positions=positions or [],
+        pattern_day_trader=pattern_day_trader, daytrade_count=daytrade_count,
     )
 
 
@@ -157,6 +167,71 @@ def test_min_order_floor_rejects_dust():
 
 
 # --------------------------------------------------------------------------- #
+# Per-trade $-loss cap (small-account survival, 1.5)
+# --------------------------------------------------------------------------- #
+def test_per_trade_risk_cap_limits_size():
+    # 1% of 100k = $1,000 max risk; default 5% stop -> $20,000 max notional, well
+    # under the 100% position cap, so the risk cap is the binding constraint.
+    rm = _rm(_limits(max_trade_risk_pct=1.0, max_position_pct=100.0,
+                     max_symbol_exposure_pct=100.0, kelly_fraction=0.0,
+                     min_cash_buffer_pct=0.0))
+    d = rm.evaluate(_buy(weight=100.0), _account(), price=100.0, volatility=0.25)
+    assert d.verdict in (RiskVerdict.APPROVED, RiskVerdict.RESIZED), d.reason
+    assert abs(d.approved_notional - 20_000.0) < 1.0, d.approved_notional
+
+
+def test_per_trade_risk_cap_wider_stop_means_smaller_size():
+    # Same $ risk budget, a wider stop must SHRINK the position (not the $ risk).
+    rm = _rm(_limits(max_trade_risk_pct=1.0, max_position_pct=100.0,
+                     max_symbol_exposure_pct=100.0, kelly_fraction=0.0,
+                     min_cash_buffer_pct=0.0))
+    wide = TradeProposal(symbol="AAPL", action=Action.BUY, conviction=1.0,
+                         target_weight_pct=100.0, stop_loss_pct=10.0, rationale="t")
+    d = rm.evaluate(wide, _account(), price=100.0, volatility=0.25)
+    # $1,000 risk / 10% stop = $10,000 notional (half of the 5%-stop case).
+    assert abs(d.approved_notional - 10_000.0) < 1.0, d.approved_notional
+
+
+def test_per_trade_risk_cap_disabled_when_zero():
+    rm = _rm(_limits(max_trade_risk_pct=0.0, max_position_pct=100.0,
+                     max_symbol_exposure_pct=100.0, kelly_fraction=0.0,
+                     min_cash_buffer_pct=0.0))
+    d = rm.evaluate(_buy(weight=100.0), _account(), price=100.0, volatility=0.25)
+    # No per-trade risk cap -> deploys the full position budget, not the $20k cap.
+    assert d.approved_notional > 20_000.0, d.approved_notional
+
+
+# --------------------------------------------------------------------------- #
+# Cost / slippage edge floor (small-account survival, 1.5)
+# --------------------------------------------------------------------------- #
+def test_edge_floor_rejects_target_below_round_trip_cost():
+    # round-trip = 2 * 0.10% = 0.20%; required = 0.20% * 2 = 0.40%. A 0.3% target
+    # can't clear the friction -> negative expectancy, reject.
+    rm = _rm(_limits(est_slippage_pct=0.10, min_edge_ratio=2.0))
+    p = TradeProposal(symbol="AAPL", action=Action.BUY, conviction=1.0,
+                      target_weight_pct=5.0, take_profit_pct=0.3, rationale="t")
+    d = rm.evaluate(p, _account(), price=100.0, volatility=0.25)
+    assert d.verdict is RiskVerdict.REJECTED
+    assert "friction" in d.reason.lower() or "round-trip" in d.reason.lower()
+
+
+def test_edge_floor_allows_target_that_clears_cost():
+    rm = _rm(_limits(est_slippage_pct=0.10, min_edge_ratio=2.0))
+    p = TradeProposal(symbol="AAPL", action=Action.BUY, conviction=1.0,
+                      target_weight_pct=5.0, take_profit_pct=5.0, rationale="t")
+    d = rm.evaluate(p, _account(), price=100.0, volatility=0.25)
+    assert d.verdict in (RiskVerdict.APPROVED, RiskVerdict.RESIZED), d.reason
+
+
+def test_edge_floor_disabled_when_slippage_zero():
+    rm = _rm(_limits(est_slippage_pct=0.0))
+    p = TradeProposal(symbol="AAPL", action=Action.BUY, conviction=1.0,
+                      target_weight_pct=5.0, take_profit_pct=0.1, rationale="t")
+    d = rm.evaluate(p, _account(), price=100.0, volatility=0.25)
+    assert d.verdict in (RiskVerdict.APPROVED, RiskVerdict.RESIZED), d.reason
+
+
+# --------------------------------------------------------------------------- #
 # Account-wide halts
 # --------------------------------------------------------------------------- #
 def test_daily_loss_halts_new_buys():
@@ -241,6 +316,155 @@ def test_earnings_blackout_does_not_block_sells():
         acct, price=100.0, days_to_earnings=1,
     )
     assert d.verdict is RiskVerdict.APPROVED   # exits are never blacked out
+
+
+# --------------------------------------------------------------------------- #
+# Market-regime sizing multiplier
+# --------------------------------------------------------------------------- #
+def test_regime_multiplier_scales_size_down():
+    rm = _rm(_limits(kelly_fraction=0.0))  # position-cap path: 5% of 100k = $5k
+    full = rm.evaluate(_buy(), _account(), price=100.0, volatility=0.3, regime_multiplier=1.0)
+    half = rm.evaluate(_buy(), _account(), price=100.0, volatility=0.3, regime_multiplier=0.5)
+    assert abs(half.approved_notional - full.approved_notional * 0.5) < 100.0
+
+
+def test_regime_multiplier_cannot_inflate_above_cap():
+    rm = _rm(_limits(kelly_fraction=0.0))
+    d = rm.evaluate(_buy(), _account(), price=100.0, volatility=0.3, regime_multiplier=5.0)
+    assert d.approved_notional <= 5_000.0 + 1e-6   # clamped to <=1, still capped
+
+
+def test_regime_filter_disabled_ignores_multiplier():
+    rm = _rm(_limits(regime_filter_enabled=False, kelly_fraction=0.0))
+    d = rm.evaluate(_buy(), _account(), price=100.0, volatility=0.3, regime_multiplier=0.1)
+    assert abs(d.approved_notional - 5_000.0) < 1e-6   # full size despite 0.1
+
+
+# --------------------------------------------------------------------------- #
+# No-leverage gross-exposure cap (margin safety)
+# --------------------------------------------------------------------------- #
+def test_gross_cap_blocks_when_fully_deployed():
+    # 100% gross cap, already holding ~equity in positions -> no room, reject.
+    rm = _rm(_limits(max_gross_exposure_pct=100.0))
+    acct = _account(equity=10_000.0, cash=10_000.0, buying_power=20_000.0,
+                    last_equity=10_000.0,
+                    positions=[_pos("MSFT", qty=100, price=100.0)])  # $10k held
+    d = rm.evaluate(_buy("NVDA"), acct, price=100.0, volatility=0.25)
+    assert d.verdict is RiskVerdict.REJECTED
+    assert "gross" in d.reason.lower() or "leverage" in d.reason.lower()
+
+
+def test_gross_cap_does_not_use_margin_buying_power():
+    # buying_power is 2x equity (margin), but the gross cap pins deployment to
+    # equity: ~half already held leaves room only up to equity, not 2x.
+    rm = _rm(_limits(max_gross_exposure_pct=100.0, max_position_pct=100.0,
+                     min_cash_buffer_pct=0.0, kelly_fraction=0.0))
+    acct = _account(equity=10_000.0, cash=10_000.0, buying_power=20_000.0,
+                    last_equity=10_000.0,
+                    positions=[_pos("MSFT", qty=80, price=100.0)])  # $8k held
+    d = rm.evaluate(_buy("NVDA", weight=100.0), acct, price=100.0, volatility=0.25)
+    # Room = 10k - 8k = 2k, never the 12k that 2x buying power would allow.
+    assert d.approved_notional <= 2_000.0 + 1e-6
+
+
+# --------------------------------------------------------------------------- #
+# Sector concentration cap
+# --------------------------------------------------------------------------- #
+def test_sector_cap_blocks_when_sector_full():
+    rm = _rm(_limits(max_sector_exposure_pct=30.0))
+    acct = _account(equity=10_000.0, last_equity=10_000.0)  # 30% cap = $3k per sector
+    d = rm.evaluate(_buy("NVDA"), acct, price=100.0, volatility=0.25,
+                    sector="Technology", sector_exposure_usd=3_000.0)
+    assert d.verdict is RiskVerdict.REJECTED
+    assert "sector" in d.reason.lower()
+
+
+def test_sector_cap_limits_partial_room():
+    rm = _rm(_limits(max_sector_exposure_pct=30.0, max_position_pct=100.0,
+                     kelly_fraction=0.0, min_cash_buffer_pct=0.0))
+    acct = _account(equity=10_000.0, cash=10_000.0, buying_power=10_000.0,
+                    last_equity=10_000.0)
+    d = rm.evaluate(_buy("NVDA", weight=100.0), acct, price=100.0, volatility=0.25,
+                    sector="Technology", sector_exposure_usd=2_500.0)
+    # 30% of 10k = 3k; 2.5k already in sector -> only $500 of room.
+    assert d.approved_notional <= 500.0 + 1e-6
+
+
+def test_sector_cap_skipped_when_sector_unknown():
+    rm = _rm(_limits(max_sector_exposure_pct=30.0, kelly_fraction=0.0))
+    acct = _account(equity=10_000.0, cash=10_000.0, buying_power=10_000.0,
+                    last_equity=10_000.0)
+    # sector=None -> cap skipped; normal position cap applies.
+    d = rm.evaluate(_buy("NVDA"), acct, price=100.0, volatility=0.25,
+                    sector=None, sector_exposure_usd=9_999.0)
+    assert d.verdict in (RiskVerdict.APPROVED, RiskVerdict.RESIZED)
+
+
+# --------------------------------------------------------------------------- #
+# Pattern-Day-Trader guard (small margin accounts)
+# --------------------------------------------------------------------------- #
+def test_pdt_flagged_under_25k_blocks_buys():
+    rm = _rm(_limits())
+    acct = _account(equity=1_000.0, cash=1_000.0, buying_power=1_000.0,
+                    last_equity=1_000.0, pattern_day_trader=True)
+    d = rm.evaluate(_buy(), acct, price=100.0, volatility=0.25)
+    assert d.verdict is RiskVerdict.REJECTED
+    assert "pdt" in d.reason.lower() or "cash account" in d.reason.lower()
+
+
+def test_pdt_daytrade_count_at_limit_blocks_buys():
+    rm = _rm(_limits(max_day_trades_under_25k=3))
+    acct = _account(equity=1_000.0, cash=1_000.0, buying_power=1_000.0,
+                    last_equity=1_000.0, daytrade_count=3)
+    d = rm.evaluate(_buy(), acct, price=100.0, volatility=0.25)
+    assert d.verdict is RiskVerdict.REJECTED
+    assert "day-trade" in d.reason.lower()
+
+
+def test_pdt_guard_inert_below_limit():
+    rm = _rm(_limits(max_day_trades_under_25k=3))
+    acct = _account(equity=1_000.0, cash=1_000.0, buying_power=1_000.0,
+                    last_equity=1_000.0, daytrade_count=2)
+    d = rm.evaluate(_buy(), acct, price=100.0, volatility=0.25)
+    assert d.verdict in (RiskVerdict.APPROVED, RiskVerdict.RESIZED)
+
+
+def test_pdt_guard_inert_at_or_above_25k():
+    # A $25k+ account is not PDT-restricted even if flagged.
+    rm = _rm(_limits())
+    acct = _account(equity=30_000.0, cash=30_000.0, buying_power=30_000.0,
+                    last_equity=30_000.0, pattern_day_trader=True, daytrade_count=9)
+    d = rm.evaluate(_buy(), acct, price=100.0, volatility=0.25)
+    assert d.verdict in (RiskVerdict.APPROVED, RiskVerdict.RESIZED)
+
+
+def test_pdt_guard_cash_account_unaffected():
+    # Cash account: pattern_day_trader=False, daytrade_count=0 -> inert.
+    rm = _rm(_limits())
+    acct = _account(equity=500.0, cash=500.0, buying_power=500.0,
+                    last_equity=500.0)
+    d = rm.evaluate(_buy(), acct, price=100.0, volatility=0.25)
+    assert d.verdict in (RiskVerdict.APPROVED, RiskVerdict.RESIZED)
+
+
+def test_pdt_guard_can_be_disabled():
+    rm = _rm(_limits(pdt_guard_enabled=False))
+    acct = _account(equity=1_000.0, cash=1_000.0, buying_power=1_000.0,
+                    last_equity=1_000.0, pattern_day_trader=True)
+    d = rm.evaluate(_buy(), acct, price=100.0, volatility=0.25)
+    assert d.verdict in (RiskVerdict.APPROVED, RiskVerdict.RESIZED)
+
+
+def test_pdt_does_not_block_sells():
+    rm = _rm(_limits())
+    acct = _account(equity=1_000.0, cash=1_000.0, buying_power=1_000.0,
+                    last_equity=1_000.0, pattern_day_trader=True, positions=[_pos(qty=5.0)])
+    d = rm.evaluate(
+        TradeProposal(symbol="AAPL", action=Action.SELL, conviction=1.0,
+                      target_weight_pct=0.0, rationale="exit"),
+        acct, price=100.0,
+    )
+    assert d.verdict is RiskVerdict.APPROVED   # closing always allowed
 
 
 # --------------------------------------------------------------------------- #

@@ -116,3 +116,134 @@ risk._evaluate_buy REJECTS new buys within N days of a report (gap risk dwarfs t
 stop); sells/exits never blacked out. Orchestrator sources days-to-earnings for
 buys and passes it to risk.evaluate; the gate stays deterministic/network-free.
 Tests: tests/test_risk.py (6 cases) + tests/test_earnings.py. PR #6.
+
+--- E.11 Account-status / P&L tracker — DONE 2026-06-29 ---
+status.py: the honest "are we up or down?" view, sourced from the Alpaca ACCOUNT
+(the ledger can't answer it — exchange-side bracket auto-fills never pass through
+our code, so ledger realized P&L structurally undercounts). compute_status():
+  total_return = equity - base_value - net_cashflows   (backs out initial funding
+                 AND later deposits/withdrawals; from Alpaca portfolio history)
+  unrealized   = sum of open positions' unrealized P&L
+  realized     = total_return - unrealized             (identity, no fill replay)
+  day_pl       = equity - last_equity
+New AlpacaClient.portfolio_basis() -> (base_value, net_cashflows). Verified live
+(equity 100,044 / capital 100,000 -> +44 total, +6 realized; matched by hand).
+`python -m investment_strategy.status` prints the report; EquityHistory persists a
+once-per-day snapshot to state/equity_history.jsonl (snapshotted each decision
+cycle by the orchestrator). Fails OPEN: if portfolio history is unavailable,
+total/realized are None but day P&L + unrealized still render.
+Tests: tests/test_status.py (identity, deposits backed out, down account, fail-open).
+
+--- E.12 Empty / screener-only watchlist — DONE 2026-06-29 ---
+__main__.resolve_watchlist(): UNSET (None) -> orchestrator default list; explicit
+"" or "NONE" -> [] (start flat; trade only screener-discovered names — the
+live-cutover mode); else parse+uppercase. Orchestrator now does
+`DEFAULT_WATCHLIST if watchlist is None else watchlist` (was `watchlist or
+DEFAULT`, which silently traded megacaps on an empty list) and warns if the
+watchlist is empty AND the screener is disabled (nothing to trade).
+Tests: tests/test_status.py (unset/empty/NONE/parse cases).
+
+--- E.13 Dashboard wired into the live loop — DONE 2026-06-29 ---
+dashboard.py now renders a real "Account (live)" card row (equity, today's P&L,
+unrealized, total return + realized — net of deposits) from compute_status(),
+above the ledger "invested" cards (relabeled "Ledger (bot orders)"). _live_enrichment()
+pulls prices AND account status in one Alpaca pass; the panel shows even with zero
+trades (useful for an empty-watchlist live start). New DASHBOARD_FILE env: when set,
+the orchestrator regenerates that HTML after every decision tick so the live
+tracker stays fresh (off by default). Manual CLI unchanged
+(python -m investment_strategy.dashboard).
+
+--- 0.1 Removed the watchlist concept (discovery-only) — DONE 2026-06-29 ---
+DEFAULT_WATCHLIST is now [] (was 7 megacaps). The model is discovery-driven: the
+scanner surfaces names each cycle and current holdings are always re-evaluated, so
+there is no standing universe. An explicit WATCHLIST can still force-include names
+(testing) but isn't part of the design. Orchestrator warns only if there's no
+watchlist AND the screener is disabled (nothing to discover). Scanner quality is
+now the sole funnel -> the top signal-investment priority.
+
+--- 1.1 Pattern-Day-Trader guard — DONE 2026-06-29 ---
+Small MARGIN accounts (<$25k) that day-trade 4+ times in 5 business days get
+flagged PDT and restricted to closing-only — and an incidental same-day watchdog
+stop counts as a day trade. AccountSnapshot now carries pattern_day_trader +
+daytrade_count (from Alpaca get_account). risk._pdt_block() blocks NEW opening buys
+when a sub-$25k account is already PDT-flagged OR at the day-trade line
+(MAX_DAY_TRADES_UNDER_25K, default 3); closing is always allowed. Inert for cash
+accounts (pattern_day_trader=False/daytrade_count=0 -> exempt; the recommended
+small-account setup) and for >=$25k. Toggle via PDT_GUARD_ENABLED. PDT status shown
+in the account report under $25k. Tests: test_risk.py (7 cases: flagged, at-limit,
+below-limit, >=25k, cash-account, disabled, sells-not-blocked).
+NOTE (2026-06-29): Alpaca is MARGIN-ONLY (no cash account), so the small live float
+is a margin account and the PDT guard is essential (not optional). The no-leverage
+gross cap (below) ensures we still never use borrowed money.
+
+--- 1.7 No-leverage gross-exposure cap — DONE 2026-06-29 ---
+From the margin-account decision: Alpaca margin accounts offer ~2x buying power, so
+relying on "cash runs out" to prevent leverage was implicit. Now explicit:
+RiskLimits.max_gross_exposure_pct (env MAX_GROSS_EXPOSURE_PCT, default 100) caps the
+TOTAL deployed across ALL positions to <= that % of equity. At 100 the bot can never
+spend more than its own cash — no borrowed money, even though buying_power is 2x.
+risk._evaluate_buy computes gross_held = sum(position market values) and refuses /
+shrinks a buy that would breach the cap. Tests: test_risk.py (blocks-when-full,
+does-not-use-margin-buying-power).
+
+--- 1.3 Sector concentration cap — DONE 2026-06-29 ---
+Discovery is the sole funnel and can surface several names from one hot sector
+(all big-tech) that look diversified but are one bet. RiskLimits.max_sector_exposure_pct
+(env MAX_SECTOR_EXPOSURE_PCT, default 30) caps total $ per sector. sectors.py
+SectorMap (yfinance .info['sector'], per-cycle cached, FAILS OPEN -> unknown sector
+skips the cap) supplies the sector; the orchestrator sums held positions per sector
+and passes (sector, sector_exposure_usd) to risk.evaluate, which enforces the cap
+(network-free gate). Tests: test_risk.py (blocks-when-full, partial-room,
+skipped-when-unknown).
+
+--- 1.2 Capital-preservation config surfaced in .env — DONE 2026-06-29 ---
+.env previously had NO risk-limit overrides (all code defaults), so EQUITY_FLOOR_USD
+(the latched flatten+halt floor) wasn't visible. Added a "capital-preservation
+stack" block: EQUITY_FLOOR_USD=85000 (=85% of the $100k paper float; set ~85% of the
+live float, e.g. 850 for $1000), MAX_GROSS_EXPOSURE_PCT, MAX_SECTOR_EXPOSURE_PCT,
+EARNINGS_BLACKOUT_DAYS, PDT_GUARD_ENABLED/MAX_DAY_TRADES_UNDER_25K, FRACTIONAL_ENABLED,
+plus MAX_DRAWDOWN_PCT/MIN_TRADE_PRICE_USD and DASHBOARD_FILE=dashboard.html (live
+tracker auto-refresh).
+
+--- 1.2b Equity floor converted to a PERCENTAGE — DONE 2026-06-30 ---
+EQUITY_FLOOR_USD (absolute $) -> EQUITY_FLOOR_PCT (% of the PEAK high-water mark),
+default 60 (= flatten + latch after a 40% drawdown from peak). As a % it
+auto-scales to any account size, so paper ($100k) and live ($100-$1000) need no
+re-tuning. watchdog._equity_floor_breached now computes floor = peak_equity * pct/100
+(peak is updated first each tick, so it's >= current equity). Consistent escalation
+with MAX_DRAWDOWN_PCT (halt new buys at 15% off peak) -> floor flattens at 40% off
+peak. Tests: test_watchdog.py (breached/not/scales-with-peak/off-at-zero).
+
+--- 1.4 Market-regime filter — DONE 2026-06-30 ---
+regime.py RegimeReader turns the market backdrop into a 0.25..1.0 RISK MULTIPLIER:
+trend (SPY vs 200dma: above=1.0, below=0.5) x fear (VIX <20=1.0, 20-30=0.7, >30=0.4),
+floored at 0.25. risk._evaluate_buy scales position size by it (clamped to [0,1] so
+it can only REDUCE, never inflate; REGIME_FILTER_ENABLED toggle). Orchestrator
+assesses once per cycle (per-cycle cached, yfinance SPY+VIX, keyless), logs the
+regime, and passes the multiplier to every buy. FAILS OPEN to 1.0 if data is
+unavailable. Verified live (SPY 744 > 200dma 688, VIX 17 -> risk-on x1.0). Tests:
+test_regime.py (risk-on/neutral/risk-off/floor/fail-open/cache) + test_risk.py
+(scales down, can't inflate, disabled).
+
+--- 1.5 Small-account sizing: per-trade $-risk cap + cost/slippage floor — DONE 2026-06-30 ---
+Last Phase-1 safety item. Three additions to the deterministic risk gate:
+  * MAX_TRADE_RISK_PCT (default 1.0) — the classic "risk 1% per trade" rule. Caps
+    the ABSOLUTE $ lost if the stop fires: notional * stop% <= equity * pct. A wider
+    stop now SHRINKS the position instead of the dollar risk, so a string of small
+    losers stays survivable on the $100-$1000 live float. As a % it auto-scales
+    (no paper-vs-live retune). 0 = off. Applied as step 2d in _evaluate_buy, after
+    the gross cap, before the cash buffer.
+  * EST_SLIPPAGE_PCT (default 0.10) + MIN_EDGE_RATIO (default 2.0) — cost/slippage
+    edge floor. Round-trip friction ~= 2 * one-way slippage; a take-profit target
+    that can't beat it by MIN_EDGE_RATIO is negative-expectancy on entry and is
+    REJECTED ("friction eats the edge"). Size-independent gate, evaluated right
+    after the liquidity guard. Inert for liquid names with normal targets (12% >>
+    0.4% required); catches dust/tight-target degenerates. EST_SLIPPAGE_PCT=0 = off.
+  * Fractional preference already covers "don't drop the sub-share remainder"
+    (existing fractional path). Tiny-float sanity: orchestrator._warn_on_weak_safety_config
+    now warns at startup if MAX_POSITION_PCT * equity < MIN_ORDER_USD (the per-name
+    budget can't clear the min order, so no buy would ever size) — the MAX_OPEN_POSITIONS
+    vs min-order recheck on a tiny float.
+Config surfaced in config.py RiskLimits. Tests: test_risk.py (+6: risk cap limits
+size / wider-stop-smaller / disabled; edge floor rejects-tight / allows-normal /
+disabled-at-zero). Full suite green (45/45 risk).

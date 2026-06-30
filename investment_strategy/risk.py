@@ -27,6 +27,11 @@ log = logging.getLogger("risk")
 # name were quite volatile so vol-targeting shrinks the position.
 _ASSUMED_VOL_WHEN_UNKNOWN = 0.60
 
+# FINRA Pattern-Day-Trader minimum equity. Below this, a margin account that day
+# trades too often gets flagged and restricted to closing-only. Cash accounts are
+# exempt (they report pattern_day_trader=False / daytrade_count=0).
+_PDT_MIN_EQUITY = 25_000.0
+
 
 class RiskManager:
     def __init__(
@@ -64,6 +69,31 @@ class RiskManager:
             return True, (
                 f"At max open positions ({self.limits.max_open_positions})."
             )
+        pdt_block, pdt_why = self._pdt_block(account)
+        if pdt_block:
+            return True, pdt_why
+        return False, ""
+
+    # -- pattern-day-trader guard (small margin accounts) ------------------- #
+    def _pdt_block(self, account: AccountSnapshot) -> tuple[bool, str]:
+        """Block NEW opening buys when a sub-$25k MARGIN account is at/over the PDT
+        line, so an incidental same-day stop can't flag it and freeze it to
+        closing-only. Cash accounts report pattern_day_trader=False / daytrade
+        count 0, so this is inert for them (the recommended setup for small size)."""
+        if not self.limits.pdt_guard_enabled or account.equity >= _PDT_MIN_EQUITY:
+            return False, ""
+        if account.pattern_day_trader:
+            return True, (
+                f"PDT-flagged under ${_PDT_MIN_EQUITY:,.0f} "
+                f"(equity ${account.equity:,.0f}) — opening new positions is "
+                "restricted. Use a CASH account for small balances (PDT-exempt)."
+            )
+        if account.daytrade_count >= self.limits.max_day_trades_under_25k:
+            return True, (
+                f"{account.daytrade_count} day-trades in 5d at the PDT line under "
+                f"${_PDT_MIN_EQUITY:,.0f} — pausing new buys to avoid a "
+                "pattern-day-trader flag (closing still allowed)."
+            )
         return False, ""
 
     # -- per-proposal evaluation ------------------------------------------- #
@@ -71,6 +101,8 @@ class RiskManager:
         self, proposal: TradeProposal, account: AccountSnapshot, price: float,
         volatility: float | None = None, pending_buy_notional: float = 0.0,
         days_to_earnings: int | None = None,
+        sector: str | None = None, sector_exposure_usd: float = 0.0,
+        regime_multiplier: float = 1.0,
     ) -> RiskDecision:
         """`price` is the current market price for proposal.symbol. `volatility`
         is the symbol's annualized realized vol (fraction, e.g. 0.45) used for
@@ -78,13 +110,17 @@ class RiskManager:
         (unfilled) BUY orders for this symbol, so repeated cycles can't stack
         duplicate buys past the exposure cap. `days_to_earnings` is calendar days
         until the symbol's next earnings report (None if unknown) for the
-        earnings-blackout guard. All from the execution client."""
+        earnings-blackout guard. `sector` is the symbol's sector and
+        `sector_exposure_usd` is the $ already held in that sector, for the sector
+        concentration cap. `regime_multiplier` (0..1) scales position size down in a
+        risk-off market backdrop. All from the execution client / orchestrator."""
         if proposal.action is Action.HOLD:
             return self._reject(proposal, "HOLD — no action.")
         if proposal.action is Action.SELL:
             return self._evaluate_sell(proposal, account)
         return self._evaluate_buy(
-            proposal, account, price, volatility, pending_buy_notional, days_to_earnings
+            proposal, account, price, volatility, pending_buy_notional,
+            days_to_earnings, sector, sector_exposure_usd, regime_multiplier,
         )
 
     # -- survival-first sizing: vol-targeted, fractional-Kelly -------------- #
@@ -121,6 +157,8 @@ class RiskManager:
         self, proposal: TradeProposal, account: AccountSnapshot, price: float,
         volatility: float | None = None, pending_buy_notional: float = 0.0,
         days_to_earnings: int | None = None,
+        sector: str | None = None, sector_exposure_usd: float = 0.0,
+        regime_multiplier: float = 1.0,
     ) -> RiskDecision:
         halted, why = self.trading_halted(account)
         if halted:
@@ -157,6 +195,26 @@ class RiskManager:
                 f"(liquidity guard).",
             )
 
+        stop_pct = proposal.stop_loss_pct or self.limits.default_stop_loss_pct
+        take_pct = proposal.take_profit_pct or self.limits.default_take_profit_pct
+
+        # Cost / slippage edge floor: a trade whose profit target can't clear the
+        # round-trip friction (spread + slippage) is negative-expectancy the moment
+        # it fills — on a tiny float that friction is the whole game. Estimate the
+        # round-trip cost as 2x the one-way slippage estimate and require the
+        # take-profit target to beat it by MIN_EDGE_RATIO. Inert for liquid names
+        # with normal targets; it catches dust/tight-target degenerates. Size-
+        # independent (it's a % comparison), so it's a gate, not a resize.
+        if self.limits.est_slippage_pct > 0 and take_pct > 0:
+            round_trip_cost_pct = 2.0 * self.limits.est_slippage_pct
+            if take_pct < round_trip_cost_pct * self.limits.min_edge_ratio:
+                return self._reject(
+                    proposal,
+                    f"Take-profit {take_pct:.2f}% can't clear ~{round_trip_cost_pct:.2f}% "
+                    f"round-trip cost by {self.limits.min_edge_ratio:g}x — friction "
+                    "eats the edge.",
+                )
+
         # 1) Take the SMALLEST of: what the LLM wants, what vol-targeted
         #    fractional-Kelly sizing allows, and the hard single-position cap.
         sized_pct = self._sized_weight_pct(proposal.conviction, volatility)
@@ -164,6 +222,12 @@ class RiskManager:
             proposal.target_weight_pct, sized_pct, self.limits.max_position_pct
         )
         target_notional = equity * (weight_pct / 100.0)
+
+        # 1b) Market-regime scaling — shrink size in a risk-off backdrop (SPY below
+        #     its 200dma / elevated VIX). 1.0 in a calm uptrend; clamped to [0,1]
+        #     so it can only ever REDUCE size, never inflate it.
+        if self.limits.regime_filter_enabled:
+            target_notional *= max(0.0, min(1.0, regime_multiplier))
 
         # 2) Respect total per-symbol exposure. Count BOTH the filled holding
         #    AND any open (unfilled) buy orders — otherwise repeated decision
@@ -182,6 +246,45 @@ class RiskManager:
                 f"(held ${existing_val:,.0f} + pending ${pending_buy_notional:,.0f}).",
             )
         target_notional = min(target_notional, room)
+
+        # 2b) Sector concentration cap — keep the discovery scanner from quietly
+        #     stacking several correlated names (e.g. all big-tech) into one bet.
+        #     sector_exposure_usd is the $ already held in this name's sector.
+        if sector and self.limits.max_sector_exposure_pct > 0:
+            max_sector_val = equity * (self.limits.max_sector_exposure_pct / 100.0)
+            sector_room = max_sector_val - max(0.0, sector_exposure_usd)
+            if sector_room <= 0:
+                return self._reject(
+                    proposal,
+                    f"At/over {self.limits.max_sector_exposure_pct:.0f}% sector cap "
+                    f"for '{sector}' (held ${sector_exposure_usd:,.0f}).",
+                )
+            target_notional = min(target_notional, sector_room)
+
+        # 2c) No-leverage gross cap — never let TOTAL deployed exceed this % of
+        #     equity. On a margin account (Alpaca offers ~2x buying power) this is
+        #     the explicit guard that we never trade with borrowed money.
+        gross_held = sum(p.market_value for p in account.positions)
+        max_gross_val = equity * (self.limits.max_gross_exposure_pct / 100.0)
+        gross_room = max_gross_val - gross_held - max(0.0, pending_buy_notional)
+        if gross_room <= 0:
+            return self._reject(
+                proposal,
+                f"At/over {self.limits.max_gross_exposure_pct:.0f}% gross-exposure "
+                f"cap (deployed ${gross_held:,.0f} of ${max_gross_val:,.0f}; "
+                "no leverage).",
+            )
+        target_notional = min(target_notional, gross_room)
+
+        # 2d) Per-trade $-loss cap — bound the ABSOLUTE dollars at risk if the stop
+        #     fires, independent of the % weight. The classic "risk 1% per trade"
+        #     rule: notional * stop% must stay under equity * MAX_TRADE_RISK_PCT.
+        #     This is what keeps a string of small losers survivable on the live
+        #     float; a wide stop now SHRINKS the position instead of the dollar risk.
+        if self.limits.max_trade_risk_pct > 0 and stop_pct > 0:
+            max_risk_usd = equity * (self.limits.max_trade_risk_pct / 100.0)
+            max_notional_by_risk = max_risk_usd / (stop_pct / 100.0)
+            target_notional = min(target_notional, max_notional_by_risk)
 
         # 3) Respect the cash buffer — never spend the reserve.
         min_cash = equity * (self.limits.min_cash_buffer_pct / 100.0)
@@ -214,16 +317,13 @@ class RiskManager:
         requested_notional = equity * (proposal.target_weight_pct / 100.0)
         resized = approved_notional < requested_notional * 0.999
 
-        stop = proposal.stop_loss_pct or self.limits.default_stop_loss_pct
-        take = proposal.take_profit_pct or self.limits.default_take_profit_pct
-
         return RiskDecision(
             proposal=proposal,
             verdict=RiskVerdict.RESIZED if resized else RiskVerdict.APPROVED,
             approved_qty=qty,
             approved_notional=approved_notional,
-            stop_loss_pct=stop,
-            take_profit_pct=take,
+            stop_loss_pct=stop_pct,
+            take_profit_pct=take_pct,
             reason=(
                 f"Sized to {qty:g} sh (${approved_notional:,.0f}) within caps."
                 + (" Reduced from request." if resized else "")
