@@ -81,10 +81,14 @@ PHASE 1 — Small-account live safety  (HIGHEST — the "don't blow up" stack)
         open to 1.0). risk._evaluate_buy scales position size by it; orchestrator
         assesses once per cycle and logs the regime. REGIME_FILTER_ENABLED toggle.
         Tests: test_regime.py + test_risk.py.
-[ ] 1.5 Small-account sizing + per-trade $-loss cap + cost/slippage floor (E.14).
-        Bound absolute $ at risk per trade; skip dust orders where friction eats
-        the edge; prefer fractional+watchdog over dropping the sub-share remainder;
-        re-check MAX_OPEN_POSITIONS vs min order on a tiny float.
+[DONE 2026-06-30 -> completed.txt] 1.5 Small-account sizing + per-trade $-loss cap
+        + cost/slippage floor (E.14). MAX_TRADE_RISK_PCT (default 1.0 = "risk 1% per
+        trade") caps absolute $ at risk (notional*stop% <= equity*pct); a wider stop
+        shrinks size, not the $ risk. EST_SLIPPAGE_PCT (0.10) + MIN_EDGE_RATIO (2.0)
+        reject trades whose take-profit can't clear ~2x one-way friction ("friction
+        eats the edge"). Fractional path already keeps the sub-share remainder;
+        startup warns if MAX_POSITION_PCT*equity < MIN_ORDER_USD (tiny-float, no buy
+        would size). Tests: test_risk.py (+6). PHASE 1 CAPITAL-PRESERVATION COMPLETE.
 [ ] 1.6 (optional) Core-ETF allocation mode — hold a broad/low-vol ETF core with
         satellite single-name picks to structurally cut single-name blow-up risk.
 
@@ -148,11 +152,12 @@ LOWER VALUE / SKIP unless a thesis calls for it
 --------------------------------------------------------------------------------
 RANKED NEXT STEPS (2026-06-30)
 --------------------------------------------------------------------------------
- 1. 1.5  Small-account sizing + per-trade $-loss cap + cost/slippage floor
-          (last Phase-1 safety item; tune for the $100-$1000 live float)
- 2. 2.1  Backtest harness                   (gate before real money / data buys)
- 3. 2.2  Data-subscription decision         (informed by 2.1)
- 4. 3.1  Lag-decay weighting · 4.1 Alerting · then Phase 5 (after the legal gate)
+ 1. 2.1  Backtest harness                   (gate before real money / data buys)
+ 2. 2.2  Data-subscription decision         (informed by 2.1)
+ 3. 3.1  Lag-decay weighting · 4.1 Alerting · then Phase 5 (after the legal gate)
+ NOTE: Phase 1 (small-account capital-preservation stack) is now COMPLETE with 1.5.
+ The next gate before risking real money is 2.1 (backtest), which lets you measure
+ the edge and tune KELLY_FRACTION/TARGET_ANNUAL_VOL_PCT/stops/MAX_TRADE_RISK_PCT.
  NOTE: 1.1b cash-account settlement is MOOT (Alpaca margin-only); the no-leverage
  cap (1.7) + PDT guard cover it. LIVE PREP: EQUITY_FLOOR_PCT auto-scales now (no
  change needed); just swap ALPACA keys + ALPACA_BASE_URL + TRADING_MODE=live.
@@ -160,6 +165,6 @@ RANKED NEXT STEPS (2026-06-30)
 DONE (-> completed.txt): A.1 govcontracts, B.6 earnings-blackout (PR #6);
 E.11 account P&L tracker, E.12 empty watchlist, E.13 live dashboard;
 0.1 watchlist removal, 1.1 PDT guard, 1.2 % equity floor, 1.3 sector cap,
-1.4 regime filter, 1.7 no-leverage gross cap.
-RECOMMENDED NEXT: 1.5 small-account sizing — Phase 1's last item. After that the
-capital-preservation stack is complete and 2.1 (backtest) is the gate to live.
+1.4 regime filter, 1.7 no-leverage gross cap, 1.5 small-account sizing.
+RECOMMENDED NEXT: 2.1 backtest harness — Phase 1's capital-preservation stack is
+complete; the backtest is the gate before risking real money or buying data.

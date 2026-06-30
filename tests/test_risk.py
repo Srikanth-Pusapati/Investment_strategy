@@ -54,6 +54,9 @@ def _limits(**over) -> RiskLimits:
         earnings_blackout_days=3,
         pdt_guard_enabled=True,
         max_day_trades_under_25k=3,
+        max_trade_risk_pct=1.0,
+        est_slippage_pct=0.10,
+        min_edge_ratio=2.0,
         fractional_enabled=True,
         min_order_usd=1.0,
         default_stop_loss_pct=5.0,
@@ -161,6 +164,71 @@ def test_min_order_floor_rejects_dust():
     d = rm.evaluate(_buy(), acct, price=300.0, volatility=0.3)  # 1% of 2k = $20 < $50
     assert d.verdict is RiskVerdict.REJECTED
     assert "min order" in d.reason.lower()
+
+
+# --------------------------------------------------------------------------- #
+# Per-trade $-loss cap (small-account survival, 1.5)
+# --------------------------------------------------------------------------- #
+def test_per_trade_risk_cap_limits_size():
+    # 1% of 100k = $1,000 max risk; default 5% stop -> $20,000 max notional, well
+    # under the 100% position cap, so the risk cap is the binding constraint.
+    rm = _rm(_limits(max_trade_risk_pct=1.0, max_position_pct=100.0,
+                     max_symbol_exposure_pct=100.0, kelly_fraction=0.0,
+                     min_cash_buffer_pct=0.0))
+    d = rm.evaluate(_buy(weight=100.0), _account(), price=100.0, volatility=0.25)
+    assert d.verdict in (RiskVerdict.APPROVED, RiskVerdict.RESIZED), d.reason
+    assert abs(d.approved_notional - 20_000.0) < 1.0, d.approved_notional
+
+
+def test_per_trade_risk_cap_wider_stop_means_smaller_size():
+    # Same $ risk budget, a wider stop must SHRINK the position (not the $ risk).
+    rm = _rm(_limits(max_trade_risk_pct=1.0, max_position_pct=100.0,
+                     max_symbol_exposure_pct=100.0, kelly_fraction=0.0,
+                     min_cash_buffer_pct=0.0))
+    wide = TradeProposal(symbol="AAPL", action=Action.BUY, conviction=1.0,
+                         target_weight_pct=100.0, stop_loss_pct=10.0, rationale="t")
+    d = rm.evaluate(wide, _account(), price=100.0, volatility=0.25)
+    # $1,000 risk / 10% stop = $10,000 notional (half of the 5%-stop case).
+    assert abs(d.approved_notional - 10_000.0) < 1.0, d.approved_notional
+
+
+def test_per_trade_risk_cap_disabled_when_zero():
+    rm = _rm(_limits(max_trade_risk_pct=0.0, max_position_pct=100.0,
+                     max_symbol_exposure_pct=100.0, kelly_fraction=0.0,
+                     min_cash_buffer_pct=0.0))
+    d = rm.evaluate(_buy(weight=100.0), _account(), price=100.0, volatility=0.25)
+    # No per-trade risk cap -> deploys the full position budget, not the $20k cap.
+    assert d.approved_notional > 20_000.0, d.approved_notional
+
+
+# --------------------------------------------------------------------------- #
+# Cost / slippage edge floor (small-account survival, 1.5)
+# --------------------------------------------------------------------------- #
+def test_edge_floor_rejects_target_below_round_trip_cost():
+    # round-trip = 2 * 0.10% = 0.20%; required = 0.20% * 2 = 0.40%. A 0.3% target
+    # can't clear the friction -> negative expectancy, reject.
+    rm = _rm(_limits(est_slippage_pct=0.10, min_edge_ratio=2.0))
+    p = TradeProposal(symbol="AAPL", action=Action.BUY, conviction=1.0,
+                      target_weight_pct=5.0, take_profit_pct=0.3, rationale="t")
+    d = rm.evaluate(p, _account(), price=100.0, volatility=0.25)
+    assert d.verdict is RiskVerdict.REJECTED
+    assert "friction" in d.reason.lower() or "round-trip" in d.reason.lower()
+
+
+def test_edge_floor_allows_target_that_clears_cost():
+    rm = _rm(_limits(est_slippage_pct=0.10, min_edge_ratio=2.0))
+    p = TradeProposal(symbol="AAPL", action=Action.BUY, conviction=1.0,
+                      target_weight_pct=5.0, take_profit_pct=5.0, rationale="t")
+    d = rm.evaluate(p, _account(), price=100.0, volatility=0.25)
+    assert d.verdict in (RiskVerdict.APPROVED, RiskVerdict.RESIZED), d.reason
+
+
+def test_edge_floor_disabled_when_slippage_zero():
+    rm = _rm(_limits(est_slippage_pct=0.0))
+    p = TradeProposal(symbol="AAPL", action=Action.BUY, conviction=1.0,
+                      target_weight_pct=5.0, take_profit_pct=0.1, rationale="t")
+    d = rm.evaluate(p, _account(), price=100.0, volatility=0.25)
+    assert d.verdict in (RiskVerdict.APPROVED, RiskVerdict.RESIZED), d.reason
 
 
 # --------------------------------------------------------------------------- #

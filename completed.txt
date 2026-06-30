@@ -224,3 +224,26 @@ regime, and passes the multiplier to every buy. FAILS OPEN to 1.0 if data is
 unavailable. Verified live (SPY 744 > 200dma 688, VIX 17 -> risk-on x1.0). Tests:
 test_regime.py (risk-on/neutral/risk-off/floor/fail-open/cache) + test_risk.py
 (scales down, can't inflate, disabled).
+
+--- 1.5 Small-account sizing: per-trade $-risk cap + cost/slippage floor — DONE 2026-06-30 ---
+Last Phase-1 safety item. Three additions to the deterministic risk gate:
+  * MAX_TRADE_RISK_PCT (default 1.0) — the classic "risk 1% per trade" rule. Caps
+    the ABSOLUTE $ lost if the stop fires: notional * stop% <= equity * pct. A wider
+    stop now SHRINKS the position instead of the dollar risk, so a string of small
+    losers stays survivable on the $100-$1000 live float. As a % it auto-scales
+    (no paper-vs-live retune). 0 = off. Applied as step 2d in _evaluate_buy, after
+    the gross cap, before the cash buffer.
+  * EST_SLIPPAGE_PCT (default 0.10) + MIN_EDGE_RATIO (default 2.0) — cost/slippage
+    edge floor. Round-trip friction ~= 2 * one-way slippage; a take-profit target
+    that can't beat it by MIN_EDGE_RATIO is negative-expectancy on entry and is
+    REJECTED ("friction eats the edge"). Size-independent gate, evaluated right
+    after the liquidity guard. Inert for liquid names with normal targets (12% >>
+    0.4% required); catches dust/tight-target degenerates. EST_SLIPPAGE_PCT=0 = off.
+  * Fractional preference already covers "don't drop the sub-share remainder"
+    (existing fractional path). Tiny-float sanity: orchestrator._warn_on_weak_safety_config
+    now warns at startup if MAX_POSITION_PCT * equity < MIN_ORDER_USD (the per-name
+    budget can't clear the min order, so no buy would ever size) — the MAX_OPEN_POSITIONS
+    vs min-order recheck on a tiny float.
+Config surfaced in config.py RiskLimits. Tests: test_risk.py (+6: risk cap limits
+size / wider-stop-smaller / disabled; edge floor rejects-tight / allows-normal /
+disabled-at-zero). Full suite green (45/45 risk).

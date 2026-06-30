@@ -52,6 +52,10 @@ class RiskLimits:
     # incidental same-day stop can't get the account flagged + restricted.
     pdt_guard_enabled: bool
     max_day_trades_under_25k: int    # pause new buys once day-trades in 5d hit this
+    # --- small-account survival: per-trade $-risk cap + cost/slippage floor ---
+    max_trade_risk_pct: float        # cap $ at risk (notional*stop%) per trade as % equity (0=off)
+    est_slippage_pct: float          # one-way spread+slippage estimate, % of notional (0=off)
+    min_edge_ratio: float            # take-profit must beat round-trip cost by this multiple
     # --- fractional shares (for small accounts) ---
     fractional_enabled: bool         # allow sub-share notional buys (no exchange bracket)
     min_order_usd: float             # smallest $ order worth placing (Alpaca min is $1)
@@ -205,6 +209,15 @@ def load_config() -> Config:
             earnings_blackout_days=_i("EARNINGS_BLACKOUT_DAYS", 3),
             pdt_guard_enabled=_flag("PDT_GUARD_ENABLED", "on"),
             max_day_trades_under_25k=_i("MAX_DAY_TRADES_UNDER_25K", 3),
+            # The classic "risk 1% of the account per trade" rule. Bounds the
+            # ABSOLUTE $ lost if the stop fires, independent of the % weight; as a
+            # % it auto-scales from the $100 live float to the $100k paper book.
+            max_trade_risk_pct=_f("MAX_TRADE_RISK_PCT", 1.0),
+            # Estimated one-way friction (bid/ask spread + slippage) as % of
+            # notional. Round-trip cost = 2x this; a profit target that can't beat
+            # it by MIN_EDGE_RATIO is negative-expectancy on entry and refused.
+            est_slippage_pct=_f("EST_SLIPPAGE_PCT", 0.10),
+            min_edge_ratio=_f("MIN_EDGE_RATIO", 2.0),
             fractional_enabled=_flag("FRACTIONAL_ENABLED", "on"),
             min_order_usd=_f("MIN_ORDER_USD", 1.0),
             default_stop_loss_pct=_f("DEFAULT_STOP_LOSS_PCT", 5.0),

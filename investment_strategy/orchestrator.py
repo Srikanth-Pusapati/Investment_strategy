@@ -164,6 +164,22 @@ class Orchestrator:
                 "trade-capable token could place orders if misused. Use a "
                 "read-scoped token."
             )
+        # Tiny-float sanity: if the per-name budget after the position cap can't
+        # clear the min order, the bot can never fill MAX_OPEN_POSITIONS slots and
+        # will sit in cash. Surface it once at startup rather than silently.
+        try:
+            account = self.broker.get_account()
+            r = self.cfg.risk
+            per_name_budget = account.equity * (r.max_position_pct / 100.0)
+            if r.fractional_enabled and per_name_budget < r.min_order_usd:
+                log.warning(
+                    "Tiny float: %.0f%% position cap on $%.0f equity = $%.2f/name, "
+                    "below the $%.2f min order — no buys will size. Lower "
+                    "MIN_ORDER_USD or raise MAX_POSITION_PCT for this account.",
+                    r.max_position_pct, account.equity, per_name_budget, r.min_order_usd,
+                )
+        except Exception:  # noqa: BLE001 — a startup advisory must never crash boot
+            log.debug("Tiny-float config check skipped (account unavailable).")
 
     def _refresh_runtime_controls(self) -> None:
         """Let an operator halt NEW buys WITHOUT a restart by creating the

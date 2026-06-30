@@ -195,6 +195,26 @@ class RiskManager:
                 f"(liquidity guard).",
             )
 
+        stop_pct = proposal.stop_loss_pct or self.limits.default_stop_loss_pct
+        take_pct = proposal.take_profit_pct or self.limits.default_take_profit_pct
+
+        # Cost / slippage edge floor: a trade whose profit target can't clear the
+        # round-trip friction (spread + slippage) is negative-expectancy the moment
+        # it fills — on a tiny float that friction is the whole game. Estimate the
+        # round-trip cost as 2x the one-way slippage estimate and require the
+        # take-profit target to beat it by MIN_EDGE_RATIO. Inert for liquid names
+        # with normal targets; it catches dust/tight-target degenerates. Size-
+        # independent (it's a % comparison), so it's a gate, not a resize.
+        if self.limits.est_slippage_pct > 0 and take_pct > 0:
+            round_trip_cost_pct = 2.0 * self.limits.est_slippage_pct
+            if take_pct < round_trip_cost_pct * self.limits.min_edge_ratio:
+                return self._reject(
+                    proposal,
+                    f"Take-profit {take_pct:.2f}% can't clear ~{round_trip_cost_pct:.2f}% "
+                    f"round-trip cost by {self.limits.min_edge_ratio:g}x — friction "
+                    "eats the edge.",
+                )
+
         # 1) Take the SMALLEST of: what the LLM wants, what vol-targeted
         #    fractional-Kelly sizing allows, and the hard single-position cap.
         sized_pct = self._sized_weight_pct(proposal.conviction, volatility)
@@ -256,6 +276,16 @@ class RiskManager:
             )
         target_notional = min(target_notional, gross_room)
 
+        # 2d) Per-trade $-loss cap — bound the ABSOLUTE dollars at risk if the stop
+        #     fires, independent of the % weight. The classic "risk 1% per trade"
+        #     rule: notional * stop% must stay under equity * MAX_TRADE_RISK_PCT.
+        #     This is what keeps a string of small losers survivable on the live
+        #     float; a wide stop now SHRINKS the position instead of the dollar risk.
+        if self.limits.max_trade_risk_pct > 0 and stop_pct > 0:
+            max_risk_usd = equity * (self.limits.max_trade_risk_pct / 100.0)
+            max_notional_by_risk = max_risk_usd / (stop_pct / 100.0)
+            target_notional = min(target_notional, max_notional_by_risk)
+
         # 3) Respect the cash buffer — never spend the reserve.
         min_cash = equity * (self.limits.min_cash_buffer_pct / 100.0)
         deployable = max(0.0, account.cash - min_cash)
@@ -287,16 +317,13 @@ class RiskManager:
         requested_notional = equity * (proposal.target_weight_pct / 100.0)
         resized = approved_notional < requested_notional * 0.999
 
-        stop = proposal.stop_loss_pct or self.limits.default_stop_loss_pct
-        take = proposal.take_profit_pct or self.limits.default_take_profit_pct
-
         return RiskDecision(
             proposal=proposal,
             verdict=RiskVerdict.RESIZED if resized else RiskVerdict.APPROVED,
             approved_qty=qty,
             approved_notional=approved_notional,
-            stop_loss_pct=stop,
-            take_profit_pct=take,
+            stop_loss_pct=stop_pct,
+            take_profit_pct=take_pct,
             reason=(
                 f"Sized to {qty:g} sh (${approved_notional:,.0f}) within caps."
                 + (" Reduced from request." if resized else "")
