@@ -78,6 +78,14 @@ class QuiverClient:
             # Cache even an empty/failed result so a down endpoint isn't hammered
             # again within the same cycle.
             self._cache[path] = data
+        # Log the size of each real (cache-miss) pull so an EMPTY upstream feed is
+        # visible — otherwise a 200-with-[] looks identical downstream to "we
+        # filtered everything out". Bulk live feeds at INFO (few per cycle);
+        # per-symbol historical at DEBUG (one per symbol, noisy).
+        if path.startswith("live/"):
+            log.info("Quiver %s -> %d row(s).", path, len(data))
+        else:
+            log.debug("Quiver %s -> %d row(s).", path, len(data))
         return data
 
     def _fetch(self, path: str) -> list[dict[str, Any]]:

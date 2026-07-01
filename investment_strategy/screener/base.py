@@ -29,7 +29,7 @@ class Screener(abc.ABC):
 
     def safe_scan(self) -> list[Candidate]:
         if not self.enabled:
-            log.debug("%s disabled (no credentials); skipping.", self.name)
+            log.info("%s screener disabled (no credentials); skipping.", self.name)
             return []
         try:
             return self.scan()

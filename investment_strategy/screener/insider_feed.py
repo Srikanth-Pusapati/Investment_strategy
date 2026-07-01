@@ -45,6 +45,10 @@ class InsiderFeedScreener(Screener):
 
     def scan(self) -> list[Candidate]:
         filings = self._recent_form4_filings()
+        # Surface the raw feed size so an empty/blocked EDGAR pull is visible
+        # rather than silently becoming "0 candidates" downstream.
+        log.info("EDGAR Form-4 feed -> %d filing(s) (scanning up to %d).",
+                 len(filings), self.cfg.screener.options_flow_scan_limit)
         if not filings:
             return []
 
