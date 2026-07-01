@@ -22,6 +22,7 @@ from ..config import Config
 from ..execution import AlpacaClient
 from ..ledger import TradeLedger, TradeRecord
 from ..models import AccountSnapshot, Position
+from ..notify import Alerter
 from ..state import PortfolioState
 
 log = logging.getLogger("watchdog")
@@ -31,6 +32,7 @@ class Watchdog:
     def __init__(
         self, cfg: Config, broker: AlpacaClient,
         state: PortfolioState | None = None, ledger: TradeLedger | None = None,
+        alerter: Alerter | None = None,
     ):
         self.cfg = cfg
         self.broker = broker
@@ -39,8 +41,17 @@ class Watchdog:
         # decision loop never sees — without recording them the ledger's round-trip
         # history (and signal attribution) would be blind to most exits. Best-effort.
         self.ledger = ledger
+        # Out-of-band paging for CRITICALs the loop can't self-heal (failed close =
+        # naked position; latched halt). None => alerts are log-only (never raises).
+        self.alerter = alerter
         #: give back this much of peak gain before trailing-stopping out.
         self.trail_giveback_pct = 3.0
+
+    def _alert(self, key: str, subject: str, body: str) -> None:
+        """Page a human, if an alerter is wired. The event is already logged at
+        CRITICAL by the caller; this is purely the outbound channel."""
+        if self.alerter is not None:
+            self.alerter.critical(key, subject, body)
 
     def check_once(self) -> None:
         """One pass. Call on a timer from the orchestrator/monitor loop."""
@@ -75,12 +86,17 @@ class Watchdog:
         floor = peak * (pct / 100.0)
         if account.equity > floor:
             return False
-        self.state.latch_halt(
+        reason = (
             f"Equity ${account.equity:,.0f} <= floor ${floor:,.0f} "
             f"({pct:.0f}% of peak ${peak:,.0f}). "
             f"Flattened and halted; clear {self.cfg.state_file} to resume."
         )
+        self.state.latch_halt(reason)
         self._flatten_all(account, "EQUITY FLOOR")
+        # Latched halt is terminal until a human clears the state file — page once.
+        self._alert(
+            "equity-floor-halt", "EQUITY FLOOR breached — trading HALTED", reason,
+        )
         return True
 
     # -- account-wide emergency exit --------------------------------------- #
@@ -109,6 +125,14 @@ class Watchdog:
                 log.critical(
                     "%s: close FAILED for %s — position may be NAKED. Will retry.",
                     why, pos.symbol,
+                )
+                self._alert(
+                    f"flatten-fail:{pos.symbol}",
+                    f"NAKED position {pos.symbol} — {why} close FAILED",
+                    f"{why} flatten of {pos.symbol} did not go through; the "
+                    f"position is unprotected. The watchdog will retry every "
+                    f"~{self.cfg.monitor_interval_s}s but may need manual "
+                    f"intervention.",
                 )
 
     # -- hard stop / take-profit for fractional (unbracketed) positions ---- #
@@ -141,6 +165,14 @@ class Watchdog:
                 "Hard-exit close FAILED for %s — fractional position unprotected. "
                 "Will retry.", pos.symbol,
             )
+            self._alert(
+                f"hard-exit-fail:{pos.symbol}",
+                f"Fractional {pos.symbol} unprotected — {hit} close FAILED",
+                f"{pos.symbol} breached its {hit} but the close did not go "
+                f"through. Fractional positions have no exchange bracket, so this "
+                f"loop is their only hard exit — the position is now unprotected. "
+                f"Retrying every ~{self.cfg.monitor_interval_s}s.",
+            )
         return True
 
     # -- per-position trailing stop ---------------------------------------- #
@@ -167,6 +199,15 @@ class Watchdog:
                 log.critical(
                     "Trailing close FAILED for %s — position unprotected. Will retry.",
                     pos.symbol,
+                )
+                self._alert(
+                    f"trail-fail:{pos.symbol}",
+                    f"{pos.symbol} unprotected — trailing-stop close FAILED",
+                    f"Trailing stop fired on {pos.symbol} (peak {peak:.1f}% -> "
+                    f"now {pos.unrealized_pl_pct:.1f}%) but the close did not go "
+                    f"through, and the bracket was already canceled — the "
+                    f"position is unprotected. Retrying every "
+                    f"~{self.cfg.monitor_interval_s}s.",
                 )
 
     def forget(self, symbol: str) -> None:

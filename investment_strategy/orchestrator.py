@@ -24,6 +24,7 @@ from .execution import AlpacaClient, OptionsHelper
 from .ledger import TradeLedger, TradeRecord
 from .models import Candidate, Instrument, RiskVerdict, SignalBundle, TradeProposal
 from .monitor import Watchdog
+from .notify import Alerter
 from .portfolio import RobinhoodReader
 from .risk import RiskManager
 from .regime import RegimeReader
@@ -67,9 +68,15 @@ class Orchestrator:
         self.state = PortfolioState(cfg.state_file)
         self.risk = RiskManager(cfg.risk, kill_switch=cfg.kill_switch, state=self.state)
         self.ledger = TradeLedger()
+        # Out-of-band paging for watchdog CRITICALs (failed close = naked position;
+        # latched halt). Log-only unless ALERTS_ENABLED + a sink is configured.
+        self.alerter = Alerter(cfg.alerts)
         # The watchdog records its own exits (stops/take-profits/flattens) to the
         # ledger so signal attribution sees every close, not just decision sells.
-        self.watchdog = Watchdog(cfg, self.broker, state=self.state, ledger=self.ledger)
+        self.watchdog = Watchdog(
+            cfg, self.broker, state=self.state, ledger=self.ledger,
+            alerter=self.alerter,
+        )
         self.benchmark = BenchmarkTracker(cfg, self.broker, symbol=cfg.benchmark_symbol)
         self.robinhood = RobinhoodReader(cfg)
         self.options = OptionsHelper(cfg) if cfg.risk.options_enabled else None

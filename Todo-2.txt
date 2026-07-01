@@ -93,6 +93,81 @@ PHASE 1 — Small-account live safety  (HIGHEST — the "don't blow up" stack)
         satellite single-name picks to structurally cut single-name blow-up risk.
 
 ################################################################################
+PHASE 1B — Capital-preservation HARDENING  (audit 2026-06-30; DO BEFORE LIVE $)
+################################################################################
+From the 2026-06-30 code audit. Phase 1's caps are sound, but the LIVE posture
+exposes gaps that the $100k paper book hides. Two LIVE facts make these permanent
+constraints, not things we can design away:
+  - LIVE balance is SMALL ($100–$1000) => MOST positions are FRACTIONAL. Fractional
+    MUST keep working; we harden around it, we don't avoid it.
+  - Account is MARGIN-ONLY (Alpaca has no cash account) => buying_power is ~2x, so
+    the broker will NOT reject an over-deploy for us; our caps are the only guard.
+RED = pre-live blocker.  YELLOW = roadmap / tune after backtest.
+
+[DONE 2026-06-30] 1B.1 (RED) Alerting on watchdog CRITICAL (was 4.1, promoted).
+        notify.py Alerter pages a human on every watchdog CRITICAL (failed
+        flatten/stop/trailing close = a NAKED position) and on the latched equity-
+        floor halt. Self-contained (the bot is a long-lived process; it can't call
+        Claude's Gmail MCP): sinks are Gmail SMTP (stdlib smtplib, app password) and
+        an optional generic webhook (Slack/Discord/PagerDuty). FAILS OPEN (never
+        raises into the safety loop; the event is logged at CRITICAL regardless) and
+        THROTTLED per event key (ALERT_COOLDOWN_SECONDS, default 15m) so the 30s
+        retry loop can't spam. A key is only marked sent when a sink actually
+        delivers, so a transient send failure retries next tick. Log-only until
+        ALERTS_ENABLED + a sink. Config: ALERTS_ENABLED, ALERT_SMTP_*, ALERT_EMAIL_TO,
+        ALERT_WEBHOOK_URL, ALERT_COOLDOWN_SECONDS. Tests: test_notify.py (11).
+[ ] 1B.2 (RED) Fractional-position protection (the live default). Fractional buys
+        carry NO exchange bracket (Alpaca limitation) — their ONLY stop is the
+        in-process 30s watchdog poll, which also can't market-sell when the market
+        is closed. Live = mostly fractional => the real money runs on the weakest
+        guard. Do: (a) verify self.exits persists + reloads so a restart keeps the
+        stop; (b) on EVERY fractional buy require a registered watchdog stop or
+        refuse the buy; (c) when a whole share is affordable, PREFER the whole-share
+        bracket (stop rests at the exchange, survives a crash) over fractional;
+        (d) document the residual overnight-gap risk (irreducible on fractional).
+[ ] 1B.3 (RED) Intra-cycle stale-snapshot over-deploy. run_decision_cycle fetches
+        the account ONCE, then evaluates every proposal against that one snapshot —
+        so N new-symbol buys in a single cycle don't see each other. The no-leverage
+        gross cap, the cash buffer, AND max-open-positions can each be breached in
+        one multi-buy cycle (margin buying_power ~2x won't reject it). Masked today
+        by defaults (15 x 5% = 75% < 100%) but a real hole in the no-leverage
+        guarantee. Fix: keep a running deployed/cash/slot tally decremented between
+        approvals in the loop, or re-fetch the account between fills.
+[ ] 1B.4 (RED) Held-position KEEP-vs-SELL review (note 3). Make the "is this still
+        worth holding" loop explicit and testable. Today: held names are re-fed
+        through signals -> Claude every decision cycle (~15m, market-open only) and
+        the watchdog enforces stop/take/trailing/flatten every ~30s. GAPS to close:
+        no max-hold age, no thesis-decay exit (a name whose signals went stale but
+        never hit a price stop is held forever), and decision-sells need the LLM up.
+        Add: per-position age + signal-freshness check that proposes an exit when
+        the entry thesis is no longer corroborated; deterministic time-stop so a
+        flat/dead position is recycled rather than held indefinitely.
+[ ] 1B.5 (YELLOW) Market-closed / halt exit fallback. Every exit is a MARKET order,
+        which can't fill when the market is closed or a name is LULD-halted — i.e. a
+        gap-down / limit-down is exactly when the flatten fails. Rest GTC protective
+        stops for whole-share; add a marketable-limit fallback; accept + document
+        that fractional overnight-gap risk is bounded, not removable.
+[ ] 1B.6 (YELLOW) Regime flip must de-risk the EXISTING book, not just new buys.
+        Today the regime multiplier only shrinks NEW positions; held names ride a
+        downturn to their own stops with no account-level trim. Add a regime-off
+        TRIM so "salvage when the market is down" has an active lever.
+[ ] 1B.7 (YELLOW) yfinance correlated fail-open. Regime filter AND sector cap both
+        source yfinance and BOTH fail open (full size, no cap), so one yfinance
+        outage drops two risk-off guards at once — during the vol spike they exist
+        for. Log LOUDLY on degrade and size DOWN (not full) when both are missing;
+        long-term move to the paid feed (2.2).
+[ ] 1B.8 (YELLOW) Let winners run. The hard take-profit closes the FULL position at
+        ~+12% and pre-empts the trailing stop, so winners are capped while losers
+        run to the stop — capping the asymmetric edge that pays for the losers. Add
+        scale-out (sell a piece at target, trail the rest; submit_ladder already
+        exists) and/or a vol-scaled take. Tune against the 2.1 backtest.
+[ ] 1B.9 (YELLOW) Persist _pending_oids + add a min-conviction gate. Reconciliation
+        state is in-memory (a reject/partial across a restart is never reconciled,
+        leaving a phantom ledger intent); a 0.1-conviction buy that merely clears
+        the friction floor still fires. Persist the pending list; add a conviction
+        floor so only real edges trade.
+
+################################################################################
 PHASE 2 — Prove the edge BEFORE spending money
 ################################################################################
 [ ] 2.1 Backtest harness (D.9) — replay scanner->signals->proposals->simulated
@@ -150,21 +225,30 @@ LOWER VALUE / SKIP unless a thesis calls for it
    skipped (free via Finnhub + SEC EDGAR).
 
 --------------------------------------------------------------------------------
-RANKED NEXT STEPS (2026-06-30)
+RANKED NEXT STEPS (reprioritized 2026-06-30 after the code audit)
 --------------------------------------------------------------------------------
- 1. 2.1  Backtest harness                   (gate before real money / data buys)
- 2. 2.2  Data-subscription decision         (informed by 2.1)
- 3. 3.1  Lag-decay weighting · 4.1 Alerting · then Phase 5 (after the legal gate)
- NOTE: Phase 1 (small-account capital-preservation stack) is now COMPLETE with 1.5.
- The next gate before risking real money is 2.1 (backtest), which lets you measure
- the edge and tune KELLY_FRACTION/TARGET_ANNUAL_VOL_PCT/stops/MAX_TRADE_RISK_PCT.
- NOTE: 1.1b cash-account settlement is MOOT (Alpaca margin-only); the no-leverage
- cap (1.7) + PDT guard cover it. LIVE PREP: EQUITY_FLOOR_PCT auto-scales now (no
- change needed); just swap ALPACA keys + ALPACA_BASE_URL + TRADING_MODE=live.
+ PRE-LIVE BLOCKERS (do first — Phase 1's caps assume these are closed):
+ 1. 1B.1  Alerting on watchdog CRITICAL      (DONE 2026-06-30)
+ 2. 1B.2  Fractional-position protection      (the live default = fractional) <- NEXT
+ 3. 1B.3  Intra-cycle over-deploy fix         (closes the no-leverage hole)
+ 4. 1B.4  Held-position keep-vs-sell review   (note 3: stale-thesis / time-stop)
+ EDGE GATE (before risking real money or buying data):
+ 5. 2.1   Backtest harness                    (also tunes 1B.8 take/stop logic)
+ 6. 2.2   Data-subscription decision          (informed by 2.1)
+ THEN: 1B.5–1B.9 hardening · 3.1 lag-decay · Phase 5 (after the legal gate).
+
+ NOTE: Phase 1's capital-preservation STACK is in place, but the 2026-06-30 audit
+ found gaps that only bite the LIVE posture (small MARGIN balance => mostly
+ FRACTIONAL). Phase 1B closes them; treat 1B.1–1B.4 as hard pre-live blockers.
+ NOTE: cash-account settlement is MOOT (Alpaca margin-only); no-leverage cap (1.7)
+ + PDT guard cover it. Fractional MUST work live (small balance) — 1B.2 hardens it.
+ LIVE PREP: EQUITY_FLOOR_PCT auto-scales; swap ALPACA keys + ALPACA_BASE_URL +
+ TRADING_MODE=live — but only AFTER 1B.1–1B.4 and the 2.1 backtest.
 
 DONE (-> completed.txt): A.1 govcontracts, B.6 earnings-blackout (PR #6);
 E.11 account P&L tracker, E.12 empty watchlist, E.13 live dashboard;
 0.1 watchlist removal, 1.1 PDT guard, 1.2 % equity floor, 1.3 sector cap,
 1.4 regime filter, 1.7 no-leverage gross cap, 1.5 small-account sizing.
-RECOMMENDED NEXT: 2.1 backtest harness — Phase 1's capital-preservation stack is
-complete; the backtest is the gate before risking real money or buying data.
+RECOMMENDED NEXT: 1B.2 fractional-position protection — with alerting (1B.1) done,
+the live default (mostly fractional, no exchange bracket) is the next pre-live
+blocker before the 2.1 backtest gate.
