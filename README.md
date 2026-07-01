@@ -62,6 +62,21 @@ That's it. 🎉
 
 ---
 
+## Made a new Alpaca account, or switching to live?
+
+Your dashboard and safety memory (trades, peak equity, stops) belong to **one
+account**. When you recreate the account or switch paper → live, start clean:
+
+```bash
+python -m investment_strategy.reset     # archives a backup, then resets to default
+```
+
+You usually don't even need to: on startup the bot **notices the account changed
+and resets itself automatically**. Either way your old data isn't lost — it's
+archived under `state/archive/`. After a reset, run `preflight` (Step 3) and go.
+
+---
+
 ## What it does (the short version)
 
 ```

@@ -75,6 +75,18 @@ class AlpacaClient:
             daytrade_count=int(getattr(a, "daytrade_count", 0) or 0),
         )
 
+    def account_id(self) -> str:
+        """Stable identifier for the connected Alpaca account. It changes if the
+        account is recreated OR you switch paper<->live, so it's the fingerprint we
+        use to detect an account change and reset stale local state. Empty string
+        if unreadable (caller then skips the check rather than wiping anything)."""
+        try:
+            a = self.trading.get_account()
+            return str(getattr(a, "account_number", "") or getattr(a, "id", "") or "")
+        except Exception as e:
+            log.warning("account_id() failed: %s", e)
+            return ""
+
     def latest_price(self, symbol: str) -> float:
         try:
             req = StockLatestTradeRequest(symbol_or_symbols=symbol)

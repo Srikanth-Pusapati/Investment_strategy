@@ -35,6 +35,7 @@ from .notify import Alerter
 from .portfolio import RobinhoodReader
 from .risk import RiskManager
 from .regime import RegimeReader
+from .reset import maybe_reset_on_account_change
 from .screener import ScreenerAggregator
 from .sectors import SectorMap
 from .signals import SignalAggregator
@@ -55,6 +56,11 @@ class Orchestrator:
     def __init__(self, cfg: Config, watchlist: list[str] | None = None):
         self.cfg = cfg
         self.broker = AlpacaClient(cfg)
+        # If the connected Alpaca account changed since the last run (recreated, or
+        # a paper<->live switch), archive the OLD account's local state and start
+        # fresh — BEFORE loading state/ledger/equity below, so they load clean and
+        # the dashboard + risk memory don't carry a stale peak-equity or old trades.
+        maybe_reset_on_account_change(cfg, self.broker)
         # One Quiver client shared by the signal and screener layers so each live
         # feed (congress, etc.) is pulled at most once per cycle, not once per
         # layer — the double-pull fix that keeps us under Quiver's rate limit.
