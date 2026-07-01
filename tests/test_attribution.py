@@ -25,14 +25,14 @@ from investment_strategy.ledger import TradeLedger, TradeRecord
 _T0 = datetime(2026, 1, 1, tzinfo=timezone.utc)
 
 
-def _buy(symbol, signals, t):
+def _buy(symbol, signals, t, qty=0.0):
     return TradeRecord(symbol=symbol, action="buy", entry_signals=signals,
-                       ts=_T0 + timedelta(hours=t))
+                       qty=qty, ts=_T0 + timedelta(hours=t))
 
 
-def _sell(symbol, pl_pct, t, reason="decision"):
+def _sell(symbol, pl_pct, t, reason="decision", qty=0.0):
     return TradeRecord(symbol=symbol, action="sell", realized_pl_pct=pl_pct,
-                       exit_reason=reason, ts=_T0 + timedelta(hours=t))
+                       exit_reason=reason, qty=qty, ts=_T0 + timedelta(hours=t))
 
 
 def test_round_trip_basic():
@@ -68,6 +68,43 @@ def test_sell_without_open_is_ignored():
     # An exit with no matching open buy attributes to nothing (no crash).
     trips = round_trips([_sell("TSLA", 1.0, 0)])
     assert trips[0].signals == []
+
+
+def test_scale_out_partial_keeps_remainder_attributed():
+    # 1B.8: a scale-out sells half at +12%, the rest exits later at +20%. BOTH
+    # trips must attribute to the entry signal — the remainder isn't orphaned.
+    recs = [
+        _buy("NVDA", ["congress"], 0, qty=2.0),
+        _sell("NVDA", 12.0, 1, reason="scale", qty=1.0),   # partial
+        _sell("NVDA", 20.0, 2, reason="trail", qty=1.0),   # remainder, full close
+    ]
+    trips = round_trips(recs)
+    assert len(trips) == 2
+    assert all(t.signals == ["congress"] for t in trips)   # neither is signal-less
+
+
+def test_regime_trim_partial_is_not_a_full_close():
+    # 1B.6: a 25% regime trim must not flatten the attribution for the rest.
+    recs = [
+        _buy("AAPL", ["technical"], 0, qty=4.0),
+        _sell("AAPL", -2.0, 1, reason="regime_trim", qty=1.0),  # partial
+        _sell("AAPL", -5.0, 2, reason="stop", qty=3.0),         # remainder
+    ]
+    trips = round_trips(recs)
+    assert len(trips) == 2
+    assert all(t.signals == ["technical"] for t in trips)
+
+
+def test_full_close_still_flattens_all_lots():
+    # A normal (non-partial) exit clears the whole position even with a qty set.
+    recs = [
+        _buy("MSFT", ["news"], 0, qty=3.0),
+        _sell("MSFT", 4.0, 1, reason="take", qty=3.0),
+        _sell("MSFT", 9.0, 2, reason="decision", qty=1.0),  # nothing open -> empty
+    ]
+    trips = round_trips(recs)
+    assert len(trips) == 2
+    assert trips[0].signals == ["news"] and trips[1].signals == []
 
 
 def test_attribute_winrate_and_avg():

@@ -9,18 +9,26 @@ to our numeric-signal architecture: Claude is told which sources have paid off s
 far and can weight conviction accordingly (and the operator learns which Quiver
 datasets to keep paying for).
 
-Round-trip reconstruction is intentionally simple: walk the ledger in time order;
-buys open a position, the next sell/exit on that symbol closes whatever is open
-(our closes flatten the whole position). The exit's realized_pl_pct is the
-round-trip outcome; the union of the open buys' entry_signals is what we attribute
-it to. Exchange-side bracket auto-fills are a known blind spot (no code sees them),
-so attribution reflects decision- and watchdog-driven exits — the ones we control.
+Round-trip reconstruction walks the ledger in time order; buys open a position and
+a sell/exit realizes an outcome attributed to the union of the open buys'
+entry_signals. Most closes flatten the whole position, but the regime trim (1B.6)
+and take-profit scale-out (1B.8) are PARTIAL sells: they realize an outcome on a
+slice while the remainder stays open, so a partial exit reduces the open lots FIFO
+by its qty and keeps the rest open (otherwise the remainder's later exit would
+orphan into a signal-less trip). Exchange-side bracket auto-fills are a known blind
+spot (no code sees them), so attribution reflects decision- and watchdog-driven
+exits — the ones we control.
 """
 from __future__ import annotations
 
 from dataclasses import dataclass, field
 
 from .ledger import TradeLedger, TradeRecord
+
+# Exit reasons that only PARTIALLY close a position (a slice is sold, the rest
+# stays open). Every other close — decision / stop / take / trail / flatten / time
+# / thesis_decay — flattens the whole position.
+_PARTIAL_EXIT_REASONS = {"scale", "regime_trim"}
 
 
 @dataclass
@@ -51,24 +59,50 @@ def round_trips(records: list[TradeRecord]) -> list[RoundTrip]:
     """Reconstruct closed round-trips from ledger records (chronological).
 
     Only trips whose exit carried a realized P&L are emitted — an exit without an
-    outcome (old records, or a sell we couldn't mark) can't be attributed.
+    outcome (old records, or a sell we couldn't mark) can't be attributed. A PARTIAL
+    exit (scale-out / regime trim) realizes an outcome on a slice and leaves the
+    remainder open, so it reduces the open lots FIFO rather than flattening them.
     """
     ordered = sorted(records, key=lambda r: r.ts)
-    open_by_symbol: dict[str, list[TradeRecord]] = {}
+    # Per symbol, a list of open lots as [remaining_qty, entry_signals].
+    open_by_symbol: dict[str, list[list]] = {}
     trips: list[RoundTrip] = []
     for r in ordered:
         if r.action == "buy":
-            open_by_symbol.setdefault(r.symbol, []).append(r)
+            open_by_symbol.setdefault(r.symbol, []).append(
+                [float(r.qty or 0.0), list(r.entry_signals)]
+            )
         elif r.action == "sell":
-            opens = open_by_symbol.pop(r.symbol, [])
-            if r.realized_pl_pct is None:
-                continue  # outcome unknown -> not attributable
-            signals = sorted({k for o in opens for k in o.entry_signals})
-            trips.append(RoundTrip(
-                symbol=r.symbol, pl_pct=r.realized_pl_pct,
-                signals=signals, exit_reason=r.exit_reason,
-            ))
+            lots = open_by_symbol.get(r.symbol, [])
+            if r.realized_pl_pct is not None:
+                signals = sorted({k for _, sigs in lots for k in sigs})
+                trips.append(RoundTrip(
+                    symbol=r.symbol, pl_pct=r.realized_pl_pct,
+                    signals=signals, exit_reason=r.exit_reason,
+                ))
+            # A partial exit (with a known qty) trims the open lots and keeps the
+            # remainder; anything else — or an unknown qty — fully closes.
+            if r.exit_reason in _PARTIAL_EXIT_REASONS and (r.qty or 0.0) > 0:
+                _reduce_fifo(lots, float(r.qty))
+                if not lots:
+                    open_by_symbol.pop(r.symbol, None)
+            else:
+                open_by_symbol.pop(r.symbol, None)
     return trips
+
+
+def _reduce_fifo(lots: list[list], qty: float) -> None:
+    """Consume `qty` shares from the front of `lots` (each [remaining_qty, signals]),
+    dropping fully-consumed lots. Mutates `lots` in place."""
+    remaining = qty
+    while remaining > 1e-9 and lots:
+        lot = lots[0]
+        if lot[0] <= remaining + 1e-9:
+            remaining -= lot[0]
+            lots.pop(0)
+        else:
+            lot[0] -= remaining
+            remaining = 0.0
 
 
 def attribute(trips: list[RoundTrip]) -> dict[str, SourceStats]:

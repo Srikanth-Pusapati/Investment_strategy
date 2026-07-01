@@ -65,8 +65,12 @@ names    data        risk caps    brackets    stops / exits
    market/limit/stop, **fractional** (dollar-notional), **bracket** (entry+stop+
    take-profit), **ladders** (scale-in/out), and **defined-risk options** (long
    calls/puts, verticals).
-5. **Monitor** ([monitor/](investment_strategy/monitor/)) — a fast loop that
-   enforces an account-wide emergency flatten and ratcheting trailing stops.
+5. **Monitor** ([monitor/](investment_strategy/monitor/)) — a fast always-on loop
+   (its own thread, never gated) that enforces an account-wide emergency flatten, a
+   **latched equity-floor halt**, hard stops/take-profits for fractional positions,
+   **scale-out** (sell part at target, trail the rest), a **time-stop** (recycle
+   dead/flat capital), and ratcheting **trailing stops** — and pages you
+   ([notify.py](investment_strategy/notify.py)) on any CRITICAL it can't self-heal.
 
 ### Benchmark goal
 The bot targets **excess return over SPY/QQQ**, not raw return.
@@ -113,36 +117,88 @@ Get **paper** API keys from [app.alpaca.markets](https://app.alpaca.markets)
 [console.anthropic.com](https://console.anthropic.com). Put them in `.env`.
 `.env` is gitignored — never commit it.
 
-## Run
+## Run the system
+
+Once `.env` has your **paper** Alpaca keys + an Anthropic key (see Setup), start
+the bot from the repo root with the venv active:
 
 ```bash
+# 1. (optional) prove the config loads and the interlock is happy
+python -c "from investment_strategy.config import load_config; load_config(); print('config OK')"
+
+# 2. (optional) narrow the universe — discovery is on by default, so this is only
+#    needed if you want to force-include names. Holdings are always re-evaluated.
+export WATCHLIST=AAPL,MSFT,NVDA        # or leave unset for pure discovery
+
+# 3. start the orchestrator (Ctrl-C to stop; it's a long-lived process)
 python -m investment_strategy
 ```
 
-It starts the orchestrator: the watchdog ticks every `MONITOR_INTERVAL_SECONDS`,
-and a full decision cycle runs every `DECISION_INTERVAL_SECONDS` while the market
-is open. Set the candidate universe with `WATCHLIST=AAPL,MSFT,NVDA` (current
-holdings are always re-evaluated too).
+What that does — the [orchestrator](investment_strategy/orchestrator.py) runs two
+timed loops on their own threads:
 
-## Trade dashboard
+| Loop | Cadence | Job |
+|---|---|---|
+| **Watchdog** (safety) | `MONITOR_INTERVAL_SECONDS` (30s) | emergency flatten, equity-floor halt, hard stops/takes, trailing stops, **scale-out**, **time-stop** — never gated, always running |
+| **Decision** (slow) | `DECISION_INTERVAL_SECONDS` (900s), market hours only | scan → signals → Claude → **RiskManager** → orders; regime trim + thesis-decay exits |
 
-Every order the bot executes is appended to a local **trade ledger**
-(`state/trades.jsonl`, gitignored) with its full decision context — executed
-date, volume, cost invested, conviction, the planned exit (take-profit /
-stop-loss levels), and Claude's rationale + key signals (the *reason behind the
-purchase*). Exits here are **price-triggered brackets, not calendar dates**, so
-the dashboard shows the TP/SL targets as the "assumed sell" levels.
+It logs each cycle to the console (regime read, proposals, risk verdicts, fills).
+Leave it running; everything it does is captured in the ledger + dashboard below.
 
-Render a self-contained HTML dashboard (summary cards, capital-per-symbol and
-cumulative-invested charts, and a full trade table — no external/JS dependencies):
+**Halt it any time without a restart:** `touch state/KILL` (blocks *new* buys; the
+watchdog can still close). Delete the file to resume. `KILL_SWITCH=on` in `.env`
+does the same from boot. A latched equity-floor halt clears by deleting
+`state/risk_state.json`.
+
+### Before live money — prove the edge, then flip the switch
 
 ```bash
-python -m investment_strategy.dashboard --open      # write dashboard.html + open it
-python -m investment_strategy.dashboard --no-live   # offline (skip live-price P/L)
+# Backtest the SAME risk knobs (sizing + exits) on price history — no keys needed
+python -m investment_strategy.backtest          # demo run + summary metrics
+
+# Once you have paper round-trips, see which paid data (if any) is worth buying
+python -m investment_strategy.subscriptions     # SUBSCRIBE / KEEP MEASURING / …
+```
+
+The [backtest harness](investment_strategy/backtest.py) replays entry signals
+through the real `RiskManager` and the same stop/take/scale-out/trailing/time-stop
+lifecycle the watchdog runs, and reports return, max drawdown, Sharpe, win rate,
+profit factor, and excess vs a benchmark — so you tune `KELLY_FRACTION`,
+`TARGET_ANNUAL_VOL_PCT`, and the stop/take levels on evidence. The
+[subscription evaluator](investment_strategy/subscriptions.py) refuses to
+recommend paying for a data source until its *free* signals show a measured edge
+in your ledger ("don't pay before you can measure it helps").
+
+## Visualize the executions — the dashboard
+
+Every order the bot places is appended to a local **trade ledger**
+(`state/trades.jsonl`, gitignored) with its full decision context — executed
+date, volume, cost invested, conviction, the planned exit (take-profit /
+stop-loss levels), the exit reason on closes (`stop` / `take` / `scale` / `trail`
+/ `time` / `thesis_decay` / `regime_trim` / `flatten`), and Claude's rationale +
+key signals (the *reason behind the purchase*). Exits are **price-triggered
+brackets, not calendar dates**, so the dashboard shows the TP/SL targets as the
+"assumed sell" levels.
+
+Render a self-contained HTML dashboard — summary cards, a **live account panel**
+(real Alpaca equity / today's P&L / unrealized P&L / total return, net of
+deposits), capital-per-symbol and cumulative-invested charts, and a full trade
+table — with **no external/JS dependencies** (opens offline, prints, emails):
+
+```bash
+python -m investment_strategy.dashboard --open       # write dashboard.html + open it
+python -m investment_strategy.dashboard -o out.html  # custom output path
+python -m investment_strategy.dashboard --no-live    # offline (skip live-price P/L)
 ```
 
 With Alpaca keys present it best-effort enriches open positions with the live
-price to show unrealized P/L; without them it still renders the full ledger.
+price to show unrealized P/L and adds the live account panel; without them it
+still renders the full ledger offline.
+
+**Keep it fresh automatically:** set `DASHBOARD_FILE=dashboard.html` in `.env` and
+the orchestrator regenerates it after every decision cycle while it runs — open
+the file in a browser and refresh to watch executions land in near-real-time.
+Nothing to serve; it's a static file.
 
 ## Safety — read this
 
@@ -155,10 +211,21 @@ price to show unrealized P/L; without them it still renders the full ledger.
   watchdog can still *close* positions — reducing risk is never gated.
 - **Hard risk limits** live in `.env` and are enforced in code, not by the LLM.
   Tune `MAX_POSITION_PCT`, `MAX_DAILY_LOSS_PCT`, etc. to your tolerance.
+- **Capital-preservation stack** (all deterministic, LLM cannot override):
+  percentage equity floor, peak-to-trough drawdown halt, no-leverage gross cap,
+  sector-concentration cap, per-trade `MAX_TRADE_RISK_PCT`, `MIN_CONVICTION` floor,
+  PDT guard, earnings blackout, a market-regime size multiplier that **sizes down
+  when its data feed is degraded** (never blindly full-size), and the watchdog
+  guards above. Small live accounts run mostly **fractional** — those carry no
+  exchange bracket, so the watchdog stop is their guard (an overnight-gap residual
+  is bounded, not removable).
+- **Alerts.** Set `ALERTS_ENABLED=on` + `ALERT_EMAIL_TO` (Gmail SMTP) and/or
+  `ALERT_WEBHOOK_URL` to get paged on a naked position or a latched halt.
 
-Going live is a deliberate, guarded change:
+Going live is a deliberate, guarded change: **run the backtest first**, then
 `TRADING_MODE=live` **and** `ALPACA_BASE_URL=https://api.alpaca.markets` **and**
-`KILL_SWITCH=off`, using your live Alpaca keys.
+`KILL_SWITCH=off`, using your live Alpaca keys. Start with $100–$1000, not your
+savings — scale up only from a real track record.
 
 ## Status / next steps
 
@@ -167,10 +234,13 @@ and survival-first sizing are in place; the risk core (hard caps, vol sizing,
 options premium gate) is unit-tested. Before real use:
 - Get the optional keys (`FINNHUB_API_KEY`, `POLYGON_API_KEY`) to activate the
   insider + options-flow + model-sentiment signals.
-- Executed orders are now persisted to a trade ledger (`state/trades.jsonl`) and
+- Executed orders are persisted to a trade ledger (`state/trades.jsonl`) and
   visualized via `python -m investment_strategy.dashboard`; extend it to also log
   *rejected* `RiskDecision`s for a full audit trail.
-- **Backtest** the decision logic against historical data before trusting sizing.
+- **Backtest** ([backtest.py](investment_strategy/backtest.py)) replays sizing +
+  exits on price history so you can tune `KELLY_FRACTION` / `TARGET_ANNUAL_VOL_PCT`
+  / stops before trusting them; next step is wiring real Alpaca history + a
+  ledger-sourced signal stream into it.
 - Options: start with `OPTIONS_ENABLED=off`, paper-test the equity loop first,
   then enable with a small `MAX_OPTION_PREMIUM_PCT`.
 - The options-flow provider is a coarse call/put-volume proxy — upgrade to a real
