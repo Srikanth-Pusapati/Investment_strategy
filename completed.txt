@@ -247,3 +247,123 @@ Last Phase-1 safety item. Three additions to the deterministic risk gate:
 Config surfaced in config.py RiskLimits. Tests: test_risk.py (+6: risk cap limits
 size / wider-stop-smaller / disabled; edge floor rejects-tight / allows-normal /
 disabled-at-zero). Full suite green (45/45 risk).
+
+################################################################################
+PHASE 1B — Capital-preservation HARDENING (pre-live blockers + YELLOW hardening)
+################################################################################
+
+--- 1B.1 Alerting on watchdog CRITICAL — DONE 2026-06-30 ---
+notify.py Alerter pages a human on every watchdog CRITICAL (failed flatten/stop/
+trailing close = a NAKED position) and on the latched equity-floor halt. Self-
+contained (Gmail SMTP via stdlib smtplib + an optional generic webhook), FAILS
+OPEN (never raises into the safety loop; the event is logged at CRITICAL
+regardless), and THROTTLED per event key (ALERT_COOLDOWN_SECONDS) so the 30s retry
+loop can't spam. A key is only marked sent when a sink actually delivers, so a
+transient failure retries. Log-only until ALERTS_ENABLED + a sink. Config:
+ALERTS_ENABLED, ALERT_SMTP_*, ALERT_EMAIL_TO, ALERT_WEBHOOK_URL,
+ALERT_COOLDOWN_SECONDS. Tests: test_notify.py (11). (Supersedes Phase-4 item 4.1.)
+
+--- 1B.2 Fractional-position protection — DONE 2026-06-30 ---
+The live default is fractional (small MARGIN float), and fractional buys carry NO
+exchange bracket. (a) self.exits already persists+reloads (state.py). (b)
+submit_from_decision now REFUSES any buy whose decision carries no stop
+(stop_loss_pct<=0) — a whole-share bracket needs a stop leg, a fractional buy needs
+a watchdog stop, so we never open a naked position; the orchestrator registers the
+watchdog stop on every fractional fill. (c) PREFERS the whole-share exchange
+bracket whenever >=1 share is affordable (drops the sub-share remainder). (d)
+documented the irreducible fractional overnight/halt-GAP residual. Tests:
+test_execution.py (6).
+
+--- 1B.3 Intra-cycle stale-snapshot over-deploy — DONE 2026-06-30 ---
+The account is fetched once per cycle; each fill now folds back into that in-memory
+snapshot — _apply_pending_buy adds/extends the position and draws down cash +
+buying_power, _apply_pending_close returns a decision-sell's value and frees its
+slot. So N buys in one cycle see each other: the no-leverage gross cap, cash
+buffer, and max-open-positions can no longer be jointly breached in a single
+multi-buy cycle (Alpaca's ~2x margin buying_power won't reject the over-deploy, so
+our caps are the only guard). Conservative (uses full approved_notional). Tests:
+test_orchestrator.py (5).
+
+--- 1B.4 Held-position time-stop + 1B.4b thesis-decay — DONE 2026-06-30/07-01 ---
+1B.4 (deterministic time-stop): PortfolioState persists a per-symbol hold clock
+(entry_times; set on the opening buy, watchdog first-seen fallback). watchdog.
+_enforce_time_stop closes a position held past MAX_HOLD_DAYS (30) that never reached
+TIME_STOP_MIN_GAIN_PCT (2%) — dead/flat capital rotates out, winners are left to the
+trailing stop. 1B.4b (thesis-decay, LLM-independent): orchestrator.
+_apply_thesis_decay_exits sells a held name past THESIS_DECAY_MIN_AGE_DAYS (3) whose
+fresh bundle carries NO signal >= THESIS_MIN_SCORE (0.1), BEFORE Claude is called,
+and drops it from the slate. Off by default (THESIS_DECAY_ENABLED) — signal absence
+is the trigger, so a data outage could force spurious exits; enable once the feed is
+trusted. Tests: test_watchdog.py (+4), test_state.py (+2), test_orchestrator.py (+5).
+
+--- 1B.5 Market-closed / halt exit fallback — DONE 2026-07-01 ---
+The whole-share bracket now rests GTC (was DAY) so its protective stop/take survive
+past the close into the overnight gap. AlpacaClient.close_position_marketable_limit
+rests a GTC sell-limit ~2% through the last trade; watchdog._close_or_rest uses it
+whenever a plain MARKET close can't fill (market closed / LULD-halted) — a failed
+flatten rests a working exit instead of leaving a naked position (the NAKED page
+now fires only if the fallback ALSO fails). Fractional overnight-gap risk stays
+irreducible (Alpaca rejects GTC/limit on fractional) — documented. Tests:
+test_watchdog.py (+2); test_execution.py + test_notify.py updated.
+
+--- 1B.6 Regime-off book trim — DONE 2026-07-01 ---
+On the flip INTO risk-off, orchestrator._apply_regime_trim sells REGIME_TRIM_PCT
+(25%) of every held name (broker.reduce_position), fires ONCE per downturn (keyed
+off the persisted last regime label), releases the bracket, and re-protects the
+trimmed remainder with a watchdog stop/take. The regime multiplier otherwise only
+shrinks NEW buys; this gives "salvage when the market is down" an active lever on
+the EXISTING book. Off by default (REGIME_TRIM_ENABLED) — swaps exchange-resident
+protection for watchdog protection on the remainder. Tests: test_orchestrator.py (+4).
+
+--- 1B.7 yfinance correlated fail-open — DONE 2026-07-01 ---
+The regime filter and sector cap both source yfinance, so one outage silently
+dropped BOTH risk-off guards during exactly the vol spike they exist for. A failed
+regime read now SIZES DOWN to REGIME_DEGRADED_MULT (default 0.5) and logs at WARNING
+(orchestrator surfaces the unknown regime loudly), instead of failing open to full
+size. Still trades (never blocks), just smaller while flying blind; clamped to
+[floor, 1.0]. Tests: test_regime.py (degraded-sizes-down / configurable+clamped).
+
+--- 1B.8 Let winners run (scale-out) — DONE 2026-07-01 ---
+At the take-profit target the watchdog now sells SCALE_OUT_PCT (50%) of a watchdog-
+managed (fractional) position, drops the hard take, marks it scaled, and lets the
+REST ride the trailing stop — so a runner isn't capped at +12% while losers run to
+the stop. Stop stays a full exit; scale-out fires once. On by default
+(SCALE_OUT_ENABLED). Whole-share still takes the full exchange-bracket profit (a
+documented limitation to revisit with an OTO refactor). Tests: test_watchdog.py (+4).
+
+--- 1B.9 Persist _pending_oids + min-conviction gate — DONE 2026-07-01 ---
+The reconciliation list is persisted in PortfolioState (pending_orders) and reloaded
+at startup, so a reject/partial across a restart is still reconciled (no phantom
+ledger intent left unchecked). RiskManager rejects buys below MIN_CONVICTION (0.2)
+before sizing, so a 0.1-conviction idea that merely clears the friction floor no
+longer trades. Tests: test_state.py (+1), test_risk.py (+2).
+
+################################################################################
+PHASE 2 — Prove the edge BEFORE spending money
+################################################################################
+
+--- 2.1 Backtest harness — DONE 2026-07-01 ---
+backtest.py BacktestEngine replays a stream of EntrySignals through the REAL
+RiskManager sizing gate and a deterministic exit lifecycle (stop / take / scale-out
+/ trailing / time-stop — the SAME exits the live watchdog runs) over injected daily
+closes, then reports return, max drawdown, annualized Sharpe, win rate, profit
+factor, exit mix, and excess vs a benchmark (BacktestResult.summary). Sizing IS the
+live risk core, so tuning KELLY_FRACTION / TARGET_ANNUAL_VOL_PCT / stops here maps
+1:1 to production; the drawdown/daily-loss halts engage via a throwaway per-run risk
+state. No network/keys (prices injected) => fully deterministic + testable. `python
+-m investment_strategy.backtest` runs a demo on synthetic data. Tests:
+test_backtest.py (8). NOT replayed: the signal->Claude step (no offline historical
+signals; LLM non-deterministic) — feed EntrySignals from a rule, sweep, or the
+ledger. Follow-on: wire AlpacaClient._daily_closes + ledger-sourced entries for a
+real-history run (engine ready; date->index mapping is the only glue left).
+
+--- 2.2 Data-subscription evaluation — DONE 2026-07-01 ---
+subscriptions.py turns "don't pay for data before you can measure it helps" into a
+mechanical gate: evaluate_subscriptions joins the ledger's signal attribution
+(realized P&L per source) to each candidate subscription and returns SUBSCRIBE /
+KEEP MEASURING / INSUFFICIENT DATA based on the measured edge of the FREE signals it
+would upgrade (>= min_trips round-trips, avg P&L > threshold). Candidates + ranks =
+the Todo ROI list (fundamentals #1, market-data #2, Quiver tier-up #3). render_report
+/ `python -m investment_strategy.subscriptions` prints the decision. Everything is
+INSUFFICIENT DATA today by design — re-run after 2.1 + more live round-trips. Tests:
+test_subscriptions.py (6).

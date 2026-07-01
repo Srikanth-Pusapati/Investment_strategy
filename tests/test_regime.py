@@ -58,9 +58,20 @@ def test_downtrend_low_vix_is_half():
     assert r.multiplier == 0.5 and r.label == "neutral"
 
 
-def test_fails_open_to_full_size_when_data_missing():
+def test_degraded_data_sizes_down_not_full():
+    # yfinance down -> the sector cap is blind too, so we size DOWN (default 0.5),
+    # not full, and label it unknown (1B.7). Never blocks; just smaller.
     r = _FakeRegime([], vix=None).assess()      # no SPY history, no VIX
-    assert r.multiplier == 1.0 and r.label == "unknown"
+    assert r.multiplier == 0.5 and r.label == "unknown"
+
+
+def test_degraded_multiplier_is_configurable_and_clamped():
+    reader = _FakeRegime([], vix=None)
+    reader.degraded_mult = 0.3                   # custom cautious downsize
+    assert reader.assess().multiplier == 0.3
+    # Out-of-range values are clamped to [floor, 1.0] at construction.
+    assert RegimeReader(degraded_mult=5.0).degraded_mult == 1.0
+    assert RegimeReader(degraded_mult=0.0).degraded_mult == 0.25
 
 
 def test_assess_is_cached_until_new_cycle():

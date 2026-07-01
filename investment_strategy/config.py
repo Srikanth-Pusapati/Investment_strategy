@@ -42,6 +42,9 @@ class RiskLimits:
     max_gross_exposure_pct: float    # max total deployed across ALL names (<=100 = no leverage)
     max_sector_exposure_pct: float   # max total % equity in one sector (concentration cap)
     regime_filter_enabled: bool      # scale position size by market regime (SPY/200dma + VIX)
+    regime_degraded_mult: float      # size multiplier when regime data (yfinance) is down (<1 = size down)
+    regime_trim_enabled: bool        # on a flip INTO risk-off, trim the existing book (1B.6)
+    regime_trim_pct: float           # % of each position to sell on entering risk-off
     max_daily_loss_pct: float        # halt new trades past this day loss
     max_drawdown_pct: float          # halt new buys past this PEAK-to-trough DD
     equity_floor_pct: float          # liquidate + latch halt below this % of PEAK equity (0=off)
@@ -54,12 +57,19 @@ class RiskLimits:
     # time_stop_min_gain_pct is closed by the watchdog (LLM-independent).
     max_hold_days: float             # max calendar days to hold a flat position (0=off)
     time_stop_min_gain_pct: float    # below this unrealized gain at max age = dead money -> recycle
+    # Thesis-decay exit (1B.4b): deterministically SELL a held name whose entry
+    # signals are no longer corroborated by fresh bullish data — independent of the
+    # LLM being up. Off by default (a data outage can transiently blank signals).
+    thesis_decay_enabled: bool
+    thesis_decay_min_age_days: float # grace period before a held name can decay-exit
+    thesis_min_score: float          # a signal at/above this score still corroborates the thesis
     # Pattern-Day-Trader guard for small MARGIN accounts (<$25k). Cash accounts are
     # exempt and stay inert. Blocks NEW opening buys near/over the PDT line so an
     # incidental same-day stop can't get the account flagged + restricted.
     pdt_guard_enabled: bool
     max_day_trades_under_25k: int    # pause new buys once day-trades in 5d hit this
     # --- small-account survival: per-trade $-risk cap + cost/slippage floor ---
+    min_conviction: float            # reject buys below this Claude conviction (0..1; 0=off)
     max_trade_risk_pct: float        # cap $ at risk (notional*stop%) per trade as % equity (0=off)
     est_slippage_pct: float          # one-way spread+slippage estimate, % of notional (0=off)
     min_edge_ratio: float            # take-profit must beat round-trip cost by this multiple
@@ -68,6 +78,12 @@ class RiskLimits:
     min_order_usd: float             # smallest $ order worth placing (Alpaca min is $1)
     default_stop_loss_pct: float     # bracket stop distance
     default_take_profit_pct: float   # bracket take-profit distance
+    # Scale-out (1B.8): at the take-profit target, sell only part of a watchdog-
+    # managed (fractional) position and let the rest ride the trailing stop, so a
+    # runner isn't capped at the first target. Whole-share positions still take the
+    # full exchange-bracket profit (their take rests at the exchange).
+    scale_out_enabled: bool
+    scale_out_pct: float             # % of the position to sell at the first target
     # --- survival-first sizing (vol-targeted, fractional-Kelly style) ---
     kelly_fraction: float            # fraction of full Kelly (0..1); 0 disables
     target_annual_vol_pct: float     # per-position volatility budget
@@ -205,6 +221,17 @@ def load_config() -> Config:
             max_gross_exposure_pct=_f("MAX_GROSS_EXPOSURE_PCT", 100.0),
             max_sector_exposure_pct=_f("MAX_SECTOR_EXPOSURE_PCT", 30.0),
             regime_filter_enabled=_flag("REGIME_FILTER_ENABLED", "on"),
+            # When the regime read fails (yfinance down), the sector cap is almost
+            # certainly blind too — so size DOWN to this fraction instead of failing
+            # open to full size (1B.7). Still trades (never blocks), just smaller.
+            regime_degraded_mult=_f("REGIME_DEGRADED_MULT", 0.5),
+            # Regime-off book TRIM (1B.6): on the flip INTO risk-off, sell this % of
+            # every held name to actively de-risk the EXISTING book (the regime
+            # multiplier otherwise only shrinks NEW buys). Fires once per downturn.
+            # Off by default: it re-protects the trimmed remainder via the watchdog
+            # (the exchange bracket is released), so opt in deliberately.
+            regime_trim_enabled=_flag("REGIME_TRIM_ENABLED", "off"),
+            regime_trim_pct=_f("REGIME_TRIM_PCT", 25.0),
             max_daily_loss_pct=_f("MAX_DAILY_LOSS_PCT", 3.0),
             max_drawdown_pct=_f("MAX_DRAWDOWN_PCT", 15.0),
             # % of the PEAK high-water mark; below it the watchdog flattens + latches
@@ -220,8 +247,19 @@ def load_config() -> Config:
             # thesis instead of sitting in a stalled position forever. 0 = off.
             max_hold_days=_f("MAX_HOLD_DAYS", 30.0),
             time_stop_min_gain_pct=_f("TIME_STOP_MIN_GAIN_PCT", 2.0),
+            # Sell a held name whose fresh signals no longer corroborate the entry
+            # thesis (no signal at/above thesis_min_score), past a grace age. Runs
+            # in the decision cycle but does NOT need the LLM. Opt-in: a transient
+            # data outage that blanks signals could otherwise force spurious exits.
+            thesis_decay_enabled=_flag("THESIS_DECAY_ENABLED", "off"),
+            thesis_decay_min_age_days=_f("THESIS_DECAY_MIN_AGE_DAYS", 3.0),
+            thesis_min_score=_f("THESIS_MIN_SCORE", 0.1),
             pdt_guard_enabled=_flag("PDT_GUARD_ENABLED", "on"),
             max_day_trades_under_25k=_i("MAX_DAY_TRADES_UNDER_25K", 3),
+            # Conviction floor: a barely-there 0.1 idea that merely clears the
+            # friction floor still costs spread + slippage and dilutes the book.
+            # Require a real edge before risking capital. 0 = off.
+            min_conviction=_f("MIN_CONVICTION", 0.2),
             # The classic "risk 1% of the account per trade" rule. Bounds the
             # ABSOLUTE $ lost if the stop fires, independent of the % weight; as a
             # % it auto-scales from the $100 live float to the $100k paper book.
@@ -235,6 +273,10 @@ def load_config() -> Config:
             min_order_usd=_f("MIN_ORDER_USD", 1.0),
             default_stop_loss_pct=_f("DEFAULT_STOP_LOSS_PCT", 5.0),
             default_take_profit_pct=_f("DEFAULT_TAKE_PROFIT_PCT", 12.0),
+            # Sell half at the first target and trail the rest by default, so the
+            # asymmetric winners that pay for the losers aren't capped at +12%.
+            scale_out_enabled=_flag("SCALE_OUT_ENABLED", "on"),
+            scale_out_pct=_f("SCALE_OUT_PCT", 50.0),
             kelly_fraction=_f("KELLY_FRACTION", 0.5),
             target_annual_vol_pct=_f("TARGET_ANNUAL_VOL_PCT", 25.0),
             options_enabled=_flag("OPTIONS_ENABLED"),

@@ -46,6 +46,14 @@ class PortfolioState:
         # the opening buy; the watchdog also stamps a first-seen fallback so a
         # restart or pre-existing position still gets a clock.
         self.entry_times: dict[str, str] = {}
+        # Order ids submitted but not yet reconciled against their fills, as
+        # [order_id, symbol] pairs. Persisted so a restart between cycles still
+        # reconciles a reject/partial fill instead of leaving a phantom ledger
+        # intent that never gets checked (1B.9).
+        self.pending_orders: list[list[str]] = []
+        # Last market-regime label seen, so the regime-off book TRIM (1B.6) fires
+        # ONCE on the transition into risk-off, not every cycle we stay there.
+        self.regime_label: str = ""
         # The watchdog (its own thread) and the decision/risk path both touch this
         # state. A reentrant lock keeps reads/writes and the file save consistent.
         self._lock = threading.RLock()
@@ -64,12 +72,17 @@ class PortfolioState:
             self.high_water = {k: float(v) for k, v in d.get("high_water", {}).items()}
             self.exits = {
                 k: {"stop_pct": float(v.get("stop_pct", 0.0)),
-                    "take_pct": float(v.get("take_pct", 0.0))}
+                    "take_pct": float(v.get("take_pct", 0.0)),
+                    "scaled": float(v.get("scaled", 0.0))}
                 for k, v in d.get("exits", {}).items()
             }
             self.entry_times = {
                 k: str(v) for k, v in d.get("entry_times", {}).items()
             }
+            self.pending_orders = [
+                [str(oid), str(sym)] for oid, sym in d.get("pending_orders", [])
+            ]
+            self.regime_label = str(d.get("regime_label", ""))
             if self.halted:
                 log.warning("Loaded LATCHED HALT from state: %s", self.halt_reason)
         except Exception as e:  # corrupt state must not crash startup
@@ -89,6 +102,8 @@ class PortfolioState:
                         "high_water": self.high_water,
                         "exits": self.exits,
                         "entry_times": self.entry_times,
+                        "pending_orders": self.pending_orders,
+                        "regime_label": self.regime_label,
                     },
                     indent=2,
                 ),
@@ -154,11 +169,18 @@ class PortfolioState:
                 self._save()
 
     # -- hard exits for fractional positions (no exchange bracket) ---------- #
-    def register_exits(self, symbol: str, stop_pct: float, take_pct: float) -> None:
+    def register_exits(
+        self, symbol: str, stop_pct: float, take_pct: float, scaled: bool = False,
+    ) -> None:
         """Record the hard stop / take-profit (% from entry) the watchdog must
-        enforce for a fractional position that can't carry an exchange bracket."""
+        enforce for a fractional position that can't carry an exchange bracket.
+        `scaled` marks that the take-profit scale-out has already fired (1B.8), so
+        the remainder rides the trailing stop instead of taking the full profit."""
         with self._lock:
-            self.exits[symbol] = {"stop_pct": float(stop_pct), "take_pct": float(take_pct)}
+            self.exits[symbol] = {
+                "stop_pct": float(stop_pct), "take_pct": float(take_pct),
+                "scaled": 1.0 if scaled else 0.0,
+            }
             self._save()
 
     def get_exits(self, symbol: str) -> dict[str, float] | None:
@@ -188,3 +210,25 @@ class PortfolioState:
             entered = entered.replace(tzinfo=timezone.utc)
         now = now or datetime.now(timezone.utc)
         return (now - entered).total_seconds() / 86_400.0
+
+    # -- pending-order reconciliation list (survives a restart) ------------- #
+    def set_pending_orders(self, pairs: list[tuple[str, str]]) -> None:
+        """Persist the not-yet-reconciled (order_id, symbol) pairs so a restart
+        between cycles still reconciles them (1B.9)."""
+        with self._lock:
+            self.pending_orders = [[str(oid), str(sym)] for oid, sym in pairs]
+            self._save()
+
+    def get_pending_orders(self) -> list[tuple[str, str]]:
+        """The persisted pending (order_id, symbol) pairs, as tuples."""
+        return [(oid, sym) for oid, sym in self.pending_orders]
+
+    # -- last regime label (for the risk-off trim transition, 1B.6) --------- #
+    def get_regime_label(self) -> str:
+        return self.regime_label
+
+    def set_regime_label(self, label: str) -> None:
+        with self._lock:
+            if label != self.regime_label:
+                self.regime_label = label
+                self._save()

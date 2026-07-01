@@ -13,11 +13,16 @@ from __future__ import annotations
 
 import os
 import sys
+import tempfile
+import threading
+import uuid
+from types import SimpleNamespace
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from investment_strategy.models import AccountSnapshot, Position
 from investment_strategy.orchestrator import Orchestrator
+from investment_strategy.state import PortfolioState
 
 
 def _acct(cash=1_000.0, positions=None):
@@ -74,6 +79,178 @@ def test_cash_never_goes_negative():
     Orchestrator._apply_pending_buy(acct, "AAPL", notional=300.0, price=100.0, qty=3.0)
     assert acct.cash == 0.0                # clamped, not negative
     assert acct.buying_power == 1_700.0
+
+
+# -- regime-off book trim (1B.6) --------------------------------------------- #
+class _FakeBroker:
+    def __init__(self):
+        self.reduced = []       # (symbol, qty)
+        self.canceled = []
+        self.closed = []
+
+    def cancel_open_orders_for(self, symbol):
+        self.canceled.append(symbol)
+
+    def reduce_position(self, symbol, qty):
+        self.reduced.append((symbol, round(qty, 6)))
+        return f"oid-{symbol}"
+
+    def close_position(self, symbol):
+        self.closed.append(symbol)
+        return f"oid-{symbol}"
+
+
+class _FakeLedger:
+    def __init__(self):
+        self.records = []
+
+    def record(self, rec):
+        self.records.append(rec)
+
+
+class _FakeWatchdog:
+    def __init__(self):
+        self.forgotten = []
+
+    def forget(self, symbol):
+        self.forgotten.append(symbol)
+
+
+def _state_tmp():
+    p = os.path.join(tempfile.gettempdir(), f"_orch_{uuid.uuid4().hex}.json")
+    return PortfolioState(path=p)
+
+
+def _orch(trim_enabled=True, trim_pct=25.0, state=None,
+          thesis_decay_enabled=False, thesis_decay_min_age_days=3.0,
+          thesis_min_score=0.1):
+    o = Orchestrator.__new__(Orchestrator)
+    o.cfg = SimpleNamespace(risk=SimpleNamespace(
+        regime_trim_enabled=trim_enabled, regime_trim_pct=trim_pct,
+        default_stop_loss_pct=5.0, default_take_profit_pct=12.0,
+        thesis_decay_enabled=thesis_decay_enabled,
+        thesis_decay_min_age_days=thesis_decay_min_age_days,
+        thesis_min_score=thesis_min_score,
+    ))
+    o.broker = _FakeBroker()
+    o.ledger = _FakeLedger()
+    o.watchdog = _FakeWatchdog()
+    o.state = state or _state_tmp()
+    o._trade_lock = threading.Lock()
+    o._pending_oids = []
+    return o
+
+
+def _regime(label):
+    return SimpleNamespace(label=label, multiplier=0.25, reason=label)
+
+
+def test_regime_trim_sells_slice_on_flip_into_risk_off():
+    o = _orch(trim_enabled=True, trim_pct=25.0)
+    acct = _acct(cash=0.0, positions=[_pos("AAPL", 400.0), _pos("MSFT", 200.0)])
+    acct.positions[0].qty = 4.0   # 25% -> sell 1.0
+    acct.positions[1].qty = 2.0   # 25% -> sell 0.5
+    o._apply_regime_trim(acct, _regime("risk-off"))
+    assert ("AAPL", 1.0) in o.broker.reduced
+    assert ("MSFT", 0.5) in o.broker.reduced
+    assert len(o.ledger.records) == 2
+    # Bracket released + remainder re-protected by the watchdog.
+    assert set(o.broker.canceled) == {"AAPL", "MSFT"}
+    assert o.state.get_exits("AAPL") == {"stop_pct": 5.0, "take_pct": 12.0, "scaled": 0.0}
+
+
+def test_regime_trim_fires_once_not_every_cycle():
+    state = _state_tmp()
+    o = _orch(trim_enabled=True, state=state)
+    acct = _acct(positions=[_pos("AAPL", 400.0)])
+    acct.positions[0].qty = 4.0
+    o._apply_regime_trim(acct, _regime("risk-off"))     # transition -> trims
+    o2 = _orch(trim_enabled=True, state=state)           # same persisted state
+    acct2 = _acct(positions=[_pos("AAPL", 300.0)])
+    acct2.positions[0].qty = 3.0
+    o2._apply_regime_trim(acct2, _regime("risk-off"))    # still risk-off -> no-op
+    assert o2.broker.reduced == []
+
+
+def test_regime_trim_noop_when_disabled():
+    o = _orch(trim_enabled=False)
+    acct = _acct(positions=[_pos("AAPL", 400.0)])
+    o._apply_regime_trim(acct, _regime("risk-off"))
+    assert o.broker.reduced == []
+    # But the label is still tracked so enabling it later trims on the next flip.
+    assert o.state.get_regime_label() == "risk-off"
+
+
+def test_regime_trim_noop_when_not_risk_off():
+    o = _orch(trim_enabled=True)
+    acct = _acct(positions=[_pos("AAPL", 400.0)])
+    o._apply_regime_trim(acct, _regime("risk-on"))
+    assert o.broker.reduced == []
+
+
+# -- deterministic thesis-decay exit (1B.4b) --------------------------------- #
+from datetime import datetime, timedelta, timezone
+
+from investment_strategy.models import Signal, SignalBundle, SignalKind
+
+
+def _bundle(symbol, score):
+    sig = Signal(kind=SignalKind.CONGRESS, symbol=symbol, summary="x", score=score)
+    return SignalBundle(symbol=symbol, signals=[sig])
+
+
+def _held(state, symbol, days_ago):
+    state.register_entry(symbol, when=datetime.now(timezone.utc) - timedelta(days=days_ago))
+
+
+def test_thesis_decay_exits_uncorroborated_held_name():
+    state = _state_tmp()
+    _held(state, "AAPL", days_ago=10)     # past the 3d grace
+    o = _orch(thesis_decay_enabled=True, state=state)
+    acct = _acct(positions=[_pos("AAPL", 300.0)])
+    # Bundle present but bearish (score -0.5) -> thesis no longer corroborated.
+    exited = o._apply_thesis_decay_exits([_bundle("AAPL", -0.5)], acct)
+    assert exited == {"AAPL"}
+    assert o.broker.closed == ["AAPL"]
+    assert "AAPL" in o.watchdog.forgotten
+    assert acct.position_for("AAPL") is None       # snapshot kept honest
+
+
+def test_thesis_decay_spares_still_corroborated_name():
+    state = _state_tmp()
+    _held(state, "AAPL", days_ago=10)
+    o = _orch(thesis_decay_enabled=True, state=state)
+    acct = _acct(positions=[_pos("AAPL", 300.0)])
+    exited = o._apply_thesis_decay_exits([_bundle("AAPL", 0.6)], acct)  # still bullish
+    assert exited == set()
+    assert o.broker.closed == []
+
+
+def test_thesis_decay_respects_grace_age():
+    state = _state_tmp()
+    _held(state, "AAPL", days_ago=1)      # younger than the 3d grace
+    o = _orch(thesis_decay_enabled=True, state=state)
+    acct = _acct(positions=[_pos("AAPL", 300.0)])
+    exited = o._apply_thesis_decay_exits([_bundle("AAPL", -0.9)], acct)
+    assert exited == set()                 # too fresh to decay-exit
+
+
+def test_thesis_decay_exits_when_no_bundle_at_all():
+    state = _state_tmp()
+    _held(state, "AAPL", days_ago=10)
+    o = _orch(thesis_decay_enabled=True, state=state)
+    acct = _acct(positions=[_pos("AAPL", 300.0)])
+    exited = o._apply_thesis_decay_exits([], acct)  # signals went stale entirely
+    assert exited == {"AAPL"}
+
+
+def test_thesis_decay_noop_when_disabled():
+    state = _state_tmp()
+    _held(state, "AAPL", days_ago=10)
+    o = _orch(thesis_decay_enabled=False, state=state)
+    acct = _acct(positions=[_pos("AAPL", 300.0)])
+    assert o._apply_thesis_decay_exits([], acct) == set()
+    assert o.broker.closed == []
 
 
 def _run_all():

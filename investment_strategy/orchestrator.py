@@ -66,8 +66,10 @@ class Orchestrator:
         self.earnings = EarningsCalendar()
         # Per-cycle-cached sector lookup feeding the risk sector-concentration cap.
         self.sectors = SectorMap()
-        # Per-cycle market-regime read; scales position size down in risk-off.
-        self.regime = RegimeReader()
+        # Per-cycle market-regime read; scales position size down in risk-off, and
+        # DOWN (not full) when its yfinance feed is degraded — since that same
+        # outage blinds the sector cap too (1B.7).
+        self.regime = RegimeReader(degraded_mult=cfg.risk.regime_degraded_mult)
         self._regime_mult = 1.0   # set each cycle from the regime read
         self.engine = DecisionEngine(cfg)
         # One persisted risk-state instance shared by the risk gate and watchdog
@@ -111,7 +113,14 @@ class Orchestrator:
         # Order ids submitted last cycle, reconciled against actual fills at the
         # start of the next one (by then ~a decision interval has passed, so async
         # fills have settled). Catches rejects, partial fills, and silent drops.
-        self._pending_oids: list[tuple[str, str]] = []  # (order_id, symbol)
+        # Loaded from persisted state so a restart between cycles still reconciles
+        # a reject/partial instead of leaving a phantom ledger intent (1B.9).
+        self._pending_oids: list[tuple[str, str]] = self.state.get_pending_orders()
+        if self._pending_oids:
+            log.info(
+                "Loaded %d pending order(s) from state to reconcile.",
+                len(self._pending_oids),
+            )  # (order_id, symbol)
 
     # -- main loop ---------------------------------------------------------- #
     def run(self) -> None:
@@ -223,11 +232,22 @@ class Orchestrator:
         if self.cfg.risk.regime_filter_enabled:
             regime = self.regime.assess()
             self._regime_mult = regime.multiplier
-            log.info("Market regime: %s", regime.reason)
+            # A degraded ("unknown") read means we're flying blind on BOTH regime
+            # and the sector cap — surface that at WARNING, not INFO (1B.7).
+            if regime.label == "unknown":
+                log.warning("Market regime: %s", regime.reason)
+            else:
+                log.info("Market regime: %s", regime.reason)
         else:
             self._regime_mult = 1.0
         self._record_equity_snapshot()
         account = self.broker.get_account()
+
+        # De-risk the EXISTING book on a flip into risk-off (the regime multiplier
+        # otherwise only shrinks NEW buys). Runs before new proposals so the trimmed
+        # snapshot is what the buy path sizes against.
+        if self.cfg.risk.regime_filter_enabled:
+            self._apply_regime_trim(account, self.regime.assess())
 
         # Watchlist + current holdings are always evaluated; the scanner widens
         # this with NEW smart-money names so buy ideas can originate from the
@@ -239,6 +259,15 @@ class Orchestrator:
 
         bundles = self.signals.gather(symbols)
         self._inject_discovery(bundles, discovered)
+
+        # Deterministic thesis-decay exits (1B.4b): sell held names whose fresh
+        # signals no longer corroborate the entry thesis, BEFORE asking Claude — so
+        # a stale-thesis name is recycled even if the LLM is down, and we don't
+        # spend tokens deciding on a name we've already exited.
+        decayed = self._apply_thesis_decay_exits(bundles, account)
+        if decayed:
+            bundles = [b for b in bundles if b.symbol not in decayed]
+
         bench_stats = self.benchmark.compute()
         bench_line = self.benchmark.context_line(bench_stats)
         external = self.robinhood.holdings()
@@ -263,6 +292,9 @@ class Orchestrator:
                 self._handle_option(proposal, account, kinds)
             else:
                 self._handle_equity(proposal, account, kinds)
+        # Persist this cycle's freshly-submitted order ids so the next boot (even
+        # after a crash between cycles) reconciles their fills (1B.9).
+        self.state.set_pending_orders(self._pending_oids)
 
     def _refresh_dashboard(self) -> None:
         """Regenerate the live dashboard HTML after a cycle so the tracker stays
@@ -332,6 +364,9 @@ class Orchestrator:
         an intent — rejects and partial fills mean the ledger and our risk picture
         can drift from reality. Surface that loudly instead of trusting submission."""
         pending, self._pending_oids = self._pending_oids, []
+        # Persist the cleared list immediately: these are about to be checked, so a
+        # crash mid-reconcile must not re-examine (or re-strand) them next boot.
+        self.state.set_pending_orders(self._pending_oids)
         for oid, symbol in pending:
             status, filled, qty = self.broker.order_fill(oid)
             if status in ("filled", "unknown"):
@@ -387,6 +422,111 @@ class Orchestrator:
         account.positions = [p for p in account.positions if p.symbol != symbol]
         account.cash += max(0.0, pos.market_value)
         account.buying_power += max(0.0, pos.market_value)
+
+    # -- regime-off book trim (1B.6) --------------------------------------- #
+    def _apply_regime_trim(self, account, regime) -> None:
+        """On the FLIP into a risk-off regime, sell a slice of every held name to
+        actively de-risk the existing book — the "salvage when the market is down"
+        lever. The regime multiplier alone only shrinks NEW buys, so held names
+        would otherwise ride a downturn to their own stops with no account-level
+        response. Fires ONCE per downturn (keyed off the persisted last label), not
+        every cycle we stay risk-off. Off by default.
+
+        The bracket is released before the partial sell (its legs reserve the
+        shares), so the trimmed remainder is re-protected by a watchdog stop/take
+        at the default levels rather than an exchange bracket."""
+        r = self.cfg.risk
+        prev = self.state.get_regime_label()
+        self.state.set_regime_label(regime.label)
+        if not r.regime_trim_enabled:
+            return
+        # Only on the transition INTO risk-off, and only if there's a book to trim.
+        if regime.label != "risk-off" or prev == "risk-off":
+            return
+        frac = r.regime_trim_pct / 100.0
+        if frac <= 0 or not account.positions:
+            return
+        log.warning(
+            "Regime flipped to risk-off — trimming the book by %.0f%% to de-risk "
+            "(%d position[s]).", r.regime_trim_pct, len(account.positions),
+        )
+        with self._trade_lock:
+            for pos in list(account.positions):
+                sell_qty = round(pos.qty * frac, 6)
+                if sell_qty <= 0:
+                    continue
+                self.broker.cancel_open_orders_for(pos.symbol)  # release bracket
+                oid = self.broker.reduce_position(pos.symbol, sell_qty)
+                if not oid:
+                    continue
+                self._pending_oids.append((oid, pos.symbol))
+                self.ledger.record(TradeRecord.for_sell(
+                    pos.symbol, f"regime risk-off trim {r.regime_trim_pct:.0f}%", oid,
+                    qty=sell_qty, realized_pl_pct=pos.unrealized_pl_pct,
+                    realized_pl=None, exit_reason="regime_trim",
+                ))
+                # Keep the in-memory snapshot honest for the rest of the cycle and
+                # re-protect the (now bracket-less) remainder via the watchdog.
+                pos.qty = round(pos.qty - sell_qty, 6)
+                pos.market_value = pos.qty * pos.current_price
+                self.state.register_exits(
+                    pos.symbol, r.default_stop_loss_pct, r.default_take_profit_pct,
+                )
+
+    # -- deterministic thesis-decay exit (1B.4b) --------------------------- #
+    def _apply_thesis_decay_exits(self, bundles, account) -> set[str]:
+        """SELL held names whose entry thesis is no longer corroborated by fresh
+        signals — a name whose signals went stale but never hit a price stop would
+        otherwise be held forever, and a decision-sell needs the LLM up. This is
+        LLM-INDEPENDENT and deterministic. Guarded by a grace age so a fresh buy
+        isn't dumped on one quiet signal day. Returns the exited symbols.
+
+        CAUTION (why it's opt-in): signal ABSENCE is the decay trigger, so a
+        transient data outage that blanks the feed could force spurious exits — run
+        it only once you trust the signal feed."""
+        r = self.cfg.risk
+        if not r.thesis_decay_enabled:
+            return set()
+        by_symbol = {b.symbol: b for b in bundles}
+        exited: set[str] = set()
+        for pos in list(account.positions):
+            age = self.state.entry_age_days(pos.symbol)
+            if age is None or age < r.thesis_decay_min_age_days:
+                continue
+            if self._thesis_corroborated(by_symbol.get(pos.symbol), r.thesis_min_score):
+                continue
+            log.info(
+                "Thesis decay on %s: no signal >= %.2f after %.1fd — deterministic "
+                "exit (%.1f%%).", pos.symbol, r.thesis_min_score, age,
+                pos.unrealized_pl_pct,
+            )
+            with self._trade_lock:
+                self.broker.cancel_open_orders_for(pos.symbol)
+                oid = self.broker.close_position(pos.symbol)
+                self.watchdog.forget(pos.symbol)
+                self.ledger.record(TradeRecord.for_sell(
+                    pos.symbol, "thesis decay: entry signals no longer corroborated",
+                    oid, qty=pos.qty, realized_pl_pct=pos.unrealized_pl_pct,
+                    realized_pl=pos.unrealized_pl, exit_reason="thesis_decay",
+                ))
+                if oid:
+                    self._pending_oids.append((oid, pos.symbol))
+                # Keep this cycle's snapshot honest (frees capital/slot downstream).
+                self._apply_pending_close(account, pos.symbol)
+            exited.add(pos.symbol)
+        return exited
+
+    @staticmethod
+    def _thesis_corroborated(bundle, min_score: float) -> bool:
+        """True if `bundle` still carries at least one bullish signal (score >=
+        min_score). A held name with no bundle, or only sub-threshold / bearish
+        signals, has a decayed thesis. DISCOVERY signals count: a name the scanner
+        re-surfaces with a positive lean is still corroborated."""
+        if bundle is None:
+            return False
+        return any(
+            s.score is not None and s.score >= min_score for s in bundle.signals
+        )
 
     # -- equity path -------------------------------------------------------- #
     def _handle_equity(

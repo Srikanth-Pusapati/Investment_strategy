@@ -28,6 +28,18 @@ from ..state import PortfolioState
 log = logging.getLogger("watchdog")
 
 
+def _partial(pos: Position, qty: float) -> Position:
+    """A view of `pos` reduced to `qty` shares — for recording a partial
+    (scale-out) exit in the ledger with the right quantity and a proportional
+    realized P&L, while the rest of the position stays open."""
+    frac = (qty / pos.qty) if pos.qty else 0.0
+    return pos.model_copy(update={
+        "qty": qty,
+        "market_value": pos.current_price * qty,
+        "unrealized_pl": pos.unrealized_pl * frac,
+    })
+
+
 class Watchdog:
     def __init__(
         self, cfg: Config, broker: AlpacaClient,
@@ -121,7 +133,7 @@ class Watchdog:
         instead of silently leaving a naked, unmonitored position."""
         for pos in account.positions:
             self.broker.cancel_open_orders_for(pos.symbol)
-            oid = self.broker.close_position(pos.symbol)
+            oid = self._close_or_rest(pos)
             if oid:
                 self.state.forget_symbol(pos.symbol)
                 self._record_exit(pos, oid, "flatten")
@@ -133,11 +145,24 @@ class Watchdog:
                 self._alert(
                     f"flatten-fail:{pos.symbol}",
                     f"NAKED position {pos.symbol} — {why} close FAILED",
-                    f"{why} flatten of {pos.symbol} did not go through; the "
-                    f"position is unprotected. The watchdog will retry every "
-                    f"~{self.cfg.monitor_interval_s}s but may need manual "
-                    f"intervention.",
+                    f"{why} flatten of {pos.symbol} did not go through (even the "
+                    f"marketable-limit fallback); the position is unprotected. The "
+                    f"watchdog will retry every ~{self.cfg.monitor_interval_s}s but "
+                    f"may need manual intervention.",
                 )
+
+    # -- close with a market-closed / halt fallback (1B.5) ----------------- #
+    def _close_or_rest(self, pos: Position) -> str | None:
+        """Market-close `pos`; if that can't fill (market closed / LULD-halted — a
+        plain market order is rejected), fall back to resting a GTC marketable-limit
+        so the exit still fills at the reopen instead of leaving a naked position.
+        The fallback is whole-share only (Alpaca rejects GTC/limit on fractional),
+        so a sub-share position's overnight-gap risk stays irreducible."""
+        oid = self.broker.close_position(pos.symbol)
+        if oid:
+            return oid
+        ref = self.broker.latest_price(pos.symbol)
+        return self.broker.close_position_marketable_limit(pos.symbol, pos.qty, ref)
 
     # -- hard stop / take-profit for fractional (unbracketed) positions ---- #
     def _enforce_hard_exits(self, pos: Position) -> bool:
@@ -149,12 +174,20 @@ class Watchdog:
             return False
         stop_pct = exits.get("stop_pct", 0.0)
         take_pct = exits.get("take_pct", 0.0)
-        hit = None
+        # Stop-loss is always a FULL exit. Take-profit may scale out (1B.8).
         if stop_pct > 0 and pos.unrealized_pl_pct <= -stop_pct:
             hit = f"stop -{stop_pct:.1f}%"
         elif take_pct > 0 and pos.unrealized_pl_pct >= take_pct:
+            # Let winners run: sell a slice at the target and trail the rest rather
+            # than capping the whole position here (unless already scaled/disabled).
+            if (
+                getattr(self.cfg.risk, "scale_out_enabled", False)
+                and not exits.get("scaled")
+                and self._scale_out(pos, stop_pct, take_pct)
+            ):
+                return True
             hit = f"take +{take_pct:.1f}%"
-        if not hit:
+        else:
             return False
         log.info(
             "Hard %s hit on %s (now %.1f%%). Closing fractional position.",
@@ -177,6 +210,36 @@ class Watchdog:
                 f"loop is their only hard exit — the position is now unprotected. "
                 f"Retrying every ~{self.cfg.monitor_interval_s}s.",
             )
+        return True
+
+    # -- scale-out at the take-profit target (let winners run, 1B.8) ------- #
+    def _scale_out(self, pos: Position, stop_pct: float, take_pct: float) -> bool:
+        """Sell SCALE_OUT_PCT of `pos` at its take-profit target and let the rest
+        ride the trailing stop, instead of closing the whole winner here. Drops the
+        hard take (so it isn't re-triggered) but KEEPS the stop, and marks the
+        position scaled so this fires once. Returns True if the partial sell went
+        through (caller then skips trailing this tick). A failed partial sell
+        returns False so the caller falls back to the full-close take path."""
+        frac = getattr(self.cfg.risk, "scale_out_pct", 0.0) / 100.0
+        sell_qty = round(pos.qty * frac, 6)
+        if frac <= 0 or sell_qty <= 0:
+            return False
+        self.broker.cancel_open_orders_for(pos.symbol)  # release any resting bracket
+        oid = self.broker.reduce_position(pos.symbol, sell_qty)
+        if not oid:
+            log.warning(
+                "Scale-out sell FAILED for %s — falling back to full take-profit close.",
+                pos.symbol,
+            )
+            return False
+        log.info(
+            "Scale-out %s: sold %.0f%% (%g sh) at +%.1f%% target; trailing the rest.",
+            pos.symbol, frac * 100.0, sell_qty, pos.unrealized_pl_pct,
+        )
+        # Keep the downside stop, drop the take, and mark scaled -> the remainder is
+        # now governed by the trailing stop (which already locks in gains).
+        self.state.register_exits(pos.symbol, stop_pct, 0.0, scaled=True)
+        self._record_exit(_partial(pos, sell_qty), oid, "scale")
         return True
 
     # -- deterministic time-stop (recycle dead/flat capital) --------------- #

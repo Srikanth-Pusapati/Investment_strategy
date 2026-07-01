@@ -24,24 +24,42 @@ from investment_strategy.state import PortfolioState
 
 
 class _FakeBroker:
-    def __init__(self, positions):
+    def __init__(self, positions, market_close_fails=False):
         self._positions = positions
+        self.market_close_fails = market_close_fails   # simulate closed/halted market
         self.closed: list[str] = []
         self.canceled: list[str] = []
+        self.reduced: list[tuple[str, float]] = []
+        self.rested: list[tuple[str, float, float]] = []
 
     def cancel_open_orders_for(self, symbol):
         self.canceled.append(symbol)
 
     def close_position(self, symbol):
+        if self.market_close_fails:
+            return None                 # market order can't fill (closed / halted)
         self.closed.append(symbol)
         return f"oid-{symbol}"          # truthy order id => confirmed close
 
+    def reduce_position(self, symbol, qty):
+        self.reduced.append((symbol, round(qty, 6)))
+        return f"oid-{symbol}"
 
-def _cfg(pct, max_hold_days=0.0, time_stop_min_gain_pct=2.0):
+    def latest_price(self, symbol):
+        return 50.0
+
+    def close_position_marketable_limit(self, symbol, qty, ref_price):
+        self.rested.append((symbol, qty, ref_price))
+        return f"rest-{symbol}"
+
+
+def _cfg(pct, max_hold_days=0.0, time_stop_min_gain_pct=2.0,
+         scale_out_enabled=False, scale_out_pct=50.0):
     return SimpleNamespace(
         risk=SimpleNamespace(
             equity_floor_pct=pct, max_daily_loss_pct=3.0,
             max_hold_days=max_hold_days, time_stop_min_gain_pct=time_stop_min_gain_pct,
+            scale_out_enabled=scale_out_enabled, scale_out_pct=scale_out_pct,
         ),
         state_file="state/risk_state.json",
         monitor_interval_s=30,
@@ -102,6 +120,78 @@ def test_floor_off_when_zero():
     wd = _wd(0.0, state)
     assert wd._equity_floor_breached(_acct(equity=1.0)) is False   # disabled
     assert state.halted is False
+
+
+# -- market-closed / halt exit fallback (1B.5) ------------------------------- #
+def test_flatten_falls_back_to_marketable_limit_when_market_closed():
+    state = _state()
+    state.peak_equity = 1_000.0                       # floor 60% -> $600
+    broker = _FakeBroker([], market_close_fails=True)  # market order won't fill
+    wd = Watchdog(_cfg(60.0), broker, state=state)
+    wd._equity_floor_breached(_acct(equity=500.0))     # triggers _flatten_all
+    # Both names fell through the failed market close to a rested GTC limit.
+    assert {r[0] for r in broker.rested} == {"AAPL", "MSFT"}
+    assert broker.closed == []                         # no market close filled
+
+
+def test_flatten_prefers_plain_market_close_when_open():
+    state = _state()
+    state.peak_equity = 1_000.0
+    broker = _FakeBroker([], market_close_fails=False)
+    wd = Watchdog(_cfg(60.0), broker, state=state)
+    wd._equity_floor_breached(_acct(equity=500.0))
+    assert sorted(broker.closed) == ["AAPL", "MSFT"]   # market close used
+    assert broker.rested == []                         # fallback not needed
+
+
+# -- scale-out at the take-profit target (1B.8) ------------------------------ #
+def _pos_qty(symbol="AAPL", qty=1.0, pl_pct=12.0):
+    return Position(symbol=symbol, qty=qty, avg_entry_price=100.0,
+                    current_price=100.0 * (1 + pl_pct / 100.0),
+                    market_value=qty * 100.0 * (1 + pl_pct / 100.0),
+                    unrealized_pl=qty * pl_pct, unrealized_pl_pct=pl_pct)
+
+
+def test_scale_out_sells_part_and_trails_the_rest():
+    state = _state()
+    state.register_exits("AAPL", stop_pct=5.0, take_pct=12.0)
+    wd = Watchdog(_cfg(0.0, scale_out_enabled=True, scale_out_pct=50.0),
+                  _FakeBroker([]), state=state)
+    fired = wd._enforce_hard_exits(_pos_qty("AAPL", qty=2.0, pl_pct=12.0))
+    assert fired is True
+    assert wd.broker.reduced == [("AAPL", 1.0)]     # sold 50% of 2.0
+    assert wd.broker.closed == []                    # NOT a full close
+    ex = state.get_exits("AAPL")
+    assert ex["scaled"] == 1.0 and ex["take_pct"] == 0.0 and ex["stop_pct"] == 5.0
+
+
+def test_scale_out_fires_once_then_trails():
+    state = _state()
+    # Post-scale state: take dropped to 0, marked scaled (what _scale_out records).
+    state.register_exits("AAPL", stop_pct=5.0, take_pct=0.0, scaled=True)
+    wd = Watchdog(_cfg(0.0, scale_out_enabled=True), _FakeBroker([]), state=state)
+    # take_pct is 0 after scaling, so a further run-up is NOT re-taken here.
+    assert wd._enforce_hard_exits(_pos_qty("AAPL", qty=1.0, pl_pct=20.0)) is False
+    assert wd.broker.reduced == []
+
+
+def test_scale_out_disabled_full_close_at_take():
+    state = _state()
+    state.register_exits("AAPL", stop_pct=5.0, take_pct=12.0)
+    wd = Watchdog(_cfg(0.0, scale_out_enabled=False), _FakeBroker([]), state=state)
+    assert wd._enforce_hard_exits(_pos_qty("AAPL", qty=2.0, pl_pct=12.0)) is True
+    assert wd.broker.closed == ["AAPL"]              # original full-close behavior
+    assert wd.broker.reduced == []
+
+
+def test_stop_is_always_a_full_exit_even_with_scale_out():
+    state = _state()
+    state.register_exits("AAPL", stop_pct=5.0, take_pct=12.0)
+    wd = Watchdog(_cfg(0.0, scale_out_enabled=True), _FakeBroker([]), state=state)
+    # Down through the stop -> full close, never a scale-out.
+    assert wd._enforce_hard_exits(_pos_qty("AAPL", qty=2.0, pl_pct=-6.0)) is True
+    assert wd.broker.closed == ["AAPL"]
+    assert wd.broker.reduced == []
 
 
 # -- deterministic time-stop (1B.4) ------------------------------------------ #

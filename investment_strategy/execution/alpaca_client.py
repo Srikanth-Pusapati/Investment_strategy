@@ -225,6 +225,12 @@ class AlpacaClient:
         if whole >= 1:
             order = OrderRequest(
                 symbol=symbol, side=Action.BUY, order_type=OrderType.MARKET,
+                # GTC so the protective stop/take-profit legs REST at the exchange
+                # across sessions (a DAY bracket's stop would expire at the close,
+                # leaving the position unprotected into the overnight gap — exactly
+                # when a gap-down needs it). The market entry fills immediately; the
+                # OCO legs persist until hit or canceled (1B.5).
+                tif=TIF.GTC,
                 qty=float(whole),
                 take_profit_price=round(price * (1 + decision.take_profit_pct / 100.0), 2),
                 stop_loss_price=round(price * (1 - decision.stop_loss_pct / 100.0), 2),
@@ -266,6 +272,26 @@ class AlpacaClient:
         log.info("OPTION %d-leg order qty=%d (order %s)", len(legs), qty, placed.id)
         return str(placed.id)
 
+    # -- partial reduce (never gated — risk reduction) --------------------- #
+    def reduce_position(self, symbol: str, qty: float) -> Optional[str]:
+        """Market-SELL `qty` shares (whole or fractional) of an existing long — a
+        PARTIAL close used by the regime-off trim (1B.6) and the scale-out
+        take-profit (1B.8). Selling is never gated by the kill switch (reducing
+        risk must never be blocked). Caller should cancel any resting bracket for
+        the symbol first, since its protective legs reserve the shares."""
+        if qty is None or qty <= 0:
+            return None
+        try:
+            order = self.trading.submit_order(MarketOrderRequest(
+                symbol=symbol, qty=qty, side=OrderSide.SELL,
+                time_in_force=TimeInForce.DAY,
+            ))
+        except Exception as e:
+            log.error("reduce_position(%s, %g) failed: %s", symbol, qty, e)
+            return None
+        log.info("REDUCE %s qty=%g (order %s)", symbol, qty, order.id)
+        return str(order.id)
+
     # -- closing (never gated) --------------------------------------------- #
     def close_position(self, symbol: str) -> Optional[str]:
         try:
@@ -275,6 +301,44 @@ class AlpacaClient:
         except Exception as e:
             log.error("close_position(%s) failed: %s", symbol, e)
             return None
+
+    #: How far THROUGH the last price a fallback exit limit is set. Aggressive
+    #: enough to fill on the next print (marketable), capped so a closed/halted
+    #: market can't fill us at a catastrophic gap.
+    EXIT_LIMIT_BUFFER_PCT = 2.0
+
+    def close_position_marketable_limit(
+        self, symbol: str, qty: float, ref_price: float,
+    ) -> Optional[str]:
+        """Fallback exit when a plain MARKET close can't fill — e.g. the market is
+        closed or the name is LULD-halted. Rests a GTC SELL LIMIT priced through
+        the last trade (marketable), so it fills on the next print / at the reopen
+        instead of leaving the position with no working exit. Whole-share only:
+        Alpaca rejects GTC/limit on fractional qty, so a sub-share position's
+        overnight-gap risk stays irreducible (see 1B.2)."""
+        if qty <= 0 or ref_price <= 0:
+            return None
+        if qty != int(qty):
+            log.warning(
+                "%s: marketable-limit fallback needs whole shares (qty=%g is "
+                "fractional; GTC/limit not allowed) — cannot rest a fallback exit.",
+                symbol, qty,
+            )
+            return None
+        limit = round(ref_price * (1 - self.EXIT_LIMIT_BUFFER_PCT / 100.0), 2)
+        try:
+            order = self.trading.submit_order(LimitOrderRequest(
+                symbol=symbol, qty=float(int(qty)), side=OrderSide.SELL,
+                time_in_force=TimeInForce.GTC, limit_price=limit,
+            ))
+        except Exception as e:
+            log.error("close_position_marketable_limit(%s) failed: %s", symbol, e)
+            return None
+        log.warning(
+            "REST fallback exit for %s: GTC sell-limit %g @ %.2f (market close "
+            "unavailable).", symbol, qty, limit,
+        )
+        return str(order.id)
 
     def cancel_open_orders_for(self, symbol: str) -> None:
         for o in self.trading.get_orders():
