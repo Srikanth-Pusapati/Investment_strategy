@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import os
 import sys
+from datetime import datetime, timedelta, timezone
 from types import SimpleNamespace
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -100,6 +101,47 @@ def test_rejected_decision_never_submits():
     )
     assert oid is None and fractional is False
     assert c.submitted == []
+
+
+# -- portfolio_basis: brand-new-account edge case --------------------------- #
+class _FakeTrading:
+    def __init__(self, created_at, hist=None):
+        self._created = created_at
+        self._hist = hist
+        self.history_calls = 0
+
+    def get_account(self):
+        return SimpleNamespace(created_at=self._created)
+
+    def get_portfolio_history(self, req):
+        self.history_calls += 1
+        return self._hist
+
+
+def _basis_client(trading):
+    c = AlpacaClient.__new__(AlpacaClient)
+    c.trading = trading
+    return c
+
+
+def test_portfolio_basis_skips_brand_new_account():
+    # Account created a few minutes ago -> no 1D bar yet -> skip quietly (None),
+    # and DON'T call the history endpoint (which would 400 on start > end).
+    trading = _FakeTrading(created_at=datetime.now(timezone.utc) - timedelta(minutes=5))
+    c = _basis_client(trading)
+    assert c.portfolio_basis() is None
+    assert trading.history_calls == 0
+
+
+def test_portfolio_basis_computes_for_aged_account():
+    hist = SimpleNamespace(base_value=1000.0, cashflow={"x": [100.0, 50.0]})
+    trading = _FakeTrading(
+        created_at=datetime.now(timezone.utc) - timedelta(days=10), hist=hist,
+    )
+    c = _basis_client(trading)
+    base, net_cf = c.portfolio_basis()
+    assert base == 1000.0 and net_cf == 150.0
+    assert trading.history_calls == 1
 
 
 def _run_all():

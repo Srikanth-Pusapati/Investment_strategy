@@ -26,9 +26,10 @@ key. (If `.env` already has keys, skip this.) Get them from
 
 **Step 3 — Check it's ready**
 ```bash
-python -c "from investment_strategy.config import load_config; load_config(); print('ready ✅')"
+python -m investment_strategy.preflight
 ```
-If it prints `ready ✅`, your keys and settings are good.
+This actually logs into Alpaca with your keys and tells you, in plain English,
+whether you're good to go (`✅ Ready to run`) or what to fix. Do this before Step 4.
 
 **Step 4 — Start the bot (fake money)**
 ```bash

@@ -117,8 +117,18 @@ class AlpacaClient:
             created = acct.created_at
             if not isinstance(created, datetime):
                 created = datetime.fromisoformat(str(created))
+            created = created.astimezone(timezone.utc)
+            now = datetime.now(timezone.utc)
+            # A brand-new account (created today, especially after the open) has no
+            # completed 1D portfolio-history bar yet, and Alpaca 400s when start >
+            # end. Skip quietly and return None — total return simply isn't
+            # computable until there's a day of history, and forcing the call would
+            # misreport the initial funding as profit. Not a failure; just too new.
+            if now - created < timedelta(days=1):
+                log.debug("portfolio_basis: account too new for 1D history; skipping.")
+                return None
             req = GetPortfolioHistoryRequest(
-                start=created.astimezone(timezone.utc), timeframe="1D",
+                start=created, end=now, timeframe="1D",
             )
             hist = self.trading.get_portfolio_history(req)
             base = float(hist.base_value or 0.0)
