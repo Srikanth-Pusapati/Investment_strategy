@@ -191,14 +191,31 @@ class AlpacaClient:
         """Build a BUY from a risk-approved equity decision.
 
         Returns (order_id, is_fractional). When at least one WHOLE share is
-        affordable we submit a whole-share BRACKET order so the stop/take-profit
-        live at the exchange (survives a process crash) and drop any sub-share
-        remainder. Below one share — only reachable on small accounts with
-        fractional enabled — we submit a dollar-NOTIONAL order, which Alpaca will
-        not let us bracket; the caller must register a watchdog stop instead."""
+        affordable we PREFER a whole-share BRACKET order so the stop/take-profit
+        rest at the exchange (they survive a process crash / market close) and we
+        drop any sub-share remainder. Below one share — only reachable on small
+        accounts with fractional enabled — we submit a dollar-NOTIONAL order,
+        which Alpaca will not let us bracket; its ONLY protection is the watchdog
+        stop the caller must then register.
+
+        Every long we open MUST carry a hard stop: without a positive
+        stop_loss_pct a whole-share bracket has no stop leg and a fractional buy
+        has nothing for the watchdog to enforce — i.e. a naked position. We refuse
+        rather than open one. The irreducible residual on the fractional path is
+        an OVERNIGHT / halt GAP that jumps the stop before the ~30s watchdog can
+        market-sell (the market is closed): that risk is bounded but not
+        removable, which is exactly why we prefer the exchange-resident bracket
+        whenever a whole share is affordable (see 1B.5)."""
         if decision.verdict not in (RiskVerdict.APPROVED, RiskVerdict.RESIZED):
             return None, False
         symbol = decision.proposal.symbol
+        if decision.stop_loss_pct <= 0:
+            log.warning(
+                "Skip %s: decision carries no stop-loss — refusing to open an "
+                "unprotected position (whole-share bracket needs a stop leg; a "
+                "fractional buy needs a watchdog stop).", symbol,
+            )
+            return None, False
         price = self.latest_price(symbol)
         if price <= 0:
             log.warning("Skip %s: no price for order/bracket levels.", symbol)

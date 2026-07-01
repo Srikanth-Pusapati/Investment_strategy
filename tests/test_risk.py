@@ -52,6 +52,8 @@ def _limits(**over) -> RiskLimits:
         min_cash_buffer_pct=10.0,
         min_trade_price_usd=5.0,
         earnings_blackout_days=3,
+        max_hold_days=30.0,
+        time_stop_min_gain_pct=2.0,
         pdt_guard_enabled=True,
         max_day_trades_under_25k=3,
         max_trade_risk_pct=1.0,

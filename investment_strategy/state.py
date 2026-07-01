@@ -41,6 +41,11 @@ class PortfolioState:
         # which have no exchange-side bracket. The watchdog enforces these. Keyed
         # by symbol: {"stop_pct": float, "take_pct": float}.
         self.exits: dict[str, dict[str, float]] = {}
+        # First-entry timestamp (ISO) per held symbol — the "hold clock" for the
+        # deterministic time-stop that recycles dead/flat capital (1B.4). Set on
+        # the opening buy; the watchdog also stamps a first-seen fallback so a
+        # restart or pre-existing position still gets a clock.
+        self.entry_times: dict[str, str] = {}
         # The watchdog (its own thread) and the decision/risk path both touch this
         # state. A reentrant lock keeps reads/writes and the file save consistent.
         self._lock = threading.RLock()
@@ -62,6 +67,9 @@ class PortfolioState:
                     "take_pct": float(v.get("take_pct", 0.0))}
                 for k, v in d.get("exits", {}).items()
             }
+            self.entry_times = {
+                k: str(v) for k, v in d.get("entry_times", {}).items()
+            }
             if self.halted:
                 log.warning("Loaded LATCHED HALT from state: %s", self.halt_reason)
         except Exception as e:  # corrupt state must not crash startup
@@ -80,6 +88,7 @@ class PortfolioState:
                         "halted_at": self.halted_at,
                         "high_water": self.high_water,
                         "exits": self.exits,
+                        "entry_times": self.entry_times,
                     },
                     indent=2,
                 ),
@@ -134,6 +143,7 @@ class PortfolioState:
         with self._lock:
             dropped = self.high_water.pop(symbol, None) is not None
             dropped |= self.exits.pop(symbol, None) is not None
+            dropped |= self.entry_times.pop(symbol, None) is not None
             if dropped:
                 self._save()
 
@@ -153,3 +163,28 @@ class PortfolioState:
 
     def get_exits(self, symbol: str) -> dict[str, float] | None:
         return self.exits.get(symbol)
+
+    # -- hold clock for the deterministic time-stop (1B.4) ------------------ #
+    def register_entry(self, symbol: str, when: datetime | None = None) -> None:
+        """Stamp the FIRST time we saw this position, starting its hold clock.
+        Idempotent: a symbol already on the clock is left untouched, so adding to
+        an existing position (or a watchdog first-seen fallback) never resets the
+        age of the original entry."""
+        with self._lock:
+            if symbol not in self.entry_times:
+                self.entry_times[symbol] = (when or datetime.now(timezone.utc)).isoformat()
+                self._save()
+
+    def entry_age_days(self, symbol: str, now: datetime | None = None) -> float | None:
+        """Calendar days since the position's first entry, or None if unknown."""
+        ts = self.entry_times.get(symbol)
+        if not ts:
+            return None
+        try:
+            entered = datetime.fromisoformat(ts)
+        except ValueError:
+            return None
+        if entered.tzinfo is None:
+            entered = entered.replace(tzinfo=timezone.utc)
+        now = now or datetime.now(timezone.utc)
+        return (now - entered).total_seconds() / 86_400.0

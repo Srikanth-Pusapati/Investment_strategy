@@ -37,10 +37,14 @@ class _FakeBroker:
         return f"oid-{symbol}"          # truthy order id => confirmed close
 
 
-def _cfg(pct):
+def _cfg(pct, max_hold_days=0.0, time_stop_min_gain_pct=2.0):
     return SimpleNamespace(
-        risk=SimpleNamespace(equity_floor_pct=pct, max_daily_loss_pct=3.0),
+        risk=SimpleNamespace(
+            equity_floor_pct=pct, max_daily_loss_pct=3.0,
+            max_hold_days=max_hold_days, time_stop_min_gain_pct=time_stop_min_gain_pct,
+        ),
         state_file="state/risk_state.json",
+        monitor_interval_s=30,
     )
 
 
@@ -98,6 +102,57 @@ def test_floor_off_when_zero():
     wd = _wd(0.0, state)
     assert wd._equity_floor_breached(_acct(equity=1.0)) is False   # disabled
     assert state.halted is False
+
+
+# -- deterministic time-stop (1B.4) ------------------------------------------ #
+def _pos_pl(symbol="AAPL", pl_pct=-1.0):
+    return Position(symbol=symbol, qty=1.0, avg_entry_price=100.0,
+                    current_price=100.0 + pl_pct, market_value=100.0 + pl_pct,
+                    unrealized_pl=pl_pct, unrealized_pl_pct=pl_pct)
+
+
+def _wd_ts(max_hold_days, state):
+    wd = Watchdog(_cfg(0.0, max_hold_days=max_hold_days), _FakeBroker([]), state=state)
+    return wd
+
+
+def test_time_stop_recycles_old_flat_position():
+    from datetime import datetime, timezone
+    state = _state()
+    # Entered 40 days ago; still flat (-1%) -> dead money, recycle after 30d.
+    state.register_entry("AAPL", when=datetime(2026, 1, 1, tzinfo=timezone.utc))
+    wd = _wd_ts(30.0, state)
+    fired = wd._enforce_time_stop(_pos_pl("AAPL", pl_pct=-1.0))
+    assert fired is True
+    assert wd.broker.closed == ["AAPL"]
+
+
+def test_time_stop_spares_a_winner():
+    from datetime import datetime, timezone
+    state = _state()
+    state.register_entry("AAPL", when=datetime(2026, 1, 1, tzinfo=timezone.utc))
+    wd = _wd_ts(30.0, state)
+    # Old but UP +8% (>= 2% target) -> let the trailing stop run it, don't recycle.
+    assert wd._enforce_time_stop(_pos_pl("AAPL", pl_pct=8.0)) is False
+    assert wd.broker.closed == []
+
+
+def test_time_stop_spares_young_position():
+    state = _state()
+    wd = _wd_ts(30.0, state)
+    # No recorded entry: the watchdog stamps first-seen NOW, so age ~0 < 30d.
+    assert wd._enforce_time_stop(_pos_pl("AAPL", pl_pct=-1.0)) is False
+    assert wd.broker.closed == []
+    assert state.entry_times.get("AAPL") is not None  # clock was started
+
+
+def test_time_stop_off_when_zero():
+    from datetime import datetime, timezone
+    state = _state()
+    state.register_entry("AAPL", when=datetime(2026, 1, 1, tzinfo=timezone.utc))
+    wd = _wd_ts(0.0, state)  # disabled
+    assert wd._enforce_time_stop(_pos_pl("AAPL", pl_pct=-50.0)) is False
+    assert wd.broker.closed == []
 
 
 def _run_all():

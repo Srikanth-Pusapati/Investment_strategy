@@ -22,7 +22,14 @@ from .decision import DecisionEngine
 from .earnings import EarningsCalendar
 from .execution import AlpacaClient, OptionsHelper
 from .ledger import TradeLedger, TradeRecord
-from .models import Candidate, Instrument, RiskVerdict, SignalBundle, TradeProposal
+from .models import (
+    Candidate,
+    Instrument,
+    Position,
+    RiskVerdict,
+    SignalBundle,
+    TradeProposal,
+)
 from .monitor import Watchdog
 from .notify import Alerter
 from .portfolio import RobinhoodReader
@@ -342,6 +349,45 @@ class Orchestrator:
             else:  # still new/accepted/pending_new long after submission
                 log.warning("Order %s (%s) still %s a full cycle later.", oid, symbol, status)
 
+    # -- intra-cycle running tally (1B.3) ---------------------------------- #
+    # The account is fetched ONCE per cycle; every proposal is then evaluated
+    # against that single snapshot. Without folding each fill back in, N buys in
+    # one cycle each size against the pre-cycle picture and can JOINTLY breach the
+    # no-leverage gross cap, the cash buffer, or max-open-positions — and on a
+    # margin account Alpaca's ~2x buying power will NOT reject the over-deploy for
+    # us. These mutate the in-memory snapshot so later proposals see reality.
+    @staticmethod
+    def _apply_pending_buy(
+        account, symbol: str, notional: float, price: float, qty: float
+    ) -> None:
+        """Reflect a just-submitted BUY into the snapshot: add/extend the position
+        and draw down cash + buying power by the (conservatively full) notional."""
+        notional = max(0.0, float(notional))
+        existing = account.position_for(symbol)
+        if existing is not None:
+            existing.qty += qty
+            existing.market_value += notional
+        else:
+            account.positions.append(Position(
+                symbol=symbol, qty=qty, avg_entry_price=price,
+                current_price=price, market_value=notional,
+                unrealized_pl=0.0, unrealized_pl_pct=0.0,
+            ))
+        account.cash = max(0.0, account.cash - notional)
+        account.buying_power = max(0.0, account.buying_power - notional)
+
+    @staticmethod
+    def _apply_pending_close(account, symbol: str) -> None:
+        """Reflect a decision SELL into the snapshot: drop the position and return
+        its market value to cash + buying power, so a later buy this cycle can use
+        the freed capital and slot."""
+        pos = account.position_for(symbol)
+        if pos is None:
+            return
+        account.positions = [p for p in account.positions if p.symbol != symbol]
+        account.cash += max(0.0, pos.market_value)
+        account.buying_power += max(0.0, pos.market_value)
+
     # -- equity path -------------------------------------------------------- #
     def _handle_equity(
         self, proposal: TradeProposal, account, signal_kinds: list[str] | None = None
@@ -386,12 +432,25 @@ class Orchestrator:
                 ))
                 if oid:
                     self._pending_oids.append((oid, proposal.symbol))
+                    # Reflect the close in this cycle's snapshot so later proposals
+                    # see the freed capital / slot (see _apply_pending_buy).
+                    self._apply_pending_close(account, proposal.symbol)
             else:  # buy (approved or resized)
                 oid, fractional = self.broker.submit_from_decision(decision)
                 if oid:
                     self.ledger.record(TradeRecord.from_equity(
                         decision, price, oid, entry_signals=signal_kinds or []))
                     self._pending_oids.append((oid, proposal.symbol))
+                    # Start (or preserve) the hold clock for the deterministic
+                    # time-stop (1B.4). register_entry only stamps a first entry.
+                    self.state.register_entry(proposal.symbol)
+                    # Fold this fill back into the once-per-cycle snapshot so the
+                    # REST of the cycle's proposals treat the capital as deployed
+                    # (1B.3 — closes the intra-cycle over-deploy hole).
+                    self._apply_pending_buy(
+                        account, proposal.symbol, decision.approved_notional,
+                        price, decision.approved_qty,
+                    )
                     if fractional:
                         # Fractional orders carry no exchange-side bracket, so the
                         # watchdog enforces the hard stop / take-profit instead.

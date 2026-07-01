@@ -116,32 +116,40 @@ RED = pre-live blocker.  YELLOW = roadmap / tune after backtest.
         delivers, so a transient send failure retries next tick. Log-only until
         ALERTS_ENABLED + a sink. Config: ALERTS_ENABLED, ALERT_SMTP_*, ALERT_EMAIL_TO,
         ALERT_WEBHOOK_URL, ALERT_COOLDOWN_SECONDS. Tests: test_notify.py (11).
-[ ] 1B.2 (RED) Fractional-position protection (the live default). Fractional buys
-        carry NO exchange bracket (Alpaca limitation) — their ONLY stop is the
-        in-process 30s watchdog poll, which also can't market-sell when the market
-        is closed. Live = mostly fractional => the real money runs on the weakest
-        guard. Do: (a) verify self.exits persists + reloads so a restart keeps the
-        stop; (b) on EVERY fractional buy require a registered watchdog stop or
-        refuse the buy; (c) when a whole share is affordable, PREFER the whole-share
-        bracket (stop rests at the exchange, survives a crash) over fractional;
-        (d) document the residual overnight-gap risk (irreducible on fractional).
-[ ] 1B.3 (RED) Intra-cycle stale-snapshot over-deploy. run_decision_cycle fetches
-        the account ONCE, then evaluates every proposal against that one snapshot —
-        so N new-symbol buys in a single cycle don't see each other. The no-leverage
-        gross cap, the cash buffer, AND max-open-positions can each be breached in
-        one multi-buy cycle (margin buying_power ~2x won't reject it). Masked today
-        by defaults (15 x 5% = 75% < 100%) but a real hole in the no-leverage
-        guarantee. Fix: keep a running deployed/cash/slot tally decremented between
-        approvals in the loop, or re-fetch the account between fills.
-[ ] 1B.4 (RED) Held-position KEEP-vs-SELL review (note 3). Make the "is this still
-        worth holding" loop explicit and testable. Today: held names are re-fed
-        through signals -> Claude every decision cycle (~15m, market-open only) and
-        the watchdog enforces stop/take/trailing/flatten every ~30s. GAPS to close:
-        no max-hold age, no thesis-decay exit (a name whose signals went stale but
-        never hit a price stop is held forever), and decision-sells need the LLM up.
-        Add: per-position age + signal-freshness check that proposes an exit when
-        the entry thesis is no longer corroborated; deterministic time-stop so a
-        flat/dead position is recycled rather than held indefinitely.
+[DONE 2026-06-30] 1B.2 (RED) Fractional-position protection (the live default).
+        (a) self.exits already persists+reloads (state.py exits dict; tested in
+        test_state). (b) submit_from_decision now REFUSES any buy whose decision
+        carries no stop (stop_loss_pct<=0) — a whole-share bracket needs a stop
+        leg and a fractional buy needs a watchdog stop, so we never open a naked
+        position; orchestrator registers the watchdog stop on every fractional
+        fill. (c) already PREFERS the whole-share exchange bracket whenever >=1
+        share is affordable (drops the sub-share remainder). (d) documented the
+        irreducible fractional overnight/halt-GAP residual (bounded, not
+        removable; see 1B.5). Tests: test_execution.py (6).
+[DONE 2026-06-30] 1B.3 (RED) Intra-cycle stale-snapshot over-deploy. The account is
+        still fetched once per cycle, but each fill now folds back into that
+        in-memory snapshot: _apply_pending_buy adds/extends the position and draws
+        down cash+buying_power; _apply_pending_close returns a decision-sell's value
+        and frees its slot. So later proposals in the SAME cycle see prior buys as
+        deployed — the no-leverage gross cap, cash buffer, and max-open-positions
+        can no longer be jointly breached in one multi-buy cycle (the margin ~2x
+        buying_power won't reject it, so our caps are the only guard). Conservative
+        (uses full approved_notional even though whole-share drops the sub-share
+        remainder). Tests: test_orchestrator.py (5).
+[DONE 2026-06-30] 1B.4 (RED) Held-position KEEP-vs-SELL review (note 3). Added a
+        DETERMINISTIC, LLM-independent time-stop that recycles dead/flat capital:
+        PortfolioState now persists a per-symbol hold clock (entry_times; set on the
+        opening buy, with a watchdog first-seen fallback so a restart / pre-existing
+        position still gets a clock). The watchdog's _enforce_time_stop closes a
+        position held past MAX_HOLD_DAYS (default 30) that never reached
+        TIME_STOP_MIN_GAIN_PCT (default 2%) — a winner is left to the trailing
+        stop/take, only stalled money is rotated out. Config: MAX_HOLD_DAYS (0=off),
+        TIME_STOP_MIN_GAIN_PCT. Tests: test_watchdog.py (+4), test_state.py (+2).
+        STILL OPEN (1B.4b): a full signal-freshness / thesis-decay exit that runs
+        independently of the LLM (deterministically SELL a held name whose entry
+        signals have gone stale/uncorroborated, not just gone flat). The time-stop
+        covers the "held forever" gap; thesis-decay is best tuned against the 2.1
+        backtest and folded into the decision engine's held-name review.
 [ ] 1B.5 (YELLOW) Market-closed / halt exit fallback. Every exit is a MARKET order,
         which can't fill when the market is closed or a name is LULD-halted — i.e. a
         gap-down / limit-down is exactly when the flatten fails. Rest GTC protective
@@ -229,13 +237,16 @@ RANKED NEXT STEPS (reprioritized 2026-06-30 after the code audit)
 --------------------------------------------------------------------------------
  PRE-LIVE BLOCKERS (do first — Phase 1's caps assume these are closed):
  1. 1B.1  Alerting on watchdog CRITICAL      (DONE 2026-06-30)
- 2. 1B.2  Fractional-position protection      (the live default = fractional) <- NEXT
- 3. 1B.3  Intra-cycle over-deploy fix         (closes the no-leverage hole)
- 4. 1B.4  Held-position keep-vs-sell review   (note 3: stale-thesis / time-stop)
+ 2. 1B.2  Fractional-position protection      (DONE 2026-06-30)
+ 3. 1B.3  Intra-cycle over-deploy fix         (DONE 2026-06-30)
+ 4. 1B.4  Held-position keep-vs-sell review   (DONE 2026-06-30 — time-stop;
+                                               1B.4b thesis-decay exit still open)
  EDGE GATE (before risking real money or buying data):
- 5. 2.1   Backtest harness                    (also tunes 1B.8 take/stop logic)
+ 5. 2.1   Backtest harness                    (also tunes 1B.8 take/stop logic) <- NEXT
  6. 2.2   Data-subscription decision          (informed by 2.1)
- THEN: 1B.5–1B.9 hardening · 3.1 lag-decay · Phase 5 (after the legal gate).
+ THEN: 1B.4b thesis-decay · 1B.5–1B.9 hardening · 3.1 lag-decay · Phase 5.
+ ALL FOUR pre-live RED blockers (1B.1–1B.4) are now closed; the remaining gate
+ before live money is the 2.1 backtest to prove the edge and tune stops/sizing.
 
  NOTE: Phase 1's capital-preservation STACK is in place, but the 2026-06-30 audit
  found gaps that only bite the LIVE posture (small MARGIN balance => mostly
@@ -248,7 +259,10 @@ RANKED NEXT STEPS (reprioritized 2026-06-30 after the code audit)
 DONE (-> completed.txt): A.1 govcontracts, B.6 earnings-blackout (PR #6);
 E.11 account P&L tracker, E.12 empty watchlist, E.13 live dashboard;
 0.1 watchlist removal, 1.1 PDT guard, 1.2 % equity floor, 1.3 sector cap,
-1.4 regime filter, 1.7 no-leverage gross cap, 1.5 small-account sizing.
-RECOMMENDED NEXT: 1B.2 fractional-position protection — with alerting (1B.1) done,
-the live default (mostly fractional, no exchange bracket) is the next pre-live
-blocker before the 2.1 backtest gate.
+1.4 regime filter, 1.7 no-leverage gross cap, 1.5 small-account sizing,
+1B.1 alerting, 1B.2 fractional protection, 1B.3 intra-cycle over-deploy,
+1B.4 deterministic time-stop.
+RECOMMENDED NEXT: 2.1 backtest harness — all four pre-live RED blockers
+(1B.1–1B.4) are closed, so the edge gate (replay scanner->signals->proposals->
+simulated fills to prove the edge and tune KELLY/vol/stops) is what stands
+between here and live money.

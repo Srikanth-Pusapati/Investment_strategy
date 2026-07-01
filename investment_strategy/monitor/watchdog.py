@@ -69,6 +69,10 @@ class Watchdog:
             # so this loop is their ONLY hard-exit enforcement.
             if self._enforce_hard_exits(pos):
                 continue
+            # Then the deterministic time-stop: recycle dead/flat capital so a
+            # stalled position isn't held indefinitely (1B.4).
+            if self._enforce_time_stop(pos):
+                continue
             self._update_trailing_stop(pos)
         # Drop tracking for positions that are gone (filled stop/tp/sell).
         for sym in set(self.state.high_water) | set(self.state.exits):
@@ -172,6 +176,52 @@ class Watchdog:
                 f"through. Fractional positions have no exchange bracket, so this "
                 f"loop is their only hard exit — the position is now unprotected. "
                 f"Retrying every ~{self.cfg.monitor_interval_s}s.",
+            )
+        return True
+
+    # -- deterministic time-stop (recycle dead/flat capital) --------------- #
+    def _enforce_time_stop(self, pos: Position) -> bool:
+        """Close `pos` if it has been held past max_hold_days WITHOUT reaching a
+        meaningful gain — i.e. dead money that should rotate to a live thesis
+        rather than sit forever (a name whose price never hit a stop but whose
+        thesis went stale). Deterministic and LLM-independent. Returns True if a
+        close was issued so the caller skips trailing.
+
+        A first-seen fallback stamps the hold clock here, so a restart or a
+        position opened before this feature still gets a (conservative) clock;
+        the real entry time is set on the opening buy when available."""
+        max_days = getattr(self.cfg.risk, "max_hold_days", 0.0)
+        if not max_days or max_days <= 0:
+            return False
+        self.state.register_entry(pos.symbol)  # idempotent; first-seen fallback
+        age = self.state.entry_age_days(pos.symbol)
+        if age is None or age < max_days:
+            return False
+        min_gain = getattr(self.cfg.risk, "time_stop_min_gain_pct", 0.0)
+        # A position that IS up and running is left to the trailing stop / take-
+        # profit to maximize — only flat/dead capital is force-recycled.
+        if pos.unrealized_pl_pct >= min_gain:
+            return False
+        log.info(
+            "Time-stop on %s: held %.1fd (>= %.0fd) at %.1f%% (< %.1f%% target) "
+            "— recycling dead capital.",
+            pos.symbol, age, max_days, pos.unrealized_pl_pct, min_gain,
+        )
+        self.broker.cancel_open_orders_for(pos.symbol)  # release any resting bracket
+        oid = self.broker.close_position(pos.symbol)
+        if oid:
+            self.state.forget_symbol(pos.symbol)
+            self._record_exit(pos, oid, "time")
+        else:
+            log.critical(
+                "Time-stop close FAILED for %s — position unprotected. Will retry.",
+                pos.symbol,
+            )
+            self._alert(
+                f"time-stop-fail:{pos.symbol}",
+                f"{pos.symbol} time-stop close FAILED",
+                f"{pos.symbol} hit its {max_days:.0f}d time-stop but the close did "
+                f"not go through; retrying every ~{self.cfg.monitor_interval_s}s.",
             )
         return True
 

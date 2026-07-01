@@ -49,6 +49,11 @@ class RiskLimits:
     min_cash_buffer_pct: float       # never deploy below this cash reserve
     min_trade_price_usd: float       # refuse buys below this price (liquidity guard)
     earnings_blackout_days: int      # block NEW buys within this many days of earnings (0=off)
+    # Deterministic time-stop: recycle dead/flat capital rather than hold it
+    # forever. After max_hold_days a position that has NOT gained at least
+    # time_stop_min_gain_pct is closed by the watchdog (LLM-independent).
+    max_hold_days: float             # max calendar days to hold a flat position (0=off)
+    time_stop_min_gain_pct: float    # below this unrealized gain at max age = dead money -> recycle
     # Pattern-Day-Trader guard for small MARGIN accounts (<$25k). Cash accounts are
     # exempt and stay inert. Blocks NEW opening buys near/over the PDT line so an
     # incidental same-day stop can't get the account flagged + restricted.
@@ -210,6 +215,11 @@ def load_config() -> Config:
             min_cash_buffer_pct=_f("MIN_CASH_BUFFER_PCT", 10.0),
             min_trade_price_usd=_f("MIN_TRADE_PRICE_USD", 5.0),
             earnings_blackout_days=_i("EARNINGS_BLACKOUT_DAYS", 3),
+            # Recycle dead money: a name held MAX_HOLD_DAYS that never got above
+            # TIME_STOP_MIN_GAIN_PCT is closed so the capital can rotate to a live
+            # thesis instead of sitting in a stalled position forever. 0 = off.
+            max_hold_days=_f("MAX_HOLD_DAYS", 30.0),
+            time_stop_min_gain_pct=_f("TIME_STOP_MIN_GAIN_PCT", 2.0),
             pdt_guard_enabled=_flag("PDT_GUARD_ENABLED", "on"),
             max_day_trades_under_25k=_i("MAX_DAY_TRADES_UNDER_25K", 3),
             # The classic "risk 1% of the account per trade" rule. Bounds the
