@@ -11,6 +11,8 @@ from enum import Enum
 
 from dotenv import load_dotenv
 
+from .notify import AlertConfig, load_alert_config
+
 load_dotenv()  # populate os.environ from .env if present
 
 
@@ -123,6 +125,7 @@ class Config:
 
     risk: RiskLimits
     screener: ScreenerConfig
+    alerts: AlertConfig              # where watchdog CRITICALs page (email/webhook)
 
     @property
     def is_live(self) -> bool:
@@ -240,6 +243,7 @@ def load_config() -> Config:
             min_score=_f("SCREENER_MIN_SCORE", 0.2),
             options_flow_scan_limit=_i("OPTIONS_FLOW_SCAN_LIMIT", 40),
         ),
+        alerts=load_alert_config(os.getenv),
     )
 
     missing = [
