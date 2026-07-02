@@ -13,8 +13,13 @@ from __future__ import annotations
 
 import logging
 import statistics
+import time
 from datetime import datetime, timedelta, timezone
-from typing import Optional
+from typing import Callable, Optional, TypeVar
+
+from requests.exceptions import ConnectionError as RequestsConnectionError
+from requests.exceptions import Timeout as RequestsTimeout
+from urllib3.exceptions import ProtocolError
 
 from alpaca.data.historical import StockHistoricalDataClient
 from alpaca.data.requests import StockBarsRequest, StockLatestTradeRequest
@@ -48,6 +53,38 @@ log = logging.getLogger("alpaca")
 _SIDE = {Action.BUY: OrderSide.BUY, Action.SELL: OrderSide.SELL}
 _TIF = {TIF.DAY: TimeInForce.DAY, TIF.GTC: TimeInForce.GTC, TIF.IOC: TimeInForce.IOC}
 
+_T = TypeVar("_T")
+
+# Transient, self-healing network faults. A "connection reset by peer" (errno 54)
+# mid-read surfaces as requests' ConnectionError wrapping urllib3's ProtocolError;
+# a slow endpoint surfaces as a Timeout. None of these mean the request is bad —
+# a quick retry almost always succeeds — so we swallow-and-retry rather than let a
+# single blip fail a whole watchdog/decision tick.
+_TRANSIENT_NET = (RequestsConnectionError, RequestsTimeout, ProtocolError)
+
+
+def _retry_read(fn: Callable[[], _T], *, what: str, tries: int = 3,
+                backoff_s: float = 0.5) -> _T:
+    """Call `fn` (an IDEMPOTENT read) and retry on a transient network fault with a
+    short linear backoff. Only reads go through here — never order submits, which
+    aren't safe to blind-retry (a reset can drop the response AFTER the order was
+    accepted, so a retry could double-submit). Re-raises the last error if every
+    attempt fails, so real outages still surface."""
+    last: Exception | None = None
+    for attempt in range(1, tries + 1):
+        try:
+            return fn()
+        except _TRANSIENT_NET as e:
+            last = e
+            if attempt < tries:
+                log.warning(
+                    "%s: transient network error (%s); retry %d/%d.",
+                    what, e.__class__.__name__, attempt, tries - 1,
+                )
+                time.sleep(backoff_s * attempt)
+    assert last is not None  # loop only exits early via return
+    raise last
+
 
 class AlpacaClient:
     def __init__(self, cfg: Config):
@@ -63,8 +100,11 @@ class AlpacaClient:
 
     # -- read --------------------------------------------------------------- #
     def get_account(self) -> AccountSnapshot:
-        a = self.trading.get_account()
-        positions = [self._to_position(p) for p in self.trading.get_all_positions()]
+        a = _retry_read(self.trading.get_account, what="get_account")
+        raw_positions = _retry_read(
+            self.trading.get_all_positions, what="get_all_positions"
+        )
+        positions = [self._to_position(p) for p in raw_positions]
         return AccountSnapshot(
             equity=float(a.equity),
             last_equity=float(a.last_equity),
@@ -90,7 +130,11 @@ class AlpacaClient:
     def latest_price(self, symbol: str) -> float:
         try:
             req = StockLatestTradeRequest(symbol_or_symbols=symbol)
-            return float(self.data.get_stock_latest_trade(req)[symbol].price)
+            trade = _retry_read(
+                lambda: self.data.get_stock_latest_trade(req),
+                what=f"latest_price({symbol})",
+            )
+            return float(trade[symbol].price)
         except Exception as e:
             log.warning("latest_price(%s) failed: %s", symbol, e)
             return 0.0
@@ -116,7 +160,8 @@ class AlpacaClient:
         return (closes[-1] / closes[0] - 1.0) * 100.0
 
     def is_market_open(self) -> bool:
-        return bool(self.trading.get_clock().is_open)
+        clock = _retry_read(self.trading.get_clock, what="get_clock")
+        return bool(clock.is_open)
 
     def portfolio_basis(self) -> Optional[tuple[float, float]]:
         """(base_value, net_cashflows) since account inception, for true
@@ -461,7 +506,10 @@ class AlpacaClient:
                 timeframe=TimeFrame.Day,
                 start=datetime.now(timezone.utc) - timedelta(days=days * 2),
             )
-            bars = self.data.get_stock_bars(req).data.get(symbol, [])
+            resp = _retry_read(
+                lambda: self.data.get_stock_bars(req), what=f"_daily_closes({symbol})"
+            )
+            bars = resp.data.get(symbol, [])
             return [float(b.close) for b in bars][-days:]
         except Exception as e:
             log.warning("_daily_closes(%s) failed: %s", symbol, e)

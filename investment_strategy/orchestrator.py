@@ -15,6 +15,10 @@ import os
 import threading
 import time
 
+from requests.exceptions import ConnectionError as RequestsConnectionError
+from requests.exceptions import Timeout as RequestsTimeout
+from urllib3.exceptions import ProtocolError
+
 from .attribution import render_lessons
 from .benchmark import BenchmarkTracker
 from .config import Config
@@ -44,6 +48,11 @@ from .state import PortfolioState
 from .status import EquityHistory, compute_status
 
 log = logging.getLogger("orchestrator")
+
+# Transient network faults that already survived the broker's own retries. They're
+# self-healing (the next tick reconnects), so they're logged as a one-line warning
+# rather than a full traceback — a reset-by-peer isn't a bug to debug.
+_TRANSIENT_NET = (RequestsConnectionError, RequestsTimeout, ProtocolError)
 
 # The model is DISCOVERY-DRIVEN: there is no standing watchlist. The scanner
 # surfaces names each cycle and current holdings are always re-evaluated, so the
@@ -148,22 +157,33 @@ class Orchestrator:
         )
         wd_thread.start()
 
-        while not self._stop.is_set():
-            try:
-                self._refresh_runtime_controls()
-                if self._decision_due():
-                    self.run_decision_cycle()
-                    self._refresh_dashboard()
-                    self._last_decision_at = time.monotonic()
-            except KeyboardInterrupt:
-                log.info("Interrupted — exiting.")
-                break
-            except Exception:
-                log.exception("Decision tick failed; continuing.")
-            # Wake promptly on shutdown; otherwise tick on the monitor cadence.
-            self._stop.wait(self.cfg.monitor_interval_s)
-        self._stop.set()
-        wd_thread.join(timeout=self.cfg.monitor_interval_s + 5)
+        # Ctrl-C almost always lands inside _stop.wait() below (that's where this
+        # loop spends nearly all its time), so the KeyboardInterrupt handler wraps
+        # the WHOLE loop, not just the decision body — otherwise an interrupt during
+        # the wait escaped as an ugly traceback. The finally guarantees a clean
+        # shutdown (signal the watchdog thread, then join it) on any exit path.
+        try:
+            while not self._stop.is_set():
+                try:
+                    self._refresh_runtime_controls()
+                    if self._decision_due():
+                        self.run_decision_cycle()
+                        self._refresh_dashboard()
+                        self._last_decision_at = time.monotonic()
+                except _TRANSIENT_NET as e:
+                    log.warning(
+                        "Decision tick skipped on a transient network error (%s); "
+                        "retrying next tick.", e.__class__.__name__,
+                    )
+                except Exception:
+                    log.exception("Decision tick failed; continuing.")
+                # Wake promptly on shutdown; otherwise tick on the monitor cadence.
+                self._stop.wait(self.cfg.monitor_interval_s)
+        except KeyboardInterrupt:
+            log.info("Interrupted — shutting down.")
+        finally:
+            self._stop.set()
+            wd_thread.join(timeout=self.cfg.monitor_interval_s + 5)
 
     def _watchdog_loop(self) -> None:
         """Independent safety loop: closing positions is never gated, so this runs
@@ -172,6 +192,11 @@ class Orchestrator:
             try:
                 with self._trade_lock:
                     self.watchdog.check_once()
+            except _TRANSIENT_NET as e:
+                log.warning(
+                    "Watchdog tick skipped on a transient network error (%s); "
+                    "retrying next tick.", e.__class__.__name__,
+                )
             except Exception:
                 log.exception("Watchdog tick failed; continuing.")
             self._stop.wait(self.cfg.monitor_interval_s)
