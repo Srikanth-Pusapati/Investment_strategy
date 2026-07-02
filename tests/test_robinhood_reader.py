@@ -119,6 +119,26 @@ def test_parse_falls_back_to_cost_basis_when_quote_missing():
     assert out[0].unrealized_pl_pct is None            # unknown without a price
 
 
+# -- read-only enforcement (Todo-3 S.2) --------------------------------------- #
+def test_read_tool_classifier():
+    for tool in ("get_equity_positions", "get_accounts", "get_option_chains",
+                 "__list_tools__", "search", "run_scan"):
+        assert RobinhoodReader._is_read_tool(tool), tool
+    for tool in ("place_equity_order", "place_option_order", "cancel_equity_order",
+                 "review_option_order", "update_watchlist", "add_to_watchlist",
+                 "remove_from_watchlist", "create_scan", "create_watchlist",
+                 "follow_watchlist", "unfollow_watchlist", "update_scan_filters"):
+        assert not RobinhoodReader._is_read_tool(tool), tool
+
+
+def test_call_json_refuses_trade_tool_before_any_network():
+    # The block fires before cfg/enabled/network are ever touched — an object
+    # with NO cfg proves the refusal path can't accidentally dispatch.
+    r = RobinhoodReader.__new__(RobinhoodReader)
+    assert r.call_json("place_equity_order", {"symbol": "AAPL"}) is None
+    assert r.call_json("cancel_option_order", {"id": "x"}) is None
+
+
 def _run_all():
     fns = [v for k, v in sorted(globals().items()) if k.startswith("test_") and callable(v)]
     failed = 0

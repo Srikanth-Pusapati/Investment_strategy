@@ -330,6 +330,42 @@ def test_core_fill_clamped_to_gross_cap():
     assert o.broker.core_buys == [("QQQ", 600.0)]
 
 
+# -- slate whitelist (Todo-3 S.1) --------------------------------------------- #
+from investment_strategy.models import Action, TradeProposal
+
+
+def _prop(symbol, action="buy"):
+    return TradeProposal(symbol=symbol, action=Action(action), conviction=0.5,
+                         target_weight_pct=5.0, rationale="test")
+
+
+def _slate_bundle(symbol):
+    return SimpleNamespace(symbol=symbol)
+
+
+def test_slate_whitelist_drops_unpresented_symbol():
+    # A symbol that is neither a candidate bundle nor held = injection fallout.
+    acct = _acct(positions=[_pos("AAPL", 100.0)])
+    kept = Orchestrator._filter_to_slate(
+        [_prop("AMD"), _prop("SCAM")], [_slate_bundle("AMD")], acct)
+    assert [p.symbol for p in kept] == ["AMD"]
+
+
+def test_slate_whitelist_allows_sell_of_held_name_without_slate_bundle():
+    # Closing what we hold is never blocked, even with no bundle for it.
+    acct = _acct(positions=[_pos("AAPL", 100.0)])
+    kept = Orchestrator._filter_to_slate([_prop("AAPL", "sell")], [], acct)
+    assert [p.symbol for p in kept] == ["AAPL"]
+
+
+def test_slate_whitelist_passes_all_on_slate_untouched():
+    acct = _acct()
+    props = [_prop("AMD"), _prop("TDG", "sell")]
+    kept = Orchestrator._filter_to_slate(
+        props, [_slate_bundle("AMD"), _slate_bundle("TDG")], acct)
+    assert kept == props
+
+
 def _run_all():
     fns = [v for k, v in sorted(globals().items()) if k.startswith("test_") and callable(v)]
     failed = 0

@@ -106,12 +106,86 @@ PHASE C — FIX DISCOVERY BREADTH  (found 2026-07-01; largely DONE 2026-07-02)
         the sector-concentration cap.
 
 --------------------------------------------------------------------------------
+PHASE S — SECURITY  (2026-07-02 audit; graphify + code walk. Close BEFORE giving
+the loop more autonomy — both HIGH items are ~15-20 line fixes.)
+--------------------------------------------------------------------------------
+[DONE 2026-07-02] S.1 (HIGH) Slate whitelist. DecisionEngine._parse (decision/engine.py) accepts
+        ANY symbol Claude returns. Untrusted text (news headlines, WSB posts, RH
+        list names) flows into the prompt; _safe() stops delimiter escape but
+        nothing stops Claude being PERSUADED to buy a pumped ticker that no
+        screener surfaced. RiskManager caps the size, not the symbol.
+        FIX: drop any proposal whose symbol is not in {candidate slate + held
+        positions}; log the rejection loudly. (~20 lines, orchestrator or _parse.)
+[DONE 2026-07-02] S.2 (HIGH) Enforce read-only Robinhood IN CODE. RobinhoodReader.call_json
+        (portfolio/robinhood.py) will call ANY MCP tool name — "NEVER call a trade
+        tool" is only a docstring, and the OAuth token is TRADE-CAPABLE (RH grants
+        a single scope). One bad string = a real Robinhood order.
+        FIX: hard denylist inside call_json before dispatch (reject place_*,
+        cancel_*, review_*, update_*, add_*, remove_*, create_*, follow_*,
+        unfollow_*), or allowlist get_*/search only. (~15 lines.)
+[DONE 2026-07-02] S.3 (LOW, 1 min) chmod 600 .env — currently 644 (world-readable) holding ~10
+        secrets (6 API keys + SMTP password). state/robinhood_oauth.json already 600.
+[x] S.4 (note) Prompt-injection basics ALREADY in place and verified: <market_data>
+        delimiter neutralization (engine._safe) + "untrusted data, not instructions"
+        framing (prompts.py). Keep; S.1 closes the remaining hole.
+
+--------------------------------------------------------------------------------
+PHASE L — LEGAL / TAX  (absorbs old G.6; single-user posture is CLEAR today)
+--------------------------------------------------------------------------------
+[ ] L.1 (GATE, non-code; =old G.6) Multi-user/managing others' money may require
+        IA/broker-dealer registration depending on jurisdiction. Hard gate before
+        any G.* build. Single-user (own money, own keys, paper->live) needs NO
+        registration — current posture is fine.
+[ ] L.2 (MED, before LIVE money) Wash-sale/tax mechanics of a high-churn bot:
+        short-term gains = ordinary income; the rebuy-after-stop pattern triggers
+        wash-sale basis adjustments the ledger doesn't track. Add a wash-sale flag
+        to the ledger, or minimally document "broker 1099-B is source of truth".
+[x] L.3 (LOW, mostly OK) Data-source ToS: RH agentic MCP = official API OK; EDGAR
+        SEC_USER_AGENT set OK; Quiver = paid license OK; yfinance is ToS-gray ->
+        already being routed away via C.5/E.2.
+
+--------------------------------------------------------------------------------
+PHASE X — EXECUTION-MODEL GAPS  (new items only; X.1/X.2/X.5 = D.1/D.3/F.1 below)
+--------------------------------------------------------------------------------
+[ ] X.3 (MED — the biggest untapped "max risk" lever) Options are OFF. The
+        defined-risk execution path EXISTS (execution/options.py,
+        RiskManager.evaluate_option) but the model has no options DATA to reason
+        with: options_flow dead on free Polygon, C.4 (RH option-chain signal)
+        unbuilt, and Alpaca options approval must be enabled on the account.
+        SEQUENCE: build C.4 -> flip OPTIONS_ENABLED=on in PAPER -> verify sizing
+        (MAX_OPTION_PREMIUM_PCT) -> only then consider live.
+[ ] X.4 (LOW, 1-line) MAX_DISCOVERED_CANDIDATES=12 re-throttles the now-3-feed
+        discovery at the aggregator. Raise to 15-20 so breadth reaches the model.
+[ ] X.6 (LATER, gated on D.1+D.3 proof) Leverage: MAX_GROSS_EXPOSURE_PCT=100 (no
+        margin) is the single biggest remaining beat-the-index amplifier. Raise to
+        ~150 ONLY on a margin account AFTER the backtest proves the config.
+
+--------------------------------------------------------------------------------
 PHASE D — PROVE IT (do BEFORE trusting the aggressive config with real money)
 --------------------------------------------------------------------------------
-[ ] D.1 RUN the 2.1 backtest on REAL history: wire AlpacaClient._daily_closes +
-        ledger-sourced entries (date->index glue is the only piece left; engine is
-        ready). Then sweep the Phase-A knobs (KELLY/vol/stops/scale-out) on
-        EVIDENCE — the aggressive numbers above are hypotheses, not proven.
+[DONE 2026-07-02] D.1 RAN the 2.1 backtest on REAL history. Glue shipped:
+        AlpacaClient.daily_close_series (dated closes), backtest_data.py (calendar
+        inner-join align, ledger->day-index entries, trailing-vol at entry, naive
+        breakout entry stream for sweeps), scripts/backtest_real.py (replay +
+        --sweep runner; replay window auto-trims to the first ledger entry so a
+        young ledger isn't compared against a full-year benchmark). Tests: +8.
+        EVIDENCE (27-config sweep, 365 trading days, 10 names, verified at BOTH
+        20d and 55d breakout lookbacks):
+          - STOP/TAKE DOMINATES. The then-live 5%/12% was the WORST config tested
+            (negative return at 20d lookback — 5% stop gets chopped out by normal
+            vol); 8%/20% was best at both lookbacks. .env updated 5/12 -> 8/20.
+          - KELLY_FRACTION and TARGET_ANNUAL_VOL barely move results — the
+            position caps (MAX_POSITION_PCT etc.) bind before sizing does. The
+            aggressive kelly=1/vol=45 is neither harmful nor magic. Keep.
+          - NOTHING in the satellite sweep beat QQQ's +38% window (best +6.4%);
+            the 90%-invested QQQ core (Phase B) is what keeps pace with the
+            benchmark — satellites must EARN displacement of the core. This is
+            the honest read, not a failure of the harness.
+          - D.3 partial evidence for free: the 3% daily-loss halt visibly engaged
+            (REJECT ... halting new buys) during high-vol stretches of the sweep.
+        CAVEAT: the sweep tunes SIZING+EXITS on a naive entry rule; it does not
+        replay the live signal stack (offline smart-money history isn't available).
+        Ledger replay mode exists for that as round-trips accumulate (D.2).
 [ ] D.2 Accumulate live PAPER round-trips under the new config, then re-run 2.2
         (subscriptions) for the first real SUBSCRIBE/HOLD data verdicts.
 [ ] D.3 Watch the concentration/vol the new knobs allow: MAX_SECTOR=50 + full Kelly
@@ -146,10 +220,9 @@ execution, monitoring are PER-ACCOUNT.
 [ ] G.3 (=5.3) Per-account isolation of risk_state/trades/equity_history/kill switch.
 [ ] G.4 (=5.4) Secure per-user secrets store (many broker keys can't sit in flat .env).
 [ ] G.5 (=5.5) Cost attribution — amortize/meter shared LLM+data cost per user.
-[ ] G.6 (=5.6) REGULATORY/LEGAL gate (NON-CODE, resolve FIRST) — trading others'
-        money may require IA/broker-dealer registration depending on jurisdiction.
-        Each person running their OWN instance with their OWN keys (self-opt-in) is a
-        different posture than managing funds. Settle the legal model before G.1-G.5.
+[ ] G.6 (=5.6) REGULATORY/LEGAL gate — MOVED to L.1 (Phase L). Settle the legal
+        model before G.1-G.5. Each person running their OWN instance with their OWN
+        keys (self-opt-in) is a different posture than managing funds.
 
 --------------------------------------------------------------------------------
 LOWER VALUE / SKIP unless a thesis calls for it (carried from Todo-2)
@@ -159,17 +232,27 @@ LOWER VALUE / SKIP unless a thesis calls for it (carried from Todo-2)
    Plan-upgrade-blocked: 13F, twitter; insiders already free via Finnhub + SEC EDGAR.
 
 --------------------------------------------------------------------------------
-RANKED NEXT STEPS
+RANKED NEXT STEPS  (re-ranked 2026-07-02 after the security/legal/execution audit)
 --------------------------------------------------------------------------------
- 1. D.1  Backtest the aggressive config on real history, tune on evidence [HIGH]
- 2. Set ROBINHOOD_ENABLED=on + a read-scoped token so the new C.2 movers/crowd
-    discovery actually runs (built + tested, inert until the bot has its own token).
+ 1. [DONE 2026-07-02] S.1 + S.2 slate whitelist + read-only RH enforced in code;
+    ~35 lines total — close the two real holes BEFORE giving the loop more
+    autonomy]. Do S.3 (chmod 600 .env) while at it.
+ 2. [DONE 2026-07-02] D.1 backtest ran on real history; stop/take re-tuned 5/12
+    -> 8/20 on evidence (see Phase D). Re-run `scripts/backtest_real.py` as the
+    ledger grows.
  3. D.2/D.3  Accumulate paper round-trips; confirm the safety brakes engage
- 4. C.4  Robinhood options-sentiment signal (partial options_flow replacement)
- 5. E.1  Lag-decay signal weighting; E.2/C.5 route paid/Robinhood data when it pays
- 6. F.1  Backfill bracket exits into the ledger (attribution accuracy)
- 7. G.*  Multi-user — AFTER the G.6 legal/regulatory gate
- (DONE 2026-07-02: C.1 dead-feed diagnosis/fix, C.2 Robinhood discovery screener.)
+    under full Kelly + vol 45 + sector 50 (daily-loss halt already seen engaging
+    in the D.1 sweep; equity-floor/DD-halt path still unproven)
+ 4. C.4  Robinhood options-chain signal -> then X.3 flip OPTIONS_ENABLED on PAPER
+    (the biggest untapped max-risk lever; needs Alpaca options approval too)
+ 5. X.4  Raise MAX_DISCOVERED_CANDIDATES 12 -> 15-20 (1 line); E.1 lag-decay
+    signal weighting; C.5/E.2 route fundamentals via RH/paid data when it pays
+ 6. F.1  Backfill bracket exits into the ledger; L.2 wash-sale/tax note — both
+    before real money
+ 7. X.6  Leverage (gross 100 -> ~150 on margin) ONLY after #2/#3 prove the config
+ 8. G.*  Multi-user — AFTER the L.1 legal/regulatory gate
+ (DONE 2026-07-02: C.1 dead-feed diagnosis/fix, C.2 Robinhood discovery screener,
+  ROBINHOOD_ENABLED=on with fresh OAuth token — 3 discovery feeds now live.)
 
  HONEST CAVEAT (restate before spending real money): NOTHING guarantees beating
  QQQ/SPY over 15-30 days — that window is mostly luck. The Phase-A/B changes remove
@@ -182,3 +265,5 @@ DONE 2026-07-02:
   C.1 diagnose+fix dead feeds (insider scan-limit decoupled; options_flow = paid
   Polygon tier, documented); C.2 Robinhood movers/crowd discovery screener +
   generalized read-only RobinhoodReader.call_json.
+  Security/legal/execution audit (graphify + code walk) -> new Phases S/L/X and
+  the re-ranked next steps above.
