@@ -109,21 +109,21 @@ PHASE C — FIX DISCOVERY BREADTH  (found 2026-07-01; largely DONE 2026-07-02)
 PHASE S — SECURITY  (2026-07-02 audit; graphify + code walk. Close BEFORE giving
 the loop more autonomy — both HIGH items are ~15-20 line fixes.)
 --------------------------------------------------------------------------------
-[ ] S.1 (HIGH) Slate whitelist. DecisionEngine._parse (decision/engine.py) accepts
+[DONE 2026-07-02] S.1 (HIGH) Slate whitelist. DecisionEngine._parse (decision/engine.py) accepts
         ANY symbol Claude returns. Untrusted text (news headlines, WSB posts, RH
         list names) flows into the prompt; _safe() stops delimiter escape but
         nothing stops Claude being PERSUADED to buy a pumped ticker that no
         screener surfaced. RiskManager caps the size, not the symbol.
         FIX: drop any proposal whose symbol is not in {candidate slate + held
         positions}; log the rejection loudly. (~20 lines, orchestrator or _parse.)
-[ ] S.2 (HIGH) Enforce read-only Robinhood IN CODE. RobinhoodReader.call_json
+[DONE 2026-07-02] S.2 (HIGH) Enforce read-only Robinhood IN CODE. RobinhoodReader.call_json
         (portfolio/robinhood.py) will call ANY MCP tool name — "NEVER call a trade
         tool" is only a docstring, and the OAuth token is TRADE-CAPABLE (RH grants
         a single scope). One bad string = a real Robinhood order.
         FIX: hard denylist inside call_json before dispatch (reject place_*,
         cancel_*, review_*, update_*, add_*, remove_*, create_*, follow_*,
         unfollow_*), or allowlist get_*/search only. (~15 lines.)
-[ ] S.3 (LOW, 1 min) chmod 600 .env — currently 644 (world-readable) holding ~10
+[DONE 2026-07-02] S.3 (LOW, 1 min) chmod 600 .env — currently 644 (world-readable) holding ~10
         secrets (6 API keys + SMTP password). state/robinhood_oauth.json already 600.
 [x] S.4 (note) Prompt-injection basics ALREADY in place and verified: <market_data>
         delimiter neutralization (engine._safe) + "untrusted data, not instructions"
@@ -215,7 +215,7 @@ LOWER VALUE / SKIP unless a thesis calls for it (carried from Todo-2)
 --------------------------------------------------------------------------------
 RANKED NEXT STEPS  (re-ranked 2026-07-02 after the security/legal/execution audit)
 --------------------------------------------------------------------------------
- 1. S.1 + S.2  Slate whitelist + enforce read-only Robinhood in code [HIGH,
+ 1. [DONE 2026-07-02] S.1 + S.2 slate whitelist + read-only RH enforced in code;
     ~35 lines total — close the two real holes BEFORE giving the loop more
     autonomy]. Do S.3 (chmod 600 .env) while at it.
  2. D.1  Backtest the aggressive config on real history, tune on evidence [HIGH]

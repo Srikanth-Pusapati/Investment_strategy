@@ -127,13 +127,30 @@ class RobinhoodReader:
                 out[sym] = price
         return out
 
+    # Read-only enforcement (Todo-3 S.2). The OAuth token is TRADE-CAPABLE (RH
+    # grants a single scope), so "reads only" must be enforced in code, not by
+    # convention: anything not on this allowlist is refused before dispatch.
+    # get_* covers every read tool; search/run_scan are read-only discovery.
+    _READ_TOOL_PREFIXES = ("get_",)
+    _READ_TOOL_EXACT = frozenset({"__list_tools__", "search", "run_scan"})
+
+    @classmethod
+    def _is_read_tool(cls, tool: str) -> bool:
+        return tool in cls._READ_TOOL_EXACT or tool.startswith(cls._READ_TOOL_PREFIXES)
+
     # -- generic read-only MCP access -------------------------------------- #
     def call_json(self, tool: str, arguments: dict | None = None) -> Any | None:
-        """Call any Robinhood MCP READ tool and return its parsed JSON payload
+        """Call a Robinhood MCP READ tool and return its parsed JSON payload
         (dict/list), or None on any failure. The sentinel tool "__list_tools__"
         returns the list of available tool names instead of calling one. Sync
         wrapper around the async MCP client so callers (screeners/signals) stay
-        simple. NEVER call a trade tool here — reads only."""
+        simple. Write/trade tools are refused — this client is read-only."""
+        if not self._is_read_tool(tool):
+            log.error(
+                "BLOCKED Robinhood MCP call %r: not a read tool. This client is "
+                "read-only by design (the token is trade-capable).", tool,
+            )
+            return None
         if not self.enabled:
             return None
         try:

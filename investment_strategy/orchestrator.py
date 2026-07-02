@@ -318,6 +318,7 @@ class Orchestrator:
         }
 
         proposals = self.engine.decide(bundles, account, bench_line, external, lessons)
+        proposals = self._filter_to_slate(proposals, bundles, account)
         if not proposals:
             log.info("No actionable proposals this cycle.")
         else:
@@ -423,6 +424,28 @@ class Orchestrator:
                 )
             else:  # still new/accepted/pending_new long after submission
                 log.warning("Order %s (%s) still %s a full cycle later.", oid, symbol, status)
+
+    # -- slate whitelist (Todo-3 S.1) --------------------------------------- #
+    @staticmethod
+    def _filter_to_slate(proposals, bundles, account):
+        """Drop any proposal whose symbol was never presented to the model. The
+        decision prompt embeds UNTRUSTED third-party text (headlines, social
+        posts, curated-list names); a crafted payload could persuade the model to
+        propose a pumped ticker no screener surfaced. The model may only act on
+        the slate it was shown (candidate bundles) plus what we already hold
+        (so closing a position is never blocked)."""
+        allowed = {b.symbol for b in bundles} | {p.symbol for p in account.positions}
+        kept = []
+        for prop in proposals:
+            if prop.symbol in allowed:
+                kept.append(prop)
+            else:
+                log.warning(
+                    "DROPPED %s proposal for %s: symbol not in the candidate "
+                    "slate or held book (possible prompt injection).",
+                    prop.action.value.upper(), prop.symbol,
+                )
+        return kept
 
     # -- intra-cycle running tally (1B.3) ---------------------------------- #
     # The account is fetched ONCE per cycle; every proposal is then evaluated
