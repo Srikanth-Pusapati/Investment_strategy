@@ -272,6 +272,21 @@ class AlpacaClient:
         )
         return self.submit(order), True
 
+    def submit_notional_buy(self, symbol: str, notional: float) -> Optional[str]:
+        """Plain dollar-notional MARKET buy (no bracket) — used by the core-ETF
+        fill (Todo 1.6) to deploy idle cash into a broad index toward the target
+        invested %. The core is a diversified holding managed at the account level
+        (equity floor, emergency flatten, regime trim), so it deliberately carries
+        no per-name stop; that's why it goes through this path, not
+        submit_from_decision (which refuses a stop-less buy)."""
+        notional = round(float(notional), 2)
+        if notional < self.cfg.risk.min_order_usd:
+            log.warning("Core fill %s: $%.2f below min order.", symbol, notional)
+            return None
+        return self.submit(OrderRequest(
+            symbol=symbol, side=Action.BUY, order_type=OrderType.MARKET, notional=notional,
+        ))
+
     # -- write: options (defined-risk) ------------------------------------- #
     def submit_option_legs(
         self, legs: list[OptionLegRequest], qty: int = 1,

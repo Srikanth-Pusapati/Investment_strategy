@@ -1,0 +1,184 @@
+================================================================================
+ACTIVE TODO  (supersedes Todo-2.txt; completed items live in completed.txt)
+Opened 2026-07-01 around a new goal: BEAT the benchmark (QQQ/SPY), high-risk OK.
+Carries forward every not-yet-done Todo-2 item (see PHASE C onward).
+================================================================================
+
+WHY THIS FILE EXISTS (the 2026-07-01 diagnosis)
+  Observation: a full trading day produced trades in only ONE name (SPG), and the
+  account sat ~90% in CASH ($90k of $100k idle). Root-cause dig showed:
+    - Discovery is HEALTHY: the screener surfaced 12 good names (AMD, TDG, HUBB,
+      DASH, ...). NOT the bottleneck.
+    - Bottleneck is DOWNSTREAM: Claude proposed only 2-3 buys/cycle and HELD the
+      rest, each buy capped ~5% (MAX_POSITION_PCT), and it kept re-buying the
+      already-capped held name. Net: capital deployed glacially.
+    - You cannot beat a FULLY-invested index while 90% in cash — it's arithmetic,
+      not stock-picking. Cash is a structural SHORT against the benchmark.
+    - Two of three discovery feeds are DEAD: insider + options_flow returned 0;
+      only congress (45-day lag, weakest signal) is producing.
+
+--------------------------------------------------------------------------------
+PHASE A — AGGRESSIVE / BEAT-THE-INDEX MODE  (DONE 2026-07-01)
+--------------------------------------------------------------------------------
+[DONE 2026-07-01] A.1 Tier-1 risk-knob loosening (.env). Re-tuned the caps from
+        capital-preservation defaults to a beat-the-index posture (high-risk OK):
+          MAX_POSITION_PCT      5  -> 12   (~8 names = fully invested, not 20)
+          MAX_SYMBOL_EXPOSURE  10  -> 18   (let a high-conviction name run)
+          MIN_CASH_BUFFER_PCT  10  ->  2   (stop hoarding cash)
+          MAX_TRADE_RISK_PCT    1  ->  3   (1%-rule is preservation, not alpha)
+          KELLY_FRACTION      0.5  -> 1.0  (full Kelly = full sizing)
+          TARGET_ANNUAL_VOL    25  -> 45   (bigger vol budget = bigger positions)
+          MAX_SECTOR_EXPOSURE  30  -> 50   (allow a real tech tilt to beat QQQ)
+          MIN_EDGE_RATIO      2.0  -> 1.5  (fewer friction rejections)
+        DELIBERATELY LEFT: MAX_GROSS_EXPOSURE_PCT=100 (no leverage — the single
+        biggest amplifier; raise to 150 only on a margin acct if truly wanted),
+        EQUITY_FLOOR_PCT=60 and MAX_DRAWDOWN on (catastrophe brake stays), OPTIONS
+        off (turn on for defined-risk convex upside — see A.4).
+[DONE 2026-07-01] A.2 Tier-2 prompt de-timid-ing (decision/prompts.py). Replaced
+        "Prefer HOLD ... capital preservation beats forced activity ... proposing
+        no trades is often correct" with a mandate to keep the book working (idle
+        cash is an implicit short vs the benchmark; deploy behind the best 6-10
+        corroborated ideas; HOLD only on genuinely absent/contradictory evidence).
+        Reframed the objective: excess return is earned only on capital DEPLOYED, so
+        an under-invested book can't beat a fully-invested index however good the
+        picks. Selection emphasis kept; the anti-exposure framing removed.
+[DONE 2026-07-01] A.3 Core-satellite fill = the OLD Todo-2 1.6 (see below), shipped
+        this session. This is the STRUCTURAL fix so the cash-drag can't silently
+        return even if Claude under-proposes.
+
+--------------------------------------------------------------------------------
+PHASE B — CORE-SATELLITE FILL  (was Todo-2 1.6; DONE 2026-07-01)
+--------------------------------------------------------------------------------
+[DONE 2026-07-01] 1.6 Core-ETF allocation mode. After each decision cycle,
+        orchestrator._apply_core_fill sweeps idle cash into a broad CORE_ETF (env,
+        default QQQ) until the book is TARGET_INVESTED_PCT invested (default 90) —
+        so we're never a structural short vs the benchmark. Runs EVEN when there
+        were no proposals (the cash-drag case it exists for). The ETF is EXEMPT
+        from the single-name/sector caps (it IS the diversified core) but still
+        bounded by MIN_CASH_BUFFER_PCT and clamped to MAX_GROSS_EXPOSURE_PCT (no
+        leverage). Held PASSIVELY: excluded from the Claude decision slate (no
+        churn), exempt from thesis-decay and the watchdog time-stop; still protected
+        by the account-level guards (equity floor, emergency flatten, regime trim).
+        New broker path AlpacaClient.submit_notional_buy (plain notional MARKET buy,
+        no bracket — the core intentionally carries no per-name stop, which is why
+        it bypasses submit_from_decision's stop-required guard). Ledger:
+        TradeRecord.from_core_fill (entry_signals=["core_fill"]). Config: CORE_ETF,
+        TARGET_INVESTED_PCT (both new). Tests: test_orchestrator.py (+7). Off when
+        CORE_ETF="".
+
+--------------------------------------------------------------------------------
+PHASE C — FIX DISCOVERY BREADTH  (found 2026-07-01; largely DONE 2026-07-02)
+--------------------------------------------------------------------------------
+[DONE 2026-07-02] C.1 Diagnosed the two "dead" feeds via a live per-source scan:
+        - insider (EDGAR Form-4): NOT broken — the feed pulls (47 filings) and the
+          XML parse extracts tickers fine; open-market P-code BUYS are simply rare
+          in any small window, and it was wrongly capped at options_flow_scan_limit
+          (40). FIX: dedicated INSIDER_SCAN_LIMIT (default 100 = EDGAR's getcurrent
+          max) so it scans the whole latest-filings feed and actually catches a
+          buy cluster when one exists. Inherently low-yield (few open-market buys
+          on a quiet day) but no longer artificially narrowed. (config.py,
+          screener/insider_feed.py.)
+        - options_flow: structurally dead on the FREE Polygon tier —
+          _call_put_volume returns None for every most-active name (options data is
+          a paid Polygon add-on). Left in place but documented in .env; the real fix
+          is C.4 (Robinhood option quotes) or a paid Polygon plan once the model earns it.
+[DONE 2026-07-02] C.2 Price-momentum + crowd discovery via Robinhood (replaces the
+        need to hand-build a momentum screener). screener/robinhood_feed.py
+        RobinhoodMoversScreener surfaces Robinhood's curated "Daily movers" (momentum,
+        score 0.6) and "100 most popular" (retail crowd, 0.35) lists through the
+        read-only Agentic MCP. Resolves list ids by display name at scan time (robust
+        to Robinhood re-issuing an id), skips crypto/non-instruments, merges a name on
+        both lists. Registered as source "robinhood"; enabled only when
+        ROBINHOOD_ENABLED=on + token. Generalized RobinhoodReader with call_json(tool,
+        args) (read-only; never a trade tool) as the shared MCP access path.
+        Tests: test_robinhood_feed.py (5). NOTE: this is momentum/crowd discovery, NOT
+        options-flow or insider data — Robinhood is a broker, not a flow/insider vendor.
+[ ] C.3 (LOW) Enable the coded-but-inert `wallstreetbets` screener once its plan
+        gating clears (already in the registry).
+[ ] C.4 (MED) Robinhood-backed options SIGNAL (partial options_flow replacement).
+        From get_option_chains + get_option_quotes compute a per-name call/put volume
+        lean / IV read for candidates already surfaced (a signal-layer input, not a
+        market-wide flow scanner). Free with Gold; routes around the paid Polygon tier.
+        Needs live iteration on the option-quote volume/OI schema — hasn't been built.
+[ ] C.5 (LOW) Route fundamentals / earnings / sector through Robinhood MCP
+        (get_equity_fundamentals is rich: PE, float, 52wk, sector) to reduce reliance
+        on flaky yfinance for the fundamentals signal, earnings-blackout guard, and
+        the sector-concentration cap.
+
+--------------------------------------------------------------------------------
+PHASE D — PROVE IT (do BEFORE trusting the aggressive config with real money)
+--------------------------------------------------------------------------------
+[ ] D.1 RUN the 2.1 backtest on REAL history: wire AlpacaClient._daily_closes +
+        ledger-sourced entries (date->index glue is the only piece left; engine is
+        ready). Then sweep the Phase-A knobs (KELLY/vol/stops/scale-out) on
+        EVIDENCE — the aggressive numbers above are hypotheses, not proven.
+[ ] D.2 Accumulate live PAPER round-trips under the new config, then re-run 2.2
+        (subscriptions) for the first real SUBSCRIBE/HOLD data verdicts.
+[ ] D.3 Watch the concentration/vol the new knobs allow: MAX_SECTOR=50 + full Kelly
+        + vol 45 can build a much lumpier book. Confirm the equity floor + drawdown
+        halt actually engage as intended under the looser sizing (backtest a drawdown
+        path).
+
+--------------------------------------------------------------------------------
+PHASE E — DECISION QUALITY  (carried from Todo-2 Phase 3)
+--------------------------------------------------------------------------------
+[ ] E.1 (=3.1) Per-signal lag-decay weighting (B.5) — formalize lag-based
+        confidence so a 45d congress filing and a 1d dark-pool print aren't weighted
+        equally. (Especially relevant now that congress is the only live feed.)
+[ ] E.2 (=3.2) Swap yfinance fundamentals/earnings for the paid feed once 2.2 says
+        it pays.
+
+--------------------------------------------------------------------------------
+PHASE F — OPERATIONAL  (carried from Todo-2 Phase 4)
+--------------------------------------------------------------------------------
+[ ] F.1 (=4.2) Backfill exchange-side bracket exits into the ledger (E.15) — so
+        attribution stops undercounting auto-filled bracket exits (account-level P&L
+        already complete via status.py). (4.1 alerting shipped as 1B.1.)
+
+--------------------------------------------------------------------------------
+PHASE G — MULTI-USER / MULTI-TENANT (north star; carried from Todo-2 Phase 5)
+--------------------------------------------------------------------------------
+Principle: signals/scanner are GLOBAL (compute once); decision-sizing, risk,
+execution, monitoring are PER-ACCOUNT.
+[ ] G.1 (=5.1) Account abstraction — (id, broker creds, risk profile, state/ledger/
+        equity paths, kill switch) threaded through orchestrator/risk/ledger/status.
+[ ] G.2 (=5.2) Shared signal cycle -> fan out per-account decide/risk/execute/monitor.
+[ ] G.3 (=5.3) Per-account isolation of risk_state/trades/equity_history/kill switch.
+[ ] G.4 (=5.4) Secure per-user secrets store (many broker keys can't sit in flat .env).
+[ ] G.5 (=5.5) Cost attribution — amortize/meter shared LLM+data cost per user.
+[ ] G.6 (=5.6) REGULATORY/LEGAL gate (NON-CODE, resolve FIRST) — trading others'
+        money may require IA/broker-dealer registration depending on jurisdiction.
+        Each person running their OWN instance with their OWN keys (self-opt-in) is a
+        different posture than managing funds. Settle the legal model before G.1-G.5.
+
+--------------------------------------------------------------------------------
+LOWER VALUE / SKIP unless a thesis calls for it (carried from Todo-2)
+--------------------------------------------------------------------------------
+[ ] A.2(old) senatetrading + housetrading (overlaps the existing congress signal).
+[ ] A.3(old) lobbying (weak, slow).   [ ] A.4(old) flights (niche M&A hint).
+   Plan-upgrade-blocked: 13F, twitter; insiders already free via Finnhub + SEC EDGAR.
+
+--------------------------------------------------------------------------------
+RANKED NEXT STEPS
+--------------------------------------------------------------------------------
+ 1. D.1  Backtest the aggressive config on real history, tune on evidence [HIGH]
+ 2. Set ROBINHOOD_ENABLED=on + a read-scoped token so the new C.2 movers/crowd
+    discovery actually runs (built + tested, inert until the bot has its own token).
+ 3. D.2/D.3  Accumulate paper round-trips; confirm the safety brakes engage
+ 4. C.4  Robinhood options-sentiment signal (partial options_flow replacement)
+ 5. E.1  Lag-decay signal weighting; E.2/C.5 route paid/Robinhood data when it pays
+ 6. F.1  Backfill bracket exits into the ledger (attribution accuracy)
+ 7. G.*  Multi-user — AFTER the G.6 legal/regulatory gate
+ (DONE 2026-07-02: C.1 dead-feed diagnosis/fix, C.2 Robinhood discovery screener.)
+
+ HONEST CAVEAT (restate before spending real money): NOTHING guarantees beating
+ QQQ/SPY over 15-30 days — that window is mostly luck. The Phase-A/B changes remove
+ the ~guaranteed UNDER-performance of sitting 90% in cash in one uncorrelated name;
+ they also widen BOTH tails. Prove the edge (Phase D) before going live.
+
+DONE THIS SESSION (2026-07-01, -> also completed.txt):
+  A.1 aggressive knobs, A.2 prompt de-timid, 1.6 core-satellite fill.
+DONE 2026-07-02:
+  C.1 diagnose+fix dead feeds (insider scan-limit decoupled; options_flow = paid
+  Polygon tier, documented); C.2 Robinhood movers/crowd discovery screener +
+  generalized read-only RobinhoodReader.call_json.

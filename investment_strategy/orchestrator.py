@@ -260,6 +260,11 @@ class Orchestrator:
         # market, not just a hand-typed list. Everything still flows through the
         # same signals -> decide -> risk path below.
         base = set(self.watchlist) | {p.symbol for p in account.positions}
+        # The core-satellite ETF (Todo 1.6) is managed by _apply_core_fill, not by
+        # Claude — drop it from the decision slate so the model doesn't churn the
+        # core (buy/sell/thesis-decay it); it's held as a passive base allocation.
+        if self.cfg.core_etf:
+            base.discard(self.cfg.core_etf)
         discovered = self.screeners.scan(exclude=base) if self.cfg.screener.enabled else []
         symbols = sorted(base | {c.symbol for c in discovered})
 
@@ -290,14 +295,18 @@ class Orchestrator:
         proposals = self.engine.decide(bundles, account, bench_line, external, lessons)
         if not proposals:
             log.info("No actionable proposals this cycle.")
-            return
-
-        for proposal in proposals:
-            kinds = signal_kinds.get(proposal.symbol, [])
-            if proposal.instrument is Instrument.OPTION:
-                self._handle_option(proposal, account, kinds)
-            else:
-                self._handle_equity(proposal, account, kinds)
+        else:
+            for proposal in proposals:
+                kinds = signal_kinds.get(proposal.symbol, [])
+                if proposal.instrument is Instrument.OPTION:
+                    self._handle_option(proposal, account, kinds)
+                else:
+                    self._handle_equity(proposal, account, kinds)
+        # Core-satellite fill (Todo 1.6): deploy whatever cash the single-name book
+        # left idle into the broad core ETF, so we're not structurally short the
+        # benchmark. Runs EVEN when there were no proposals — that's exactly the
+        # cash-drag case it exists to fix.
+        self._apply_core_fill(account)
         # Persist this cycle's freshly-submitted order ids so the next boot (even
         # after a crash between cycles) reconciles their fills (1B.9).
         self.state.set_pending_orders(self._pending_oids)
@@ -496,6 +505,10 @@ class Orchestrator:
         by_symbol = {b.symbol: b for b in bundles}
         exited: set[str] = set()
         for pos in list(account.positions):
+            # The core-satellite ETF carries no per-name thesis, so signal ABSENCE
+            # must not decay-exit it (Todo 1.6) — it's a passive base allocation.
+            if self.cfg.core_etf and pos.symbol == self.cfg.core_etf:
+                continue
             age = self.state.entry_age_days(pos.symbol)
             if age is None or age < r.thesis_decay_min_age_days:
                 continue
@@ -532,6 +545,56 @@ class Orchestrator:
             return False
         return any(
             s.score is not None and s.score >= min_score for s in bundle.signals
+        )
+
+    # -- core-satellite fill (1.6) ----------------------------------------- #
+    def _apply_core_fill(self, account) -> None:
+        """Deploy idle cash into the broad CORE_ETF until the book reaches
+        TARGET_INVESTED_PCT, so sitting in cash isn't a structural short against the
+        benchmark. The ETF is exempt from the single-name / sector caps (it IS the
+        diversified core) but still bounded by the cash buffer and the no-leverage
+        gross cap. Held as a passive base allocation — managed here, not by Claude,
+        and protected only by the account-level guards (equity floor, emergency
+        flatten, regime trim). Off unless CORE_ETF is set."""
+        etf = self.cfg.core_etf
+        if not etf or self.cfg.target_invested_pct <= 0:
+            return
+        if self.risk.kill_switch:
+            return  # new buys halted — don't top up the core either
+        r = self.cfg.risk
+        equity = account.equity
+        if equity <= 0:
+            return
+        deployed = sum(max(0.0, p.market_value) for p in account.positions)
+        invested_pct = deployed / equity * 100.0
+        # Never target beyond the no-leverage gross cap (respect the same ceiling
+        # single-name buys do).
+        target = min(self.cfg.target_invested_pct, r.max_gross_exposure_pct)
+        if invested_pct >= target:
+            return
+        gap = equity * (target - invested_pct) / 100.0
+        # Respect the cash buffer: keep min_cash_buffer_pct of equity uninvested.
+        min_cash = equity * (r.min_cash_buffer_pct / 100.0)
+        spendable = max(0.0, account.cash - min_cash)
+        notional = round(min(gap, spendable), 2)
+        if notional < max(r.min_order_usd, 1.0):
+            return
+        price = self.broker.latest_price(etf)
+        with self._trade_lock:
+            oid = self.broker.submit_notional_buy(etf, notional)
+        if not oid:
+            return
+        log.info(
+            "Core fill: bought $%.0f of %s (invested %.0f%% -> ~%.0f%%, target %.0f%%).",
+            notional, etf, invested_pct,
+            invested_pct + notional / equity * 100.0, target,
+        )
+        self.ledger.record(TradeRecord.from_core_fill(etf, notional, price, oid))
+        self._pending_oids.append((oid, etf))
+        self.state.register_entry(etf)
+        # Fold into this cycle's snapshot so a later call sees the deployed capital.
+        self._apply_pending_buy(
+            account, etf, notional, price, notional / price if price > 0 else 0.0,
         )
 
     # -- equity path -------------------------------------------------------- #

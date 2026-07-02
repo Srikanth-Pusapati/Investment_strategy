@@ -87,6 +87,7 @@ class _FakeBroker:
         self.reduced = []       # (symbol, qty)
         self.canceled = []
         self.closed = []
+        self.core_buys = []     # (symbol, notional)
 
     def cancel_open_orders_for(self, symbol):
         self.canceled.append(symbol)
@@ -98,6 +99,13 @@ class _FakeBroker:
     def close_position(self, symbol):
         self.closed.append(symbol)
         return f"oid-{symbol}"
+
+    def latest_price(self, symbol):
+        return 100.0
+
+    def submit_notional_buy(self, symbol, notional):
+        self.core_buys.append((symbol, round(notional, 2)))
+        return f"oid-core-{symbol}"
 
 
 class _FakeLedger:
@@ -123,15 +131,24 @@ def _state_tmp():
 
 def _orch(trim_enabled=True, trim_pct=25.0, state=None,
           thesis_decay_enabled=False, thesis_decay_min_age_days=3.0,
-          thesis_min_score=0.1):
+          thesis_min_score=0.1, core_etf="", target_invested_pct=0.0,
+          min_cash_buffer_pct=2.0, max_gross_exposure_pct=100.0,
+          kill_switch=False):
     o = Orchestrator.__new__(Orchestrator)
-    o.cfg = SimpleNamespace(risk=SimpleNamespace(
-        regime_trim_enabled=trim_enabled, regime_trim_pct=trim_pct,
-        default_stop_loss_pct=5.0, default_take_profit_pct=12.0,
-        thesis_decay_enabled=thesis_decay_enabled,
-        thesis_decay_min_age_days=thesis_decay_min_age_days,
-        thesis_min_score=thesis_min_score,
-    ))
+    o.cfg = SimpleNamespace(
+        core_etf=core_etf, target_invested_pct=target_invested_pct,
+        risk=SimpleNamespace(
+            regime_trim_enabled=trim_enabled, regime_trim_pct=trim_pct,
+            default_stop_loss_pct=5.0, default_take_profit_pct=12.0,
+            thesis_decay_enabled=thesis_decay_enabled,
+            thesis_decay_min_age_days=thesis_decay_min_age_days,
+            thesis_min_score=thesis_min_score,
+            min_cash_buffer_pct=min_cash_buffer_pct,
+            max_gross_exposure_pct=max_gross_exposure_pct,
+            min_order_usd=1.0,
+        ),
+    )
+    o.risk = SimpleNamespace(kill_switch=kill_switch)
     o.broker = _FakeBroker()
     o.ledger = _FakeLedger()
     o.watchdog = _FakeWatchdog()
@@ -251,6 +268,66 @@ def test_thesis_decay_noop_when_disabled():
     acct = _acct(positions=[_pos("AAPL", 300.0)])
     assert o._apply_thesis_decay_exits([], acct) == set()
     assert o.broker.closed == []
+
+
+# -- core-satellite fill (1.6) ----------------------------------------------- #
+def test_core_fill_deploys_idle_cash_to_target():
+    # $1000 equity, nothing deployed, target 90% -> buy ~$900 of QQQ
+    # (cash buffer 2% = $20 reserve, so spendable $980 covers the $900 gap).
+    o = _orch(core_etf="QQQ", target_invested_pct=90.0, min_cash_buffer_pct=2.0)
+    acct = _acct(cash=1_000.0)
+    o._apply_core_fill(acct)
+    assert o.broker.core_buys == [("QQQ", 900.0)]
+    assert o._pending_oids == [("oid-core-QQQ", "QQQ")]
+    assert len(o.ledger.records) == 1
+    # Snapshot folded the fill in so a later call this cycle sees it deployed.
+    assert acct.position_for("QQQ").market_value == 900.0
+
+
+def test_core_fill_respects_cash_buffer():
+    # Target wants $900 but only $500 is spendable above the 50% buffer -> caps at $500.
+    o = _orch(core_etf="QQQ", target_invested_pct=90.0, min_cash_buffer_pct=50.0)
+    acct = _acct(cash=1_000.0)
+    o._apply_core_fill(acct)
+    assert o.broker.core_buys == [("QQQ", 500.0)]
+
+
+def test_core_fill_accounts_for_existing_positions():
+    # Already 80% invested; target 90% -> only top up the remaining $100.
+    o = _orch(core_etf="QQQ", target_invested_pct=90.0, min_cash_buffer_pct=2.0)
+    acct = _acct(cash=200.0, positions=[_pos("AAPL", 800.0)])
+    o._apply_core_fill(acct)
+    assert o.broker.core_buys == [("QQQ", 100.0)]
+
+
+def test_core_fill_noop_when_already_at_target():
+    o = _orch(core_etf="QQQ", target_invested_pct=90.0)
+    acct = _acct(cash=50.0, positions=[_pos("AAPL", 950.0)])  # 95% invested
+    o._apply_core_fill(acct)
+    assert o.broker.core_buys == []
+
+
+def test_core_fill_noop_when_disabled():
+    o = _orch(core_etf="", target_invested_pct=90.0)
+    acct = _acct(cash=1_000.0)
+    o._apply_core_fill(acct)
+    assert o.broker.core_buys == []
+
+
+def test_core_fill_noop_under_kill_switch():
+    o = _orch(core_etf="QQQ", target_invested_pct=90.0, kill_switch=True)
+    acct = _acct(cash=1_000.0)
+    o._apply_core_fill(acct)
+    assert o.broker.core_buys == []
+
+
+def test_core_fill_clamped_to_gross_cap():
+    # Target 90% but the no-leverage gross cap is 60% -> deploy only to 60%.
+    o = _orch(core_etf="QQQ", target_invested_pct=90.0, max_gross_exposure_pct=60.0,
+              min_cash_buffer_pct=2.0)
+    acct = _acct(cash=1_000.0)
+    o._apply_core_fill(acct)
+    assert o.broker.core_buys == [("QQQ", 600.0)]
 
 
 def _run_all():

@@ -256,6 +256,11 @@ class Watchdog:
         max_days = getattr(self.cfg.risk, "max_hold_days", 0.0)
         if not max_days or max_days <= 0:
             return False
+        # The core-satellite ETF (Todo 1.6) is a permanent, diversified holding — it
+        # has no thesis to go stale, so the "recycle dead capital" time-stop must not
+        # rotate it out. Account-level guards still protect it.
+        if getattr(self.cfg, "core_etf", "") and pos.symbol == self.cfg.core_etf:
+            return False
         self.state.register_entry(pos.symbol)  # idempotent; first-seen fallback
         age = self.state.entry_age_days(pos.symbol)
         if age is None or age < max_days:
