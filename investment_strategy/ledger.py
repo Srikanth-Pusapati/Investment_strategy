@@ -113,6 +113,24 @@ class TradeRecord(BaseModel):
         )
 
     @classmethod
+    def from_core_fill(
+        cls, symbol: str, notional: float, entry_price: float,
+        order_id: Optional[str],
+    ) -> "TradeRecord":
+        """A core-satellite (Todo 1.6) top-up buy of the broad CORE_ETF. It is NOT
+        a Claude proposal — it deploys idle cash toward TARGET_INVESTED_PCT — so it
+        carries no conviction/thesis and no per-name stop (account-level guards
+        protect the core). exit_reason left blank; entry marked 'core_fill'."""
+        qty = round(notional / entry_price, 6) if entry_price > 0 else 0.0
+        return cls(
+            symbol=symbol, action="buy", instrument="equity", qty=qty,
+            entry_price=entry_price, cost_usd=round(notional, 2),
+            rationale="core-satellite fill: deploy idle cash toward target invested %",
+            entry_signals=["core_fill"], verdict="approved",
+            risk_note="core ETF — exempt from single-name caps", order_id=order_id,
+        )
+
+    @classmethod
     def for_sell(
         cls, symbol: str, rationale: str, order_id: Optional[str],
         qty: float = 0.0, key_signals: Optional[list[str]] = None,

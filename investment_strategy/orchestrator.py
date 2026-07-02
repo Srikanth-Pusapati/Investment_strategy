@@ -15,6 +15,10 @@ import os
 import threading
 import time
 
+from requests.exceptions import ConnectionError as RequestsConnectionError
+from requests.exceptions import Timeout as RequestsTimeout
+from urllib3.exceptions import ProtocolError
+
 from .attribution import render_lessons
 from .benchmark import BenchmarkTracker
 from .config import Config
@@ -22,12 +26,20 @@ from .decision import DecisionEngine
 from .earnings import EarningsCalendar
 from .execution import AlpacaClient, OptionsHelper
 from .ledger import TradeLedger, TradeRecord
-from .models import Candidate, Instrument, RiskVerdict, SignalBundle, TradeProposal
+from .models import (
+    Candidate,
+    Instrument,
+    Position,
+    RiskVerdict,
+    SignalBundle,
+    TradeProposal,
+)
 from .monitor import Watchdog
 from .notify import Alerter
 from .portfolio import RobinhoodReader
 from .risk import RiskManager
 from .regime import RegimeReader
+from .reset import maybe_reset_on_account_change
 from .screener import ScreenerAggregator
 from .sectors import SectorMap
 from .signals import SignalAggregator
@@ -36,6 +48,11 @@ from .state import PortfolioState
 from .status import EquityHistory, compute_status
 
 log = logging.getLogger("orchestrator")
+
+# Transient network faults that already survived the broker's own retries. They're
+# self-healing (the next tick reconnects), so they're logged as a one-line warning
+# rather than a full traceback — a reset-by-peer isn't a bug to debug.
+_TRANSIENT_NET = (RequestsConnectionError, RequestsTimeout, ProtocolError)
 
 # The model is DISCOVERY-DRIVEN: there is no standing watchlist. The scanner
 # surfaces names each cycle and current holdings are always re-evaluated, so the
@@ -48,6 +65,11 @@ class Orchestrator:
     def __init__(self, cfg: Config, watchlist: list[str] | None = None):
         self.cfg = cfg
         self.broker = AlpacaClient(cfg)
+        # If the connected Alpaca account changed since the last run (recreated, or
+        # a paper<->live switch), archive the OLD account's local state and start
+        # fresh — BEFORE loading state/ledger/equity below, so they load clean and
+        # the dashboard + risk memory don't carry a stale peak-equity or old trades.
+        maybe_reset_on_account_change(cfg, self.broker)
         # One Quiver client shared by the signal and screener layers so each live
         # feed (congress, etc.) is pulled at most once per cycle, not once per
         # layer — the double-pull fix that keeps us under Quiver's rate limit.
@@ -59,8 +81,10 @@ class Orchestrator:
         self.earnings = EarningsCalendar()
         # Per-cycle-cached sector lookup feeding the risk sector-concentration cap.
         self.sectors = SectorMap()
-        # Per-cycle market-regime read; scales position size down in risk-off.
-        self.regime = RegimeReader()
+        # Per-cycle market-regime read; scales position size down in risk-off, and
+        # DOWN (not full) when its yfinance feed is degraded — since that same
+        # outage blinds the sector cap too (1B.7).
+        self.regime = RegimeReader(degraded_mult=cfg.risk.regime_degraded_mult)
         self._regime_mult = 1.0   # set each cycle from the regime read
         self.engine = DecisionEngine(cfg)
         # One persisted risk-state instance shared by the risk gate and watchdog
@@ -104,7 +128,14 @@ class Orchestrator:
         # Order ids submitted last cycle, reconciled against actual fills at the
         # start of the next one (by then ~a decision interval has passed, so async
         # fills have settled). Catches rejects, partial fills, and silent drops.
-        self._pending_oids: list[tuple[str, str]] = []  # (order_id, symbol)
+        # Loaded from persisted state so a restart between cycles still reconciles
+        # a reject/partial instead of leaving a phantom ledger intent (1B.9).
+        self._pending_oids: list[tuple[str, str]] = self.state.get_pending_orders()
+        if self._pending_oids:
+            log.info(
+                "Loaded %d pending order(s) from state to reconcile.",
+                len(self._pending_oids),
+            )  # (order_id, symbol)
 
     # -- main loop ---------------------------------------------------------- #
     def run(self) -> None:
@@ -126,22 +157,33 @@ class Orchestrator:
         )
         wd_thread.start()
 
-        while not self._stop.is_set():
-            try:
-                self._refresh_runtime_controls()
-                if self._decision_due():
-                    self.run_decision_cycle()
-                    self._refresh_dashboard()
-                    self._last_decision_at = time.monotonic()
-            except KeyboardInterrupt:
-                log.info("Interrupted — exiting.")
-                break
-            except Exception:
-                log.exception("Decision tick failed; continuing.")
-            # Wake promptly on shutdown; otherwise tick on the monitor cadence.
-            self._stop.wait(self.cfg.monitor_interval_s)
-        self._stop.set()
-        wd_thread.join(timeout=self.cfg.monitor_interval_s + 5)
+        # Ctrl-C almost always lands inside _stop.wait() below (that's where this
+        # loop spends nearly all its time), so the KeyboardInterrupt handler wraps
+        # the WHOLE loop, not just the decision body — otherwise an interrupt during
+        # the wait escaped as an ugly traceback. The finally guarantees a clean
+        # shutdown (signal the watchdog thread, then join it) on any exit path.
+        try:
+            while not self._stop.is_set():
+                try:
+                    self._refresh_runtime_controls()
+                    if self._decision_due():
+                        self.run_decision_cycle()
+                        self._refresh_dashboard()
+                        self._last_decision_at = time.monotonic()
+                except _TRANSIENT_NET as e:
+                    log.warning(
+                        "Decision tick skipped on a transient network error (%s); "
+                        "retrying next tick.", e.__class__.__name__,
+                    )
+                except Exception:
+                    log.exception("Decision tick failed; continuing.")
+                # Wake promptly on shutdown; otherwise tick on the monitor cadence.
+                self._stop.wait(self.cfg.monitor_interval_s)
+        except KeyboardInterrupt:
+            log.info("Interrupted — shutting down.")
+        finally:
+            self._stop.set()
+            wd_thread.join(timeout=self.cfg.monitor_interval_s + 5)
 
     def _watchdog_loop(self) -> None:
         """Independent safety loop: closing positions is never gated, so this runs
@@ -150,6 +192,11 @@ class Orchestrator:
             try:
                 with self._trade_lock:
                     self.watchdog.check_once()
+            except _TRANSIENT_NET as e:
+                log.warning(
+                    "Watchdog tick skipped on a transient network error (%s); "
+                    "retrying next tick.", e.__class__.__name__,
+                )
             except Exception:
                 log.exception("Watchdog tick failed; continuing.")
             self._stop.wait(self.cfg.monitor_interval_s)
@@ -216,22 +263,47 @@ class Orchestrator:
         if self.cfg.risk.regime_filter_enabled:
             regime = self.regime.assess()
             self._regime_mult = regime.multiplier
-            log.info("Market regime: %s", regime.reason)
+            # A degraded ("unknown") read means we're flying blind on BOTH regime
+            # and the sector cap — surface that at WARNING, not INFO (1B.7).
+            if regime.label == "unknown":
+                log.warning("Market regime: %s", regime.reason)
+            else:
+                log.info("Market regime: %s", regime.reason)
         else:
             self._regime_mult = 1.0
         self._record_equity_snapshot()
         account = self.broker.get_account()
+
+        # De-risk the EXISTING book on a flip into risk-off (the regime multiplier
+        # otherwise only shrinks NEW buys). Runs before new proposals so the trimmed
+        # snapshot is what the buy path sizes against.
+        if self.cfg.risk.regime_filter_enabled:
+            self._apply_regime_trim(account, self.regime.assess())
 
         # Watchlist + current holdings are always evaluated; the scanner widens
         # this with NEW smart-money names so buy ideas can originate from the
         # market, not just a hand-typed list. Everything still flows through the
         # same signals -> decide -> risk path below.
         base = set(self.watchlist) | {p.symbol for p in account.positions}
+        # The core-satellite ETF (Todo 1.6) is managed by _apply_core_fill, not by
+        # Claude — drop it from the decision slate so the model doesn't churn the
+        # core (buy/sell/thesis-decay it); it's held as a passive base allocation.
+        if self.cfg.core_etf:
+            base.discard(self.cfg.core_etf)
         discovered = self.screeners.scan(exclude=base) if self.cfg.screener.enabled else []
         symbols = sorted(base | {c.symbol for c in discovered})
 
         bundles = self.signals.gather(symbols)
         self._inject_discovery(bundles, discovered)
+
+        # Deterministic thesis-decay exits (1B.4b): sell held names whose fresh
+        # signals no longer corroborate the entry thesis, BEFORE asking Claude — so
+        # a stale-thesis name is recycled even if the LLM is down, and we don't
+        # spend tokens deciding on a name we've already exited.
+        decayed = self._apply_thesis_decay_exits(bundles, account)
+        if decayed:
+            bundles = [b for b in bundles if b.symbol not in decayed]
+
         bench_stats = self.benchmark.compute()
         bench_line = self.benchmark.context_line(bench_stats)
         external = self.robinhood.holdings()
@@ -248,14 +320,21 @@ class Orchestrator:
         proposals = self.engine.decide(bundles, account, bench_line, external, lessons)
         if not proposals:
             log.info("No actionable proposals this cycle.")
-            return
-
-        for proposal in proposals:
-            kinds = signal_kinds.get(proposal.symbol, [])
-            if proposal.instrument is Instrument.OPTION:
-                self._handle_option(proposal, account, kinds)
-            else:
-                self._handle_equity(proposal, account, kinds)
+        else:
+            for proposal in proposals:
+                kinds = signal_kinds.get(proposal.symbol, [])
+                if proposal.instrument is Instrument.OPTION:
+                    self._handle_option(proposal, account, kinds)
+                else:
+                    self._handle_equity(proposal, account, kinds)
+        # Core-satellite fill (Todo 1.6): deploy whatever cash the single-name book
+        # left idle into the broad core ETF, so we're not structurally short the
+        # benchmark. Runs EVEN when there were no proposals — that's exactly the
+        # cash-drag case it exists to fix.
+        self._apply_core_fill(account)
+        # Persist this cycle's freshly-submitted order ids so the next boot (even
+        # after a crash between cycles) reconciles their fills (1B.9).
+        self.state.set_pending_orders(self._pending_oids)
 
     def _refresh_dashboard(self) -> None:
         """Regenerate the live dashboard HTML after a cycle so the tracker stays
@@ -325,6 +404,9 @@ class Orchestrator:
         an intent — rejects and partial fills mean the ledger and our risk picture
         can drift from reality. Surface that loudly instead of trusting submission."""
         pending, self._pending_oids = self._pending_oids, []
+        # Persist the cleared list immediately: these are about to be checked, so a
+        # crash mid-reconcile must not re-examine (or re-strand) them next boot.
+        self.state.set_pending_orders(self._pending_oids)
         for oid, symbol in pending:
             status, filled, qty = self.broker.order_fill(oid)
             if status in ("filled", "unknown"):
@@ -341,6 +423,204 @@ class Orchestrator:
                 )
             else:  # still new/accepted/pending_new long after submission
                 log.warning("Order %s (%s) still %s a full cycle later.", oid, symbol, status)
+
+    # -- intra-cycle running tally (1B.3) ---------------------------------- #
+    # The account is fetched ONCE per cycle; every proposal is then evaluated
+    # against that single snapshot. Without folding each fill back in, N buys in
+    # one cycle each size against the pre-cycle picture and can JOINTLY breach the
+    # no-leverage gross cap, the cash buffer, or max-open-positions — and on a
+    # margin account Alpaca's ~2x buying power will NOT reject the over-deploy for
+    # us. These mutate the in-memory snapshot so later proposals see reality.
+    @staticmethod
+    def _apply_pending_buy(
+        account, symbol: str, notional: float, price: float, qty: float
+    ) -> None:
+        """Reflect a just-submitted BUY into the snapshot: add/extend the position
+        and draw down cash + buying power by the (conservatively full) notional."""
+        notional = max(0.0, float(notional))
+        existing = account.position_for(symbol)
+        if existing is not None:
+            existing.qty += qty
+            existing.market_value += notional
+        else:
+            account.positions.append(Position(
+                symbol=symbol, qty=qty, avg_entry_price=price,
+                current_price=price, market_value=notional,
+                unrealized_pl=0.0, unrealized_pl_pct=0.0,
+            ))
+        account.cash = max(0.0, account.cash - notional)
+        account.buying_power = max(0.0, account.buying_power - notional)
+
+    @staticmethod
+    def _apply_pending_close(account, symbol: str) -> None:
+        """Reflect a decision SELL into the snapshot: drop the position and return
+        its market value to cash + buying power, so a later buy this cycle can use
+        the freed capital and slot."""
+        pos = account.position_for(symbol)
+        if pos is None:
+            return
+        account.positions = [p for p in account.positions if p.symbol != symbol]
+        account.cash += max(0.0, pos.market_value)
+        account.buying_power += max(0.0, pos.market_value)
+
+    # -- regime-off book trim (1B.6) --------------------------------------- #
+    def _apply_regime_trim(self, account, regime) -> None:
+        """On the FLIP into a risk-off regime, sell a slice of every held name to
+        actively de-risk the existing book — the "salvage when the market is down"
+        lever. The regime multiplier alone only shrinks NEW buys, so held names
+        would otherwise ride a downturn to their own stops with no account-level
+        response. Fires ONCE per downturn (keyed off the persisted last label), not
+        every cycle we stay risk-off. Off by default.
+
+        The bracket is released before the partial sell (its legs reserve the
+        shares), so the trimmed remainder is re-protected by a watchdog stop/take
+        at the default levels rather than an exchange bracket."""
+        r = self.cfg.risk
+        prev = self.state.get_regime_label()
+        self.state.set_regime_label(regime.label)
+        if not r.regime_trim_enabled:
+            return
+        # Only on the transition INTO risk-off, and only if there's a book to trim.
+        if regime.label != "risk-off" or prev == "risk-off":
+            return
+        frac = r.regime_trim_pct / 100.0
+        if frac <= 0 or not account.positions:
+            return
+        log.warning(
+            "Regime flipped to risk-off — trimming the book by %.0f%% to de-risk "
+            "(%d position[s]).", r.regime_trim_pct, len(account.positions),
+        )
+        with self._trade_lock:
+            for pos in list(account.positions):
+                sell_qty = round(pos.qty * frac, 6)
+                if sell_qty <= 0:
+                    continue
+                self.broker.cancel_open_orders_for(pos.symbol)  # release bracket
+                oid = self.broker.reduce_position(pos.symbol, sell_qty)
+                if not oid:
+                    continue
+                self._pending_oids.append((oid, pos.symbol))
+                self.ledger.record(TradeRecord.for_sell(
+                    pos.symbol, f"regime risk-off trim {r.regime_trim_pct:.0f}%", oid,
+                    qty=sell_qty, realized_pl_pct=pos.unrealized_pl_pct,
+                    realized_pl=None, exit_reason="regime_trim",
+                ))
+                # Keep the in-memory snapshot honest for the rest of the cycle and
+                # re-protect the (now bracket-less) remainder via the watchdog.
+                pos.qty = round(pos.qty - sell_qty, 6)
+                pos.market_value = pos.qty * pos.current_price
+                self.state.register_exits(
+                    pos.symbol, r.default_stop_loss_pct, r.default_take_profit_pct,
+                )
+
+    # -- deterministic thesis-decay exit (1B.4b) --------------------------- #
+    def _apply_thesis_decay_exits(self, bundles, account) -> set[str]:
+        """SELL held names whose entry thesis is no longer corroborated by fresh
+        signals — a name whose signals went stale but never hit a price stop would
+        otherwise be held forever, and a decision-sell needs the LLM up. This is
+        LLM-INDEPENDENT and deterministic. Guarded by a grace age so a fresh buy
+        isn't dumped on one quiet signal day. Returns the exited symbols.
+
+        CAUTION (why it's opt-in): signal ABSENCE is the decay trigger, so a
+        transient data outage that blanks the feed could force spurious exits — run
+        it only once you trust the signal feed."""
+        r = self.cfg.risk
+        if not r.thesis_decay_enabled:
+            return set()
+        by_symbol = {b.symbol: b for b in bundles}
+        exited: set[str] = set()
+        for pos in list(account.positions):
+            # The core-satellite ETF carries no per-name thesis, so signal ABSENCE
+            # must not decay-exit it (Todo 1.6) — it's a passive base allocation.
+            if self.cfg.core_etf and pos.symbol == self.cfg.core_etf:
+                continue
+            age = self.state.entry_age_days(pos.symbol)
+            if age is None or age < r.thesis_decay_min_age_days:
+                continue
+            if self._thesis_corroborated(by_symbol.get(pos.symbol), r.thesis_min_score):
+                continue
+            log.info(
+                "Thesis decay on %s: no signal >= %.2f after %.1fd — deterministic "
+                "exit (%.1f%%).", pos.symbol, r.thesis_min_score, age,
+                pos.unrealized_pl_pct,
+            )
+            with self._trade_lock:
+                self.broker.cancel_open_orders_for(pos.symbol)
+                oid = self.broker.close_position(pos.symbol)
+                self.watchdog.forget(pos.symbol)
+                self.ledger.record(TradeRecord.for_sell(
+                    pos.symbol, "thesis decay: entry signals no longer corroborated",
+                    oid, qty=pos.qty, realized_pl_pct=pos.unrealized_pl_pct,
+                    realized_pl=pos.unrealized_pl, exit_reason="thesis_decay",
+                ))
+                if oid:
+                    self._pending_oids.append((oid, pos.symbol))
+                # Keep this cycle's snapshot honest (frees capital/slot downstream).
+                self._apply_pending_close(account, pos.symbol)
+            exited.add(pos.symbol)
+        return exited
+
+    @staticmethod
+    def _thesis_corroborated(bundle, min_score: float) -> bool:
+        """True if `bundle` still carries at least one bullish signal (score >=
+        min_score). A held name with no bundle, or only sub-threshold / bearish
+        signals, has a decayed thesis. DISCOVERY signals count: a name the scanner
+        re-surfaces with a positive lean is still corroborated."""
+        if bundle is None:
+            return False
+        return any(
+            s.score is not None and s.score >= min_score for s in bundle.signals
+        )
+
+    # -- core-satellite fill (1.6) ----------------------------------------- #
+    def _apply_core_fill(self, account) -> None:
+        """Deploy idle cash into the broad CORE_ETF until the book reaches
+        TARGET_INVESTED_PCT, so sitting in cash isn't a structural short against the
+        benchmark. The ETF is exempt from the single-name / sector caps (it IS the
+        diversified core) but still bounded by the cash buffer and the no-leverage
+        gross cap. Held as a passive base allocation — managed here, not by Claude,
+        and protected only by the account-level guards (equity floor, emergency
+        flatten, regime trim). Off unless CORE_ETF is set."""
+        etf = self.cfg.core_etf
+        if not etf or self.cfg.target_invested_pct <= 0:
+            return
+        if self.risk.kill_switch:
+            return  # new buys halted — don't top up the core either
+        r = self.cfg.risk
+        equity = account.equity
+        if equity <= 0:
+            return
+        deployed = sum(max(0.0, p.market_value) for p in account.positions)
+        invested_pct = deployed / equity * 100.0
+        # Never target beyond the no-leverage gross cap (respect the same ceiling
+        # single-name buys do).
+        target = min(self.cfg.target_invested_pct, r.max_gross_exposure_pct)
+        if invested_pct >= target:
+            return
+        gap = equity * (target - invested_pct) / 100.0
+        # Respect the cash buffer: keep min_cash_buffer_pct of equity uninvested.
+        min_cash = equity * (r.min_cash_buffer_pct / 100.0)
+        spendable = max(0.0, account.cash - min_cash)
+        notional = round(min(gap, spendable), 2)
+        if notional < max(r.min_order_usd, 1.0):
+            return
+        price = self.broker.latest_price(etf)
+        with self._trade_lock:
+            oid = self.broker.submit_notional_buy(etf, notional)
+        if not oid:
+            return
+        log.info(
+            "Core fill: bought $%.0f of %s (invested %.0f%% -> ~%.0f%%, target %.0f%%).",
+            notional, etf, invested_pct,
+            invested_pct + notional / equity * 100.0, target,
+        )
+        self.ledger.record(TradeRecord.from_core_fill(etf, notional, price, oid))
+        self._pending_oids.append((oid, etf))
+        self.state.register_entry(etf)
+        # Fold into this cycle's snapshot so a later call sees the deployed capital.
+        self._apply_pending_buy(
+            account, etf, notional, price, notional / price if price > 0 else 0.0,
+        )
 
     # -- equity path -------------------------------------------------------- #
     def _handle_equity(
@@ -386,12 +666,25 @@ class Orchestrator:
                 ))
                 if oid:
                     self._pending_oids.append((oid, proposal.symbol))
+                    # Reflect the close in this cycle's snapshot so later proposals
+                    # see the freed capital / slot (see _apply_pending_buy).
+                    self._apply_pending_close(account, proposal.symbol)
             else:  # buy (approved or resized)
                 oid, fractional = self.broker.submit_from_decision(decision)
                 if oid:
                     self.ledger.record(TradeRecord.from_equity(
                         decision, price, oid, entry_signals=signal_kinds or []))
                     self._pending_oids.append((oid, proposal.symbol))
+                    # Start (or preserve) the hold clock for the deterministic
+                    # time-stop (1B.4). register_entry only stamps a first entry.
+                    self.state.register_entry(proposal.symbol)
+                    # Fold this fill back into the once-per-cycle snapshot so the
+                    # REST of the cycle's proposals treat the capital as deployed
+                    # (1B.3 — closes the intra-cycle over-deploy hole).
+                    self._apply_pending_buy(
+                        account, proposal.symbol, decision.approved_notional,
+                        price, decision.approved_qty,
+                    )
                     if fractional:
                         # Fractional orders carry no exchange-side bracket, so the
                         # watchdog enforces the hard stop / take-profit instead.

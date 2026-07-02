@@ -69,10 +69,43 @@ def test_exits_round_trip_and_cleared_by_forget():
     s1.register_exits("NVDA", stop_pct=5.0, take_pct=12.0)
     s2 = PortfolioState(path=path)  # survives restart
     ex = s2.get_exits("NVDA")
-    assert ex == {"stop_pct": 5.0, "take_pct": 12.0}
+    assert ex == {"stop_pct": 5.0, "take_pct": 12.0, "scaled": 0.0}
     s2.forget_symbol("NVDA")  # closing a position must clear its hard exits
     s3 = PortfolioState(path=path)
     assert s3.get_exits("NVDA") is None
+
+
+def test_entry_time_round_trip_idempotent_and_forget():
+    from datetime import datetime, timedelta, timezone
+
+    path = _tmp()
+    s1 = PortfolioState(path=path)
+    t0 = datetime(2026, 6, 1, tzinfo=timezone.utc)
+    s1.register_entry("AAPL", when=t0)
+    s1.register_entry("AAPL", when=t0 + timedelta(days=10))  # idempotent: no reset
+    s2 = PortfolioState(path=path)  # survives restart
+    # ~29 days as of 2026-06-30, measured from the ORIGINAL entry, not the re-stamp.
+    age = s2.entry_age_days("AAPL", now=datetime(2026, 6, 30, tzinfo=timezone.utc))
+    assert abs(age - 29.0) < 0.01
+    s2.forget_symbol("AAPL")  # closing a position clears its hold clock
+    s3 = PortfolioState(path=path)
+    assert s3.entry_age_days("AAPL") is None
+
+
+def test_entry_age_unknown_symbol_is_none():
+    s = PortfolioState(path=_tmp())
+    assert s.entry_age_days("NOPE") is None
+
+
+def test_pending_orders_round_trip_across_restart():
+    path = _tmp()
+    s1 = PortfolioState(path=path)
+    s1.set_pending_orders([("oid-1", "AAPL"), ("oid-2", "MSFT")])
+    s2 = PortfolioState(path=path)  # restart mid-flight
+    assert s2.get_pending_orders() == [("oid-1", "AAPL"), ("oid-2", "MSFT")]
+    s2.set_pending_orders([])  # reconciled -> cleared
+    s3 = PortfolioState(path=path)
+    assert s3.get_pending_orders() == []
 
 
 def test_corrupt_state_does_not_crash():

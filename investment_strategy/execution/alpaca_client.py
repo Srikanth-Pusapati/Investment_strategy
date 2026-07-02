@@ -13,8 +13,13 @@ from __future__ import annotations
 
 import logging
 import statistics
+import time
 from datetime import datetime, timedelta, timezone
-from typing import Optional
+from typing import Callable, Optional, TypeVar
+
+from requests.exceptions import ConnectionError as RequestsConnectionError
+from requests.exceptions import Timeout as RequestsTimeout
+from urllib3.exceptions import ProtocolError
 
 from alpaca.data.historical import StockHistoricalDataClient
 from alpaca.data.requests import StockBarsRequest, StockLatestTradeRequest
@@ -48,6 +53,38 @@ log = logging.getLogger("alpaca")
 _SIDE = {Action.BUY: OrderSide.BUY, Action.SELL: OrderSide.SELL}
 _TIF = {TIF.DAY: TimeInForce.DAY, TIF.GTC: TimeInForce.GTC, TIF.IOC: TimeInForce.IOC}
 
+_T = TypeVar("_T")
+
+# Transient, self-healing network faults. A "connection reset by peer" (errno 54)
+# mid-read surfaces as requests' ConnectionError wrapping urllib3's ProtocolError;
+# a slow endpoint surfaces as a Timeout. None of these mean the request is bad —
+# a quick retry almost always succeeds — so we swallow-and-retry rather than let a
+# single blip fail a whole watchdog/decision tick.
+_TRANSIENT_NET = (RequestsConnectionError, RequestsTimeout, ProtocolError)
+
+
+def _retry_read(fn: Callable[[], _T], *, what: str, tries: int = 3,
+                backoff_s: float = 0.5) -> _T:
+    """Call `fn` (an IDEMPOTENT read) and retry on a transient network fault with a
+    short linear backoff. Only reads go through here — never order submits, which
+    aren't safe to blind-retry (a reset can drop the response AFTER the order was
+    accepted, so a retry could double-submit). Re-raises the last error if every
+    attempt fails, so real outages still surface."""
+    last: Exception | None = None
+    for attempt in range(1, tries + 1):
+        try:
+            return fn()
+        except _TRANSIENT_NET as e:
+            last = e
+            if attempt < tries:
+                log.warning(
+                    "%s: transient network error (%s); retry %d/%d.",
+                    what, e.__class__.__name__, attempt, tries - 1,
+                )
+                time.sleep(backoff_s * attempt)
+    assert last is not None  # loop only exits early via return
+    raise last
+
 
 class AlpacaClient:
     def __init__(self, cfg: Config):
@@ -63,8 +100,11 @@ class AlpacaClient:
 
     # -- read --------------------------------------------------------------- #
     def get_account(self) -> AccountSnapshot:
-        a = self.trading.get_account()
-        positions = [self._to_position(p) for p in self.trading.get_all_positions()]
+        a = _retry_read(self.trading.get_account, what="get_account")
+        raw_positions = _retry_read(
+            self.trading.get_all_positions, what="get_all_positions"
+        )
+        positions = [self._to_position(p) for p in raw_positions]
         return AccountSnapshot(
             equity=float(a.equity),
             last_equity=float(a.last_equity),
@@ -75,10 +115,26 @@ class AlpacaClient:
             daytrade_count=int(getattr(a, "daytrade_count", 0) or 0),
         )
 
+    def account_id(self) -> str:
+        """Stable identifier for the connected Alpaca account. It changes if the
+        account is recreated OR you switch paper<->live, so it's the fingerprint we
+        use to detect an account change and reset stale local state. Empty string
+        if unreadable (caller then skips the check rather than wiping anything)."""
+        try:
+            a = self.trading.get_account()
+            return str(getattr(a, "account_number", "") or getattr(a, "id", "") or "")
+        except Exception as e:
+            log.warning("account_id() failed: %s", e)
+            return ""
+
     def latest_price(self, symbol: str) -> float:
         try:
             req = StockLatestTradeRequest(symbol_or_symbols=symbol)
-            return float(self.data.get_stock_latest_trade(req)[symbol].price)
+            trade = _retry_read(
+                lambda: self.data.get_stock_latest_trade(req),
+                what=f"latest_price({symbol})",
+            )
+            return float(trade[symbol].price)
         except Exception as e:
             log.warning("latest_price(%s) failed: %s", symbol, e)
             return 0.0
@@ -104,7 +160,8 @@ class AlpacaClient:
         return (closes[-1] / closes[0] - 1.0) * 100.0
 
     def is_market_open(self) -> bool:
-        return bool(self.trading.get_clock().is_open)
+        clock = _retry_read(self.trading.get_clock, what="get_clock")
+        return bool(clock.is_open)
 
     def portfolio_basis(self) -> Optional[tuple[float, float]]:
         """(base_value, net_cashflows) since account inception, for true
@@ -117,8 +174,18 @@ class AlpacaClient:
             created = acct.created_at
             if not isinstance(created, datetime):
                 created = datetime.fromisoformat(str(created))
+            created = created.astimezone(timezone.utc)
+            now = datetime.now(timezone.utc)
+            # A brand-new account (created today, especially after the open) has no
+            # completed 1D portfolio-history bar yet, and Alpaca 400s when start >
+            # end. Skip quietly and return None — total return simply isn't
+            # computable until there's a day of history, and forcing the call would
+            # misreport the initial funding as profit. Not a failure; just too new.
+            if now - created < timedelta(days=1):
+                log.debug("portfolio_basis: account too new for 1D history; skipping.")
+                return None
             req = GetPortfolioHistoryRequest(
-                start=created.astimezone(timezone.utc), timeframe="1D",
+                start=created, end=now, timeframe="1D",
             )
             hist = self.trading.get_portfolio_history(req)
             base = float(hist.base_value or 0.0)
@@ -191,14 +258,31 @@ class AlpacaClient:
         """Build a BUY from a risk-approved equity decision.
 
         Returns (order_id, is_fractional). When at least one WHOLE share is
-        affordable we submit a whole-share BRACKET order so the stop/take-profit
-        live at the exchange (survives a process crash) and drop any sub-share
-        remainder. Below one share — only reachable on small accounts with
-        fractional enabled — we submit a dollar-NOTIONAL order, which Alpaca will
-        not let us bracket; the caller must register a watchdog stop instead."""
+        affordable we PREFER a whole-share BRACKET order so the stop/take-profit
+        rest at the exchange (they survive a process crash / market close) and we
+        drop any sub-share remainder. Below one share — only reachable on small
+        accounts with fractional enabled — we submit a dollar-NOTIONAL order,
+        which Alpaca will not let us bracket; its ONLY protection is the watchdog
+        stop the caller must then register.
+
+        Every long we open MUST carry a hard stop: without a positive
+        stop_loss_pct a whole-share bracket has no stop leg and a fractional buy
+        has nothing for the watchdog to enforce — i.e. a naked position. We refuse
+        rather than open one. The irreducible residual on the fractional path is
+        an OVERNIGHT / halt GAP that jumps the stop before the ~30s watchdog can
+        market-sell (the market is closed): that risk is bounded but not
+        removable, which is exactly why we prefer the exchange-resident bracket
+        whenever a whole share is affordable (see 1B.5)."""
         if decision.verdict not in (RiskVerdict.APPROVED, RiskVerdict.RESIZED):
             return None, False
         symbol = decision.proposal.symbol
+        if decision.stop_loss_pct <= 0:
+            log.warning(
+                "Skip %s: decision carries no stop-loss — refusing to open an "
+                "unprotected position (whole-share bracket needs a stop leg; a "
+                "fractional buy needs a watchdog stop).", symbol,
+            )
+            return None, False
         price = self.latest_price(symbol)
         if price <= 0:
             log.warning("Skip %s: no price for order/bracket levels.", symbol)
@@ -208,6 +292,12 @@ class AlpacaClient:
         if whole >= 1:
             order = OrderRequest(
                 symbol=symbol, side=Action.BUY, order_type=OrderType.MARKET,
+                # GTC so the protective stop/take-profit legs REST at the exchange
+                # across sessions (a DAY bracket's stop would expire at the close,
+                # leaving the position unprotected into the overnight gap — exactly
+                # when a gap-down needs it). The market entry fills immediately; the
+                # OCO legs persist until hit or canceled (1B.5).
+                tif=TIF.GTC,
                 qty=float(whole),
                 take_profit_price=round(price * (1 + decision.take_profit_pct / 100.0), 2),
                 stop_loss_price=round(price * (1 - decision.stop_loss_pct / 100.0), 2),
@@ -226,6 +316,21 @@ class AlpacaClient:
             symbol=symbol, side=Action.BUY, order_type=OrderType.MARKET, notional=notional,
         )
         return self.submit(order), True
+
+    def submit_notional_buy(self, symbol: str, notional: float) -> Optional[str]:
+        """Plain dollar-notional MARKET buy (no bracket) — used by the core-ETF
+        fill (Todo 1.6) to deploy idle cash into a broad index toward the target
+        invested %. The core is a diversified holding managed at the account level
+        (equity floor, emergency flatten, regime trim), so it deliberately carries
+        no per-name stop; that's why it goes through this path, not
+        submit_from_decision (which refuses a stop-less buy)."""
+        notional = round(float(notional), 2)
+        if notional < self.cfg.risk.min_order_usd:
+            log.warning("Core fill %s: $%.2f below min order.", symbol, notional)
+            return None
+        return self.submit(OrderRequest(
+            symbol=symbol, side=Action.BUY, order_type=OrderType.MARKET, notional=notional,
+        ))
 
     # -- write: options (defined-risk) ------------------------------------- #
     def submit_option_legs(
@@ -249,6 +354,26 @@ class AlpacaClient:
         log.info("OPTION %d-leg order qty=%d (order %s)", len(legs), qty, placed.id)
         return str(placed.id)
 
+    # -- partial reduce (never gated — risk reduction) --------------------- #
+    def reduce_position(self, symbol: str, qty: float) -> Optional[str]:
+        """Market-SELL `qty` shares (whole or fractional) of an existing long — a
+        PARTIAL close used by the regime-off trim (1B.6) and the scale-out
+        take-profit (1B.8). Selling is never gated by the kill switch (reducing
+        risk must never be blocked). Caller should cancel any resting bracket for
+        the symbol first, since its protective legs reserve the shares."""
+        if qty is None or qty <= 0:
+            return None
+        try:
+            order = self.trading.submit_order(MarketOrderRequest(
+                symbol=symbol, qty=qty, side=OrderSide.SELL,
+                time_in_force=TimeInForce.DAY,
+            ))
+        except Exception as e:
+            log.error("reduce_position(%s, %g) failed: %s", symbol, qty, e)
+            return None
+        log.info("REDUCE %s qty=%g (order %s)", symbol, qty, order.id)
+        return str(order.id)
+
     # -- closing (never gated) --------------------------------------------- #
     def close_position(self, symbol: str) -> Optional[str]:
         try:
@@ -258,6 +383,44 @@ class AlpacaClient:
         except Exception as e:
             log.error("close_position(%s) failed: %s", symbol, e)
             return None
+
+    #: How far THROUGH the last price a fallback exit limit is set. Aggressive
+    #: enough to fill on the next print (marketable), capped so a closed/halted
+    #: market can't fill us at a catastrophic gap.
+    EXIT_LIMIT_BUFFER_PCT = 2.0
+
+    def close_position_marketable_limit(
+        self, symbol: str, qty: float, ref_price: float,
+    ) -> Optional[str]:
+        """Fallback exit when a plain MARKET close can't fill — e.g. the market is
+        closed or the name is LULD-halted. Rests a GTC SELL LIMIT priced through
+        the last trade (marketable), so it fills on the next print / at the reopen
+        instead of leaving the position with no working exit. Whole-share only:
+        Alpaca rejects GTC/limit on fractional qty, so a sub-share position's
+        overnight-gap risk stays irreducible (see 1B.2)."""
+        if qty <= 0 or ref_price <= 0:
+            return None
+        if qty != int(qty):
+            log.warning(
+                "%s: marketable-limit fallback needs whole shares (qty=%g is "
+                "fractional; GTC/limit not allowed) — cannot rest a fallback exit.",
+                symbol, qty,
+            )
+            return None
+        limit = round(ref_price * (1 - self.EXIT_LIMIT_BUFFER_PCT / 100.0), 2)
+        try:
+            order = self.trading.submit_order(LimitOrderRequest(
+                symbol=symbol, qty=float(int(qty)), side=OrderSide.SELL,
+                time_in_force=TimeInForce.GTC, limit_price=limit,
+            ))
+        except Exception as e:
+            log.error("close_position_marketable_limit(%s) failed: %s", symbol, e)
+            return None
+        log.warning(
+            "REST fallback exit for %s: GTC sell-limit %g @ %.2f (market close "
+            "unavailable).", symbol, qty, limit,
+        )
+        return str(order.id)
 
     def cancel_open_orders_for(self, symbol: str) -> None:
         for o in self.trading.get_orders():
@@ -343,7 +506,10 @@ class AlpacaClient:
                 timeframe=TimeFrame.Day,
                 start=datetime.now(timezone.utc) - timedelta(days=days * 2),
             )
-            bars = self.data.get_stock_bars(req).data.get(symbol, [])
+            resp = _retry_read(
+                lambda: self.data.get_stock_bars(req), what=f"_daily_closes({symbol})"
+            )
+            bars = resp.data.get(symbol, [])
             return [float(b.close) for b in bars][-days:]
         except Exception as e:
             log.warning("_daily_closes(%s) failed: %s", symbol, e)

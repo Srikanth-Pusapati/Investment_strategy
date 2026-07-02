@@ -164,6 +164,16 @@ class RiskManager:
         if halted:
             return self._reject(proposal, why)
 
+        # Conviction floor: a barely-there idea that only clears the friction floor
+        # still pays spread + slippage and dilutes the book. Require a real edge
+        # before risking capital (1B.9). Inert at 0.
+        if proposal.conviction < self.limits.min_conviction:
+            return self._reject(
+                proposal,
+                f"Conviction {proposal.conviction:.2f} below floor "
+                f"{self.limits.min_conviction:.2f} — no real edge; skip.",
+            )
+
         # Earnings-blackout guard: refuse NEW buys within N days of a scheduled
         # report. Gap risk through the print dwarfs the stop, so a tight stop gives
         # false comfort. Fail OPEN — only block on a date we actually have.

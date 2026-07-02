@@ -45,6 +45,9 @@ def _limits(**over) -> RiskLimits:
         max_gross_exposure_pct=100.0,
         max_sector_exposure_pct=30.0,
         regime_filter_enabled=True,
+        regime_degraded_mult=0.5,
+        regime_trim_enabled=False,
+        regime_trim_pct=25.0,
         max_daily_loss_pct=3.0,
         max_drawdown_pct=15.0,
         equity_floor_pct=0.0,
@@ -52,8 +55,14 @@ def _limits(**over) -> RiskLimits:
         min_cash_buffer_pct=10.0,
         min_trade_price_usd=5.0,
         earnings_blackout_days=3,
+        max_hold_days=30.0,
+        time_stop_min_gain_pct=2.0,
+        thesis_decay_enabled=False,
+        thesis_decay_min_age_days=3.0,
+        thesis_min_score=0.1,
         pdt_guard_enabled=True,
         max_day_trades_under_25k=3,
+        min_conviction=0.0,
         max_trade_risk_pct=1.0,
         est_slippage_pct=0.10,
         min_edge_ratio=2.0,
@@ -61,6 +70,8 @@ def _limits(**over) -> RiskLimits:
         min_order_usd=1.0,
         default_stop_loss_pct=5.0,
         default_take_profit_pct=12.0,
+        scale_out_enabled=False,
+        scale_out_pct=50.0,
         kelly_fraction=0.5,
         target_annual_vol_pct=25.0,
         options_enabled=False,
@@ -155,6 +166,20 @@ def test_fractional_disabled_rejects_sub_share():
     acct = _account(equity=2_000.0, cash=2_000.0, buying_power=2_000.0, last_equity=2_000.0)
     d = rm.evaluate(_buy(), acct, price=300.0, volatility=0.3)  # $100 budget < $300
     assert d.verdict is RiskVerdict.REJECTED
+
+
+def test_conviction_floor_rejects_low_edge():
+    # A 0.1-conviction idea is below the 0.2 floor -> rejected before sizing (1B.9).
+    rm = _rm(_limits(min_conviction=0.2))
+    d = rm.evaluate(_buy(conviction=0.1), _account(), price=100.0, volatility=0.25)
+    assert d.verdict is RiskVerdict.REJECTED
+    assert "conviction" in d.reason.lower()
+
+
+def test_conviction_floor_allows_real_edge():
+    rm = _rm(_limits(min_conviction=0.2))
+    d = rm.evaluate(_buy(conviction=0.5), _account(), price=100.0, volatility=0.25)
+    assert d.verdict in (RiskVerdict.APPROVED, RiskVerdict.RESIZED), d.reason
 
 
 def test_min_order_floor_rejects_dust():

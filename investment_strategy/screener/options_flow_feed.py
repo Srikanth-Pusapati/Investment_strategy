@@ -42,6 +42,9 @@ class OptionsFlowScreener(Screener):
 
     def scan(self) -> list[Candidate]:
         pool = self._most_actives()
+        # Surface the scan-pool size so an empty most-actives pull is visible
+        # rather than silently becoming "0 candidates" downstream.
+        log.info("Options-flow most-actives pool -> %d name(s).", len(pool))
         candidates: list[Candidate] = []
         for symbol in pool:
             agg = self._flow._call_put_volume(symbol)

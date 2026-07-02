@@ -45,12 +45,17 @@ class InsiderFeedScreener(Screener):
 
     def scan(self) -> list[Candidate]:
         filings = self._recent_form4_filings()
+        limit = self.cfg.screener.insider_scan_limit
+        # Surface the raw feed size so an empty/blocked EDGAR pull is visible
+        # rather than silently becoming "0 candidates" downstream.
+        log.info("EDGAR Form-4 feed -> %d filing(s) (scanning up to %d).",
+                 len(filings), limit)
         if not filings:
             return []
 
         buys: dict[str, int] = defaultdict(int)
         filers: dict[str, int] = defaultdict(int)   # distinct filings per ticker
-        for cik, accno, acc_dash in filings[: self.cfg.screener.options_flow_scan_limit]:
+        for cik, accno, acc_dash in filings[:limit]:
             sym, buy_sh = self._parse_submission(cik, accno, acc_dash)
             if sym and buy_sh > 0:
                 buys[sym] += buy_sh

@@ -129,12 +129,19 @@ def test_load_alert_config_from_env():
 # -- watchdog wiring: CRITICAL paths must page ------------------------------- #
 
 class _FailingBroker:
-    """close_position returns None (failed close) => naked position path."""
+    """Every exit path fails (market close AND the marketable-limit fallback) =>
+    the genuinely-naked position path that must page (1B.5)."""
     def cancel_open_orders_for(self, symbol):
         pass
 
     def close_position(self, symbol):
         return None
+
+    def latest_price(self, symbol):
+        return 50.0
+
+    def close_position_marketable_limit(self, symbol, qty, ref_price):
+        return None                      # fallback also fails => truly naked
 
     def get_account(self):
         return _acct(1000.0)

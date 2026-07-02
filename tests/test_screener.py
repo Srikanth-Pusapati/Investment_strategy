@@ -29,6 +29,7 @@ def _cfg(options_enabled=True, **over) -> SimpleNamespace:
         max_candidates=12,
         min_score=0.2,
         options_flow_scan_limit=40,
+        insider_scan_limit=100,
     )
     base.update(over)
     # Only options_enabled is read off cfg.risk by the aggregator (it gates
