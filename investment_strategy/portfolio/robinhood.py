@@ -34,10 +34,13 @@ from ..models import ExternalHolding
 
 log = logging.getLogger("robinhood")
 
+_UNSET = object()  # "not resolved yet" sentinel (distinct from a resolved None)
+
 
 class RobinhoodReader:
     def __init__(self, cfg: Config):
         self.cfg = cfg
+        self._account_number: Any = _UNSET  # cached agentic account number
 
     @property
     def enabled(self) -> bool:
@@ -65,8 +68,64 @@ class RobinhoodReader:
                 "holdings tool to enable import. Available tools: %s", names,
             )
             return []
-        payload = self.call_json(tool, {})
+        # RH's get_equity_positions is scoped per account and REQUIRES the account
+        # number. Resolve the dedicated agentic account (never the main portfolio).
+        account = self._resolve_account_number()
+        if account is None:
+            return []
+        payload = self.call_json(tool, {"account_number": account})
         return self._parse_holdings(payload) if payload is not None else []
+
+    def _resolve_account_number(self) -> str | None:
+        """The account whose holdings we import. An explicit ROBINHOOD_ACCOUNT_NUMBER
+        wins; otherwise auto-pick the one with agentic_allowed=true. We NEVER fall
+        back to the default (main-portfolio) account — the whole point is to read the
+        dedicated, funded agentic account, not your real book. Cached per instance."""
+        if self.cfg.robinhood_account_number:
+            return self.cfg.robinhood_account_number
+        if self._account_number is not _UNSET:
+            return self._account_number  # type: ignore[return-value]
+
+        payload = self.call_json("get_accounts", {})
+        accounts = payload.get("accounts") if isinstance(payload, dict) else (payload or [])
+        agentic = [a for a in (accounts or []) if a.get("agentic_allowed")]
+        if not agentic:
+            log.warning(
+                "Robinhood: no agentic-enabled account found (token sees %d account(s)). "
+                "Set ROBINHOOD_ACCOUNT_NUMBER to choose one; skipping holdings import.",
+                len(accounts or []),
+            )
+            self._account_number = None
+            return None
+        if len(agentic) > 1:
+            log.info(
+                "Robinhood: %d agentic accounts visible; using the first. Pin one with "
+                "ROBINHOOD_ACCOUNT_NUMBER to be explicit.", len(agentic),
+            )
+        num = str(agentic[0].get("account_number") or "") or None
+        self._account_number = num
+        return num
+
+    def _quote_prices(self, symbols: list[str]) -> dict[str, float]:
+        """{symbol: last price} via one batched get_equity_quotes read. Used to turn
+        RH's price-less position rows into a market value + unrealized P&L. Best
+        effort: any symbol without a usable price is simply omitted."""
+        if not symbols:
+            return {}
+        payload = self.call_json("get_equity_quotes", {"symbols": symbols})
+        results = payload.get("results", []) if isinstance(payload, dict) else (payload or [])
+        out: dict[str, float] = {}
+        for r in results or []:
+            q = (r.get("quote") if isinstance(r, dict) else None) or r
+            sym = str(q.get("symbol", "")).upper()
+            price = self._opt_float(
+                q.get("last_trade_price")
+                or q.get("last_non_reg_trade_price")
+                or q.get("previous_close")
+            )
+            if sym and price is not None:
+                out[sym] = price
+        return out
 
     # -- generic read-only MCP access -------------------------------------- #
     def call_json(self, tool: str, arguments: dict | None = None) -> Any | None:
@@ -98,8 +157,12 @@ class RobinhoodReader:
             auth = build_provider(self.cfg, interactive=False)
         else:
             headers = {"Authorization": f"Bearer {self.cfg.robinhood_mcp_token}"}
+        # terminate_on_close=False: RH's MCP rejects the session-termination DELETE
+        # with a 400, which the SDK logs as a scary (but harmless) warning on every
+        # call. We open a fresh session per call anyway, so skip the teardown DELETE.
         async with streamablehttp_client(
-            self.cfg.robinhood_mcp_url, headers=headers, auth=auth
+            self.cfg.robinhood_mcp_url, headers=headers, auth=auth,
+            terminate_on_close=False,
         ) as (read, write, _):
             async with ClientSession(read, write) as session:
                 await session.initialize()
@@ -130,7 +193,12 @@ class RobinhoodReader:
     # -- defensive parsing -------------------------------------------------- #
     def _parse_holdings(self, payload: Any) -> list[ExternalHolding]:
         """Map an already-unwrapped positions payload (list, or a dict carrying a
-        positions/results list) to ExternalHolding. Defensive: unknown shapes -> []."""
+        positions/results list) to ExternalHolding. Defensive: unknown shapes -> [].
+
+        RH's get_equity_positions rows carry symbol + quantity + average_buy_price but
+        NO market value or P&L, so we batch-fetch live quotes and derive them
+        (market_value = qty*price; unrealized_pl_pct off the avg buy). A tool that
+        already provides market_value/unrealized_pl_pct is honoured as-is."""
         if isinstance(payload, list):
             rows = payload
         elif isinstance(payload, dict):
@@ -138,20 +206,35 @@ class RobinhoodReader:
         else:
             log.warning("Robinhood MCP returned no parseable positions payload.")
             return []
-        out: list[ExternalHolding] = []
+
+        # First pass: pull the raw fields (market_value/P&L may be absent).
+        parsed: list[tuple[str, float, float | None, float | None, float | None]] = []
         for r in rows or []:
-            try:
-                out.append(ExternalHolding(
-                    source="robinhood",
-                    symbol=str(r.get("symbol") or r.get("ticker")),
-                    qty=float(r.get("quantity") or r.get("qty") or 0),
-                    market_value=float(r.get("market_value") or r.get("equity") or 0),
-                    unrealized_pl_pct=self._opt_float(
-                        r.get("unrealized_pl_pct") or r.get("percent_change")
-                    ),
-                ))
-            except (TypeError, ValueError):
+            sym = str(r.get("symbol") or r.get("ticker") or "").upper()
+            qty = self._opt_float(r.get("quantity") or r.get("qty")) or 0.0
+            if not sym or qty == 0.0:
                 continue
+            avg = self._opt_float(r.get("average_buy_price") or r.get("average_price"))
+            mv = self._opt_float(r.get("market_value") or r.get("equity"))
+            upl = self._opt_float(r.get("unrealized_pl_pct") or r.get("percent_change"))
+            parsed.append((sym, qty, avg, mv, upl))
+
+        # Enrich the rows missing a market value with one batched quote read.
+        need = [p[0] for p in parsed if p[3] is None]
+        prices = self._quote_prices(need) if need else {}
+
+        out: list[ExternalHolding] = []
+        for sym, qty, avg, mv, upl in parsed:
+            price = prices.get(sym)
+            if mv is None:
+                # live market value if we have a price, else cost basis, else 0
+                mv = qty * price if price is not None else (qty * avg if avg else 0.0)
+            if upl is None and price is not None and avg:
+                upl = (price / avg - 1.0) * 100.0
+            out.append(ExternalHolding(
+                source="robinhood", symbol=sym, qty=qty,
+                market_value=round(mv, 2), unrealized_pl_pct=upl,
+            ))
         log.info("Imported %d Robinhood holding(s) for context (read-only).", len(out))
         return out
 

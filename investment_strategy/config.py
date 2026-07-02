@@ -132,6 +132,7 @@ class Config:
     robinhood_mcp_url: str
     robinhood_mcp_token: str          # legacy: a pre-obtained OAuth access token (Bearer)
     robinhood_positions_tool: str     # MCP tool name that returns positions
+    robinhood_account_number: str     # which RH account to read (blank = auto-pick agentic)
     # OAuth handshake (preferred over a pasted token). `robinhood_auth login`
     # runs the PKCE flow once and persists access+refresh tokens to this file;
     # the reader then loads + auto-refreshes them. Scope/port/name are the DCR
@@ -222,6 +223,7 @@ def load_config() -> Config:
         ),
         robinhood_mcp_token=os.getenv("ROBINHOOD_MCP_TOKEN", ""),
         robinhood_positions_tool=os.getenv("ROBINHOOD_POSITIONS_TOOL", ""),
+        robinhood_account_number=os.getenv("ROBINHOOD_ACCOUNT_NUMBER", "").strip(),
         robinhood_oauth_file=os.getenv(
             "ROBINHOOD_OAUTH_FILE", "state/robinhood_oauth.json"
         ),
