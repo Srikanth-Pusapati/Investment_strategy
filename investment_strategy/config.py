@@ -102,6 +102,7 @@ class ScreenerConfig:
     max_candidates: int              # hard cap on discovered names per cycle
     min_score: float                 # drop candidates whose |smart-money score| is below this
     options_flow_scan_limit: int     # size of the most-actives pool the flow screener scans
+    insider_scan_limit: int          # how many recent EDGAR Form-4 filings the insider screener parses
 
 
 @dataclass(frozen=True)
@@ -129,8 +130,16 @@ class Config:
     # We call READ tools only; orders always go through Alpaca + RiskManager.
     robinhood_enabled: bool
     robinhood_mcp_url: str
-    robinhood_mcp_token: str          # OAuth access token (Bearer)
+    robinhood_mcp_token: str          # legacy: a pre-obtained OAuth access token (Bearer)
     robinhood_positions_tool: str     # MCP tool name that returns positions
+    # OAuth handshake (preferred over a pasted token). `robinhood_auth login`
+    # runs the PKCE flow once and persists access+refresh tokens to this file;
+    # the reader then loads + auto-refreshes them. Scope/port/name are the DCR
+    # + authorization-request parameters.
+    robinhood_oauth_file: str         # where the persisted OAuth tokens live
+    robinhood_scope: str              # OAuth scope requested (RH advertises "internal")
+    robinhood_callback_port: int      # localhost port for the redirect during login
+    robinhood_client_name: str        # client_name shown at DCR / on the consent screen
 
     benchmark_symbol: str
 
@@ -147,6 +156,12 @@ class Config:
     risk: RiskLimits
     screener: ScreenerConfig
     alerts: AlertConfig              # where watchdog CRITICALs page (email/webhook)
+
+    # Core-satellite (Todo 1.6): if CORE_ETF is set, top the book up to
+    # TARGET_INVESTED_PCT with that broad ETF after each decision cycle, so idle
+    # cash isn't a structural short against the benchmark. Off when core_etf="".
+    core_etf: str = ""
+    target_invested_pct: float = 0.0
 
     @property
     def is_live(self) -> bool:
@@ -207,6 +222,14 @@ def load_config() -> Config:
         ),
         robinhood_mcp_token=os.getenv("ROBINHOOD_MCP_TOKEN", ""),
         robinhood_positions_tool=os.getenv("ROBINHOOD_POSITIONS_TOOL", ""),
+        robinhood_oauth_file=os.getenv(
+            "ROBINHOOD_OAUTH_FILE", "state/robinhood_oauth.json"
+        ),
+        robinhood_scope=os.getenv("ROBINHOOD_SCOPE", "internal"),
+        robinhood_callback_port=_i("ROBINHOOD_CALLBACK_PORT", 8765),
+        robinhood_client_name=os.getenv(
+            "ROBINHOOD_CLIENT_NAME", "Investment Strategy Bot"
+        ),
         benchmark_symbol=os.getenv("BENCHMARK_SYMBOL", "QQQ").upper(),
         decision_interval_s=_i("DECISION_INTERVAL_SECONDS", 900),
         monitor_interval_s=_i("MONITOR_INTERVAL_SECONDS", 30),
@@ -294,8 +317,16 @@ def load_config() -> Config:
             max_candidates=_i("MAX_DISCOVERED_CANDIDATES", 12),
             min_score=_f("SCREENER_MIN_SCORE", 0.2),
             options_flow_scan_limit=_i("OPTIONS_FLOW_SCAN_LIMIT", 40),
+            # Open-market insider BUYS are rare in any small window, so scan a wide
+            # slice of EDGAR's ~100-filing "latest filings" feed to actually catch a
+            # cluster (was wrongly sharing options_flow_scan_limit=40).
+            insider_scan_limit=_i("INSIDER_SCAN_LIMIT", 100),
         ),
         alerts=load_alert_config(os.getenv),
+        # Core-satellite fill (Todo 1.6). CORE_ETF unset/"" disables it entirely;
+        # TARGET_INVESTED_PCT is clamped to the no-leverage gross cap downstream.
+        core_etf=os.getenv("CORE_ETF", "").strip().upper(),
+        target_invested_pct=_f("TARGET_INVESTED_PCT", 0.0),
     )
 
     missing = [
