@@ -499,6 +499,28 @@ class AlpacaClient:
             limit_price=o.limit_price, stop_price=o.stop_price, **common
         )
 
+    def daily_close_series(self, symbol: str, days: int) -> list[tuple[str, float]]:
+        """(ISO-date, close) pairs for the last `days` trading days — the dated
+        variant of _daily_closes. The dates are what lets the backtest glue align
+        multi-symbol histories and map ledger timestamps to bar indexes (D.1)."""
+        try:
+            req = StockBarsRequest(
+                symbol_or_symbols=symbol,
+                timeframe=TimeFrame.Day,
+                start=datetime.now(timezone.utc) - timedelta(days=days * 2),
+            )
+            resp = _retry_read(
+                lambda: self.data.get_stock_bars(req),
+                what=f"daily_close_series({symbol})",
+            )
+            bars = resp.data.get(symbol, [])
+            return [
+                (b.timestamp.date().isoformat(), float(b.close)) for b in bars
+            ][-days:]
+        except Exception as e:
+            log.warning("daily_close_series(%s) failed: %s", symbol, e)
+            return []
+
     def _daily_closes(self, symbol: str, days: int) -> list[float]:
         try:
             req = StockBarsRequest(

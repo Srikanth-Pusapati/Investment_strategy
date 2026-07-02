@@ -163,10 +163,29 @@ PHASE X — EXECUTION-MODEL GAPS  (new items only; X.1/X.2/X.5 = D.1/D.3/F.1 bel
 --------------------------------------------------------------------------------
 PHASE D — PROVE IT (do BEFORE trusting the aggressive config with real money)
 --------------------------------------------------------------------------------
-[ ] D.1 RUN the 2.1 backtest on REAL history: wire AlpacaClient._daily_closes +
-        ledger-sourced entries (date->index glue is the only piece left; engine is
-        ready). Then sweep the Phase-A knobs (KELLY/vol/stops/scale-out) on
-        EVIDENCE — the aggressive numbers above are hypotheses, not proven.
+[DONE 2026-07-02] D.1 RAN the 2.1 backtest on REAL history. Glue shipped:
+        AlpacaClient.daily_close_series (dated closes), backtest_data.py (calendar
+        inner-join align, ledger->day-index entries, trailing-vol at entry, naive
+        breakout entry stream for sweeps), scripts/backtest_real.py (replay +
+        --sweep runner; replay window auto-trims to the first ledger entry so a
+        young ledger isn't compared against a full-year benchmark). Tests: +8.
+        EVIDENCE (27-config sweep, 365 trading days, 10 names, verified at BOTH
+        20d and 55d breakout lookbacks):
+          - STOP/TAKE DOMINATES. The then-live 5%/12% was the WORST config tested
+            (negative return at 20d lookback — 5% stop gets chopped out by normal
+            vol); 8%/20% was best at both lookbacks. .env updated 5/12 -> 8/20.
+          - KELLY_FRACTION and TARGET_ANNUAL_VOL barely move results — the
+            position caps (MAX_POSITION_PCT etc.) bind before sizing does. The
+            aggressive kelly=1/vol=45 is neither harmful nor magic. Keep.
+          - NOTHING in the satellite sweep beat QQQ's +38% window (best +6.4%);
+            the 90%-invested QQQ core (Phase B) is what keeps pace with the
+            benchmark — satellites must EARN displacement of the core. This is
+            the honest read, not a failure of the harness.
+          - D.3 partial evidence for free: the 3% daily-loss halt visibly engaged
+            (REJECT ... halting new buys) during high-vol stretches of the sweep.
+        CAVEAT: the sweep tunes SIZING+EXITS on a naive entry rule; it does not
+        replay the live signal stack (offline smart-money history isn't available).
+        Ledger replay mode exists for that as round-trips accumulate (D.2).
 [ ] D.2 Accumulate live PAPER round-trips under the new config, then re-run 2.2
         (subscriptions) for the first real SUBSCRIBE/HOLD data verdicts.
 [ ] D.3 Watch the concentration/vol the new knobs allow: MAX_SECTOR=50 + full Kelly
@@ -218,9 +237,12 @@ RANKED NEXT STEPS  (re-ranked 2026-07-02 after the security/legal/execution audi
  1. [DONE 2026-07-02] S.1 + S.2 slate whitelist + read-only RH enforced in code;
     ~35 lines total — close the two real holes BEFORE giving the loop more
     autonomy]. Do S.3 (chmod 600 .env) while at it.
- 2. D.1  Backtest the aggressive config on real history, tune on evidence [HIGH]
+ 2. [DONE 2026-07-02] D.1 backtest ran on real history; stop/take re-tuned 5/12
+    -> 8/20 on evidence (see Phase D). Re-run `scripts/backtest_real.py` as the
+    ledger grows.
  3. D.2/D.3  Accumulate paper round-trips; confirm the safety brakes engage
-    under full Kelly + vol 45 + sector 50 (the loosened knobs)
+    under full Kelly + vol 45 + sector 50 (daily-loss halt already seen engaging
+    in the D.1 sweep; equity-floor/DD-halt path still unproven)
  4. C.4  Robinhood options-chain signal -> then X.3 flip OPTIONS_ENABLED on PAPER
     (the biggest untapped max-risk lever; needs Alpaca options approval too)
  5. X.4  Raise MAX_DISCOVERED_CANDIDATES 12 -> 15-20 (1 line); E.1 lag-decay
