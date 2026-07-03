@@ -418,6 +418,87 @@ def test_reconcile_still_pending_logs_warning():
     assert any("full cycle later" in r.getMessage() for r in recs)
 
 
+# --------------------------------------------------------------------------- #
+# Exchange-exit backfill (F.1) — record bracket-leg fills / manual sells the
+# process never issued, keyed (idempotently) on order id against the ledger.
+# --------------------------------------------------------------------------- #
+from investment_strategy.ledger import TradeRecord  # noqa: E402
+
+
+class _BackfillLedger:
+    def __init__(self, records=None):
+        self.records = list(records or [])
+
+    def record(self, rec):
+        self.records.append(rec)
+
+    def all(self):
+        return list(self.records)
+
+
+def _backfill_orch(closed_sells, records=None):
+    o = Orchestrator.__new__(Orchestrator)
+    o.broker = SimpleNamespace(closed_sell_orders=lambda: closed_sells)
+    o.ledger = _BackfillLedger(records)
+    return o
+
+
+def _buy_rec(symbol="AAPL", entry=100.0, oid="buy-1"):
+    return TradeRecord(symbol=symbol, action="buy", qty=10.0,
+                       entry_price=entry, cost_usd=entry * 10.0, order_id=oid)
+
+
+def _closed(oid, symbol="AAPL", qty=10.0, price=92.0, otype="stop",
+            filled_at="2026-07-02T15:30:00+00:00"):
+    return {"order_id": oid, "symbol": symbol, "qty": qty, "price": price,
+            "type": otype, "filled_at": filled_at}
+
+
+def test_backfill_records_bracket_legs_with_realized_pl():
+    known_sell = TradeRecord(symbol="AAPL", action="sell", order_id="known-1")
+    o = _backfill_orch(
+        closed_sells=[
+            _closed("known-1"),                                   # already ours
+            _closed("leg-stop", price=92.0, otype="stop"),        # stop leg fill
+            _closed("leg-take", qty=5.0, price=120.0, otype="limit"),
+            _closed("manual", symbol="MSFT", qty=1.0, price=50.0,
+                    otype="market"),                              # outside actor
+        ],
+        records=[_buy_rec("AAPL", entry=100.0), known_sell],
+    )
+    o._backfill_exchange_exits()
+    new = o.ledger.records[2:]
+    assert [r.exit_reason for r in new] == ["bracket_stop", "bracket_take", "external"]
+    stop, take, manual = new
+    assert abs(stop.realized_pl_pct - (-8.0)) < 1e-9
+    assert abs(stop.realized_pl - (-80.0)) < 1e-9
+    assert stop.ts.isoformat() == "2026-07-02T15:30:00+00:00"  # actual FILL time
+    assert abs(take.realized_pl_pct - 20.0) < 1e-9
+    assert manual.realized_pl_pct is None      # no ledger entry price for MSFT
+    assert manual.symbol == "MSFT"
+
+
+def test_backfill_is_idempotent_across_cycles():
+    sells = [_closed("leg-stop")]
+    o = _backfill_orch(sells, records=[_buy_rec()])
+    o._backfill_exchange_exits()
+    n = len(o.ledger.records)
+    o._backfill_exchange_exits()               # same broker answer next cycle
+    assert len(o.ledger.records) == n          # deduped by order id
+
+
+def test_backfill_never_breaks_the_cycle_on_broker_failure():
+    o = Orchestrator.__new__(Orchestrator)
+
+    def _boom():
+        raise RuntimeError("api down")
+
+    o.broker = SimpleNamespace(closed_sell_orders=_boom)
+    o.ledger = _BackfillLedger()
+    o._backfill_exchange_exits()               # must swallow, not raise
+    assert o.ledger.records == []
+
+
 def _run_all():
     fns = [v for k, v in sorted(globals().items()) if k.startswith("test_") and callable(v)]
     failed = 0

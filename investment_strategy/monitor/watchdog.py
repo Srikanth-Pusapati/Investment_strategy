@@ -56,8 +56,9 @@ class Watchdog:
         # Out-of-band paging for CRITICALs the loop can't self-heal (failed close =
         # naked position; latched halt). None => alerts are log-only (never raises).
         self.alerter = alerter
-        #: give back this much of peak gain before trailing-stopping out.
-        self.trail_giveback_pct = 3.0
+        #: give back this much of peak gain before trailing-stopping out
+        #: (TRAIL_GIVEBACK_PCT; the backtest engine mirrors the same knob).
+        self.trail_giveback_pct = getattr(cfg.risk, "trail_giveback_pct", 3.0)
 
     def _alert(self, key: str, subject: str, body: str) -> None:
         """Page a human, if an alerter is wired. The event is already logged at

@@ -95,15 +95,29 @@ PHASE C — FIX DISCOVERY BREADTH  (found 2026-07-01; largely DONE 2026-07-02)
         options-flow or insider data — Robinhood is a broker, not a flow/insider vendor.
 [ ] C.3 (LOW) Enable the coded-but-inert `wallstreetbets` screener once its plan
         gating clears (already in the registry).
-[ ] C.4 (MED) Robinhood-backed options SIGNAL (partial options_flow replacement).
-        From get_option_chains + get_option_quotes compute a per-name call/put volume
-        lean / IV read for candidates already surfaced (a signal-layer input, not a
-        market-wide flow scanner). Free with Gold; routes around the paid Polygon tier.
-        Needs live iteration on the option-quote volume/OI schema — hasn't been built.
-[ ] C.5 (LOW) Route fundamentals / earnings / sector through Robinhood MCP
-        (get_equity_fundamentals is rich: PE, float, 52wk, sector) to reduce reliance
-        on flaky yfinance for the fundamentals signal, earnings-blackout guard, and
-        the sector-concentration cap.
+[ ] C.4 (MED->HIGH; UNBLOCKED 2026-07-03) Robinhood-backed options SIGNAL
+        (partial options_flow replacement). RH's agentic MCP expansion now
+        confirms option chains + contract quotes WITH FULL GREEKS
+        (get_option_chains / get_option_instruments / get_option_quotes — all
+        get_* = auto-allowed by the S.2 allowlist). Compute a per-name call/put
+        volume lean / IV read for candidates already surfaced (a signal-layer
+        input, not a market-wide flow scanner). Routes around the paid Polygon
+        tier. Needs live iteration on the quote volume/OI schema. This is the
+        gate on X.3 (options execution).
+[ ] C.5 (LOW->MED; UNBLOCKED 2026-07-03) Route fundamentals / earnings / sector
+        through Robinhood MCP — the expansion confirms get_equity_fundamentals
+        (PE, market cap, div yield, SECTOR) + get_earnings_calendar +
+        get_equity_historicals. Reduces reliance on flaky yfinance for the
+        fundamentals signal, the earnings-blackout guard, AND the
+        sector-concentration cap (whose outage currently also blinds regime).
+[ ] C.6 (NEW 2026-07-03, MED) Robinhood SCANNER as a discovery source. The MCP
+        expansion adds market scans with RSI / volume / upcoming-earnings
+        filters. run_scan + get_scans are ALREADY on the S.2 allowlist;
+        create_scan / update_scan_* are write-tools and stay BLOCKED — so
+        define scans once by hand in the RH app (e.g. "RSI breakout + volume
+        spike"), then a screener/robinhood_scan_feed.py runs them read-only
+        each cycle. A momentum-technical discovery leg alongside congress/
+        insider/movers — different alpha family from smart-money feeds.
 
 --------------------------------------------------------------------------------
 PHASE S — SECURITY  (2026-07-02 audit; graphify + code walk. Close BEFORE giving
@@ -217,9 +231,17 @@ PHASE E — DECISION QUALITY  (carried from Todo-2 Phase 3)
 --------------------------------------------------------------------------------
 PHASE F — OPERATIONAL  (carried from Todo-2 Phase 4)
 --------------------------------------------------------------------------------
-[ ] F.1 (=4.2) Backfill exchange-side bracket exits into the ledger (E.15) — so
-        attribution stops undercounting auto-filled bracket exits (account-level P&L
-        already complete via status.py). (4.1 alerting shipped as 1B.1.)
+[DONE 2026-07-03] F.1 Exchange-exit backfill. Each decision cycle,
+        orchestrator._backfill_exchange_exits pulls the last 500 CLOSED filled
+        SELL orders (AlpacaClient.closed_sell_orders), dedupes by order id
+        against the ledger (every code-driven sell already records at submit),
+        and records what remains — bracket stop legs (exit_reason
+        bracket_stop), take-profit legs (bracket_take), manual UI sells
+        (external) — realizing P&L vs the ledger's entry price and stamping
+        the ACTUAL fill time so attribution's chronological pairing holds.
+        Idempotent, best-effort. Attribution's "bracket blind spot" caveat
+        removed — round-trips now cover every exit path. Tests +5.
+        (4.1 alerting shipped as 1B.1.)
 
 --------------------------------------------------------------------------------
 PHASE G — MULTI-USER / MULTI-TENANT (north star; carried from Todo-2 Phase 5)
@@ -256,22 +278,26 @@ VERDICTS:
     none), exit cadence (30s watchdog vs their 5-min poll), and LLM frugality
     (one decision call/cycle vs 90+ articles per ticker). We are BEHIND on four
     concrete mechanisms, imported below as R.1-R.4.
-[ ] R.1 (HIGH) ATR-scaled dynamic stops + trailing stop (their tools/
-        dynamic_stops.py). Our stop/take is one fixed 8%/20% for EVERY name;
-        D.1's own evidence says stop width DOMINATES outcomes (fixed-5% got
-        chopped by normal vol). ATR-scaling is the principled generalization of
-        the 8/20 hand-fix — tight stops on quiet names, wide on volatile ones —
-        plus a trailing ratchet the watchdog can maintain on winners.
-        Trailing-vol-at-entry already exists in backtest_data.py: sweep ATR
-        multipliers in the EXISTING harness first, ship only on evidence.
-[ ] R.2 (MED-HIGH) Pairwise-correlation concentration guard (their risk/
-        correlation_monitor.py). risk.py's sector cap is our only correlation
-        control (the 2b comment literally names the gap: "quietly stacking
-        several correlated names ... into one bet"). Under the aggressive
-        12/18/50 posture, 4-5 "different" names can be ONE factor bet.
-        Deterministic: 90d daily-return correlation vs each HELD name via
-        AlpacaClient.daily_close_series; block or downsize a buy at corr>~0.7.
-        Lives in RiskManager — Claude proposes, risk disposes, unchanged.
+[DONE 2026-07-03] R.1 Vol-scaled ("ATR-style") dynamic stops + trailing knob.
+        RiskManager._exit_levels: stop = VOL_STOP_MULT x realized daily sigma
+        (same vol input sizing already uses — zero extra fetches), take =
+        VOL_STOP_TAKE_RATIO x stop, clamped [4,15]%, DETERMINISTIC (overrides
+        the LLM's levels). Interplay: the 2d $-risk cap divides by stop width,
+        so wide-stop names buy fewer shares — $ risk stays ~flat per position.
+        TRAIL_GIVEBACK_PCT now a knob (was hardcoded 3.0 in watchdog+backtest).
+        EVIDENCE (`backtest_real.py --sweep-stops`, 365d, both 20d AND 55d
+        lookbacks): 2.0-sigma is top-2 at BOTH (20d: +32-35% vs fixed 8/20's
+        +15.8% at HALF the maxDD, ~2x Sharpe; 55d: ties best fixed at lowest
+        maxDD 4.3%, best PF 1.90); 1.5-sigma chops out, 3-sigma gives back.
+        .env: VOL_STOPS_ENABLED=on, MULT=2.0, RATIO=2.5. --stress re-run under
+        the new regime: all 5 brake checks still PASS. Tests +6.
+[DONE 2026-07-03] R.2 Pairwise-correlation guard. New correlation.py
+        (CorrelationGuard: 90d daily-return Pearson vs each held name,
+        per-cycle cached, fail-open on missing data); orchestrator computes
+        max corr EXCLUDING the core ETF (satellites are MEANT to correlate
+        with the index core) and the candidate itself (top-ups aren't new
+        bets); RiskManager rejects at corr >= MAX_PAIRWISE_CORR (.env 0.85,
+        0=off). Claude proposes, risk disposes — unchanged. Tests +12.
 [ ] R.3 (MED, merges INTO D.2) Periodic re-sweep = their ml/adaptive_optimizer
         pattern (rolling grid search on realized trades, Sharpe-ranked). We ran
         the sweep ONCE (D.1). As paper round-trips accumulate, re-run
@@ -301,31 +327,30 @@ LOWER VALUE / SKIP unless a thesis calls for it (carried from Todo-2)
    Plan-upgrade-blocked: 13F, twitter; insiders already free via Finnhub + SEC EDGAR.
 
 --------------------------------------------------------------------------------
-RANKED NEXT STEPS  (re-ranked 2026-07-03 after the reference-project analysis;
-prior 07-02 ranking's #1-#3 are DONE — see Phases S and D)
+RANKED NEXT STEPS  (re-ranked 2026-07-03 PM: R.1/R.2/F.1 SHIPPED same day;
+Robinhood MCP expansion unblocked C.4/C.5 and added C.6)
 --------------------------------------------------------------------------------
- 1. D.2  Accumulate live PAPER round-trips under the new config (unchanged #1 —
-    every evidence-gated item below feeds on its data); then re-run 2.2
-    (subscriptions) for the first real SUBSCRIBE/HOLD verdicts. Once F.1 lands,
-    fold in R.3's periodic --sweep re-tune.
- 2. R.1  ATR-scaled stops + trailing stop — attacks the ONE lever D.1 proved
-    dominates outcomes (stop width); sweep ATR multipliers in the existing
-    backtest harness for evidence BEFORE shipping to live paper.
- 3. F.1  Backfill exchange-side bracket exits into the ledger — PROMOTED
-    (was #6): now a data PREREQUISITE for R.3 re-tuning and attribution
-    accuracy, not just bookkeeping hygiene.
- 4. R.2  Pairwise-correlation guard in RiskManager — closes the concentration
-    hole the aggressive 12/18/50 posture opened (sector cap alone is too
-    crude; risk.py's own comment names the gap).
- 5. C.4  Robinhood options-chain signal -> then X.3 flip OPTIONS_ENABLED on
-    PAPER (the biggest untapped max-risk lever; needs Alpaca options approval
-    too)
- 6. E.1+R.4  Signal lag-decay weighting, generalized to trend/inflection
-    tracking; C.5/E.2 route fundamentals via RH/paid data when it pays
- 7. L.2  Wash-sale/tax note — before real money
- 8. X.6  Leverage (gross 100 -> ~150 on margin) ONLY after #1 proves the config
-    on live paper round-trips
- 9. G.*  Multi-user — AFTER the L.1 legal/regulatory gate
+ 1. D.2  Accumulate live PAPER round-trips under the new config (fresh paper
+    account planned ~mid-July — run the current stack on it as-is); then re-run
+    2.2 (subscriptions) for the first real SUBSCRIBE/HOLD verdicts. F.1 is in,
+    so R.3's periodic `--sweep` / `--sweep-stops` re-tune runs on COMPLETE
+    exit data as trips accumulate (human applies knob changes).
+ 2. C.4  Robinhood options-chain SIGNAL (now unblocked: quotes carry full
+    greeks) -> then X.3 flip OPTIONS_ENABLED on PAPER (the biggest untapped
+    max-risk lever; also needs Alpaca options approval on the new account).
+ 3. C.6  RH scanner discovery feed + C.5 fundamentals/earnings/sector via RH
+    MCP — widens discovery to a technical alpha family and de-flakes the
+    sector/earnings guards' data source before the mid-July start.
+ 4. E.1+R.4  Signal lag-decay weighting, generalized to trend/inflection
+    tracking (persist per-signal scores per cycle; weight by trend + lag).
+ 5. L.2  Wash-sale/tax note — before real money.
+ 6. X.6  Leverage (gross 100 -> ~150 on margin) ONLY after #1 proves the config
+    on live paper round-trips.
+ 7. G.*  Multi-user — AFTER the L.1 legal/regulatory gate.
+ (SHIPPED 2026-07-03 PM: R.1 vol-scaled stops ON with 2-lookback sweep evidence
+  + stress re-PASS; R.2 correlation guard ON at 0.85; F.1 exchange-exit
+  backfill closing attribution's last blind spot; --sweep-stops mode; sweep
+  log-spam fix. 302 tests green.)
 
  HONEST CAVEAT (restate before spending real money): NOTHING guarantees beating
  QQQ/SPY over 15-30 days — that window is mostly luck. The Phase-A/B changes remove
@@ -348,3 +373,9 @@ DONE 2026-07-03:
   nothing to adopt; enving/TradeAgent = direct comparable, 4 mechanisms imported
   as Phase R) -> new Phase R + re-ranked next steps (R.1 ATR stops #2, F.1
   promoted #3, R.2 correlation guard #4).
+  PM session: R.1 + R.2 + F.1 all SHIPPED (see the DONE entries above) — vol
+  stops evidence-flipped ON (2.0 sigma / rr 2.5), correlation guard ON (0.85),
+  bracket exits backfilled into ledger/attribution; --stress re-PASS under the
+  new regime; 302 tests. Robinhood MCP expansion assessed: S.2 allowlist holds
+  (new order tools auto-blocked, new get_* reads auto-allowed); C.4 + C.5
+  unblocked, C.6 (RH scanner discovery) added; next steps re-ranked.

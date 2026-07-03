@@ -32,6 +32,10 @@ _ASSUMED_VOL_WHEN_UNKNOWN = 0.60
 # exempt (they report pattern_day_trader=False / daytrade_count=0).
 _PDT_MIN_EQUITY = 25_000.0
 
+# sqrt(252): converts annualized vol back to a daily sigma for the vol-scaled
+# stop (R.1) — the inverse of the annualization the vol input arrived with.
+_TRADING_DAYS_SQRT = 252 ** 0.5
+
 
 class RiskManager:
     def __init__(
@@ -103,6 +107,7 @@ class RiskManager:
         days_to_earnings: int | None = None,
         sector: str | None = None, sector_exposure_usd: float = 0.0,
         regime_multiplier: float = 1.0,
+        max_held_corr: float | None = None, corr_symbol: str = "",
     ) -> RiskDecision:
         """`price` is the current market price for proposal.symbol. `volatility`
         is the symbol's annualized realized vol (fraction, e.g. 0.45) used for
@@ -113,7 +118,11 @@ class RiskManager:
         earnings-blackout guard. `sector` is the symbol's sector and
         `sector_exposure_usd` is the $ already held in that sector, for the sector
         concentration cap. `regime_multiplier` (0..1) scales position size down in a
-        risk-off market backdrop. All from the execution client / orchestrator."""
+        risk-off market backdrop. `max_held_corr` is the highest daily-return
+        correlation between this symbol and any already-held satellite (None =
+        unknown -> guard skipped, fail-open) and `corr_symbol` names that
+        position, for the pairwise-correlation guard (R.2). All from the
+        execution client / orchestrator."""
         if proposal.action is Action.HOLD:
             return self._reject(proposal, "HOLD — no action.")
         if proposal.action is Action.SELL:
@@ -121,6 +130,7 @@ class RiskManager:
         return self._evaluate_buy(
             proposal, account, price, volatility, pending_buy_notional,
             days_to_earnings, sector, sector_exposure_usd, regime_multiplier,
+            max_held_corr, corr_symbol,
         )
 
     # -- survival-first sizing: vol-targeted, fractional-Kelly -------------- #
@@ -136,6 +146,33 @@ class RiskManager:
         vol_ratio = min(target / vol, 1.5)   # cap upsizing on calm names
         sized_frac = self.limits.kelly_fraction * conviction * vol_ratio
         return sized_frac * 100.0
+
+    # -- vol-scaled ("ATR-style") stop / take distances (R.1) --------------- #
+    def _exit_levels(
+        self, proposal: TradeProposal, volatility: float | None,
+    ) -> tuple[float, float]:
+        """Stop/take distances (%) for this buy. With VOL_STOPS_ENABLED and a
+        known realized vol, the stop scales to the name's daily sigma — tight on
+        quiet names, wide on volatile ones — and the take is a fixed reward:risk
+        multiple of it. Both are DETERMINISTIC (they override the LLM's proposed
+        levels; Claude's numbers are untrusted input) and the stop is clamped to
+        [vol_stop_min_pct, vol_stop_max_pct]. Interplay that makes this safe at
+        full Kelly: the per-trade $-risk cap (2d) divides by the stop width, so
+        a wider stop buys FEWER shares — dollar risk per position stays ~flat.
+        Falls back to proposal-else-default when disabled or vol is unknown
+        (a data outage must not silently change the exit regime)."""
+        lim = self.limits
+        if lim.vol_stops_enabled and volatility and volatility > 0:
+            daily_sigma_pct = volatility / (_TRADING_DAYS_SQRT) * 100.0
+            stop = min(
+                max(lim.vol_stop_mult * daily_sigma_pct, lim.vol_stop_min_pct),
+                lim.vol_stop_max_pct,
+            )
+            return stop, stop * lim.vol_stop_take_ratio
+        return (
+            proposal.stop_loss_pct or lim.default_stop_loss_pct,
+            proposal.take_profit_pct or lim.default_take_profit_pct,
+        )
 
     # -- sells: always allowed (risk reduction), size = what we hold -------- #
     def _evaluate_sell(
@@ -159,6 +196,7 @@ class RiskManager:
         days_to_earnings: int | None = None,
         sector: str | None = None, sector_exposure_usd: float = 0.0,
         regime_multiplier: float = 1.0,
+        max_held_corr: float | None = None, corr_symbol: str = "",
     ) -> RiskDecision:
         halted, why = self.trading_halted(account)
         if halted:
@@ -205,8 +243,7 @@ class RiskManager:
                 f"(liquidity guard).",
             )
 
-        stop_pct = proposal.stop_loss_pct or self.limits.default_stop_loss_pct
-        take_pct = proposal.take_profit_pct or self.limits.default_take_profit_pct
+        stop_pct, take_pct = self._exit_levels(proposal, volatility)
 
         # Cost / slippage edge floor: a trade whose profit target can't clear the
         # round-trip friction (spread + slippage) is negative-expectancy the moment
@@ -270,6 +307,26 @@ class RiskManager:
                     f"for '{sector}' (held ${sector_exposure_usd:,.0f}).",
                 )
             target_notional = min(target_notional, sector_room)
+
+        # 2b-ii) Pairwise-correlation guard (R.2) — the sector cap's finer-
+        #     grained sibling. A NEW name whose daily returns track an already-
+        #     held satellite is not diversification, it's the SAME bet wearing a
+        #     different ticker; under the aggressive caps that quietly stacks one
+        #     factor. The orchestrator computes max_held_corr against held names
+        #     (core ETF excluded — satellites are MEANT to correlate with the
+        #     index core); None (no data / nothing held) fails open. Adding to
+        #     the SAME symbol is exempt upstream (a top-up isn't a new bet).
+        if (
+            self.limits.max_pairwise_corr > 0
+            and max_held_corr is not None
+            and max_held_corr >= self.limits.max_pairwise_corr
+        ):
+            return self._reject(
+                proposal,
+                f"Return correlation {max_held_corr:.2f} with held "
+                f"{corr_symbol or 'position'} >= {self.limits.max_pairwise_corr:.2f} "
+                "cap — effectively the same bet; diversify instead.",
+            )
 
         # 2c) No-leverage gross cap — never let TOTAL deployed exceed this % of
         #     equity. On a margin account (Alpaca offers ~2x buying power) this is

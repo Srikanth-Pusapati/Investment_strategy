@@ -15,9 +15,10 @@ entry_signals. Most closes flatten the whole position, but the regime trim (1B.6
 and take-profit scale-out (1B.8) are PARTIAL sells: they realize an outcome on a
 slice while the remainder stays open, so a partial exit reduces the open lots FIFO
 by its qty and keeps the rest open (otherwise the remainder's later exit would
-orphan into a signal-less trip). Exchange-side bracket auto-fills are a known blind
-spot (no code sees them), so attribution reflects decision- and watchdog-driven
-exits — the ones we control.
+orphan into a signal-less trip). Exchange-side bracket auto-fills — formerly a
+blind spot no code observed — are backfilled into the ledger each cycle (F.1:
+exit_reason bracket_stop / bracket_take / external), so round-trips now cover
+every exit path, not just the decision- and watchdog-driven ones.
 """
 from __future__ import annotations
 

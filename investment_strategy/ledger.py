@@ -64,6 +64,8 @@ class TradeRecord(BaseModel):
     verdict: str = ""                 # risk verdict: approved | resized
     risk_note: str = ""               # risk layer's sizing note
     exit_reason: str = ""             # what closed it: decision | stop | take | trail | flatten
+                                      # | time | thesis_decay | regime_trim | scale
+                                      # | bracket_stop | bracket_take | external (F.1 backfill)
     option_strategy: Optional[str] = None
     order_id: Optional[str] = None
 
@@ -136,13 +138,21 @@ class TradeRecord(BaseModel):
         qty: float = 0.0, key_signals: Optional[list[str]] = None,
         realized_pl_pct: Optional[float] = None, realized_pl: Optional[float] = None,
         exit_reason: str = "decision", instrument: str = "equity",
+        ts: Optional[datetime] = None,
     ) -> "TradeRecord":
-        return cls(
+        """`ts` overrides the record time — the exchange-exit backfill (F.1)
+        stamps the order's actual FILL time so attribution's chronological
+        round-trip pairing sees the exit where it really happened, not when the
+        backfill noticed it."""
+        kwargs: dict = dict(
             symbol=symbol, action="sell", instrument=instrument, qty=qty,
             rationale=rationale, key_signals=key_signals or [], order_id=order_id,
             realized_pl_pct=realized_pl_pct, realized_pl=realized_pl,
             exit_reason=exit_reason,
         )
+        if ts is not None:
+            kwargs["ts"] = ts
+        return cls(**kwargs)
 
 
 class TradeLedger:

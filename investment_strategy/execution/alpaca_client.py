@@ -25,8 +25,9 @@ from alpaca.data.historical import StockHistoricalDataClient
 from alpaca.data.requests import StockBarsRequest, StockLatestTradeRequest
 from alpaca.data.timeframe import TimeFrame
 from alpaca.trading.client import TradingClient
-from alpaca.trading.enums import OrderClass, OrderSide, TimeInForce
+from alpaca.trading.enums import OrderClass, OrderSide, QueryOrderStatus, TimeInForce
 from alpaca.trading.requests import (
+    GetOrdersRequest,
     GetPortfolioHistoryRequest,
     LimitOrderRequest,
     MarketOrderRequest,
@@ -447,6 +448,42 @@ class AlpacaClient:
         except Exception as e:
             log.warning("order_fill(%s) failed: %s", order_id, e)
             return ("unknown", 0.0, 0.0)
+
+    def closed_sell_orders(self, limit: int = 500) -> list[dict]:
+        """Recently CLOSED (terminal-state) SELL orders from the broker, newest
+        first, as plain dicts — the raw material for the exchange-exit backfill
+        (F.1). This is how exits the process never issued become visible: a
+        bracket's stop/take leg filling at the exchange, or a manual sell in the
+        Alpaca UI, happens with no code running. Only FILLED orders are
+        returned (canceled/expired legs realized nothing). Read-only,
+        best-effort: [] on failure."""
+        try:
+            req = GetOrdersRequest(
+                status=QueryOrderStatus.CLOSED, side=OrderSide.SELL, limit=limit,
+            )
+            orders = _retry_read(
+                lambda: self.trading.get_orders(filter=req),
+                what="closed_sell_orders",
+            )
+        except Exception as e:
+            log.warning("closed_sell_orders failed: %s", e)
+            return []
+        out: list[dict] = []
+        for o in orders:
+            status = str(getattr(o.status, "value", o.status) or "").lower()
+            if status != "filled":
+                continue
+            otype = getattr(o, "order_type", None) or getattr(o, "type", "")
+            filled_at = getattr(o, "filled_at", None)
+            out.append({
+                "order_id": str(o.id),
+                "symbol": str(o.symbol),
+                "qty": float(getattr(o, "filled_qty", 0) or 0),
+                "price": float(getattr(o, "filled_avg_price", 0) or 0),
+                "type": str(getattr(otype, "value", otype) or "").lower(),
+                "filled_at": filled_at.isoformat() if filled_at else "",
+            })
+        return out
 
     def open_buy_notional(self, symbol: str) -> float:
         """$ value of OPEN (unfilled) BUY orders for `symbol`. The risk layer

@@ -45,7 +45,6 @@ from .state import PortfolioState
 log = logging.getLogger("backtest")
 
 _TRADING_DAYS = 252
-_TRAIL_GIVEBACK_PCT = 3.0    # mirrors Watchdog.trail_giveback_pct
 
 
 @dataclass
@@ -320,9 +319,16 @@ class BacktestEngine:
             _cfg_note=(
                 f"kelly={self.limits.kelly_fraction:g} "
                 f"vol_target={self.limits.target_annual_vol_pct:g}% "
-                f"stop={self.limits.default_stop_loss_pct:g}% "
-                f"take={self.limits.default_take_profit_pct:g}% "
-                f"scale_out={'on' if self.scale_out else 'off'} "
+                + (
+                    f"vol_stops={self.limits.vol_stop_mult:g}sigma "
+                    f"rr={self.limits.vol_stop_take_ratio:g} "
+                    f"clamp=[{self.limits.vol_stop_min_pct:g},"
+                    f"{self.limits.vol_stop_max_pct:g}]% "
+                    if self.limits.vol_stops_enabled else
+                    f"stop={self.limits.default_stop_loss_pct:g}% "
+                    f"take={self.limits.default_take_profit_pct:g}% "
+                )
+                + f"scale_out={'on' if self.scale_out else 'off'} "
                 f"slippage={self.slippage_pct:g}%"
             ),
         )
@@ -431,8 +437,10 @@ class BacktestEngine:
             trades.append(self._closed(pos, exit_px, day, "time"))
             return pos.qty * exit_px, True
 
-        # Trailing stop: give back at most _TRAIL_GIVEBACK_PCT of the peak gain.
-        if pos.peak_pl_pct > _TRAIL_GIVEBACK_PCT and pl_pct <= pos.peak_pl_pct - _TRAIL_GIVEBACK_PCT:
+        # Trailing stop: give back at most trail_giveback_pct of the peak gain
+        # (the same knob Watchdog.trail_giveback_pct runs live).
+        giveback = self.limits.trail_giveback_pct
+        if pos.peak_pl_pct > giveback and pl_pct <= pos.peak_pl_pct - giveback:
             trades.append(self._closed(pos, exit_px, day, "trail"))
             return pos.qty * exit_px, True
 
