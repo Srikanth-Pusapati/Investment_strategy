@@ -237,6 +237,63 @@ execution, monitoring are PER-ACCOUNT.
         keys (self-opt-in) is a different posture than managing funds.
 
 --------------------------------------------------------------------------------
+PHASE R — REFERENCE-PROJECT ADOPTIONS  (2026-07-03 analysis of
+neocharlesprojects/tradeagents + enving/TradeAgent; the standing TauricResearch
+do-not-adopt lines — no LLM risk layer, no per-ticker LLM fan-out — still apply)
+--------------------------------------------------------------------------------
+VERDICTS:
+  - neocharlesprojects/tradeagents = LLM-persona MARKET-SIMULATION research rig
+    (auction/stock-market mechanisms, pgvector memory, parallel per-agent
+    inference, group-chat orchestrators). NOTHING to adopt for a live bot:
+    multi-agent fan-out + LLM-driven decisions-about-risk are the two standing
+    do-not-adopt lines; attribution.py already covers its memory/reflection idea
+    frugally; backtest_real.py (+ --stress) already covers "simulate it first".
+  - enving/TradeAgent = the direct comparable (Alpaca paper bot: momentum + LLM
+    news sentiment, Kelly sizing, -3% daily circuit breaker, defensive core,
+    Supabase audit trail). We are AHEAD on discovery breadth (3 smart-money
+    feeds vs their static watchlist + finviz), risk PROOF (D.1 sweep + D.3
+    crash-path evidence vs untested breakers), security hardening (S.1/S.2 vs
+    none), exit cadence (30s watchdog vs their 5-min poll), and LLM frugality
+    (one decision call/cycle vs 90+ articles per ticker). We are BEHIND on four
+    concrete mechanisms, imported below as R.1-R.4.
+[ ] R.1 (HIGH) ATR-scaled dynamic stops + trailing stop (their tools/
+        dynamic_stops.py). Our stop/take is one fixed 8%/20% for EVERY name;
+        D.1's own evidence says stop width DOMINATES outcomes (fixed-5% got
+        chopped by normal vol). ATR-scaling is the principled generalization of
+        the 8/20 hand-fix — tight stops on quiet names, wide on volatile ones —
+        plus a trailing ratchet the watchdog can maintain on winners.
+        Trailing-vol-at-entry already exists in backtest_data.py: sweep ATR
+        multipliers in the EXISTING harness first, ship only on evidence.
+[ ] R.2 (MED-HIGH) Pairwise-correlation concentration guard (their risk/
+        correlation_monitor.py). risk.py's sector cap is our only correlation
+        control (the 2b comment literally names the gap: "quietly stacking
+        several correlated names ... into one bet"). Under the aggressive
+        12/18/50 posture, 4-5 "different" names can be ONE factor bet.
+        Deterministic: 90d daily-return correlation vs each HELD name via
+        AlpacaClient.daily_close_series; block or downsize a buy at corr>~0.7.
+        Lives in RiskManager — Claude proposes, risk disposes, unchanged.
+[ ] R.3 (MED, merges INTO D.2) Periodic re-sweep = their ml/adaptive_optimizer
+        pattern (rolling grid search on realized trades, Sharpe-ranked). We ran
+        the sweep ONCE (D.1). As paper round-trips accumulate, re-run
+        scripts/backtest_real.py --sweep on a cadence; knobs change ONLY on
+        evidence and a HUMAN applies them (no self-tuning loop writing .env).
+        DEPENDS on F.1: the optimizer is only as good as realized-P&L
+        completeness — bracket auto-fills must land in the ledger first.
+[ ] R.4 (MED, folds into E.1) Signal-TREND tracking (their llm/
+        sentiment_tracker.py: per-ticker sentiment time series, linear-
+        regression momentum, inflection detection). Generalize E.1 from static
+        lag-decay to score DYNAMICS: persist per-signal scores each cycle
+        (state/), weight by trend + lag — an IMPROVING 2-day-old signal is not
+        the same as a decaying one.
+[x] R.5 (explicitly NOT adopted — don't re-litigate): LLM personas / debate /
+        LLM risk agents (deterministic risk layer is the moat); pgvector memory
+        (attribution.py is the frugal equivalent); per-ticker LLM fan-out
+        (token cost); WebSocket/RSS event triggers (our 15-min decision loop +
+        30s watchdog already beat their 5x-daily scans — revisit only if a
+        missed fast move is ever the demonstrated bottleneck); Supabase
+        (ledger JSON + status.py is fine at single-user scale).
+
+--------------------------------------------------------------------------------
 LOWER VALUE / SKIP unless a thesis calls for it (carried from Todo-2)
 --------------------------------------------------------------------------------
 [ ] A.2(old) senatetrading + housetrading (overlaps the existing congress signal).
@@ -244,29 +301,31 @@ LOWER VALUE / SKIP unless a thesis calls for it (carried from Todo-2)
    Plan-upgrade-blocked: 13F, twitter; insiders already free via Finnhub + SEC EDGAR.
 
 --------------------------------------------------------------------------------
-RANKED NEXT STEPS  (re-ranked 2026-07-02 after the security/legal/execution audit)
+RANKED NEXT STEPS  (re-ranked 2026-07-03 after the reference-project analysis;
+prior 07-02 ranking's #1-#3 are DONE — see Phases S and D)
 --------------------------------------------------------------------------------
- 1. [DONE 2026-07-02] S.1 + S.2 slate whitelist + read-only RH enforced in code;
-    ~35 lines total — close the two real holes BEFORE giving the loop more
-    autonomy]. Do S.3 (chmod 600 .env) while at it.
- 2. [DONE 2026-07-02] D.1 backtest ran on real history; stop/take re-tuned 5/12
-    -> 8/20 on evidence (see Phase D). Re-run `scripts/backtest_real.py` as the
-    ledger grows.
- 3. [D.3 DONE 2026-07-03 — all three account-level brakes PROVEN to engage via
-    `backtest_real.py --stress`; X.4 breadth 12->18 done same day]
-    D.2 remains: accumulate paper round-trips under the new config, then re-run
-    2.2 (subscriptions) for the first real SUBSCRIBE/HOLD verdicts
- 4. C.4  Robinhood options-chain signal -> then X.3 flip OPTIONS_ENABLED on PAPER
-    (the biggest untapped max-risk lever; needs Alpaca options approval too)
- 5. E.1 lag-decay signal weighting; C.5/E.2 route fundamentals via RH/paid data
-    when it pays
- 6. F.1  Backfill bracket exits into the ledger; L.2 wash-sale/tax note — both
-    before real money
- 7. X.6  Leverage (gross 100 -> ~150 on margin) ONLY after #3's D.2 proves the
-    config on live paper round-trips
- 8. G.*  Multi-user — AFTER the L.1 legal/regulatory gate
- (DONE 2026-07-02: C.1 dead-feed diagnosis/fix, C.2 Robinhood discovery screener,
-  ROBINHOOD_ENABLED=on with fresh OAuth token — 3 discovery feeds now live.)
+ 1. D.2  Accumulate live PAPER round-trips under the new config (unchanged #1 —
+    every evidence-gated item below feeds on its data); then re-run 2.2
+    (subscriptions) for the first real SUBSCRIBE/HOLD verdicts. Once F.1 lands,
+    fold in R.3's periodic --sweep re-tune.
+ 2. R.1  ATR-scaled stops + trailing stop — attacks the ONE lever D.1 proved
+    dominates outcomes (stop width); sweep ATR multipliers in the existing
+    backtest harness for evidence BEFORE shipping to live paper.
+ 3. F.1  Backfill exchange-side bracket exits into the ledger — PROMOTED
+    (was #6): now a data PREREQUISITE for R.3 re-tuning and attribution
+    accuracy, not just bookkeeping hygiene.
+ 4. R.2  Pairwise-correlation guard in RiskManager — closes the concentration
+    hole the aggressive 12/18/50 posture opened (sector cap alone is too
+    crude; risk.py's own comment names the gap).
+ 5. C.4  Robinhood options-chain signal -> then X.3 flip OPTIONS_ENABLED on
+    PAPER (the biggest untapped max-risk lever; needs Alpaca options approval
+    too)
+ 6. E.1+R.4  Signal lag-decay weighting, generalized to trend/inflection
+    tracking; C.5/E.2 route fundamentals via RH/paid data when it pays
+ 7. L.2  Wash-sale/tax note — before real money
+ 8. X.6  Leverage (gross 100 -> ~150 on margin) ONLY after #1 proves the config
+    on live paper round-trips
+ 9. G.*  Multi-user — AFTER the L.1 legal/regulatory gate
 
  HONEST CAVEAT (restate before spending real money): NOTHING guarantees beating
  QQQ/SPY over 15-30 days — that window is mostly luck. The Phase-A/B changes remove
@@ -285,3 +344,7 @@ DONE 2026-07-03:
   D.3 account-level brake proof (backtest guards + `--stress` crash-path run:
   daily-loss flatten, drawdown halt, equity-floor latch ALL engaged as intended);
   X.4 MAX_DISCOVERED_CANDIDATES 12 -> 18.
+  Reference-project analysis (neocharlesprojects/tradeagents = simulation rig,
+  nothing to adopt; enving/TradeAgent = direct comparable, 4 mechanisms imported
+  as Phase R) -> new Phase R + re-ranked next steps (R.1 ATR stops #2, F.1
+  promoted #3, R.2 correlation guard #4).
