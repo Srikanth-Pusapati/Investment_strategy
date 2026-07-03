@@ -154,8 +154,8 @@ PHASE X — EXECUTION-MODEL GAPS  (new items only; X.1/X.2/X.5 = D.1/D.3/F.1 bel
         unbuilt, and Alpaca options approval must be enabled on the account.
         SEQUENCE: build C.4 -> flip OPTIONS_ENABLED=on in PAPER -> verify sizing
         (MAX_OPTION_PREMIUM_PCT) -> only then consider live.
-[ ] X.4 (LOW, 1-line) MAX_DISCOVERED_CANDIDATES=12 re-throttles the now-3-feed
-        discovery at the aggregator. Raise to 15-20 so breadth reaches the model.
+[DONE 2026-07-03] X.4 MAX_DISCOVERED_CANDIDATES 12 -> 18 (.env + config default)
+        so the 3-feed discovery breadth actually reaches the model.
 [ ] X.6 (LATER, gated on D.1+D.3 proof) Leverage: MAX_GROSS_EXPOSURE_PCT=100 (no
         margin) is the single biggest remaining beat-the-index amplifier. Raise to
         ~150 ONLY on a margin account AFTER the backtest proves the config.
@@ -188,10 +188,22 @@ PHASE D — PROVE IT (do BEFORE trusting the aggressive config with real money)
         Ledger replay mode exists for that as round-trips accumulate (D.2).
 [ ] D.2 Accumulate live PAPER round-trips under the new config, then re-run 2.2
         (subscriptions) for the first real SUBSCRIBE/HOLD data verdicts.
-[ ] D.3 Watch the concentration/vol the new knobs allow: MAX_SECTOR=50 + full Kelly
-        + vol 45 can build a much lumpier book. Confirm the equity floor + drawdown
-        halt actually engage as intended under the looser sizing (backtest a drawdown
-        path).
+[DONE 2026-07-03] D.3 Drawdown-path brake proof. BacktestEngine now models the
+        watchdog's ACCOUNT-LEVEL guards (equity-floor latch+flatten, daily-loss
+        emergency flatten) in the live ordering; HaltEvent + blocked-buy counts
+        are reported in summary(). New `scripts/backtest_real.py --stress`:
+        grafts a deterministic crash (-2%/day x 70 bars + two -9% gaps, market
+        -72.5%) onto real history and fires stubborn re-entries into it, twice.
+        EVIDENCE (365d, 10 ledger names, live kelly=1/vol=45/8/20 knobs):
+          - Pass 1 (live knobs): daily-loss flatten fired 2x on real vol days;
+            drawdown halt blocked 620 crash re-buys; book -11.8% (max DD 16.3%)
+            vs benchmark -72.5%; floor never needed (correct layering).
+          - Pass 2 (outer brakes off): the floor ALONE latched + flattened at
+            $84,607 vs the $89,614 floor (60% of peak) and blocked all 310
+            later re-entries; no auto-resume.
+        Tests +7 (backtest guards, crash overlay, stubborn entries). The
+        watchdog's brakes are PROVEN to engage under full Kelly + vol 45 +
+        sector 50. Ongoing (rolled into D.2): watch live paper lumpiness.
 
 --------------------------------------------------------------------------------
 PHASE E — DECISION QUALITY  (carried from Todo-2 Phase 3)
@@ -240,16 +252,18 @@ RANKED NEXT STEPS  (re-ranked 2026-07-02 after the security/legal/execution audi
  2. [DONE 2026-07-02] D.1 backtest ran on real history; stop/take re-tuned 5/12
     -> 8/20 on evidence (see Phase D). Re-run `scripts/backtest_real.py` as the
     ledger grows.
- 3. D.2/D.3  Accumulate paper round-trips; confirm the safety brakes engage
-    under full Kelly + vol 45 + sector 50 (daily-loss halt already seen engaging
-    in the D.1 sweep; equity-floor/DD-halt path still unproven)
+ 3. [D.3 DONE 2026-07-03 — all three account-level brakes PROVEN to engage via
+    `backtest_real.py --stress`; X.4 breadth 12->18 done same day]
+    D.2 remains: accumulate paper round-trips under the new config, then re-run
+    2.2 (subscriptions) for the first real SUBSCRIBE/HOLD verdicts
  4. C.4  Robinhood options-chain signal -> then X.3 flip OPTIONS_ENABLED on PAPER
     (the biggest untapped max-risk lever; needs Alpaca options approval too)
- 5. X.4  Raise MAX_DISCOVERED_CANDIDATES 12 -> 15-20 (1 line); E.1 lag-decay
-    signal weighting; C.5/E.2 route fundamentals via RH/paid data when it pays
+ 5. E.1 lag-decay signal weighting; C.5/E.2 route fundamentals via RH/paid data
+    when it pays
  6. F.1  Backfill bracket exits into the ledger; L.2 wash-sale/tax note — both
     before real money
- 7. X.6  Leverage (gross 100 -> ~150 on margin) ONLY after #2/#3 prove the config
+ 7. X.6  Leverage (gross 100 -> ~150 on margin) ONLY after #3's D.2 proves the
+    config on live paper round-trips
  8. G.*  Multi-user — AFTER the L.1 legal/regulatory gate
  (DONE 2026-07-02: C.1 dead-feed diagnosis/fix, C.2 Robinhood discovery screener,
   ROBINHOOD_ENABLED=on with fresh OAuth token — 3 discovery feeds now live.)
@@ -267,3 +281,7 @@ DONE 2026-07-02:
   generalized read-only RobinhoodReader.call_json.
   Security/legal/execution audit (graphify + code walk) -> new Phases S/L/X and
   the re-ranked next steps above.
+DONE 2026-07-03:
+  D.3 account-level brake proof (backtest guards + `--stress` crash-path run:
+  daily-loss flatten, drawdown halt, equity-floor latch ALL engaged as intended);
+  X.4 MAX_DISCOVERED_CANDIDATES 12 -> 18.

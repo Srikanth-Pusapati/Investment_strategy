@@ -20,7 +20,9 @@ from investment_strategy.backtest_data import (
     align_price_history,
     annualized_vol_at,
     breakout_entries,
+    crash_overlay,
     entries_from_ledger,
+    stubborn_entries,
 )
 
 
@@ -129,6 +131,36 @@ def test_breakout_excludes_benchmark():
     entries = breakout_entries(
         dates, {"QQQ": rising}, lookback=20, benchmark="QQQ")
     assert entries == []
+
+
+# -- crash_overlay / stubborn_entries (D.3 stress path) ----------------------- #
+def test_crash_overlay_decays_then_plateaus():
+    prices = {"AAA": [100.0] * 10}
+    out = crash_overlay(prices, start=5, daily_pct=10.0, crash_days=2, gap_days=())
+    assert out["AAA"][:5] == [100.0] * 5                 # pre-crash untouched
+    assert abs(out["AAA"][5] - 90.0) < 1e-9
+    assert abs(out["AAA"][6] - 81.0) < 1e-9
+    assert out["AAA"][7:] == [out["AAA"][6]] * 3         # crushed level holds
+    assert prices["AAA"] == [100.0] * 10                 # input not mutated
+
+
+def test_crash_overlay_gap_day_compounds():
+    out = crash_overlay(
+        {"AAA": [100.0] * 4}, start=1, daily_pct=10.0, crash_days=3,
+        gap_days=(1,), gap_pct=50.0,
+    )
+    assert abs(out["AAA"][1] - 90.0) < 1e-9
+    assert abs(out["AAA"][2] - 40.5) < 1e-9              # 90% * 50% gap on top
+    assert abs(out["AAA"][3] - 36.45) < 1e-9
+
+
+def test_stubborn_entries_refire_and_skip_benchmark():
+    n = 12
+    dates = [f"2026-04-{i + 1:02d}" for i in range(n)]
+    prices = {"AAA": [100.0] * n, "QQQ": [400.0] * n}
+    entries = stubborn_entries(dates, prices, every=5, benchmark="QQQ")
+    assert {e.symbol for e in entries} == {"AAA"}
+    assert [e.day for e in entries] == [0, 5, 10]        # keeps firing, no trend gate
 
 
 def _run_all():

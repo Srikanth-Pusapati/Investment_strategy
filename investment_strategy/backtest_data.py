@@ -130,6 +130,54 @@ def entries_from_ledger(
     return entries
 
 
+def crash_overlay(
+    prices: dict[str, list[float]], start: int, daily_pct: float = 2.0,
+    crash_days: int = 70, gap_days: tuple[int, ...] = (5, 25), gap_pct: float = 9.0,
+) -> dict[str, list[float]]:
+    """Deterministic market-wide crash grafted onto real closes (D.3): from bar
+    `start`, every series glides down `daily_pct`/day for `crash_days` bars, with
+    extra `gap_pct` gap-downs on the given crash-relative days (so stops gap
+    through instead of filling politely), then stays at the crushed level. Keeps
+    the real day-to-day texture — it's a scale factor, not synthetic prices. This
+    is a BRAKE test path, not a return forecast."""
+    out: dict[str, list[float]] = {}
+    for sym, closes in prices.items():
+        row = list(closes)
+        mult = 1.0
+        for d in range(start, len(row)):
+            k = d - start
+            if k < crash_days:
+                mult *= 1.0 - daily_pct / 100.0
+                if k in gap_days:
+                    mult *= 1.0 - gap_pct / 100.0
+            row[d] = closes[d] * mult
+        out[sym] = row
+    return out
+
+
+def stubborn_entries(
+    dates: list[str], prices: dict[str, list[float]],
+    every: int = 5, benchmark: str = "",
+) -> list[EntrySignal]:
+    """Worst-case entry stream for the D.3 brake test: every symbol re-fires a
+    buy every `every` bars for the WHOLE window, regardless of trend — a strategy
+    that keeps buying straight into a crash. The point is that the ACCOUNT-LEVEL
+    guards (daily-loss halt, drawdown halt, equity floor) must be what stops the
+    bleeding, not polite entry logic."""
+    entries: list[EntrySignal] = []
+    for sym, closes in prices.items():
+        if sym == benchmark:
+            continue
+        for day in range(0, len(dates), every):
+            if closes[day] > 0:
+                entries.append(EntrySignal(
+                    day=day, symbol=sym, conviction=0.7, target_weight_pct=12.0,
+                    volatility=annualized_vol_at(closes, day),
+                ))
+    entries.sort(key=lambda e: e.day)
+    return entries
+
+
 def breakout_entries(
     dates: list[str], prices: dict[str, list[float]],
     lookback: int = 20, cooldown: int = 10, benchmark: str = "",

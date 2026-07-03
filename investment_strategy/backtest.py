@@ -29,7 +29,7 @@ import os
 import statistics
 import tempfile
 import uuid
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from .config import RiskLimits
 from .models import (
@@ -75,6 +75,16 @@ class _OpenPosition:
 
 
 @dataclass
+class HaltEvent:
+    """An account-level guard firing during the replay (D.3 evidence): the
+    equity-floor latch or the daily-loss emergency flatten — the same brakes the
+    live watchdog enforces."""
+    day: int
+    kind: str                   # floor | daily_loss
+    reason: str
+
+
+@dataclass
 class ClosedTrade:
     symbol: str
     entry_day: int
@@ -95,6 +105,10 @@ class BacktestResult:
     trades: list[ClosedTrade]
     benchmark_return_pct: float | None = None
     _cfg_note: str = ""
+    # Account-level guard engagements (D.3): floor latch / daily-loss flatten
+    # events, plus how many entry attempts each halt kind blocked.
+    halt_events: list[HaltEvent] = field(default_factory=list)
+    blocked_buys: dict[str, int] = field(default_factory=dict)
 
     # -- headline metrics --------------------------------------------------- #
     @property
@@ -173,6 +187,11 @@ class BacktestResult:
         if by_reason:
             lines.append("Exits:         " + ", ".join(
                 f"{k}={v}" for k, v in sorted(by_reason.items())))
+        if self.blocked_buys:
+            lines.append("Halted buys:   " + ", ".join(
+                f"{k}={v}" for k, v in sorted(self.blocked_buys.items())))
+        for ev in self.halt_events:
+            lines.append(f"GUARD day {ev.day}: [{ev.kind}] {ev.reason}")
         return "\n".join(x for x in lines if x)
 
 
@@ -218,8 +237,24 @@ class BacktestEngine:
         open_pos: dict[str, _OpenPosition] = {}
         curve: list[float] = []
         trades: list[ClosedTrade] = []
+        halt_events: list[HaltEvent] = []
+        blocked: dict[str, int] = {}
 
         for day in range(self._n):
+            prev_equity = curve[-1] if curve else self.initial_equity
+
+            # 0) Account-level guards FIRST, in the live watchdog's order:
+            #    ratchet peak equity -> equity floor (latch + flatten) ->
+            #    daily-loss emergency flatten. Per-position exits only run on
+            #    whatever survives, exactly like a real watchdog tick.
+            equity = cash + sum(
+                p.qty * self.prices[p.symbol][day] for p in open_pos.values()
+            )
+            self.risk.state.update_equity(equity)
+            cash += self._apply_account_guards(
+                equity, prev_equity, open_pos, day, trades, halt_events,
+            )
+
             # 1) Mark to market + run exits on the existing book.
             for sym in list(open_pos.keys()):
                 pos = open_pos[sym]
@@ -233,10 +268,8 @@ class BacktestEngine:
             equity = cash + sum(
                 p.qty * self.prices[p.symbol][day] for p in open_pos.values()
             )
-            self.risk.state.update_equity(equity)
 
             # 2) Fire the day's entry signals through the REAL sizing gate.
-            prev_equity = curve[-1] if curve else self.initial_equity
             for sig in by_day.get(day, []):
                 if sig.symbol not in self.prices:
                     continue
@@ -248,6 +281,9 @@ class BacktestEngine:
                     self._proposal(sig), account, price, sig.volatility,
                 )
                 if decision.verdict == RiskVerdict.REJECTED or decision.approved_qty <= 0:
+                    kind = self._halt_block_kind(decision.reason)
+                    if kind:
+                        blocked[kind] = blocked.get(kind, 0) + 1
                     continue
                 fill = price * (1 + self.slippage_pct / 100.0)  # pay up on entry
                 spend = decision.approved_qty * fill
@@ -279,6 +315,7 @@ class BacktestEngine:
         return BacktestResult(
             initial_equity=self.initial_equity, final_equity=final_equity,
             equity_curve=curve, trades=trades,
+            halt_events=halt_events, blocked_buys=blocked,
             benchmark_return_pct=self._benchmark_return(),
             _cfg_note=(
                 f"kelly={self.limits.kelly_fraction:g} "
@@ -289,6 +326,70 @@ class BacktestEngine:
                 f"slippage={self.slippage_pct:g}%"
             ),
         )
+
+    # -- account-level guards (mirror Watchdog.check_once, D.3) ------------- #
+    def _apply_account_guards(
+        self, equity: float, prev_equity: float,
+        open_pos: dict[str, _OpenPosition], day: int,
+        trades: list[ClosedTrade], events: list[HaltEvent],
+    ) -> float:
+        """The watchdog's account-wide protections: the equity-floor latch (flatten
+        everything and refuse new buys for the REST of the run — the latch does not
+        auto-clear, same as live) and the daily-loss emergency flatten. The matching
+        buy-side halts (daily loss / drawdown) already run inside
+        RiskManager.trading_halted at entry time. Returns flatten cash proceeds."""
+        # Equity floor: % of PEAK equity; breach = liquidate + latch.
+        if not self.risk.state.halted and self.limits.equity_floor_pct > 0:
+            peak = self.risk.state.peak_equity
+            floor = peak * (self.limits.equity_floor_pct / 100.0)
+            if peak > 0 and equity <= floor:
+                reason = (
+                    f"Equity ${equity:,.0f} <= floor ${floor:,.0f} "
+                    f"({self.limits.equity_floor_pct:.0f}% of peak ${peak:,.0f}) "
+                    "— flattened and LATCHED."
+                )
+                self.risk.state.latch_halt(reason)
+                events.append(HaltEvent(day=day, kind="floor", reason=reason))
+                return self._flatten(open_pos, day, trades, "floor")
+
+        # Daily-loss emergency flatten (the position dump; new buys are blocked
+        # separately by trading_halted's daily-loss check).
+        if open_pos and prev_equity > 0:
+            loss_pct = (1.0 - equity / prev_equity) * 100.0
+            if loss_pct >= self.limits.max_daily_loss_pct:
+                reason = (
+                    f"Day loss {loss_pct:.2f}% >= limit "
+                    f"{self.limits.max_daily_loss_pct:.2f}% — emergency flatten."
+                )
+                events.append(HaltEvent(day=day, kind="daily_loss", reason=reason))
+                return self._flatten(open_pos, day, trades, "flatten")
+        return 0.0
+
+    def _flatten(
+        self, open_pos: dict[str, _OpenPosition], day: int,
+        trades: list[ClosedTrade], reason: str,
+    ) -> float:
+        """Close every open position at today's close (with slippage), like the
+        watchdog's _flatten_all. Returns the cash proceeds."""
+        proceeds = 0.0
+        for sym in list(open_pos.keys()):
+            pos = open_pos.pop(sym)
+            exit_px = self.prices[sym][day] * (1 - self.slippage_pct / 100.0)
+            proceeds += pos.qty * exit_px
+            trades.append(self._closed(pos, exit_px, day, reason))
+        return proceeds
+
+    @staticmethod
+    def _halt_block_kind(reason: str) -> str | None:
+        """Classify a rejected buy that an ACCOUNT-LEVEL halt blocked (the D.3
+        evidence); ordinary sizing/conviction rejects return None."""
+        if "HALT LATCH" in reason:
+            return "halt_latch"
+        if "Daily loss" in reason:
+            return "daily_loss_halt"
+        if "Drawdown" in reason:
+            return "drawdown_halt"
+        return None
 
     # -- exits (mirror the live watchdog ordering) -------------------------- #
     def _apply_exits(

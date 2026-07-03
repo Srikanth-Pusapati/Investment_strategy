@@ -8,11 +8,20 @@ Modes:
                     on rule-based breakout entries over the full window, ranked
                     by excess return vs the benchmark. This is the EVIDENCE pass
                     for the aggressive config.
+  --stress          D.3 brake test: graft a deterministic crash onto real history
+                    and keep firing stubborn re-entries into it, twice —
+                    (1) LIVE knobs: the daily-loss + drawdown halts must stop the
+                        bleeding early;
+                    (2) outer brakes disabled: the equity-floor latch (the last
+                        line) must flatten + halt on its own.
+                    Verifies the guards ENGAGE under full Kelly / vol 45 /
+                    sector 50; says nothing about returns.
 
 Usage:
   .venv/bin/python scripts/backtest_real.py                 # ledger replay, 365d
   .venv/bin/python scripts/backtest_real.py --sweep         # knob sweep
   .venv/bin/python scripts/backtest_real.py --sweep --days 500 --symbols AMD,TDG
+  .venv/bin/python scripts/backtest_real.py --stress        # D.3 guard check
 
 Read-only: market-data calls only; never places orders or touches live state.
 """
@@ -31,8 +40,10 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from investment_strategy.backtest import BacktestEngine, EntrySignal  # noqa: E402
 from investment_strategy.backtest_data import (  # noqa: E402
     breakout_entries,
+    crash_overlay,
     entries_from_ledger,
     fetch_price_history,
+    stubborn_entries,
 )
 from investment_strategy.config import load_config  # noqa: E402
 from investment_strategy.execution.alpaca_client import AlpacaClient  # noqa: E402
@@ -65,11 +76,73 @@ def _run(limits, prices, entries, benchmark):
     return BacktestEngine(limits, prices, benchmark=benchmark).run(entries)
 
 
+# Liquid fallback basket so --stress works before the ledger has any buys.
+_STRESS_BASKET = ["AAPL", "MSFT", "NVDA", "AMD", "AMZN", "GOOGL", "META", "AVGO", "COST", "TSLA"]
+
+
+def _stress(cfg, dates, prices, benchmark) -> int:
+    """D.3 brake test: crash path + stubborn re-entries, run twice.
+    Pass 1 (live knobs) must show the daily-loss/drawdown halts engaging;
+    pass 2 (outer brakes off) must show the equity-floor latch flattening.
+    Returns a shell exit code: 0 only if every expected guard engaged."""
+    start = len(dates) // 2
+    crashed = crash_overlay(prices, start)
+    bench = crash_overlay({"_b": benchmark}, start)["_b"] if benchmark else None
+    entries = stubborn_entries(dates, crashed)
+    r = cfg.risk
+    print(
+        f"Crash grafted from bar {start} ({dates[start]}): -2%/day x 70 bars + "
+        f"two -9% gap days; {len(entries)} stubborn re-entries into the decline.\n"
+    )
+
+    print("== Pass 1: LIVE knobs — daily-loss + drawdown halts should stop the bleed ==")
+    res1 = _run(r, crashed, list(entries), bench)
+    print(res1.summary())
+    p1_daily = (
+        any(e.kind == "daily_loss" for e in res1.halt_events)
+        or res1.blocked_buys.get("daily_loss_halt", 0) > 0
+    )
+    p1_dd = res1.blocked_buys.get("drawdown_halt", 0) > 0
+    p1_floor_quiet = not any(e.kind == "floor" for e in res1.halt_events)
+
+    print("\n== Pass 2: daily-loss/drawdown brakes OFF — the equity floor is the last line ==")
+    naked = replace(r, max_daily_loss_pct=100.0, max_drawdown_pct=100.0)
+    res2 = _run(naked, crashed, list(entries), bench)
+    print(res2.summary())
+    floor_evs = [e for e in res2.halt_events if e.kind == "floor"]
+    p2_floor = bool(floor_evs)
+    p2_latch = res2.blocked_buys.get("halt_latch", 0) > 0
+
+    def _mark(ok: bool) -> str:
+        return "PASS" if ok else "FAIL"
+
+    print("\n== D.3 verdict ==")
+    print(f"[{_mark(p1_daily)}] daily-loss guard engaged under live knobs "
+          f"(flatten and/or buy-halt)")
+    print(f"[{_mark(p1_dd)}] drawdown halt blocked re-buys under live knobs "
+          f"({res1.blocked_buys.get('drawdown_halt', 0)} blocked)")
+    print(f"[{_mark(p1_floor_quiet)}] equity floor NOT needed while the outer "
+          f"brakes are on (fired earlier = correct layering)")
+    print(f"[{_mark(p2_floor)}] equity floor latched + flattened when it was the "
+          f"only guard left"
+          + (f" (day {floor_evs[0].day}, final ${res2.final_equity:,.0f}; "
+             f"floor is {r.equity_floor_pct:.0f}% of PEAK — see GUARD line)"
+             if p2_floor else ""))
+    print(f"[{_mark(p2_latch)}] latch kept blocking every later re-entry "
+          f"({res2.blocked_buys.get('halt_latch', 0)} blocked; no auto-resume)")
+    ok = all((p1_daily, p1_dd, p1_floor_quiet, p2_floor, p2_latch))
+    print("\nAll account-level brakes engaged as intended."
+          if ok else "\nA guard did NOT engage — investigate before live money.")
+    return 0 if ok else 1
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--days", type=int, default=365, help="trading-day window")
     ap.add_argument("--symbols", default="", help="comma list; default = ledger buys")
     ap.add_argument("--sweep", action="store_true", help="knob grid on breakout entries")
+    ap.add_argument("--stress", action="store_true",
+                    help="D.3 crash-path brake test (guards must engage)")
     ap.add_argument("--lookback", type=int, default=20, help="breakout high lookback")
     ap.add_argument("--ledger", default="state/trades.jsonl")
     args = ap.parse_args()
@@ -84,8 +157,11 @@ def main() -> int:
         or _ledger_symbols(args.ledger)
     )
     if not symbols:
-        print("No symbols: ledger is empty and --symbols not given.")
-        return 1
+        if args.stress:
+            symbols = list(_STRESS_BASKET)   # brake test needs A book, not YOUR book
+        else:
+            print("No symbols: ledger is empty and --symbols not given.")
+            return 1
     fetch = sorted(set(symbols) | {bench_sym})
     print(f"Fetching {args.days} trading days for {len(fetch)} symbols: {', '.join(fetch)}")
     dates, prices = fetch_price_history(broker, fetch, args.days)
@@ -95,6 +171,9 @@ def main() -> int:
     benchmark = prices.pop(bench_sym, None)
     print(f"Calendar: {dates[0]} -> {dates[-1]} ({len(dates)} bars, "
           f"{len(prices)} tradable symbols)\n")
+
+    if args.stress:
+        return _stress(cfg, dates, prices, benchmark)
 
     if not args.sweep:
         entries = entries_from_ledger(args.ledger, dates, prices)

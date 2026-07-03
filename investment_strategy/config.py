@@ -316,7 +316,9 @@ def load_config() -> Config:
                 ).split(",")
                 if s.strip()
             ),
-            max_candidates=_i("MAX_DISCOVERED_CANDIDATES", 12),
+            # X.4: 12 re-throttled the now-3-feed discovery at the aggregator;
+            # 18 lets the full breadth actually reach the model.
+            max_candidates=_i("MAX_DISCOVERED_CANDIDATES", 18),
             min_score=_f("SCREENER_MIN_SCORE", 0.2),
             options_flow_scan_limit=_i("OPTIONS_FLOW_SCAN_LIMIT", 40),
             # Open-market insider BUYS are rare in any small window, so scan a wide

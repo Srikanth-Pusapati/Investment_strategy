@@ -116,6 +116,68 @@ def test_metrics_compute_on_a_multi_trade_run():
     assert "Backtest result" in r.summary()
 
 
+# -- account-level guards (D.3): floor latch / daily-loss flatten ------------ #
+# One big position (90% of the book, wide 60% stop) so the ACCOUNT guards fire
+# before any per-position stop does.
+def _big_position(**over):
+    return _limits(max_position_pct=100.0, default_stop_loss_pct=60.0, **over)
+
+
+def test_equity_floor_flattens_and_latches():
+    prices = {"AAA": [100.0, 100.0, 85.0, 85.0, 85.0]}   # -15% book day 2
+    r = run_backtest(_big_position(equity_floor_pct=90.0), prices, [
+        EntrySignal(day=0, symbol="AAA", target_weight_pct=90.0),
+        EntrySignal(day=3, symbol="AAA", target_weight_pct=90.0),  # post-latch
+    ])
+    floors = [e for e in r.halt_events if e.kind == "floor"]
+    assert len(floors) == 1 and floors[0].day == 2
+    assert [t.reason for t in r.trades] == ["floor"]      # flattened, held nothing
+    # The latch blocked the day-3 re-entry and does NOT auto-clear.
+    assert r.blocked_buys.get("halt_latch") == 1
+    assert all(t.entry_day == 0 for t in r.trades)
+
+
+def test_daily_loss_emergency_flatten_without_latch():
+    prices = {"AAA": [100.0, 100.0, 90.0, 90.0, 90.0]}   # -9% book day 2
+    r = run_backtest(_big_position(max_daily_loss_pct=5.0), prices, [
+        EntrySignal(day=0, symbol="AAA", target_weight_pct=90.0),
+        EntrySignal(day=2, symbol="AAA", target_weight_pct=90.0),  # same-day rebuy
+        EntrySignal(day=3, symbol="AAA", target_weight_pct=90.0),  # next-day rebuy
+    ])
+    dls = [e for e in r.halt_events if e.kind == "daily_loss"]
+    assert len(dls) == 1 and dls[0].day == 2
+    assert "flatten" in [t.reason for t in r.trades]
+    # Same-day rebuy is blocked by the daily-loss halt; the next day (loss reset)
+    # trading resumes — the daily flatten is NOT a latch, matching live behavior.
+    assert r.blocked_buys.get("daily_loss_halt") == 1
+    assert any(t.entry_day == 3 for t in r.trades)
+
+
+def test_drawdown_halt_blocks_new_buys_without_flattening():
+    prices = {
+        "AAA": [100.0, 95.0, 88.0, 88.0, 88.0],          # dd ~11% from peak
+        "BBB": [100.0, 100.0, 100.0, 100.0, 100.0],      # the blocked new idea
+    }
+    r = run_backtest(_big_position(max_drawdown_pct=10.0), prices, [
+        EntrySignal(day=0, symbol="AAA", target_weight_pct=90.0),
+        EntrySignal(day=2, symbol="BBB", target_weight_pct=5.0),
+        EntrySignal(day=3, symbol="BBB", target_weight_pct=5.0),
+    ])
+    # Blocks NEW buys but never dumps the book — that's the floor's job.
+    assert r.blocked_buys.get("drawdown_halt") == 2
+    assert r.halt_events == []
+    assert [t.reason for t in r.trades] == ["end"]       # only AAA, held to the end
+    assert all(t.symbol == "AAA" for t in r.trades)
+
+
+def test_guards_off_change_nothing():
+    prices = {"AAA": [100.0, 100.0, 85.0, 85.0, 85.0]}
+    r = run_backtest(_big_position(), prices,               # floor 0 / daily 100
+                     [EntrySignal(day=0, symbol="AAA", target_weight_pct=90.0)])
+    assert r.halt_events == [] and r.blocked_buys == {}
+    assert "GUARD" not in r.summary()
+
+
 def _run_all():
     fns = [v for k, v in sorted(globals().items()) if k.startswith("test_") and callable(v)]
     failed = 0
