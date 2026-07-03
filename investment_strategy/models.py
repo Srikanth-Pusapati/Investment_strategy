@@ -5,6 +5,7 @@ RiskDecision  ->  Alpaca order.  Positions/Account feed back as context.
 """
 from __future__ import annotations
 
+import re
 from datetime import datetime, timezone
 from enum import Enum
 from typing import Any, Optional
@@ -14,6 +15,19 @@ from pydantic import BaseModel, Field
 
 def _now() -> datetime:
     return datetime.now(timezone.utc)
+
+
+# 1-5 letters plus an optional class/ADR suffix (BRK.B, BF-B). Crypto pairs
+# (BTC-USD) fail the 1-2 letter suffix rule by design.
+_TICKER_RE = re.compile(r"^[A-Z]{1,5}([.-][A-Z]{1,2})?$")
+# EDGAR Form-4 filings for unlisted issuers put a literal "N/A" in
+# issuerTradingSymbol; other feeds render missing symbols as these strings.
+_PLACEHOLDER_SYMS = {"N/A", "NA", "NONE", "NULL"}
+
+
+def is_valid_ticker(sym: str) -> bool:
+    """True for a plausible US-listed symbol; rejects feed placeholders."""
+    return bool(sym) and sym not in _PLACEHOLDER_SYMS and bool(_TICKER_RE.match(sym))
 
 
 # --------------------------------------------------------------------------- #

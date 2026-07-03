@@ -11,6 +11,7 @@ Runnable two ways:
 """
 from __future__ import annotations
 
+import logging
 import os
 import sys
 import tempfile
@@ -364,6 +365,57 @@ def test_slate_whitelist_passes_all_on_slate_untouched():
     kept = Orchestrator._filter_to_slate(
         props, [_slate_bundle("AMD"), _slate_bundle("TDG")], acct)
     assert kept == props
+
+
+# -- fill reconciliation ------------------------------------------------------ #
+class _LogCapture(logging.Handler):
+    def __init__(self):
+        super().__init__()
+        self.records = []
+
+    def emit(self, record):
+        self.records.append(record)
+
+
+def _reconcile(status, filled, qty):
+    """Run _reconcile_fills over one pending order with the given broker fill
+    state; return the orchestrator and the log records it emitted."""
+    o = _orch()
+    o.broker.order_fill = lambda oid: (status, filled, qty)
+    o._pending_oids = [("oid-1", "AAPL")]
+    cap = _LogCapture()
+    orch_log = logging.getLogger("orchestrator")
+    orch_log.addHandler(cap)
+    try:
+        o._reconcile_fills()
+    finally:
+        orch_log.removeHandler(cap)
+    return o, cap.records
+
+
+def test_reconcile_filled_order_is_silent():
+    # Regression: order_fill used to return "OrderStatus.FILLED", so cleanly
+    # filled orders fell through to the "still pending" warning every cycle.
+    o, recs = _reconcile("filled", 3.0, 3.0)
+    assert [r for r in recs if r.levelno >= logging.WARNING] == []
+    assert o._pending_oids == []
+
+
+def test_reconcile_rejected_order_logs_error():
+    _, recs = _reconcile("rejected", 0.0, 3.0)
+    assert any(r.levelno == logging.ERROR for r in recs)
+
+
+def test_reconcile_partial_fill_logs_warning():
+    _, recs = _reconcile("accepted", 1.0, 3.0)
+    assert any(
+        r.levelno == logging.WARNING and "PARTIAL" in r.getMessage() for r in recs
+    )
+
+
+def test_reconcile_still_pending_logs_warning():
+    _, recs = _reconcile("new", 0.0, 3.0)
+    assert any("full cycle later" in r.getMessage() for r in recs)
 
 
 def _run_all():

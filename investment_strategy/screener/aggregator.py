@@ -11,7 +11,7 @@ from __future__ import annotations
 import logging
 
 from ..config import Config
-from ..models import Candidate
+from ..models import Candidate, is_valid_ticker
 from ..signals.quiver_client import QuiverClient
 from .base import Screener
 from .congress_feed import CongressFeedScreener
@@ -62,6 +62,9 @@ class ScreenerAggregator:
         for s in self.screeners:
             for cand in s.safe_scan():
                 sym = cand.symbol.upper()
+                if not is_valid_ticker(sym):
+                    log.debug("Dropping invalid candidate symbol %r from %s.", sym, s.name)
+                    continue
                 if sym in exclude:
                     continue
                 existing = merged.get(sym)

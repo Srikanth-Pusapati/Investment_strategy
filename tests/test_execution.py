@@ -144,6 +144,38 @@ def test_portfolio_basis_computes_for_aged_account():
     assert trading.history_calls == 1
 
 
+# -- order_fill: status normalization ---------------------------------------- #
+class _FakeOrderTrading:
+    def __init__(self, order=None, err=None):
+        self._order = order
+        self._err = err
+
+    def get_order_by_id(self, oid):
+        if self._err:
+            raise self._err
+        return self._order
+
+
+def test_order_fill_normalizes_status_enum_to_plain_value():
+    # alpaca-py returns an OrderStatus enum; str() of it is "OrderStatus.FILLED",
+    # which broke _reconcile_fills' comparisons against plain "filled".
+    from alpaca.trading.enums import OrderStatus
+
+    c = AlpacaClient.__new__(AlpacaClient)
+    c.trading = _FakeOrderTrading(
+        order=SimpleNamespace(status=OrderStatus.FILLED, filled_qty="3", qty="3")
+    )
+    status, filled, qty = c.order_fill("oid-1")
+    assert status == "filled"
+    assert filled == 3.0 and qty == 3.0
+
+
+def test_order_fill_unknown_on_fetch_failure():
+    c = AlpacaClient.__new__(AlpacaClient)
+    c.trading = _FakeOrderTrading(err=RuntimeError("boom"))
+    assert c.order_fill("oid-1") == ("unknown", 0.0, 0.0)
+
+
 def _run_all():
     fns = [v for k, v in sorted(globals().items()) if k.startswith("test_") and callable(v)]
     failed = 0
