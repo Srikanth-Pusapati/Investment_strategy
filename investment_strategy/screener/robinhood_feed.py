@@ -19,7 +19,7 @@ from __future__ import annotations
 import logging
 
 from ..config import Config
-from ..models import Candidate
+from ..models import Candidate, is_valid_ticker
 from ..portfolio import RobinhoodReader
 from .base import Screener
 
@@ -93,6 +93,6 @@ class RobinhoodMoversScreener(Screener):
             if it.get("object_type") != "instrument":
                 continue  # crypto pairs, futures, indexes — not equity-tradable here
             sym = str(it.get("symbol", "")).strip().upper()
-            if sym and "-" not in sym:   # "-" == crypto pair (BTC-USD), belt-and-suspenders
+            if is_valid_ticker(sym) and "-" not in sym:   # "-" == crypto pair (BTC-USD)
                 out.append(sym)
         return out

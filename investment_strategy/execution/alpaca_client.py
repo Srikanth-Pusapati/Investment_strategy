@@ -435,8 +435,12 @@ class AlpacaClient:
         Returns ('unknown', 0, 0) if the order can't be fetched."""
         try:
             o = self.trading.get_order_by_id(order_id)
+            status = getattr(o, "status", "")
+            # OrderStatus enum stringifies to "OrderStatus.FILLED"; callers
+            # compare against plain values like "filled" — use .value.
+            status = getattr(status, "value", status)
             return (
-                str(getattr(o, "status", "")),
+                str(status).lower(),
                 float(getattr(o, "filled_qty", 0) or 0),
                 float(getattr(o, "qty", 0) or 0),
             )

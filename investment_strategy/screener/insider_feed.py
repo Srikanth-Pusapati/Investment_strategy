@@ -20,7 +20,7 @@ from collections import defaultdict
 import requests
 
 from ..config import Config
-from ..models import Candidate
+from ..models import Candidate, is_valid_ticker
 from .base import Screener
 
 log = logging.getLogger("screener")
@@ -118,7 +118,8 @@ class InsiderFeedScreener(Screener):
             return None, 0
 
         sym = (root.findtext(".//issuer/issuerTradingSymbol") or "").strip().upper()
-        if not sym:
+        # Unlisted issuers file with a literal "N/A" symbol — drop those too.
+        if not is_valid_ticker(sym):
             return None, 0
         buy = 0
         for t in root.findall(".//nonDerivativeTransaction"):

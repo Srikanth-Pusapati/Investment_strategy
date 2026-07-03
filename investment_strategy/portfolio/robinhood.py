@@ -30,7 +30,7 @@ import logging
 from typing import Any
 
 from ..config import Config
-from ..models import ExternalHolding
+from ..models import ExternalHolding, is_valid_ticker
 
 log = logging.getLogger("robinhood")
 
@@ -229,7 +229,7 @@ class RobinhoodReader:
         for r in rows or []:
             sym = str(r.get("symbol") or r.get("ticker") or "").upper()
             qty = self._opt_float(r.get("quantity") or r.get("qty")) or 0.0
-            if not sym or qty == 0.0:
+            if not is_valid_ticker(sym) or qty == 0.0:
                 continue
             avg = self._opt_float(r.get("average_buy_price") or r.get("average_price"))
             mv = self._opt_float(r.get("market_value") or r.get("equity"))
