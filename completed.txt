@@ -367,3 +367,35 @@ the Todo ROI list (fundamentals #1, market-data #2, Quiver tier-up #3). render_r
 / `python -m investment_strategy.subscriptions` prints the decision. Everything is
 INSUFFICIENT DATA today by design — re-run after 2.1 + more live round-trips. Tests:
 test_subscriptions.py (6).
+
+################################################################################
+PHASE D/X (Todo-3) — Prove the brakes; unthrottle discovery
+################################################################################
+
+--- D.3 Account-level brake proof under the aggressive config — DONE 2026-07-03 ---
+BacktestEngine now models the watchdog's ACCOUNT-LEVEL guards, in the live order
+(peak ratchet -> equity-floor latch+flatten -> daily-loss emergency flatten ->
+per-position exits): backtest.py _apply_account_guards/_flatten, HaltEvent records
++ blocked-buy counts (halt_latch / daily_loss_halt / drawdown_halt) on
+BacktestResult and in summary(). backtest_data.py adds crash_overlay (deterministic
+market-wide crash grafted onto real closes) + stubborn_entries (re-buys every N
+bars straight into the decline — the guards, not entry logic, must stop the bleed).
+scripts/backtest_real.py --stress runs the two-pass brake test on real history.
+EVIDENCE (2026-07-03, 365d real history, 10 ledger names, live knobs kelly=1/
+vol=45/stop 8/take 20, crash: -2%/day x 70 bars + two -9% gaps => benchmark -72.5%):
+  Pass 1 (live knobs): daily-loss flatten fired TWICE on real pre-crash vol days
+  (3.41%, 6.26% book losses); drawdown halt blocked 620 re-buys during the crash;
+  book lost only -11.8% (max DD 16.3%, +60.7% excess vs the crashed benchmark);
+  equity floor never needed — correct layering.
+  Pass 2 (daily-loss/drawdown OFF): the floor was the last line and WORKED —
+  latched + flattened at $84,607 vs $89,614 floor (60% of $149,357 peak), then
+  blocked all 310 later re-entries; max DD capped at 43% on a -72.5% path.
+Tests: test_backtest.py (+4: floor latch, daily-loss flatten w/o latch, drawdown
+halt w/o flatten, guards-off no-op), test_backtest_data.py (+3: overlay decay/
+plateau, gap compounding, stubborn re-fire). Remaining D.2: accumulate live paper
+round-trips, re-run subscriptions.
+
+--- X.4 Discovery breadth unthrottled — DONE 2026-07-03 ---
+MAX_DISCOVERED_CANDIDATES 12 -> 18 (.env + config.py default): 12 re-throttled the
+now-3-feed discovery (congress + insider + robinhood) at the aggregator; 18 lets
+the surfaced breadth actually reach the model.

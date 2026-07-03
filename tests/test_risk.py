@@ -567,6 +567,107 @@ def test_defined_risk_spread_approved_and_premium_capped():
     assert d.approved_notional <= 1000 + 1e-6
 
 
+# --------------------------------------------------------------------------- #
+# R.1 — vol-scaled ("ATR-style") dynamic stops
+# --------------------------------------------------------------------------- #
+_SQRT252 = 252 ** 0.5
+
+
+def test_vol_stops_scale_stop_and_take_to_realized_vol():
+    rm = _rm(_limits(vol_stops_enabled=True, vol_stop_mult=2.5,
+                     vol_stop_take_ratio=2.5))
+    vol = 0.40                                   # calm-ish name
+    d = rm.evaluate(_buy(), _account(), price=100.0, volatility=vol)
+    expected_stop = 2.5 * (vol / _SQRT252 * 100.0)   # ~6.3%, inside the clamp
+    assert d.verdict in (RiskVerdict.APPROVED, RiskVerdict.RESIZED), d.reason
+    assert abs(d.stop_loss_pct - expected_stop) < 1e-9
+    assert abs(d.take_profit_pct - expected_stop * 2.5) < 1e-9
+
+
+def test_vol_stops_clamped_at_both_ends():
+    rm = _rm(_limits(vol_stops_enabled=True, vol_stop_mult=2.5,
+                     vol_stop_min_pct=4.0, vol_stop_max_pct=15.0))
+    # A very quiet name would compute ~1.6% -> clamped up to the 4% floor.
+    d = rm.evaluate(_buy(), _account(), price=100.0, volatility=0.10)
+    assert d.stop_loss_pct == 4.0
+    # A meme-vol name would compute ~31.5% -> clamped down to the 15% ceiling.
+    d = rm.evaluate(_buy(), _account(), price=100.0, volatility=2.0)
+    assert d.stop_loss_pct == 15.0
+
+
+def test_vol_stops_override_llm_proposed_levels():
+    rm = _rm(_limits(vol_stops_enabled=True))
+    p = _buy()
+    p.stop_loss_pct = 1.0        # untrusted LLM numbers must not win
+    p.take_profit_pct = 99.0
+    d = rm.evaluate(p, _account(), price=100.0, volatility=0.40)
+    assert d.stop_loss_pct != 1.0
+    assert d.take_profit_pct != 99.0
+
+
+def test_vol_stops_fall_back_to_defaults_when_vol_unknown():
+    rm = _rm(_limits(vol_stops_enabled=True))
+    d = rm.evaluate(_buy(), _account(), price=100.0, volatility=None)
+    assert d.stop_loss_pct == 5.0        # fixture default_stop_loss_pct
+    assert d.take_profit_pct == 12.0
+
+
+def test_vol_stops_disabled_keeps_fixed_behavior():
+    rm = _rm(_limits(vol_stops_enabled=False))
+    d = rm.evaluate(_buy(), _account(), price=100.0, volatility=0.40)
+    assert d.stop_loss_pct == 5.0
+    assert d.take_profit_pct == 12.0
+
+
+def test_wider_vol_stop_shrinks_position_via_trade_risk_cap():
+    """The safety interplay: 2d caps $-at-risk = notional * stop%, so the wide
+    stop a volatile name gets must buy FEWER dollars, not risk more."""
+    lim = _limits(vol_stops_enabled=True, max_trade_risk_pct=1.0,
+                  max_position_pct=100.0, max_symbol_exposure_pct=100.0,
+                  min_cash_buffer_pct=0.0, kelly_fraction=0.0)
+    rm = _rm(lim)
+    calm = rm.evaluate(_buy(), _account(), price=100.0, volatility=0.20)
+    wild = rm.evaluate(_buy(), _account(), price=100.0, volatility=1.50)
+    assert wild.stop_loss_pct > calm.stop_loss_pct
+    assert wild.approved_notional < calm.approved_notional
+    # Dollar risk if the stop fires stays pinned at ~1% of equity for both
+    # (cent-level slack: qty is rounded to 6dp before notional is recomputed).
+    for d in (calm, wild):
+        assert d.approved_notional * d.stop_loss_pct / 100.0 <= 1_000.0 + 0.01
+
+
+# --------------------------------------------------------------------------- #
+# R.2 — pairwise-correlation guard
+# --------------------------------------------------------------------------- #
+def test_corr_guard_rejects_duplicate_bet():
+    rm = _rm(_limits(max_pairwise_corr=0.85))
+    d = rm.evaluate(_buy("SMCI"), _account(), price=100.0, volatility=0.3,
+                    max_held_corr=0.91, corr_symbol="NVDA")
+    assert d.verdict is RiskVerdict.REJECTED
+    assert "NVDA" in d.reason and "same bet" in d.reason
+
+
+def test_corr_guard_passes_below_cap():
+    rm = _rm(_limits(max_pairwise_corr=0.85))
+    d = rm.evaluate(_buy("SMCI"), _account(), price=100.0, volatility=0.3,
+                    max_held_corr=0.60, corr_symbol="NVDA")
+    assert d.verdict is not RiskVerdict.REJECTED, d.reason
+
+
+def test_corr_guard_fails_open_when_unknown():
+    rm = _rm(_limits(max_pairwise_corr=0.85))
+    d = rm.evaluate(_buy("SMCI"), _account(), price=100.0, volatility=0.3,
+                    max_held_corr=None)
+    assert d.verdict is not RiskVerdict.REJECTED, d.reason
+
+
+def test_corr_guard_off_at_zero():
+    rm = _rm(_limits(max_pairwise_corr=0.0))
+    d = rm.evaluate(_buy("SMCI"), _account(), price=100.0, volatility=0.3,
+                    max_held_corr=0.99, corr_symbol="NVDA")
+    assert d.verdict is not RiskVerdict.REJECTED, d.reason
+
+
 def _run_all():
     fns = [v for k, v in sorted(globals().items()) if k.startswith("test_") and callable(v)]
     failed = 0

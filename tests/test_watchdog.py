@@ -86,6 +86,15 @@ def _wd(pct, state):
     return Watchdog(_cfg(pct), _FakeBroker([]), state=state)
 
 
+def test_trail_giveback_comes_from_risk_limits():
+    # R.1: the trailing giveback is a knob (TRAIL_GIVEBACK_PCT), no longer a
+    # hardcoded 3.0; fixtures without it still get the 3.0 default.
+    cfg = _cfg(0.0)
+    cfg.risk.trail_giveback_pct = 5.0
+    assert Watchdog(cfg, _FakeBroker([]), state=_state()).trail_giveback_pct == 5.0
+    assert _wd(0.0, _state()).trail_giveback_pct == 3.0
+
+
 def test_floor_breached_flattens_and_latches():
     state = _state()
     state.peak_equity = 1_000.0           # floor = 60% -> $600

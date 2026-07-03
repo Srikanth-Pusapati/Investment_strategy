@@ -176,6 +176,50 @@ def test_order_fill_unknown_on_fetch_failure():
     assert c.order_fill("oid-1") == ("unknown", 0.0, 0.0)
 
 
+# -- closed_sell_orders: raw material for the exchange-exit backfill (F.1) -- #
+def _closed_order(oid="o-1", status="filled", otype="stop", qty="10",
+                  price="92.5", filled_at=None):
+    return SimpleNamespace(
+        id=oid, symbol="AAPL",
+        status=SimpleNamespace(value=status),
+        order_type=SimpleNamespace(value=otype),
+        filled_qty=qty, filled_avg_price=price,
+        filled_at=filled_at or datetime(2026, 7, 2, 15, 30, tzinfo=timezone.utc),
+    )
+
+
+class _FakeClosedOrdersTrading:
+    def __init__(self, orders=None, err=None):
+        self.orders = orders or []
+        self.err = err
+
+    def get_orders(self, filter=None):  # noqa: A002 — alpaca-py kwarg name
+        if self.err:
+            raise self.err
+        return self.orders
+
+
+def test_closed_sell_orders_returns_filled_only_as_plain_dicts():
+    c = AlpacaClient.__new__(AlpacaClient)
+    c.trading = _FakeClosedOrdersTrading([
+        _closed_order("o-1", status="filled", otype="stop"),
+        _closed_order("o-2", status="canceled"),   # realized nothing -> dropped
+    ])
+    out = c.closed_sell_orders()
+    assert len(out) == 1
+    o = out[0]
+    assert o["order_id"] == "o-1" and o["symbol"] == "AAPL"
+    assert o["qty"] == 10.0 and o["price"] == 92.5
+    assert o["type"] == "stop"
+    assert o["filled_at"].startswith("2026-07-02T15:30")
+
+
+def test_closed_sell_orders_empty_on_failure():
+    c = AlpacaClient.__new__(AlpacaClient)
+    c.trading = _FakeClosedOrdersTrading(err=RuntimeError("api down"))
+    assert c.closed_sell_orders() == []
+
+
 def _run_all():
     fns = [v for k, v in sorted(globals().items()) if k.startswith("test_") and callable(v)]
     failed = 0

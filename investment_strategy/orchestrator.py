@@ -14,6 +14,7 @@ import logging
 import os
 import threading
 import time
+from datetime import datetime
 
 from requests.exceptions import ConnectionError as RequestsConnectionError
 from requests.exceptions import Timeout as RequestsTimeout
@@ -22,6 +23,7 @@ from urllib3.exceptions import ProtocolError
 from .attribution import render_lessons
 from .benchmark import BenchmarkTracker
 from .config import Config
+from .correlation import CorrelationGuard
 from .decision import DecisionEngine
 from .earnings import EarningsCalendar
 from .execution import AlpacaClient, OptionsHelper
@@ -81,6 +83,10 @@ class Orchestrator:
         self.earnings = EarningsCalendar()
         # Per-cycle-cached sector lookup feeding the risk sector-concentration cap.
         self.sectors = SectorMap()
+        # Per-cycle-cached pairwise-correlation guard (R.2): measures whether a
+        # NEW buy is effectively a duplicate of something already held; the
+        # RiskManager enforces the cap on the number computed here.
+        self.corr_guard = CorrelationGuard(self.broker)
         # Per-cycle market-regime read; scales position size down in risk-off, and
         # DOWN (not full) when its yfinance feed is degraded — since that same
         # outage blinds the sector cap too (1B.7).
@@ -254,11 +260,13 @@ class Orchestrator:
             return
 
         self._reconcile_fills()
+        self._backfill_exchange_exits()
         # Fresh Quiver data this cycle, but pulled once and shared by the signal
         # and screener layers (both read the same cached live feeds).
         self.quiver.new_cycle()
         self.earnings.new_cycle()
         self.sectors.new_cycle()
+        self.corr_guard.new_cycle()
         self.regime.new_cycle()
         if self.cfg.risk.regime_filter_enabled:
             regime = self.regime.assess()
@@ -364,6 +372,28 @@ class Orchestrator:
             log.warning("sector context for %s failed: %s", symbol, e)
             return None, 0.0
 
+    def _corr_context(self, symbol: str, account) -> tuple[float | None, str]:
+        """(max daily-return correlation vs the held book, which holding) for the
+        pairwise-correlation guard (R.2). Exclusions that make it correct:
+          - the candidate itself — topping up an existing position is not a new
+            bet (corr with itself is 1.0 and would block every add-on);
+          - the core ETF — satellites are MEANT to correlate with the index
+            core; comparing against it would block essentially every buy.
+        (None, "") = nothing comparable / data missing -> guard fails open."""
+        try:
+            held = [
+                p.symbol for p in account.positions
+                if p.symbol != symbol
+                and not (self.cfg.core_etf and p.symbol == self.cfg.core_etf)
+            ]
+            if not held:
+                return None, ""
+            best = self.corr_guard.max_correlation(symbol, held)
+            return (None, "") if best is None else best
+        except Exception as e:  # advisory context — never blocks a cycle
+            log.warning("correlation context for %s failed: %s", symbol, e)
+            return None, ""
+
     def _record_equity_snapshot(self) -> None:
         """Persist a once-per-day account P&L snapshot (true total return from the
         Alpaca account, not the ledger). Best-effort; never blocks a cycle."""
@@ -424,6 +454,65 @@ class Orchestrator:
                 )
             else:  # still new/accepted/pending_new long after submission
                 log.warning("Order %s (%s) still %s a full cycle later.", oid, symbol, status)
+
+    # -- exchange-exit backfill (F.1) ---------------------------------------- #
+    def _backfill_exchange_exits(self) -> None:
+        """Record exits that happened with NO code running: a resting bracket's
+        stop or take-profit leg filling at the exchange, or a manual sell in the
+        broker UI. Every code path that sells already writes the ledger at
+        submit time (decision sells, watchdog stops/takes/flattens, trims,
+        scale-outs) — those dedupe away by order id. Whatever filled sell
+        remains is exactly the blind spot attribution used to carry: realized
+        P&L nobody recorded, silently undercounting exits in the round-trip
+        history (and the track record Claude is shown). P&L is realized against
+        the symbol's most recent ledger BUY price; the record is stamped with
+        the actual fill time so chronological pairing holds. Idempotent (order-
+        id keyed) and best-effort — a failure just retries next cycle."""
+        try:
+            closed = self.broker.closed_sell_orders()
+            if not closed:
+                return
+            records = self.ledger.all()
+            known = {r.order_id for r in records if r.order_id}
+            entry_px: dict[str, float] = {}
+            for r in records:            # append-only file -> chronological
+                if r.action == "buy" and r.entry_price > 0:
+                    entry_px[r.symbol] = r.entry_price
+            for o in closed:
+                if not o["order_id"] or o["order_id"] in known:
+                    continue
+                entry = entry_px.get(o["symbol"], 0.0)
+                pl_pct = pl = None
+                if entry > 0 and o["price"] > 0:
+                    pl_pct = (o["price"] / entry - 1.0) * 100.0
+                    pl = (o["price"] - entry) * o["qty"]
+                # A bracket's stop leg is a STOP order; its take-profit leg is a
+                # LIMIT. Anything else filled that we didn't place (market/other)
+                # was an outside actor — label it external, don't guess.
+                reason = {
+                    "stop": "bracket_stop", "stop_limit": "bracket_stop",
+                    "trailing_stop": "bracket_stop", "limit": "bracket_take",
+                }.get(o["type"], "external")
+                ts = None
+                if o["filled_at"]:
+                    try:
+                        ts = datetime.fromisoformat(o["filled_at"])
+                    except ValueError:
+                        pass
+                self.ledger.record(TradeRecord.for_sell(
+                    o["symbol"],
+                    f"exchange-side exit backfill ({o['type'] or 'unknown'} sell)",
+                    o["order_id"], qty=o["qty"],
+                    realized_pl_pct=pl_pct, realized_pl=pl,
+                    exit_reason=reason, ts=ts,
+                ))
+                log.info(
+                    "Backfilled exchange exit: %s %g sh @ %.2f (%s -> %s%s).",
+                    o["symbol"], o["qty"], o["price"], o["type"] or "?", reason,
+                    f", {pl_pct:+.1f}%" if pl_pct is not None else "",
+                )
+        except Exception as e:  # bookkeeping must never break a decision cycle
+            log.warning("Exchange-exit backfill failed: %s", e)
 
     # -- slate whitelist (Todo-3 S.1) --------------------------------------- #
     @staticmethod
@@ -659,9 +748,16 @@ class Orchestrator:
         )
         sector, sector_exposure = self._sector_context(proposal.symbol, account) \
             if is_buy else (None, 0.0)
+        # Pairwise-correlation context (R.2) — only when the guard is on and
+        # this is a buy; the fetches are per-cycle cached in the guard.
+        max_corr, corr_sym = (
+            self._corr_context(proposal.symbol, account)
+            if is_buy and self.cfg.risk.max_pairwise_corr > 0 else (None, "")
+        )
         decision = self.risk.evaluate(
             proposal, account, price, vol, pending, days_to_earnings,
             sector, sector_exposure, self._regime_mult,
+            max_held_corr=max_corr, corr_symbol=corr_sym,
         )
         log.info(
             "%s %s -> %s: %s | %s",

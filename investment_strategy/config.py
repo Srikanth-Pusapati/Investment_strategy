@@ -90,6 +90,32 @@ class RiskLimits:
     # --- options (defined-risk only) ---
     options_enabled: bool            # master gate for the options path
     max_option_premium_pct: float    # max % equity as debit on one options play
+    # --- R.1 vol-scaled ("ATR-style") dynamic stops ---
+    # One fixed stop % is too tight for volatile names (chopped out by normal
+    # noise — the exact failure D.1 measured on the old 5% stop) and too loose
+    # for quiet ones. When enabled, the stop scales to the name's realized
+    # daily sigma (the same vol input sizing already uses — no extra fetch) and
+    # the take is a fixed reward:risk multiple of it; both deterministic,
+    # OVERRIDING the LLM's proposed levels, and clamped to [min, max]. The
+    # per-trade $-risk cap (2d) then shrinks SIZE as the stop widens, keeping
+    # dollar risk ~constant per position. Defaulted (not required) fields so
+    # existing RiskLimits(...) call sites keep working.
+    vol_stops_enabled: bool = False  # scale stop/take to each name's realized vol
+    vol_stop_mult: float = 2.0       # stop = mult x daily sigma (in %); 2.0 won
+                                     # the --sweep-stops evidence at BOTH lookbacks
+    vol_stop_take_ratio: float = 2.5 # take = ratio x stop (reward:risk)
+    vol_stop_min_pct: float = 4.0    # clamp: never tighter than this stop
+    vol_stop_max_pct: float = 15.0   # clamp: never wider than this stop
+    # Trailing-stop giveback: % of the peak gain surrendered before the
+    # watchdog (and the backtest's mirror of it) closes a runner. Previously a
+    # hardcoded 3.0 in both places.
+    trail_giveback_pct: float = 3.0
+    # --- R.2 pairwise-correlation guard ---
+    # The sector cap's finer-grained sibling: two "different" names whose daily
+    # returns move together are ONE bet. Reject a NEW buy whose return
+    # correlation with any already-held satellite (core ETF excluded) is
+    # at/above this. Fail-open when price history is unavailable. 0 = off.
+    max_pairwise_corr: float = 0.85
 
 
 @dataclass(frozen=True)
@@ -306,6 +332,17 @@ def load_config() -> Config:
             target_annual_vol_pct=_f("TARGET_ANNUAL_VOL_PCT", 25.0),
             options_enabled=_flag("OPTIONS_ENABLED"),
             max_option_premium_pct=_f("MAX_OPTION_PREMIUM_PCT", 1.0),
+            # R.1 vol-scaled stops: off until the --sweep-stops evidence says
+            # otherwise for this account's basket; flip in .env when it does.
+            vol_stops_enabled=_flag("VOL_STOPS_ENABLED"),
+            vol_stop_mult=_f("VOL_STOP_MULT", 2.0),
+            vol_stop_take_ratio=_f("VOL_STOP_TAKE_RATIO", 2.5),
+            vol_stop_min_pct=_f("VOL_STOP_MIN_PCT", 4.0),
+            vol_stop_max_pct=_f("VOL_STOP_MAX_PCT", 15.0),
+            trail_giveback_pct=_f("TRAIL_GIVEBACK_PCT", 3.0),
+            # R.2: 0 disables; 0.85 = "effectively the same trade" line (two
+            # normal tech megacaps sit ~0.6-0.8; near-clones sit above 0.85).
+            max_pairwise_corr=_f("MAX_PAIRWISE_CORR", 0.85),
         ),
         screener=ScreenerConfig(
             enabled=_flag("SCREENER_ENABLED", "on"),
@@ -316,7 +353,9 @@ def load_config() -> Config:
                 ).split(",")
                 if s.strip()
             ),
-            max_candidates=_i("MAX_DISCOVERED_CANDIDATES", 12),
+            # X.4: 12 re-throttled the now-3-feed discovery at the aggregator;
+            # 18 lets the full breadth actually reach the model.
+            max_candidates=_i("MAX_DISCOVERED_CANDIDATES", 18),
             min_score=_f("SCREENER_MIN_SCORE", 0.2),
             options_flow_scan_limit=_i("OPTIONS_FLOW_SCAN_LIMIT", 40),
             # Open-market insider BUYS are rare in any small window, so scan a wide
