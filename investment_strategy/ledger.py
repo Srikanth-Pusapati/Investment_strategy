@@ -39,7 +39,7 @@ class TradeRecord(BaseModel):
     """One executed order, with the decision context that produced it."""
     ts: datetime = Field(default_factory=_now)
     symbol: str
-    action: str                       # "buy" | "sell"
+    action: str                       # "buy" | "sell" | "correct"
     instrument: str = "equity"        # "equity" | "option"
 
     qty: float = 0.0
@@ -51,6 +51,11 @@ class TradeRecord(BaseModel):
     stop_loss_pct: float = 0.0        # planned downside cap
     take_profit_price: Optional[float] = None
     stop_loss_price: Optional[float] = None
+
+    # Fill/quote price at exit (sells) — the counterpart of entry_price, needed
+    # for FIFO lot P&L (lots.py). None on old records; lots.py then reconstructs
+    # a price from realized_pl_pct and flags the result as estimated.
+    exit_price: Optional[float] = None
 
     rationale: str = ""               # why — the reason behind the purchase
     key_signals: list[str] = Field(default_factory=list)
@@ -138,21 +143,43 @@ class TradeRecord(BaseModel):
         qty: float = 0.0, key_signals: Optional[list[str]] = None,
         realized_pl_pct: Optional[float] = None, realized_pl: Optional[float] = None,
         exit_reason: str = "decision", instrument: str = "equity",
-        ts: Optional[datetime] = None,
+        ts: Optional[datetime] = None, exit_price: Optional[float] = None,
     ) -> "TradeRecord":
         """`ts` overrides the record time — the exchange-exit backfill (F.1)
         stamps the order's actual FILL time so attribution's chronological
         round-trip pairing sees the exit where it really happened, not when the
-        backfill noticed it."""
+        backfill noticed it. `exit_price` is the sell's fill/quote price —
+        record it whenever known so FIFO lot P&L (GA-2.5) has a real basis."""
         kwargs: dict = dict(
             symbol=symbol, action="sell", instrument=instrument, qty=qty,
             rationale=rationale, key_signals=key_signals or [], order_id=order_id,
             realized_pl_pct=realized_pl_pct, realized_pl=realized_pl,
-            exit_reason=exit_reason,
+            exit_reason=exit_reason, exit_price=exit_price,
         )
         if ts is not None:
             kwargs["ts"] = ts
         return cls(**kwargs)
+
+    @classmethod
+    def correction(
+        cls, order_id: str, symbol: str, status: str,
+        filled_qty: float, orig_qty: float,
+    ) -> "TradeRecord":
+        """A CORRECTION for an earlier record whose order did not (fully) execute
+        (goGA GA-2.5). The ledger is append-only, so a reject/cancel/partial found
+        at reconcile is fixed by appending a record that points at the original
+        via order_id: `qty` is the ACTUAL filled quantity (0 = the intent never
+        executed at all). effective() applies these — voiding zero-fill records
+        and resizing partials — so every consumer (dashboard, attribution, lots,
+        track record) sees the broker's reality, not the recorded intent."""
+        return cls(
+            symbol=symbol, action="correct", qty=max(0.0, float(filled_qty)),
+            rationale=(
+                f"reconcile correction: order ended {status} with "
+                f"{filled_qty:g}/{orig_qty:g} filled"
+            ),
+            risk_note=status, order_id=order_id, exit_reason="correction",
+        )
 
 
 class TradeLedger:
@@ -183,4 +210,42 @@ class TradeLedger:
                 out.append(TradeRecord.model_validate_json(line))
             except Exception as e:
                 log.warning("Skipping malformed ledger line: %s", e)
+        return out
+
+    def effective(self) -> list[TradeRecord]:
+        """Records with reconcile CORRECTIONS applied (goGA GA-2.5): a corrected
+        record whose order filled 0 is dropped (the intent never executed — the
+        old phantom-BUY-row bug); a partial fill is resized to what actually
+        filled (qty, cost, and realized $ scaled proportionally; per-share
+        prices and % are size-independent and stand). Correction rows themselves
+        are consumed, never returned. Every read-side consumer (dashboard,
+        attribution, lots, track record) should use this, not all()."""
+        records = self.all()
+        # Last correction per order id wins (a re-reconcile can refine a fill).
+        corrections = {
+            r.order_id: r for r in records
+            if r.action == "correct" and r.order_id
+        }
+        out: list[TradeRecord] = []
+        for r in records:
+            if r.action == "correct":
+                continue
+            c = corrections.get(r.order_id) if r.order_id else None
+            if c is None:
+                out.append(r)
+                continue
+            if c.qty <= 0:
+                continue  # order never executed — void the recorded intent
+            if r.qty > 0 and c.qty < r.qty:
+                frac = c.qty / r.qty
+                r = r.model_copy(update={
+                    "qty": c.qty,
+                    "cost_usd": round(r.cost_usd * frac, 2),
+                    "realized_pl": (
+                        r.realized_pl * frac if r.realized_pl is not None else None
+                    ),
+                    "risk_note": (r.risk_note + " " if r.risk_note else "")
+                    + f"[corrected: {c.qty:g}/{r.qty:g} filled]",
+                })
+            out.append(r)
         return out

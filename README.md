@@ -59,6 +59,8 @@ That's it. 🎉
 | **Test the strategy on past data first** | `python -m investment_strategy.backtest` |
 | **See if paid data is worth buying** (later) | `python -m investment_strategy.subscriptions` |
 | **Auto-refresh the dashboard while it runs** | it's already on (`DASHBOARD_FILE=dashboard.html` in `.env`) — just refresh the page |
+| **Publish an honest track record** (equity vs QQQ/SPY + a naive trailing stop, disclaimers baked in) | `python -m investment_strategy.track_record` — or set `TRACK_RECORD_FILE=track_record.html` to auto-refresh it each cycle |
+| **Back up the bot's memory nightly** (ledger, equity history, risk state) | `ops/backup_state.sh` — schedule it with `ops/launchd/com.investment-strategy.backup.plist` |
 
 ---
 
@@ -99,7 +101,14 @@ already set up and tested.
 
 1. Run it in **paper mode for weeks** and read what it does.
 2. **Backtest** it: `python -m investment_strategy.backtest` (tests sizing + exits on history).
-3. Start live with **$100–$1000, not your savings** — scale up only from a real track record.
+3. Fund a live account at the **$10–25k floor, never your savings** — and scale
+   up only from a real track record. Why the floor: the bot now buys **whole
+   shares only** by default (`WHOLE_SHARES_ONLY=on`), so every position rests a
+   real stop at the exchange. At $25k a 12% position is ~$3k/name and reaches
+   nearly the whole screened universe; at $500 it can't buy one share of most
+   names and the account degenerates to core-only. If you must run smaller,
+   prefer a max-share-price filter over turning whole-shares off — a fractional
+   position's only stop is the 30-second watchdog in a killable process.
 
 To go live (deliberate, 3 changes in `.env`): `TRADING_MODE=live` **and**
 `ALPACA_BASE_URL=https://api.alpaca.markets` **and** `KILL_SWITCH=off`, with your

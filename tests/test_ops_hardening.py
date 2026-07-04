@@ -38,6 +38,14 @@ class _FakeState:
         self.pending = list(oids)
 
 
+class _FakeLedger:
+    def __init__(self):
+        self.records = []
+
+    def record(self, rec):
+        self.records.append(rec)
+
+
 def _kill_path():
     return os.path.join(tempfile.gettempdir(), f"_kill_{uuid.uuid4().hex}")
 
@@ -54,6 +62,7 @@ def _orch(fills=None, *, halt_enabled=True, kill_file=None, heartbeat_url=""):
     o.risk = SimpleNamespace(kill_switch=False)
     o.state = _FakeState()
     o.broker = _FillBroker(fills or {})
+    o.ledger = _FakeLedger()
     o.alerter = _RecordingAlerter()
     o._trade_lock = threading.Lock()
     o._pending_oids = [(oid, f"SYM{i}") for i, oid in enumerate(fills or {})]
@@ -81,6 +90,36 @@ def test_partial_fill_halts_new_buys():
     o._reconcile_fills()
     assert o.risk.kill_switch is True
     assert os.path.exists(o.cfg.kill_switch_file)
+    os.remove(o.cfg.kill_switch_file)
+
+
+# -- ledger corrections at reconcile (GA-2.5) --------------------------------- #
+def test_rejected_order_writes_a_ledger_correction():
+    o = _orch({"o1": ("rejected", 0.0, 5.0)})
+    o._reconcile_fills()
+    assert len(o.ledger.records) == 1
+    c = o.ledger.records[0]
+    assert c.action == "correct" and c.order_id == "o1" and c.qty == 0.0
+    assert "rejected" in c.risk_note
+    os.remove(o.cfg.kill_switch_file)
+
+
+def test_canceled_partial_correction_carries_filled_qty():
+    o = _orch({"o1": ("canceled", 2.0, 5.0)})
+    o._reconcile_fills()
+    c = o.ledger.records[0]
+    assert c.action == "correct" and c.qty == 2.0
+    os.remove(o.cfg.kill_switch_file)
+
+
+def test_live_partial_writes_no_correction_yet_and_requeues():
+    # A non-terminal partial may still fill more — no correction until the
+    # order reaches a terminal state; it's re-queued for the next reconcile.
+    o = _orch({"o1": ("partially_filled", 2.0, 5.0)})
+    o._reconcile_fills()
+    assert o.ledger.records == []
+    assert ("o1", "SYM0") in o._pending_oids
+    assert o.state.pending == o._pending_oids  # survives a crash mid-cycle
     os.remove(o.cfg.kill_switch_file)
 
 

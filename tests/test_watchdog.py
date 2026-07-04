@@ -54,12 +54,13 @@ class _FakeBroker:
 
 
 def _cfg(pct, max_hold_days=0.0, time_stop_min_gain_pct=2.0,
-         scale_out_enabled=False, scale_out_pct=50.0):
+         scale_out_enabled=False, scale_out_pct=50.0, whole_shares_only=False):
     return SimpleNamespace(
         risk=SimpleNamespace(
             equity_floor_pct=pct, max_daily_loss_pct=3.0,
             max_hold_days=max_hold_days, time_stop_min_gain_pct=time_stop_min_gain_pct,
             scale_out_enabled=scale_out_enabled, scale_out_pct=scale_out_pct,
+            whole_shares_only=whole_shares_only,
         ),
         state_file="state/risk_state.json",
         monitor_interval_s=30,
@@ -182,6 +183,27 @@ def test_scale_out_fires_once_then_trails():
     # take_pct is 0 after scaling, so a further run-up is NOT re-taken here.
     assert wd._enforce_hard_exits(_pos_qty("AAPL", qty=1.0, pl_pct=20.0)) is False
     assert wd.broker.reduced == []
+
+
+def test_scale_out_rounds_down_to_whole_shares_in_whole_shares_mode():
+    # GA-2.3: 50% of 3 shares = 1.5 -> sell 1 whole share, trail the rest.
+    state = _state()
+    state.register_exits("AAPL", stop_pct=5.0, take_pct=12.0)
+    wd = Watchdog(_cfg(0.0, scale_out_enabled=True, scale_out_pct=50.0,
+                       whole_shares_only=True), _FakeBroker([]), state=state)
+    assert wd._enforce_hard_exits(_pos_qty("AAPL", qty=3.0, pl_pct=12.0)) is True
+    assert wd.broker.reduced == [("AAPL", 1.0)]
+
+
+def test_scale_out_of_single_share_falls_back_to_full_take():
+    # 50% of 1 share floors to 0 -> no partial possible -> full take-profit close.
+    state = _state()
+    state.register_exits("AAPL", stop_pct=5.0, take_pct=12.0)
+    wd = Watchdog(_cfg(0.0, scale_out_enabled=True, scale_out_pct=50.0,
+                       whole_shares_only=True), _FakeBroker([]), state=state)
+    assert wd._enforce_hard_exits(_pos_qty("AAPL", qty=1.0, pl_pct=12.0)) is True
+    assert wd.broker.reduced == []
+    assert wd.broker.closed == ["AAPL"]
 
 
 def test_scale_out_disabled_full_close_at_take():

@@ -29,11 +29,15 @@ from .earnings import EarningsCalendar
 from .execution import AlpacaClient, OptionsHelper
 from .ledger import TradeLedger, TradeRecord
 from .models import (
+    Action,
     Candidate,
     Instrument,
+    OrderRequest,
+    OrderType,
     Position,
     RiskVerdict,
     SignalBundle,
+    TIF,
     TradeProposal,
 )
 from .monitor import Watchdog
@@ -393,22 +397,33 @@ class Orchestrator:
         # benchmark. Runs EVEN when there were no proposals — that's exactly the
         # cash-drag case it exists to fix.
         self._apply_core_fill(account)
+        # GA-2.3: keep the core's exchange-resident GTC stop sized to the
+        # (growing) position — the core previously had NO exchange-side stop.
+        self._ensure_core_stop(account)
         # Persist this cycle's freshly-submitted order ids so the next boot (even
         # after a crash between cycles) reconciles their fills (1B.9).
         self.state.set_pending_orders(self._pending_oids)
 
     def _refresh_dashboard(self) -> None:
-        """Regenerate the live dashboard HTML after a cycle so the tracker stays
-        fresh (off unless DASHBOARD_FILE is set). Best-effort; never blocks."""
-        if not self.cfg.dashboard_file:
-            return
-        try:
-            from pathlib import Path
+        """Regenerate the live dashboard HTML — and the public track-record page
+        (GA-1.2) — after a cycle so both stay fresh (each off unless its file is
+        set). Best-effort; never blocks."""
+        if self.cfg.dashboard_file:
+            try:
+                from pathlib import Path
 
-            from .dashboard import generate
-            generate(Path(self.cfg.dashboard_file), live=True)
-        except Exception as e:
-            log.warning("Dashboard refresh failed: %s", e)
+                from .dashboard import generate
+                generate(Path(self.cfg.dashboard_file), live=True)
+            except Exception as e:
+                log.warning("Dashboard refresh failed: %s", e)
+        if self.cfg.track_record_file:
+            try:
+                from pathlib import Path
+
+                from .track_record import generate as generate_track_record
+                generate_track_record(Path(self.cfg.track_record_file), live=True)
+            except Exception as e:
+                log.warning("Track-record refresh failed: %s", e)
 
     def _sector_context(self, symbol: str, account) -> tuple[str | None, float]:
         """(sector of `symbol`, $ already held in that sector) for the risk
@@ -504,16 +519,27 @@ class Orchestrator:
                     "Order %s (%s) ended %s with %g/%g filled — ledger records an "
                     "intent that did not (fully) execute.", oid, symbol, status, filled, qty,
                 )
+                # CORRECT the ledger (GA-2.5): append a correction pointing at the
+                # original record so effective() voids a zero-fill intent or
+                # resizes a partial — no more phantom BUY rows.
+                self.ledger.record(TradeRecord.correction(oid, symbol, status, filled, qty))
                 mismatches.append(f"{symbol} {status} ({filled:g}/{qty:g} filled)")
             elif qty and 0 < filled < qty:
                 log.warning(
                     "Order %s (%s) PARTIAL: %g/%g filled (status=%s).",
                     oid, symbol, filled, qty, status,
                 )
+                # Non-terminal partial: may still fill more, so no correction yet —
+                # re-queue it and let a later reconcile write the final number.
+                self._pending_oids.append((oid, symbol))
                 mismatches.append(f"{symbol} partial {filled:g}/{qty:g}")
             else:  # still new/accepted/pending_new long after submission — may yet
                 # fill; not a confirmed divergence, so warn without halting.
                 log.warning("Order %s (%s) still %s a full cycle later.", oid, symbol, status)
+        if self._pending_oids:
+            # Re-queued live partials must survive a crash before the cycle's
+            # end-of-run persist, or their final fill never gets corrected.
+            self.state.set_pending_orders(self._pending_oids)
         if mismatches and self.cfg.reconcile_halt_enabled:
             self._halt_new_buys(
                 "reconcile mismatch: " + "; ".join(mismatches),
@@ -553,27 +579,41 @@ class Orchestrator:
         remains is exactly the blind spot attribution used to carry: realized
         P&L nobody recorded, silently undercounting exits in the round-trip
         history (and the track record Claude is shown). P&L is realized against
-        the symbol's most recent ledger BUY price; the record is stamped with
-        the actual fill time so chronological pairing holds. Idempotent (order-
-        id keyed) and best-effort — a failure just retries next cycle."""
+        the FIFO basis of the shares actually sold (lots.py, GA-2.5 — the old
+        most-recent-buy-price basis was wrong for multi-lot names); the record
+        is stamped with the actual fill time so chronological pairing holds.
+        Idempotent (order-id keyed) and best-effort — a failure just retries
+        next cycle."""
         try:
+            from .lots import build_lot_history, fifo_basis
+
             closed = self.broker.closed_sell_orders()
             if not closed:
                 return
-            records = self.ledger.all()
+            records = self.ledger.effective()
             known = {r.order_id for r in records if r.order_id}
-            entry_px: dict[str, float] = {}
-            for r in records:            # append-only file -> chronological
-                if r.action == "buy" and r.entry_price > 0:
-                    entry_px[r.symbol] = r.entry_price
-            for o in closed:
+            # Open FIFO lots after every recorded trade so far; consumed as we
+            # backfill (oldest fills first) so multiple exits in one batch each
+            # see the lots the earlier ones left behind.
+            open_lots, _ = build_lot_history(records)
+            for o in sorted(closed, key=lambda x: x["filled_at"] or ""):
                 if not o["order_id"] or o["order_id"] in known:
                     continue
-                entry = entry_px.get(o["symbol"], 0.0)
+                lots = open_lots.get(o["symbol"], [])
+                basis, covered = fifo_basis(lots, o["qty"])
                 pl_pct = pl = None
-                if entry > 0 and o["price"] > 0:
-                    pl_pct = (o["price"] / entry - 1.0) * 100.0
-                    pl = (o["price"] - entry) * o["qty"]
+                if basis > 0 and o["price"] > 0:
+                    pl_pct = (o["price"] / basis - 1.0) * 100.0
+                    pl = (o["price"] - basis) * covered
+                    # Consume the shares this exit sold so the next backfilled
+                    # sell in this batch realizes against the remaining lots.
+                    remaining = o["qty"]
+                    while remaining > 1e-9 and lots:
+                        take = min(lots[0].remaining, remaining)
+                        lots[0].remaining -= take
+                        remaining -= take
+                        if lots[0].remaining <= 1e-9:
+                            lots.pop(0)
                 # A bracket's stop leg is a STOP order; its take-profit leg is a
                 # LIMIT. Anything else filled that we didn't place (market/other)
                 # was an outside actor — label it external, don't guess.
@@ -592,7 +632,7 @@ class Orchestrator:
                     f"exchange-side exit backfill ({o['type'] or 'unknown'} sell)",
                     o["order_id"], qty=o["qty"],
                     realized_pl_pct=pl_pct, realized_pl=pl,
-                    exit_reason=reason, ts=ts,
+                    exit_reason=reason, ts=ts, exit_price=o["price"] or None,
                 ))
                 log.info(
                     "Backfilled exchange exit: %s %g sh @ %.2f (%s -> %s%s).",
@@ -693,6 +733,10 @@ class Orchestrator:
         with self._trade_lock:
             for pos in list(account.positions):
                 sell_qty = round(pos.qty * frac, 6)
+                # Whole-shares mode (GA-2.3): don't leave fractional dust that
+                # can't carry a GTC exit; a sub-share trim is skipped.
+                if r.whole_shares_only:
+                    sell_qty = float(int(sell_qty))
                 if sell_qty <= 0:
                     continue
                 self.broker.cancel_open_orders_for(pos.symbol)  # release bracket
@@ -704,6 +748,7 @@ class Orchestrator:
                     pos.symbol, f"regime risk-off trim {r.regime_trim_pct:.0f}%", oid,
                     qty=sell_qty, realized_pl_pct=pos.unrealized_pl_pct,
                     realized_pl=None, exit_reason="regime_trim",
+                    exit_price=pos.current_price or None,
                 ))
                 # Keep the in-memory snapshot honest for the rest of the cycle and
                 # re-protect the (now bracket-less) remainder via the watchdog.
@@ -752,6 +797,7 @@ class Orchestrator:
                     pos.symbol, "thesis decay: entry signals no longer corroborated",
                     oid, qty=pos.qty, realized_pl_pct=pos.unrealized_pl_pct,
                     realized_pl=pos.unrealized_pl, exit_reason="thesis_decay",
+                    exit_price=pos.current_price or None,
                 ))
                 if oid:
                     self._pending_oids.append((oid, pos.symbol))
@@ -822,6 +868,56 @@ class Orchestrator:
             account, etf, notional, price, notional / price if price > 0 else 0.0,
         )
 
+    # -- core exchange-side stop (GA-2.3) ----------------------------------- #
+    def _ensure_core_stop(self, account) -> None:
+        """Rest a standalone GTC STOP at the exchange for the core position,
+        CORE_STOP_PCT under its average basis. The core accumulates through
+        notional (fractional) buys, which can't carry brackets — before this its
+        only protection was the 30s watchdog in a killable process; a resting
+        stop survives a crash, a sleeping laptop, and the overnight session's
+        open. Covers the whole-share part only (Alpaca rejects GTC on
+        fractional qty); the sub-share residual stays watchdog-guarded.
+        Re-issued (cancel + replace) when the position grows by >= 1 share or
+        the basis moves the stop by > 0.5%. Placing a protective SELL is risk
+        reduction — never gated by the kill switch. Best-effort: a failed
+        cancel/submit is retried next cycle."""
+        etf = self.cfg.core_etf
+        pct = self.cfg.core_stop_pct
+        if not etf or pct <= 0:
+            return
+        pos = account.position_for(etf)
+        if pos is None or pos.qty < 1 or pos.avg_entry_price <= 0:
+            return
+        desired_qty = float(int(pos.qty))
+        desired_stop = round(pos.avg_entry_price * (1 - pct / 100.0), 2)
+        if desired_stop <= 0:
+            return
+        existing = self.broker.open_stop_sells(etf)
+        for o in existing:
+            if (
+                abs(o["qty"] - desired_qty) < 1.0
+                and abs(o["stop_price"] - desired_stop) / desired_stop < 0.005
+            ):
+                return  # resting stop is already right — leave it alone
+        with self._trade_lock:
+            for o in existing:  # stale size/level — replace
+                self.broker.cancel_order(o["id"])
+            oid = self.broker.submit(OrderRequest(
+                symbol=etf, side=Action.SELL, order_type=OrderType.STOP,
+                tif=TIF.GTC, qty=desired_qty, stop_price=desired_stop,
+            ))
+        if oid:
+            log.info(
+                "Core stop: GTC stop resting for %g %s @ %.2f (%.0f%% under "
+                "basis %.2f).", desired_qty, etf, desired_stop, pct,
+                pos.avg_entry_price,
+            )
+        else:
+            log.warning(
+                "Core stop for %s could not be placed this cycle; the watchdog "
+                "still guards it. Will retry next cycle.", etf,
+            )
+
     # -- equity path -------------------------------------------------------- #
     def _handle_equity(
         self, proposal: TradeProposal, account, signal_kinds: list[str] | None = None
@@ -870,6 +966,7 @@ class Orchestrator:
                     realized_pl_pct=held.unrealized_pl_pct if held else None,
                     realized_pl=held.unrealized_pl if held else None,
                     exit_reason="decision",
+                    exit_price=held.current_price if held else None,
                 ))
                 if oid:
                     self._pending_oids.append((oid, proposal.symbol))

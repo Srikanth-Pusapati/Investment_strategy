@@ -128,7 +128,9 @@ def render_lessons(
     each cycle (the Quiver notes warn about exactly this). Sources are sorted by
     realized avg P&L so the best/worst performers read first.
     """
-    trips = round_trips(ledger.all())
+    # effective(): reconcile corrections applied, so a rejected/partial order's
+    # phantom intent can't count as a round-trip (GA-2.5).
+    trips = round_trips(ledger.effective())
     if not trips:
         return ""
     recent = trips[-max_trips:]

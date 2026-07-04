@@ -223,6 +223,11 @@ class Watchdog:
         returns False so the caller falls back to the full-close take path."""
         frac = getattr(self.cfg.risk, "scale_out_pct", 0.0) / 100.0
         sell_qty = round(pos.qty * frac, 6)
+        # Whole-shares mode (GA-2.3): a partial sell must not leave fractional
+        # dust that can't carry a GTC exit — round the slice down; too small to
+        # make a whole share -> fall back to the full take-profit close.
+        if getattr(self.cfg.risk, "whole_shares_only", False):
+            sell_qty = float(int(sell_qty))
         if frac <= 0 or sell_qty <= 0:
             return False
         self.broker.cancel_open_orders_for(pos.symbol)  # release any resting bracket
@@ -344,7 +349,7 @@ class Watchdog:
             self.ledger.record(TradeRecord.for_sell(
                 pos.symbol, f"watchdog {reason}", oid, qty=pos.qty,
                 realized_pl_pct=pos.unrealized_pl_pct, realized_pl=pos.unrealized_pl,
-                exit_reason=reason,
+                exit_reason=reason, exit_price=pos.current_price or None,
             ))
         except Exception as e:  # never let logging break the watchdog
             log.warning("Ledger exit-record failed for %s: %s", pos.symbol, e)

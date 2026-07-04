@@ -306,6 +306,15 @@ class AlpacaClient:
             return self.submit(order), False
 
         # Sub-share: fractional dollar-notional order, no exchange bracket.
+        # Whole-shares mode (GA-2.3) must never reach here — the risk layer
+        # floors/rejects upstream — but a decision built another way (or a
+        # future refactor) must not slip an unbracketed buy through either.
+        if self.cfg.risk.whole_shares_only:
+            log.warning(
+                "Skip %s: whole-shares mode — refusing sub-share fractional "
+                "fallback (no exchange bracket).", symbol,
+            )
+            return None, False
         if not self.cfg.risk.fractional_enabled:
             log.warning("Skip %s: under one share and fractional disabled.", symbol)
             return None, False
@@ -430,6 +439,40 @@ class AlpacaClient:
                     self.trading.cancel_order_by_id(o.id)
                 except Exception as e:
                     log.warning("cancel order %s failed: %s", o.id, e)
+
+    def cancel_order(self, order_id: str) -> bool:
+        """Cancel one order by id. False (logged) on failure."""
+        try:
+            self.trading.cancel_order_by_id(order_id)
+            return True
+        except Exception as e:
+            log.warning("cancel order %s failed: %s", order_id, e)
+            return False
+
+    def open_stop_sells(self, symbol: str) -> list[dict]:
+        """OPEN stop-type SELL orders for `symbol` as (id, qty, stop_price)
+        dicts — how the core-stop maintainer (GA-2.3) sees the protection that
+        is ALREADY resting at the exchange before deciding to replace it.
+        Best-effort: [] on failure (caller then leaves the resting stop alone
+        rather than risking a cancel with no replacement)."""
+        out: list[dict] = []
+        try:
+            for o in self.trading.get_orders():
+                if o.symbol != symbol:
+                    continue
+                if not str(getattr(o, "side", "")).lower().endswith("sell"):
+                    continue
+                otype = getattr(o, "order_type", None) or getattr(o, "type", "")
+                if "stop" not in str(getattr(otype, "value", otype)).lower():
+                    continue
+                out.append({
+                    "id": str(o.id),
+                    "qty": float(getattr(o, "qty", 0) or 0),
+                    "stop_price": float(getattr(o, "stop_price", 0) or 0),
+                })
+        except Exception as e:
+            log.warning("open_stop_sells(%s) failed: %s", symbol, e)
+        return out
 
     def order_fill(self, order_id: str) -> tuple[str, float, float]:
         """(status, filled_qty, qty) for an order — for post-hoc fill reconciliation.

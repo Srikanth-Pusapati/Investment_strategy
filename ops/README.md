@@ -40,3 +40,34 @@ pages. Use one of:
 - **Reconcile finds a mismatch** (rejected/partial order the ledger recorded as
   intent) → new buys halt + page; you verify positions against the broker, then
   `rm state/KILL` to resume.
+
+## GA-2.3 — no more stop-less positions
+
+| Env | Default | Meaning |
+|---|---|---|
+| `WHOLE_SHARES_ONLY` | `on` | Satellite buys floor to whole shares so EVERY entry rests an exchange-side GTC bracket; a budget under one share is rejected, never downgraded to an unprotected fractional. Partial sells (scale-out, trim) round to whole shares too. Turn off only on a tiny account that accepts watchdog-only stops. |
+| `CORE_STOP_PCT` | `15` | Standalone GTC stop protecting the core ETF this % under its average basis (whole-share part; the sub-share residual stays watchdog-guarded). `0` = off — that is the explicit written-acceptance path: broad-ETF gap risk accepted, dead-man paging is the compensating control. |
+
+Re-validated 2026-07-04 under whole-share sizing: `--stress` all 5 brake checks
+PASS; `--sweep-stops` at 20- and 55-day lookbacks keeps the vol 2σ family on
+top — the live `VOL_STOPS` config stands.
+
+## GA-2.8 — nightly state/ backup
+
+`state/` (ledger, equity history = the track record, risk latch) is gitignored
+by design; git is not its backup. Run `ops/backup_state.sh` nightly:
+
+- mac: `cp ops/launchd/com.investment-strategy.backup.plist ~/Library/LaunchAgents/`
+  (edit the `REPLACE_ME` paths), then `launchctl load` it. Runs 02:15 daily.
+- VPS/cron: `15 2 * * * /path/to/ops/backup_state.sh`
+- Off-machine: point `BACKUP_DIR` at an iCloud/Dropbox-synced folder, or set
+  `BACKUP_RCLONE_REMOTE=remote:bucket` (requires rclone). Keeps the newest 30
+  tarballs locally (`BACKUP_KEEP`).
+
+## GA-2.7 — preflight breadth
+
+`python -m investment_strategy.preflight` now also exercises Quiver, the
+yfinance regime feed (the sector cap is blind in the same outage), the
+Robinhood MCP token (when enabled), and **sends a real test alert** through the
+configured sink (`--no-alert-test` to skip). Run it before market open — a
+broken pager should be discovered by the test page, not by the incident.

@@ -76,6 +76,9 @@ def _limits(**over) -> RiskLimits:
         target_annual_vol_pct=25.0,
         options_enabled=False,
         max_option_premium_pct=1.0,
+        # Most of this suite exercises the FRACTIONAL sizing path; the
+        # whole-shares mode (GA-2.3, live default ON) has its own tests below.
+        whole_shares_only=False,
     )
     base.update(over)
     return RiskLimits(**base)
@@ -166,6 +169,29 @@ def test_fractional_disabled_rejects_sub_share():
     acct = _account(equity=2_000.0, cash=2_000.0, buying_power=2_000.0, last_equity=2_000.0)
     d = rm.evaluate(_buy(), acct, price=300.0, volatility=0.3)  # $100 budget < $300
     assert d.verdict is RiskVerdict.REJECTED
+
+
+# -- whole-shares mode (GA-2.3): every entry can rest an exchange bracket ---- #
+def test_whole_shares_mode_floors_to_int_qty():
+    # $5,000 budget on a $333 stock = 15.01 shares -> floored to 15 whole shares.
+    rm = _rm(_limits(whole_shares_only=True, kelly_fraction=0.0,
+                     max_trade_risk_pct=0.0))
+    d = rm.evaluate(_buy(), _account(), price=333.0, volatility=0.25)
+    assert d.verdict in (RiskVerdict.APPROVED, RiskVerdict.RESIZED), d.reason
+    assert d.approved_qty == 15.0
+    assert d.approved_qty == int(d.approved_qty)
+
+
+def test_whole_shares_mode_rejects_sub_share_budget():
+    # Whole-shares overrides fractional: a budget under one share is REJECTED,
+    # never silently downgraded to an unprotected fractional buy.
+    rm = _rm(_limits(whole_shares_only=True, fractional_enabled=True,
+                     kelly_fraction=0.0))
+    acct = _account(equity=2_000.0, cash=2_000.0, buying_power=2_000.0,
+                    last_equity=2_000.0)
+    d = rm.evaluate(_buy(), acct, price=300.0, volatility=0.3)  # $100 < $300
+    assert d.verdict is RiskVerdict.REJECTED
+    assert "Whole-shares" in d.reason
 
 
 def test_conviction_floor_rejects_low_edge():
