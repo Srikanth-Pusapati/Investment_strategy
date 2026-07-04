@@ -37,7 +37,7 @@ from .models import (
     TradeProposal,
 )
 from .monitor import Watchdog
-from .notify import Alerter
+from .notify import Alerter, ping_heartbeat
 from .portfolio import RobinhoodReader
 from .risk import RiskManager
 from .regime import RegimeReader
@@ -142,6 +142,17 @@ class Orchestrator:
                 "Loaded %d pending order(s) from state to reconcile.",
                 len(self._pending_oids),
             )  # (order_id, symbol)
+        # Liveness stamps (goGA GA-2.1/2.2). _last_main_tick gates the heartbeat:
+        # the watchdog thread only pings the external dead-man URL while the main
+        # loop is ALSO fresh, so either thread dying silences the ping and the
+        # external monitor pages. _last_wall_tick detects dark gaps (laptop sleep,
+        # clock jumps) that monotonic timers can't see.
+        self._last_main_tick = time.monotonic()
+        self._last_wall_tick = time.time()
+        # In-memory halt latch: backs the kill-switch FILE when the file write
+        # itself failed (disk full/read-only). Cleared only by restart — if we
+        # couldn't write the ack file, there's nothing a human can delete to ack.
+        self._forced_halt = False
 
     # -- main loop ---------------------------------------------------------- #
     def run(self) -> None:
@@ -171,6 +182,7 @@ class Orchestrator:
         try:
             while not self._stop.is_set():
                 try:
+                    self._note_loop_tick()
                     self._refresh_runtime_controls()
                     if self._decision_due():
                         self.run_decision_cycle()
@@ -198,6 +210,7 @@ class Orchestrator:
             try:
                 with self._trade_lock:
                     self.watchdog.check_once()
+                self._maybe_heartbeat()
             except _TRANSIENT_NET as e:
                 log.warning(
                     "Watchdog tick skipped on a transient network error (%s); "
@@ -206,6 +219,45 @@ class Orchestrator:
             except Exception:
                 log.exception("Watchdog tick failed; continuing.")
             self._stop.wait(self.cfg.monitor_interval_s)
+
+    def _note_loop_tick(self) -> None:
+        """Stamp main-loop liveness and detect dark gaps. A wall-clock jump much
+        larger than the tick interval means the process was suspended (laptop
+        sleep) or the host clock jumped — positions moved unwatched, so say so
+        loudly. Trading itself needs no special resume path: the watchdog's next
+        tick re-checks every position and the decision cycle reconciles first."""
+        self._last_main_tick = time.monotonic()
+        now_wall = time.time()
+        gap = now_wall - self._last_wall_tick
+        self._last_wall_tick = now_wall
+        threshold = self.cfg.monitor_interval_s * 3 + 60
+        if gap > threshold:
+            log.critical(
+                "DARK GAP: no loop tick for %.0f min (sleep/suspend?). Positions "
+                "were unwatched; reconciling before trading resumes.", gap / 60.0,
+            )
+            self.alerter.critical(
+                "dark_gap",
+                f"Bot was dark for {gap / 60.0:.0f} min",
+                "The process missed loop ticks (host slept, was suspended, or the "
+                "clock jumped). Position monitoring resumed; the next decision "
+                "cycle reconciles pending orders first. Check the host.",
+            )
+
+    def _maybe_heartbeat(self) -> None:
+        """Ping the external dead-man monitor — only while the MAIN loop is also
+        fresh. Called from the watchdog thread, so a dead/hung decision loop OR a
+        dead watchdog both silence the ping and the external monitor pages."""
+        if not self.cfg.heartbeat_url:
+            return
+        main_age = time.monotonic() - self._last_main_tick
+        if main_age > self.cfg.monitor_interval_s * 3 + 60:
+            log.warning(
+                "Heartbeat withheld: main loop last ticked %.0fs ago — letting "
+                "the external monitor page.", main_age,
+            )
+            return
+        ping_heartbeat(self.cfg.heartbeat_url)
 
     def _decision_due(self) -> bool:
         return (time.monotonic() - self._last_decision_at) >= self.cfg.decision_interval_s
@@ -245,7 +297,7 @@ class Orchestrator:
         """Let an operator halt NEW buys WITHOUT a restart by creating the
         kill-switch file. Startup KILL_SWITCH stays in effect regardless."""
         file_kill = os.path.exists(self.cfg.kill_switch_file)
-        desired = self.cfg.kill_switch or file_kill
+        desired = self.cfg.kill_switch or file_kill or self._forced_halt
         if desired != self.risk.kill_switch:
             log.warning(
                 "Kill switch -> %s (file=%s).", "ON" if desired else "off",
@@ -433,11 +485,16 @@ class Orchestrator:
     def _reconcile_fills(self) -> None:
         """Confirm last cycle's orders actually filled. A recorded order id is only
         an intent — rejects and partial fills mean the ledger and our risk picture
-        can drift from reality. Surface that loudly instead of trusting submission."""
+        have DIVERGED from the broker's reality. That used to be log-only
+        (advisory); now it's enforcing (goGA GA-2.1): a confirmed divergence halts
+        NEW buys via the kill-switch file until a human deletes the file to
+        acknowledge. Sells and the watchdog are never gated — closing out of a
+        mis-booked position is exactly what we still want to work."""
         pending, self._pending_oids = self._pending_oids, []
         # Persist the cleared list immediately: these are about to be checked, so a
         # crash mid-reconcile must not re-examine (or re-strand) them next boot.
         self.state.set_pending_orders(self._pending_oids)
+        mismatches: list[str] = []
         for oid, symbol in pending:
             status, filled, qty = self.broker.order_fill(oid)
             if status in ("filled", "unknown"):
@@ -447,13 +504,44 @@ class Orchestrator:
                     "Order %s (%s) ended %s with %g/%g filled — ledger records an "
                     "intent that did not (fully) execute.", oid, symbol, status, filled, qty,
                 )
+                mismatches.append(f"{symbol} {status} ({filled:g}/{qty:g} filled)")
             elif qty and 0 < filled < qty:
                 log.warning(
                     "Order %s (%s) PARTIAL: %g/%g filled (status=%s).",
                     oid, symbol, filled, qty, status,
                 )
-            else:  # still new/accepted/pending_new long after submission
+                mismatches.append(f"{symbol} partial {filled:g}/{qty:g}")
+            else:  # still new/accepted/pending_new long after submission — may yet
+                # fill; not a confirmed divergence, so warn without halting.
                 log.warning("Order %s (%s) still %s a full cycle later.", oid, symbol, status)
+        if mismatches and self.cfg.reconcile_halt_enabled:
+            self._halt_new_buys(
+                "reconcile mismatch: " + "; ".join(mismatches),
+                "Ledger/broker divergence at reconcile",
+                "The ledger records intents that did not execute as recorded: "
+                + "; ".join(mismatches)
+                + ".\nNew buys are halted (kill-switch file). Verify positions "
+                "against the broker, then delete the file to resume: "
+                + self.cfg.kill_switch_file,
+            )
+
+    def _halt_new_buys(self, reason: str, subject: str, body: str) -> None:
+        """Halt new entries via the kill-switch FILE (not just the in-memory
+        flag): the file survives restarts, is picked up within one tick by
+        _refresh_runtime_controls, and deleting it is the explicit human
+        acknowledgment that resumes buying. Closing positions is never gated."""
+        log.critical("HALTING NEW BUYS — %s", reason)
+        try:
+            os.makedirs(os.path.dirname(self.cfg.kill_switch_file) or ".", exist_ok=True)
+            with open(self.cfg.kill_switch_file, "a", encoding="utf-8") as f:
+                f.write(f"{datetime.now().isoformat()} {reason}\n")
+        except OSError as e:
+            # Latch in memory so the halt still holds this run (survives the
+            # per-tick kill-switch recompute; cleared only by restart).
+            log.error("Could not write kill-switch file (%s); using in-memory halt.", e)
+            self._forced_halt = True
+        self.risk.kill_switch = True
+        self.alerter.critical("reconcile_halt", subject, body)
 
     # -- exchange-exit backfill (F.1) ---------------------------------------- #
     def _backfill_exchange_exits(self) -> None:

@@ -132,11 +132,14 @@ says satellites haven't beaten QQQ yet. This phase CONSUMES Todo-3 D.2.
 --------------------------------------------------------------------------------
 PHASE GA-2 — SINGLE-INSTANCE PRODUCTION HARDENING  (required for OWN live money
 AND every product shape; items = the 2026-07-03 ops audit + critic pass.
-THE PRE-START GATE for the record account is: GA-2.1, 2.2, 2.3, 2.5, 2.6 —
+THE PRE-START GATE for the record account is: GA-2.1, 2.2, 2.3, 2.5 —
 if they don't fit before mid-July, SLIP THE START to Aug 1 rather than open
 the window dirty; a silent slip is the only unacceptable outcome.)
 --------------------------------------------------------------------------------
-[ ] GA-2.1 (HIGH) Process supervision + SUBSTRATE. launchd plist for dev, but
+[~] GA-2.1 (HIGH; CODE DONE 2026-07-03 — launchd plist + Dockerfile in ops/,
+        enforcing reconcile-halt shipped; REMAINING: the substrate DECISION +
+        actually installing on it) Process supervision + SUBSTRATE. launchd
+        plist for dev, but
         the track-record host is NOT a sleeping laptop: a $5-10/mo VPS
         running the Dockerfile (restart=always) or a dedicated always-on
         Mac (pmset/caffeinate). A laptop-hosted dead-man (GA-2.2) pages on
@@ -145,8 +148,15 @@ the window dirty; a silent slip is the only unacceptable outcome.)
         RECONCILE-FIRST, and make reconcile ENFORCING to back it (today
         _reconcile_fills is log-only): on position/order mismatch vs
         broker, HALT new entries via the existing halt path, page via
-        GA-2.2, resume only on human ack. (~S.1/S.2-sized: tens of lines.)
-[ ] GA-2.2 (HIGH) Dead-man switch with TEETH. Heartbeat ping
+        GA-2.2, resume only on human ack. (SHIPPED 2026-07-03: reconcile
+        mismatch -> kill-switch file with reason + CRITICAL page; delete the
+        file to ack/resume; RECONCILE_HALT=on default; dark-gap detection
+        pages on wake-after-sleep. Tests +12 in test_ops_hardening.py.)
+[~] GA-2.2 (HIGH; CODE DONE 2026-07-03 — HEARTBEAT_URL ping each watchdog
+        tick, gated on main-loop freshness so either thread dying silences
+        it; REMAINING: create the healthchecks.io check + set HEARTBEAT_URL,
+        and the auto-flatten teeth stay deferred to GA-5.1)
+        Dead-man switch with TEETH. Heartbeat ping
         (healthchecks.io or equivalent) each decision cycle + watchdog
         tick; external page when silent > 2 intervals. Solo-operator
         reality: the page may go unanswered — so the fail-to-safe is
@@ -167,8 +177,9 @@ the window dirty; a silent slip is the only unacceptable outcome.)
           whole-share sizing BEFORE the window opens — the D.1/D.3 numbers
           were gathered under fractional sizing, and this supersedes
           Todo-3 #1's "run the current stack as-is" (noted there).
-[ ] GA-2.4 (MED) Log persistence: rotating FileHandler alongside RichHandler
-        (__main__.py); surface last N lines in the dashboard for support.
+[x] GA-2.4 (DONE 2026-07-03) Log persistence: rotating FileHandler alongside
+        RichHandler (__main__.py) — logs/bot.log, 5MB x 5, LOG_DIR knob.
+        (Dashboard tail view: fold into GA-1.2's dashboard work.)
 [ ] GA-2.5 (MED) Ledger/lot correctness — the substrate for GA-1.2, GA-3
         taxes, and any customer-facing report:
         - rejected/canceled/partial orders CORRECT the ledger (today:
@@ -178,13 +189,13 @@ the window dirty; a silent slip is the only unacceptable outcome.)
           a schema-shaped, append-only dataclass with explicit lot ids so
           GA-4.5's DB migration is a storage swap, not a logic rewrite;
         - wash-sale flag (= Todo-3 L.2) rides on the same lot machinery.
-[ ] GA-2.6 (HIGH, was MED — DO FIRST, ~30 min, zero dependencies) Secrets:
-        ROTATE all four keys that sat in 644-mode backup files (Alpaca
-        trade-capable, Anthropic, Quiver, SMTP — world-readable for some
-        period; chmod 600 applied 2026-07-03 but rotation is the honest
-        fix); DELETE .env.backup/.env.preview; live keys via macOS Keychain
-        or env-injection, never flat files. A compromised Alpaca key
-        mid-window = unexplained orders = restart the 3-month record.
+[ ] GA-2.6 (LOW — downgraded 2026-07-03: .env* files are GITIGNORED and were
+        NEVER committed, verified via git log/ls-files; the exposure was only
+        644 file perms to other local processes/users on a single-user Mac,
+        and chmod 600 is applied) Secrets: rotating the four keys (Alpaca,
+        Anthropic, Quiver, SMTP) is cheap insurance, not a gate. Before LIVE
+        money: prefer macOS Keychain/env-injection over flat files, and keep
+        env backups out of the working tree.
 [ ] GA-2.7 (LOW) Preflight breadth: exercise Quiver, yfinance (regime/sector
         guards), Robinhood MCP token, and SEND a real test alert at startup —
         fail loud before market open, not mid-session.
@@ -332,26 +343,28 @@ PHASE GA-7 — BETA -> GA
 --------------------------------------------------------------------------------
 RANKED NEXT STEPS  (2026-07-03, post-critique)
 --------------------------------------------------------------------------------
- 1. GA-2.6 rotate the four exposed keys + delete .env.backup/.env.preview
-    (TODAY, ~30 min, zero dependencies — a compromised trade-capable key
-    mid-window restarts the whole 3-month record)  AND  GA-0.1a email the
-    attorney (TODAY — calendars are the long pole; the answer gates whether
-    GA-4/5/6 exist at all).
- 2. GA-2.1 + GA-2.2 supervisor, substrate decision (VPS, not the laptop),
-    dead-man with auto-flatten teeth, enforcing reconcile-halt; GA-2.4 log
-    files — THIS WEEK; the unattended mid-July run is untrustworthy without
-    them.
+ 1. GA-0.1a email the attorney (TODAY — calendars are the long pole; the
+    answer gates whether GA-4/5/6 exist at all).
+    (2026-07-03 note: GA-2.6 key rotation demoted from this slot — .env*
+    was never committed/gitignored; local-perms exposure only, chmod 600
+    applied. Rotation = cheap insurance whenever convenient.)
+ 2. [CODE SHIPPED 2026-07-03] GA-2.1 + GA-2.2 + GA-2.4: enforcing
+    reconcile-halt, dark-gap alert, heartbeat plumbing, rotating file logs,
+    launchd plist + Dockerfile (ops/). REMAINING user actions: pick the
+    substrate (VPS vs always-on Mac) and install the supervisor on it;
+    create the healthchecks.io check and set HEARTBEAT_URL.
  3. GA-2.3 whole-shares + core-stop decision + --stress/--sweep-stops
     re-validation under the new mode; GA-2.5 FIFO-lot ledger correctness —
-    BEFORE the record account starts. PRE-START GATE = GA-2.1/2.2/2.3/2.5/
-    2.6; if it doesn't fit by mid-July, SLIP THE START TO AUG 1 out loud
+    BEFORE the record account starts. PRE-START GATE = GA-2.1/2.2/2.3/2.5;
+    if it doesn't fit by mid-July, SLIP THE START TO AUG 1 out loud
     (and shift GA ~2 weeks) rather than open the window dirty. Todo-3's
     C.4/C.5/C.6 move BEHIND the start, onto the experiment account — they
     change the config anyway (see COORDINATION).
  4. GA-1.1 record-account window opens (frozen config; second paper account
     opens alongside as the experiment bench).
  5. GA-0.2 shape + PRD + unit economics; GA-0.4 vendor-ToS audit; GA-0.5
-    Anthropic-terms determination (all desk work; parallel with #2-4).
+    Anthropic-terms determination (all desk work; parallel with #2-4);
+    GA-2.6 key rotation + Keychain move whenever convenient.
  6. GA-1.2 track-record page (3 benchmark lines + baked disclaimers) —
     build while paper data accumulates; attorney reviews it in the GA-0.1a
     consult.

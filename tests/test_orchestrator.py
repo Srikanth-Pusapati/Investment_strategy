@@ -138,6 +138,9 @@ def _orch(trim_enabled=True, trim_pct=25.0, state=None,
     o = Orchestrator.__new__(Orchestrator)
     o.cfg = SimpleNamespace(
         core_etf=core_etf, target_invested_pct=target_invested_pct,
+        # These reconcile tests assert the LOG output; the enforcing halt
+        # behavior has its own suite in test_ops_hardening.py.
+        reconcile_halt_enabled=False,
         risk=SimpleNamespace(
             regime_trim_enabled=trim_enabled, regime_trim_pct=trim_pct,
             default_stop_loss_pct=5.0, default_take_profit_pct=12.0,

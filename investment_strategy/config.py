@@ -190,6 +190,16 @@ class Config:
     core_etf: str = ""
     target_invested_pct: float = 0.0
 
+    # Ops hardening (goGA GA-2.1/2.2). heartbeat_url: an external dead-man
+    # monitor (e.g. healthchecks.io ping URL) GET-pinged from the watchdog
+    # thread each tick — but only while the MAIN loop is also fresh, so a hung
+    # decision thread stops the pings and the external monitor pages. "" = off.
+    # reconcile_halt_enabled: a reject/partial found at reconcile means the
+    # ledger and the real book have DIVERGED — halt new buys (via the kill-
+    # switch file) until a human deletes the file to acknowledge.
+    heartbeat_url: str = ""
+    reconcile_halt_enabled: bool = True
+
     @property
     def is_live(self) -> bool:
         return self.mode is TradingMode.LIVE
@@ -262,6 +272,8 @@ def load_config() -> Config:
         decision_interval_s=_i("DECISION_INTERVAL_SECONDS", 900),
         monitor_interval_s=_i("MONITOR_INTERVAL_SECONDS", 30),
         kill_switch_file=os.getenv("KILL_SWITCH_FILE", "state/KILL"),
+        heartbeat_url=os.getenv("HEARTBEAT_URL", "").strip(),
+        reconcile_halt_enabled=_flag("RECONCILE_HALT", "on"),
         state_file=os.getenv("STATE_FILE", "state/risk_state.json"),
         dashboard_file=os.getenv("DASHBOARD_FILE", "").strip(),
         risk=RiskLimits(
