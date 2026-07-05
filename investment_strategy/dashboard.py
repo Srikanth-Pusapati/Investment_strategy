@@ -424,7 +424,8 @@ def generate(
     out: Path, ledger_path: Optional[Path] = None, live: bool = True,
 ) -> Path:
     ledger = TradeLedger(ledger_path) if ledger_path else TradeLedger()
-    records = ledger.all()
+    # effective(): reconcile corrections applied — no phantom rows (GA-2.5).
+    records = ledger.effective()
     prices, account = _live_enrichment({r.symbol for r in records}) if live else ({}, None)
     out.write_text(build_html(records, prices, account), encoding="utf-8")
     log.info("Wrote dashboard with %d trades -> %s", len(records), out)

@@ -26,13 +26,15 @@ from investment_strategy.models import (
 )
 
 
-def _client(fractional_enabled=True, min_order_usd=1.0, price=100.0):
+def _client(fractional_enabled=True, min_order_usd=1.0, price=100.0,
+            whole_shares_only=False):
     """An AlpacaClient with no broker connection; records the OrderRequest it
     would submit so we can inspect whole-share vs fractional / bracket."""
     c = AlpacaClient.__new__(AlpacaClient)
     c.cfg = SimpleNamespace(
         risk=SimpleNamespace(
             fractional_enabled=fractional_enabled, min_order_usd=min_order_usd,
+            whole_shares_only=whole_shares_only,
         )
     )
     c.submitted = []
@@ -83,6 +85,15 @@ def test_buy_without_stop_is_refused():
 
 def test_sub_share_refused_when_fractional_disabled():
     c = _client(fractional_enabled=False, price=100.0)
+    oid, fractional = c.submit_from_decision(_decision(qty=0.4, notional=40.0))
+    assert oid is None and fractional is False
+    assert c.submitted == []
+
+
+def test_sub_share_refused_in_whole_shares_mode_even_with_fractional_on():
+    # GA-2.3 belt-and-suspenders: the risk layer floors/rejects upstream, but a
+    # decision built any other way must not slip an unbracketed buy through.
+    c = _client(fractional_enabled=True, whole_shares_only=True, price=100.0)
     oid, fractional = c.submit_from_decision(_decision(qty=0.4, notional=40.0))
     assert oid is None and fractional is False
     assert c.submitted == []

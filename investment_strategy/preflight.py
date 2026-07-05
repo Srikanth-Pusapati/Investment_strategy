@@ -1,11 +1,20 @@
 """Preflight readiness check — does everything the bot needs ACTUALLY work?
 
     python -m investment_strategy.preflight
+    python -m investment_strategy.preflight --no-alert-test   # skip the test page
 
 Importing load_config only checks that keys are PRESENT, not that they WORK — so a
 wrong / rotated / mis-pasted key still prints "ready" and then 401-loops once the
-bot starts. This command goes one step further and actually talks to Alpaca, so a
-bad key fails HERE with a plain-English message instead of a stack trace at runtime.
+bot starts. This command goes one step further and actually talks to the vendors,
+so a bad key fails HERE with a plain-English message instead of a stack trace at
+runtime.
+
+Breadth (goGA GA-2.7): beyond Alpaca + Anthropic, this also exercises every feed
+the risk guards silently depend on — Quiver (signals/screeners), yfinance (the
+regime + sector guards go BLIND when it's down), the Robinhood MCP token when
+enabled — and SENDS a real test alert through the configured sink, so a broken
+pager is discovered before market open, not during the incident it was for.
+A feed check only fails the gate when that feature is configured/on.
 
 Exit code 0 = good to run; 1 = fix the ❌ items first. Never raises.
 """
@@ -54,22 +63,86 @@ def _check_anthropic(cfg):
     return True, "Anthropic key present and well-formed (billed per call at run time)."
 
 
-def _check_alerts(cfg):
-    """Advisory: are CRITICAL alerts wired? Never fatal."""
+def _check_quiver(cfg):
+    """Exercise the Quiver key with a real (cached-dataset) call. Only gates when
+    a key is configured — the bot runs without Quiver, but if you PAY for it and
+    it's broken, you want to know before the open, not from an empty slate."""
+    if not cfg.quiver_api_key:
+        return True, "Quiver key not set (optional) — congress/insider feeds off."
+    try:
+        from .signals.quiver_client import QuiverClient
+        rows = QuiverClient(cfg.quiver_api_key).live("congresstrading")
+        if rows:
+            return True, f"Quiver works — congresstrading returned {len(rows)} rows."
+        return False, ("Quiver returned NO rows for congresstrading — key expired, "
+                       "plan changed, or endpoint down. Signals would run blind.")
+    except Exception as e:
+        return False, f"Quiver call FAILED: {e}"
+
+
+def _check_regime_feed(cfg):
+    """Exercise the yfinance-backed regime read. A degraded read doesn't just
+    lose the regime multiplier — the sector cap is blind in the same outage
+    (1B.7), so surface it as a failure while the regime filter is enabled."""
+    if not cfg.risk.regime_filter_enabled:
+        return True, "Regime filter off — yfinance check skipped."
+    try:
+        from .regime import RegimeReader
+        regime = RegimeReader(degraded_mult=cfg.risk.regime_degraded_mult).assess()
+        if regime.label == "unknown":
+            return False, (f"Regime read DEGRADED ({regime.reason}) — yfinance is "
+                           "down/blocked; regime AND sector guards would fly blind.")
+        return True, f"Regime feed works — {regime.reason}"
+    except Exception as e:
+        return False, f"Regime (yfinance) read FAILED: {e}"
+
+
+def _check_robinhood(cfg):
+    """Exercise the Robinhood MCP token by actually reading holdings. Only gates
+    when ROBINHOOD_ENABLED=on."""
+    if not cfg.robinhood_enabled:
+        return True, "Robinhood MCP off (optional)."
+    try:
+        from .portfolio import RobinhoodReader
+        holdings = RobinhoodReader(cfg).holdings()
+        if holdings:
+            return True, f"Robinhood MCP works — {len(holdings)} external holding(s)."
+        return False, ("Robinhood MCP returned no holdings — the OAuth token may "
+                       "be expired (re-run `robinhood_auth login`) or the account "
+                       "is empty; check the logs to tell which.")
+    except Exception as e:
+        return False, f"Robinhood MCP read FAILED: {e}"
+
+
+def _check_alert_send(cfg, send: bool):
+    """SEND a real test page through the configured sink — the only way to know
+    the pager works is to page. Skipped (advisory) when alerts are off/unwired."""
     a = cfg.alerts
     if not a.enabled:
         return True, "Alerts OFF (optional) — set ALERTS_ENABLED=on to get paged."
-    sinks = []
-    if a.smtp_host and a.smtp_user and a.smtp_password and a.email_to:
-        sinks.append(f"email→{a.email_to}")
-    if a.webhook_url:
-        sinks.append("webhook")
-    if not sinks:
-        return True, "Alerts ON but no sink configured — will only log. Set ALERT_EMAIL_TO or ALERT_WEBHOOK_URL."
-    return True, f"Alerts ON via {', '.join(sinks)}."
+    has_sink = bool(a.webhook_url) or bool(
+        a.smtp_host and a.smtp_user and a.smtp_password and a.email_to
+    )
+    if not has_sink:
+        return True, ("Alerts ON but no sink configured — will only log. "
+                      "Set ALERT_EMAIL_TO or ALERT_WEBHOOK_URL.")
+    if not send:
+        return True, "Alert sink configured (test send skipped: --no-alert-test)."
+    try:
+        from .notify import Alerter
+        Alerter(a).critical(
+            "preflight-test", "Preflight test alert",
+            "This is a TEST page from `python -m investment_strategy.preflight`. "
+            "If you are reading it, the alert path works.",
+        )
+        return True, ("Test alert SENT — confirm it arrived (inbox/webhook). "
+                      "No arrival = broken pager, fix before market open.")
+    except Exception as e:
+        return False, f"Test alert send FAILED: {e}"
 
 
 def main() -> int:
+    send_test = "--no-alert-test" not in sys.argv[1:]
     print("Preflight — checking the bot is ready to run…\n")
     ok, msg, cfg = _check_config()
     print(f"  {'✅' if ok else '❌'} {msg}")
@@ -78,13 +151,14 @@ def main() -> int:
         return 1
 
     critical_ok = True
-    for check in (_check_alpaca, _check_anthropic):
+    for check in (_check_alpaca, _check_anthropic, _check_quiver,
+                  _check_regime_feed, _check_robinhood):
         ok, msg = check(cfg)
         critical_ok = critical_ok and ok
         print(f"  {'✅' if ok else '❌'} {msg}")
-    # Advisory (never blocks readiness)
-    _, msg = _check_alerts(cfg)
-    print(f"  ℹ️  {msg}")
+    ok, msg = _check_alert_send(cfg, send_test)
+    critical_ok = critical_ok and ok
+    print(f"  {'✅' if ok else '❌'} {msg}")
 
     if critical_ok:
         print("\n✅ Ready to run:  python -m investment_strategy")

@@ -1,0 +1,495 @@
+================================================================================
+goGA.txt — ROADMAP TO GA  (opened 2026-07-03; critic-pass applied same day)
+The PRODUCTIZATION track: single-user paper bot -> generally available product.
+Companion to Todo-3.txt (the ALPHA track). Todo-3 proves the edge; this file
+ships the product. Todo-3 items are referenced (D.2, L.1, L.2, G.*), never
+duplicated — when one closes there, it closes here. Where the two files
+conflict, the COORDINATION section at the bottom is the tie-breaker.
+
+>>> PARKED 2026-07-05 (operator decision): SOLO USE ONLY for ~1 year — no
+>>> other users, no product launch. What that changes:
+>>>   - GA-0 legal/vendor work (attorney consult, ToS answers, PRD decisions)
+>>>     is ON HOLD; the drafts in docs/ stay on file for when this resumes.
+>>>   - GA-4/5/6/7 (multi-tenant, service infra, product security, beta) are
+>>>     out of scope until then.
+>>>   - What STILL RUNS: the alpha track (Todo-3), GA-1 evidence base (track
+>>>     record + windowed evaluation — now for judging OUR OWN improvement,
+>>>     not marketing), GA-2 hardening, and GA-3 dogfood — amended: live
+>>>     float is $100-1000 (tuition-sized; improve the model for ~1 year
+>>>     without risking real savings), FRACTIONAL sizing
+>>>     (WHOLE_SHARES_ONLY default flipped to off; set it on for the paper
+>>>     record account, where whole shares are affordable). GA-3.2's $10-25k
+>>>     floor applies only if/when whole-shares live mode is adopted.
+================================================================================
+
+WHERE WE START (2026-07-03 audit: 4-agent workflow + adversarial verifier that
+re-ran the backtests; findings verified against code, .env, and state/)
+  - Production-grade PAPER prototype TODAY: deterministic risk layer (~12
+    layered caps, LLM treated as untrusted), crash-path-proven account brakes
+    (--stress: all 5 checks PASS), S.1/S.2 security hardening, 302 tests green.
+  - NOT ready for own real money: edge unproven (D.1's own evidence: no
+    satellite config beat QQQ; live record = 2 days / 4 round-trips / -$59),
+    fractional + core positions have NO exchange-side stop (watchdog-only, in
+    a foreground laptop process), no supervisor, no dead-man switch, console-
+    only logs, advisory-only (log, don't block) reconcile.
+  - NOWHERE near GA: L.1 legal gate untouched, G.1-G.5 multi-tenant unbuilt,
+    zero service infrastructure, and NO vendor/platform-terms review for any
+    product shape (Quiver/Alpaca/RH/Anthropic — see GA-0.4/0.5).
+
+--------------------------------------------------------------------------------
+PHASE GA-0 — DEFINE "GA": LEGAL POSTURE + VENDOR/PLATFORM TERMS  (GATE;
+~1-2 weeks for the (a)-track answers; the (b)-track written work is longer)
+--------------------------------------------------------------------------------
+The one decision that shapes everything below. Three product shapes, in
+increasing legal weight:
+  (a) SELF-HOSTED — each user runs their OWN instance with their OWN keys
+    (broker, Anthropic, Quiver) on their own machine/VPS. We ship software,
+    not advice. Lightest regulatory surface (disclaimers + license). G.4
+    secrets vault mostly unnecessary; G.1-G.3 become nice-to-have. Fastest
+    path to a real GA. BYO-keys is also what keeps most vendor-ToS problems
+    on the user's side of the line (see GA-0.4).
+  (b) HOSTED SaaS — we run per-user instances; users connect their broker
+    keys; trades execute on THEIR accounts. Custody-free but "investment
+    advice delivered via software" questions; state-by-state RIA analysis;
+    redistribution licensing for every data feed (GA-0.4).
+  (c) MANAGED MONEY — we trade pooled/managed funds. RIA/BD registration,
+    audits, compliance officer. OUT OF SCOPE for GA-1 (Todo-3 L.1 hard gate).
+[~] GA-0.1a (GATE; = Todo-3 L.1, generalized to the product shapes; DRAFTED
+        2026-07-04: outreach email + consult prep sheet in
+        docs/ga0-1a-attorney-email.md — REMAINING user action: pick the
+        attorney and SEND) 1-hour
+        securities-attorney consult, booked NOW (calendars are the long
+        pole). Realistic deliverables of one hour: verbal confirmation that
+        shape (a) needs only disclaimers/license, a scope+quote for the
+        written shape-(b) analysis (GA-0.1b), and a review of the GA-1.2
+        track-record page + landing-page claims against performance-
+        advertising rules (paper/hypothetical results are regulated
+        advertising territory — SEC marketing rule if adviser status ever
+        attaches, FTC deception standards regardless).
+[ ] GA-0.1b (shape-(b)-only GATE) The WRITTEN opinion: state-by-state RIA
+        analysis + requirements list. Multi-week engagement with a real fee —
+        sits on the GA-4 critical path, budgeted in GA-0.3. Do not start
+        GA-4/5/6 on verbal comfort.
+[~] GA-0.2 (DRAFTED 2026-07-04: docs/ga0-2-prd.md — shape (a) recommended,
+        unit-cost arithmetic + pricing hypothesis + open-decisions list;
+        REMAINING: finalize after the GA-0.1a consult)
+        Pick the shape + one-page PRD: target user, what "GA" literally
+        means (public repo + tag? public sign-up? invite-only?), and pricing
+        built on a back-of-envelope unit-cost model NOW (tokens/cycle x
+        cycles/market-day x model price + amortized Quiver/data = $/tenant/
+        month; GA-4.4 validates with real metering later). Include: does a
+        no-alpha "deterministic-only" cheap tier (core + brakes, LLM off)
+        exist? (See GA-1.3 branch 2 — it may be the honest flagship.)
+[ ] GA-0.3 Budget + entity: LLC and E&O insurance quote if (b); explicit
+        budget lines for GA-0.1b legal fee and the GA-6.2 pen test
+        ($10-30k) so the shape decision is made with real numbers.
+[~] GA-0.4 (HIGH; WORKSHEET DRAFTED 2026-07-04:
+        docs/ga0-4-vendor-terms-audit.md with per-vendor [VERIFY] items +
+        summary table; REMAINING: get the WRITTEN answers) Vendor-ToS /
+        licensing audit per shape. The shared signal cycle would REDISTRIBUTE
+        derived data to N tenants; Todo-3 L.3 cleared the single-user posture
+        ONLY. Determine in writing: Quiver commercial/redistribution license
+        (get a quote), Alpaca market-data agreement (SIP redistribution
+        restrictions), Robinhood agentic-MCP commercial-use status (likely
+        answer: RH-derived signals CANNOT ship in a product at all — plan
+        for per-user RH auth in shape (a) and feed REMOVAL in shape (b)),
+        EDGAR fair-use confirm. Output feeds GA-4.4's cost floor and the
+        shape-(a) BYO-keys docs.
+[~] GA-0.5 (HIGH; MEMO DRAFTED 2026-07-04: docs/ga0-5-anthropic-terms.md —
+        compliance argument mapped feature-by-feature + the questions to get
+        answered in writing; REMAINING: obtain the determination)
+        Anthropic terms for a financial product: Usage Policy
+        treats automated high-stakes/consumer-financial decisions as
+        requiring human oversight + disclosure — obtain the determination,
+        don't assume it (our kill switch + deterministic risk layer +
+        per-user opt-in is the argument; get it reviewed via GA-0.1a or in
+        writing). Decide BYOK (shape (a): users bring ANTHROPIC_API_KEY) vs
+        metered org key (shape (b): concentrates spend, rate-tier, and
+        policy exposure on us); fold into GA-0.2 pricing + GA-4.4.
+
+--------------------------------------------------------------------------------
+PHASE GA-1 — PROVE THE EDGE / THE EVIDENCE BASE  (time-gated; runs in parallel)
+--------------------------------------------------------------------------------
+Nobody adopts a trading bot without a track record, and our own D.1 evidence
+says satellites haven't beaten QQQ yet. This phase CONSUMES Todo-3 D.2.
+[ ] GA-1.1 (= Todo-3 D.2) >= 3 months live paper on the fresh mid-July
+        account; target >= 30 satellite round-trips.
+        CONFIG-FREEZE POLICY (tie-breaker over Todo-3's ranked #1-2, which
+        schedule R.3 re-tunes and the X.3 options flip mid-window):
+        - The RECORD account runs a FROZEN config for the full window.
+          Changes allowed only for halt-severity bugs; every change is
+          logged on the GA-1.2 page; any material risk-knob change RESTARTS
+          the 3-month clock.
+        - A SECOND paper account is the EXPERIMENT bench: C.4/X.3 options,
+          R.3 re-sweeps, MIN_EDGE_RATIO friction updates (GA-3.3), X.6
+          leverage trials. Changes graduate to the record account only at
+          window boundaries.
+        PER-SOURCE RULE: a signal source with < 2 round-trips in the window
+        gets verdict INSUFFICIENT (probation into the next window), and
+        per-source undersampling does NOT block the book-level GA-1.3 gate
+        (insider is "inherently low-yield" per Todo-3 C.1 — expected).
+[~] GA-1.2 (CODE DONE 2026-07-04: investment_strategy/track_record.py —
+        equity curve vs QQQ/SPY/QQQ+15%-trail with the whipsaw count shown,
+        per-source attribution, FIFO realized table + wash flags, config-
+        change log from state/config_changes.jsonl, disclaimers BAKED into
+        the template; auto-regens each cycle via TRACK_RECORD_FILE.
+        REMAINING: attorney reviews the page in GA-0.1a; data accumulates
+        over the GA-1.1 window) Track-record page auto-generated from ledger
+        + equity history: equity curve vs THREE lines — QQQ, SPY, and
+        QQQ + a naive 15% trailing stop (the honest competitor for the
+        seatbelt story; also surfaces the measured "seatbelt cost" — D.3
+        pass-1 showed the daily-loss flatten firing 2x on real vol days in a
+        normal year, i.e. whipsaw drag is real and must be shown, not
+        hidden); per-source attribution; max DD; all costs included;
+        regenerated daily. Mandatory disclaimers ("paper trading",
+        "hypothetical results", "past performance...") are BAKED INTO the
+        generator so they cannot be omitted; page reviewed in GA-0.1a.
+        HONESTY RULE: shows the live numbers WHATEVER they are.
+        Depends on GA-2.5 (ledger/lot correctness) or the curve is fiction.
+[ ] GA-1.3 GO/NO-GO gate — THREE branches, numeric thresholds written down
+        BEFORE the window closes (pre-registration, so the grade can't be
+        gamed after the fact):
+        1. Satellites beat QQQ risk-adjusted over the window -> the "alpha"
+           claim is allowed in marketing.
+        2. Total return within X% of QQQ AND max DD <= Y% of QQQ's -> GA
+           proceeds with the honest positioning: RISK-MANAGED AUTOPILOT
+           (proven brakes + deterministic caps around a benchmark-tracking
+           core) — sell the seatbelts and the engine, not an alpha claim.
+        3. Worse than both (negative or badly trailing) -> NO-GO for GA-7.
+           The published page would be a self-disqualifier. Return to the
+           alpha track, change what the evidence says to change, restart a
+           fresh window. GA waits.
+        (X and Y get set when the window opens; candidate: X=3pp, Y=75%.)
+
+--------------------------------------------------------------------------------
+PHASE GA-2 — SINGLE-INSTANCE PRODUCTION HARDENING  (required for OWN live money
+AND every product shape; items = the 2026-07-03 ops audit + critic pass.
+THE PRE-START GATE for the record account is: GA-2.1, 2.2, 2.3, 2.5 —
+if they don't fit before mid-July, SLIP THE START to Aug 1 rather than open
+the window dirty; a silent slip is the only unacceptable outcome.)
+--------------------------------------------------------------------------------
+[~] GA-2.1 (HIGH; CODE DONE 2026-07-03 — launchd plist + Dockerfile in ops/,
+        enforcing reconcile-halt shipped; REMAINING: the substrate DECISION +
+        actually installing on it) Process supervision + SUBSTRATE. launchd
+        plist for dev, but
+        the track-record host is NOT a sleeping laptop: a $5-10/mo VPS
+        running the Dockerfile (restart=always) or a dedicated always-on
+        Mac (pmset/caffeinate). A laptop-hosted dead-man (GA-2.2) pages on
+        every lid-close and trains the operator to ignore pages. Survive
+        crash/reboot; on wake/restart after > N dark minutes:
+        RECONCILE-FIRST, and make reconcile ENFORCING to back it (today
+        _reconcile_fills is log-only): on position/order mismatch vs
+        broker, HALT new entries via the existing halt path, page via
+        GA-2.2, resume only on human ack. (SHIPPED 2026-07-03: reconcile
+        mismatch -> kill-switch file with reason + CRITICAL page; delete the
+        file to ack/resume; RECONCILE_HALT=on default; dark-gap detection
+        pages on wake-after-sleep. Tests +12 in test_ops_hardening.py.)
+[~] GA-2.2 (HIGH; CODE DONE 2026-07-03 — HEARTBEAT_URL ping each watchdog
+        tick, gated on main-loop freshness so either thread dying silences
+        it; REMAINING: create the healthchecks.io check + set HEARTBEAT_URL,
+        and the auto-flatten teeth stay deferred to GA-5.1)
+        Dead-man switch with TEETH. Heartbeat ping
+        (healthchecks.io or equivalent) each decision cycle + watchdog
+        tick; external page when silent > 2 intervals. Solo-operator
+        reality: the page may go unanswered — so the fail-to-safe is
+        automatic, not human: operator unreachable > N minutes during
+        market hours -> auto-flatten satellites to core (kill-switch path
+        already exists). "Best-effort ops, fail-to-safe automatically" is
+        an honest solo SLO; "99% with one human" is not.
+[x] GA-2.3 (DONE 2026-07-04) Close the stop-less-position hole (fractional
+        satellites and the QQQ core had NO exchange-side stop; the 30s
+        watchdog was their only protection).
+        SHIPPED: WHOLE_SHARES_ONLY mode (risk layer floors to whole
+        shares, rejects sub-share budgets — never downgrades to an
+        unprotected fractional; execution layer refuses as backstop;
+        scale-out + regime trim round to whole shares so no fractional dust).
+        DEFAULT: off as of 2026-07-05 (solo/small-float decision — see the
+        PARKED note atop this file); set on for the record account + $10k+;
+        core: standalone GTC stop via CORE_STOP_PCT=15 default (whole-share
+        part; cancel/replace as the position grows; 0 = the written-
+        acceptance path). RE-VALIDATED under whole-share sizing: --stress
+        all 5 brake checks PASS; --sweep-stops at lookback 20 AND 55 keeps
+        the vol 2-sigma family on top — live VOL_STOPS config stands,
+        no knob change (freeze-friendly).
+        - Satellites: WHOLE_SHARES_ONLY mode (round qty down; exchange-
+          resident GTC brackets for everything).
+        - Core: standalone GTC stop at guard level (e.g. 15% under core
+          basis), OR written acceptance (broad-ETF gap risk) with GA-2.2 as
+          the compensating control. Decide, implement, test either way.
+        - RE-VALIDATE THE EVIDENCE under the new mode: re-run
+          scripts/backtest_real.py --stress and --sweep-stops with
+          whole-share sizing BEFORE the window opens — the D.1/D.3 numbers
+          were gathered under fractional sizing, and this supersedes
+          Todo-3 #1's "run the current stack as-is" (noted there).
+[x] GA-2.4 (DONE 2026-07-03) Log persistence: rotating FileHandler alongside
+        RichHandler (__main__.py) — logs/bot.log, 5MB x 5, LOG_DIR knob.
+        (Dashboard tail view: fold into GA-1.2's dashboard work.)
+[x] GA-2.5 (DONE 2026-07-04) Ledger/lot correctness — the substrate for
+        GA-1.2, GA-3 taxes, and any customer-facing report. SHIPPED:
+        reconcile now APPENDS correction records (append-only preserved);
+        TradeLedger.effective() voids zero-fill intents and resizes partials
+        — all read-side consumers (dashboard, attribution, lots, track
+        record) use it; lots.py = schema-versioned Lot/RealizedLot with
+        explicit lot ids (GA-4.5 DB migration = storage swap), FIFO realized
+        P&L (exit_price now recorded on every sell path; legacy rows
+        reconstructed + flagged estimated); exchange-exit backfill realizes
+        against FIFO basis, not last-buy-price; wash-sale flag (±30d) rides
+        the same lot machinery (= Todo-3 L.2 flag):
+        - rejected/canceled/partial orders CORRECT the ledger (today:
+          log-only, phantom BUY rows persist);
+        - FIFO lot tracking for realized P&L (today: last-buy-price basis
+          is wrong for multi-lot names like FRHC). Build the lot record as
+          a schema-shaped, append-only dataclass with explicit lot ids so
+          GA-4.5's DB migration is a storage swap, not a logic rewrite;
+        - wash-sale flag (= Todo-3 L.2) rides on the same lot machinery.
+[ ] GA-2.6 (LOW — downgraded 2026-07-03: .env* files are GITIGNORED and were
+        NEVER committed, verified via git log/ls-files; the exposure was only
+        644 file perms to other local processes/users on a single-user Mac,
+        and chmod 600 is applied) Secrets: rotating the four keys (Alpaca,
+        Anthropic, Quiver, SMTP) is cheap insurance, not a gate. Before LIVE
+        money: prefer macOS Keychain/env-injection over flat files, and keep
+        env backups out of the working tree.
+[x] GA-2.7 (DONE 2026-07-04) Preflight breadth: preflight now exercises
+        Quiver (live congresstrading call), yfinance (regime read — the
+        sector cap is blind in the same outage), Robinhood MCP token (when
+        enabled), and SENDS a real test alert through the configured sink
+        (--no-alert-test to skip) — fail loud before market open, not
+        mid-session. Each check only gates when its feature is configured.
+[~] GA-2.8 (CODE DONE 2026-07-04: ops/backup_state.sh — timestamped tarball,
+        BACKUP_DIR / BACKUP_RCLONE_REMOTE destinations, 30-tarball retention
+        — plus a 02:15 launchd plist; REMAINING user action: install the
+        plist/cron on the substrate and pick the off-machine destination)
+        Nightly off-machine backup of state/ (ledger, equity history,
+        risk_state). rclone/iCloud is fine at this scale.
+
+--------------------------------------------------------------------------------
+PHASE GA-3 — DOGFOOD: OWN REAL MONEY  (~2-4 weeks after GA-2; the credibility
+gate — "we trade our own money on it" is the only honest marketing until GA-1.3)
+--------------------------------------------------------------------------------
+[ ] GA-3.1 (= Todo-3 L.2) Wash-sale/tax note first; broker 1099-B = source of
+        truth; ledger wash-sale flag from GA-2.5.
+[ ] GA-3.2 (AMENDED 2026-07-05: live starts at $100-1000 with FRACTIONAL
+        sizing — tuition-sized float for a year of model improvement; max
+        loss bounded by the float, per-trade risk cap + account brakes do
+        the guarding. The floor below applies only if/when whole-shares
+        live mode is adopted.) Live account sized so the whole-shares mode
+        actually works:
+        $10-25k floor (at $25k, MAX_POSITION_PCT=12 -> $3k/name — whole
+        shares reach nearly the whole screened universe; at the README's
+        old $1-5k advice, 12% = $120-600 and whole-shares excludes most
+        screener hits — TDG alone is > $1,200/share, and the account
+        degenerates to core-only, defeating GA-3.3). If capital must be
+        smaller, add a max-share-price filter to the satellite slate
+        instead of relaxing whole-shares (that would re-open GA-2.3's
+        hole). Update README's advice to match. 2-week shakedown before
+        any size-up decision.
+[ ] GA-3.3 Measure the live-vs-paper gap: slippage, partial fills, halted
+        names. Feed real friction numbers into MIN_EDGE_RATIO on the
+        EXPERIMENT account (GA-1.1 policy) — the record account's config
+        stays frozen; graduate at a window boundary.
+
+--------------------------------------------------------------------------------
+PHASE GA-4 — MULTI-TENANT CORE  (shape (b) ONLY; ~4-8 weeks; = Todo-3 G.1-G.5;
+gated on GA-0.1b written opinion + GA-0.4 licensing)
+--------------------------------------------------------------------------------
+[ ] GA-4.1 (= G.1) Account abstraction: (id, broker creds, risk profile,
+        state/ledger/equity paths, kill switch) threaded through
+        orchestrator/risk/ledger/status. Scope honestly: RiskState and
+        Ledger classes already take path parameters; the genuinely
+        process-global pieces are env-derived config (load_dotenv at
+        import), cwd-relative default paths, and the single kill-switch
+        file — this is config/kill-switch plumbing, not a state rewrite.
+[ ] GA-4.2 (= G.2 + G.3) Shared signal cycle -> per-account decide/risk/
+        execute/monitor fan-out; HARD per-account isolation of risk_state,
+        trades, equity history, kill switch. (Feeds allowed in the shared
+        cycle are whatever GA-0.4 licensing permits.)
+[ ] GA-4.3 (= G.4) Per-user secrets vault (broker keys encrypted at rest,
+        KMS/age; never in flat files; never in logs or LLM prompts).
+[ ] GA-4.4 (= G.5) Cost attribution: meter shared LLM + data spend per
+        account; validates the GA-0.2 unit-economics estimate and sets the
+        (b) price floor.
+[ ] GA-4.5 SQLite/Postgres migration of ledger + state (R.5's "JSON is fine"
+        holds at single-user scale only; GA-2.5's lot schema makes this a
+        storage swap).
+[ ] GA-4.6 (new) Capacity model, one page: requests/cycle/account x vendor
+        rate limits (Alpaca data key, Quiver quota, Anthropic tier) +
+        watchdog x positions x accounts -> max tenants per key/tier/
+        container. LLM traffic is linear in N (slates differ per holdings).
+        A synthetic-tenant load test against this model is a GA-7.1 entry
+        criterion.
+
+--------------------------------------------------------------------------------
+PHASE GA-5 — SERVICE INFRA + PRODUCT SURFACE  (shape (b); ~4-6 wks, overlaps GA-4)
+--------------------------------------------------------------------------------
+[ ] GA-5.1 Deploy target: container per N accounts (N from GA-4.6) on a small
+        VPS; IaC script; market-hours SLO stated as GA-2.2's fail-to-safe
+        (auto-flatten on operator-unreachable), not a fictional 24/7 human.
+[ ] GA-5.2 Web app: auth, onboarding, per-user dashboard (today's
+        dashboard.html, per account), kill-switch BUTTON, billing (Stripe)
+        if paid. Onboarding path: confirm Alpaca's terms for third-party
+        key access — the sanctioned path is likely a registered OAuth app,
+        which has an application/review lead time -> START THE APPLICATION
+        during GA-0 if shape (b) is chosen, in parallel with GA-0.1b.
+[ ] GA-5.3 Observability: cycle latency, order-reject rate, feed-health
+        metrics; error tracking; per-account audit-log export. Config
+        changes (risk knobs) get a review trail — R.3's "a HUMAN applies
+        knob changes" rule becomes an audited product invariant.
+[ ] GA-5.4 Docs: quickstart, risk disclosure, "what this does NOT promise"
+        page (the Todo-3 honest-caveat culture, productized); support
+        channel named + market-hours response target stated (solo
+        operator = best-effort; say so).
+[ ] GA-5.5 (new, HIGH) Incident response: operator-level GLOBAL kill/flatten
+        spanning all tenants (today's kill switch is one file per process);
+        written IR runbook for "a bad release placed wrong orders on
+        customer accounts" (detect -> freeze all tenants -> reconcile ->
+        notify -> postmortem); rollback procedure TESTED with open
+        positions; customer-notification obligation defined. One IR drill
+        executed = GA-7.2 criterion.
+
+--------------------------------------------------------------------------------
+PHASE GA-6 — PRODUCT-GRADE SECURITY  (shape (b) ONLY, before any external
+tenant; shape (a)'s lighter checklist lives in GA-7.3's packaging)
+--------------------------------------------------------------------------------
+[ ] GA-6.1 Threat-model refresh for adversarial TENANTS. S.1/S.2 defend
+        against hostile DATA; a product must defend against hostile
+        CUSTOMERS: cross-tenant contamination through the shared signal
+        cycle (one tenant's injected "market data" must never influence
+        another's decisions), rate limits, abuse controls.
+[ ] GA-6.2 External pen test: LLM pipeline (injection -> order flow) + web
+        surface, before first paying user. Weeks of scheduling lead time +
+        $10-30k — booked and budgeted in GA-0.3.
+[ ] GA-6.3 Key-handling audit: prove a tenant's broker key never leaves its
+        boundary — not in logs, not in error messages, not in prompts.
+[ ] GA-6.4 (new) Privacy/data protection: broker credentials + positions +
+        trading history = sensitive financial PII. Privacy policy,
+        retention/deletion-on-churn (off-boarding includes data destruction
+        + broker-key revocation instructions), breach-notification plan;
+        CCPA/GDPR applicability folded into the GA-0.1 consults.
+
+--------------------------------------------------------------------------------
+PHASE GA-7 — BETA -> GA
+--------------------------------------------------------------------------------
+[ ] GA-7.1 Private beta: 3-5 users, own keys, free, weekly check-ins, 4+
+        weeks. PAPER ACCOUNTS ONLY (a beta user putting real money on an
+        edge this plan itself calls unproven is the single likeliest
+        liability event in this file; live only behind a written risk
+        acknowledgment + hard size cap enforced in config).
+        Entry, shape (a): GA-2 done + GA-3 running + the shape-(a) security
+        checklist from GA-7.3. Entry, shape (b): additionally GA-4/5/6 +
+        the GA-4.6 load test.
+        Beta may OVERLAP the tail of the GA-1.1 window (entry criteria
+        don't require the completed record) — that overlap is what makes
+        the GA dates below hold.
+[ ] GA-7.2 GA criteria checklist — WRITE IT BEFORE BETA, grade after:
+        - GA-1.3 gate passed on branch 1 or 2 (a NEGATIVE record = branch 3
+          = no launch; "published, whatever it shows" is the page's rule,
+          not a launch criterion)
+        - >= 99% market-hours uptime across beta (on the GA-2.1 substrate)
+        - ZERO unprotected-position incidents; ZERO cross-tenant incidents
+        - support + off-boarding flow exercised at least once for real;
+          shape (b): one GA-5.5 IR drill executed
+        - legal sign-off per GA-0.1a/(b: 0.1b) + GA-0.4/0.5 determinations
+          on file
+[ ] GA-7.3 GA launch. Shape (a): tag v1.0 + Docker image + docs site, plus
+        the shape-(a) security checklist (secure-defaults review of shipped
+        config, key-handling guidance in self-host docs, dependency/
+        supply-chain audit of the image — ~2-3 days) and CI as a release
+        gate (GitHub Actions: full test suite + paper-account smoke test
+        required for tagging/deploying). Shape (b): open public sign-up.
+[ ] GA-7.4 (new, HIGH for shape (a)) Versioning/upgrade path for self-hosted
+        users: semver; schema-version stamps in all state/ files (none
+        exist today) + migration script run on startup; documented upgrade
+        procedure for a user with OPEN POSITIONS and resting GTC brackets
+        (reuse GA-2.1's reconcile-first posture post-upgrade); CHANGELOG +
+        security-advisory channel; model-fallback policy for deprecated
+        Claude model IDs (a pinned DECISION_MODEL will eventually 404 under
+        a self-hosted user).
+
+--------------------------------------------------------------------------------
+RANKED NEXT STEPS  (2026-07-03, post-critique)
+--------------------------------------------------------------------------------
+ 1. [PARKED 2026-07-05 — solo for ~1 year; draft stays in
+    docs/ga0-1a-attorney-email.md for when productization resumes]
+    GA-0.1a email the attorney (calendars are the long pole; the
+    answer gates whether GA-4/5/6 exist at all).
+    (2026-07-03 note: GA-2.6 key rotation demoted from this slot — .env*
+    was never committed/gitignored; local-perms exposure only, chmod 600
+    applied. Rotation = cheap insurance whenever convenient.)
+ 2. [CODE SHIPPED 2026-07-03] GA-2.1 + GA-2.2 + GA-2.4: enforcing
+    reconcile-halt, dark-gap alert, heartbeat plumbing, rotating file logs,
+    launchd plist + Dockerfile (ops/). REMAINING user actions: pick the
+    substrate (VPS vs always-on Mac) and install the supervisor on it;
+    create the healthchecks.io check and set HEARTBEAT_URL.
+ 3. [CODE SHIPPED 2026-07-04] GA-2.3 whole-shares + core GTC stop +
+    --stress/--sweep-stops re-validation (all brakes PASS; vol 2-sigma
+    family still wins at both lookbacks — live config stands); GA-2.5
+    FIFO-lot ledger correctness (corrections, lots.py, wash flags). The
+    CODE half of the pre-start gate (GA-2.1/2.2/2.3/2.5) is now COMPLETE —
+    the remaining gate items are USER actions: substrate pick + supervisor
+    install (GA-2.1), healthchecks.io check + HEARTBEAT_URL (GA-2.2).
+    If those don't land by mid-July, SLIP THE START TO AUG 1 out loud
+    (and shift GA ~2 weeks) rather than open the window dirty. Todo-3's
+    C.4/C.5/C.6 move BEHIND the start, onto the experiment account — they
+    change the config anyway (see COORDINATION).
+ 4. GA-1.1 record-account window opens (frozen config; second paper account
+    opens alongside as the experiment bench).
+ 5. [DRAFTED 2026-07-04 — docs/ga0-*.md] GA-0.2 shape + PRD + unit
+    economics; GA-0.4 vendor-ToS audit worksheet; GA-0.5 Anthropic-terms
+    memo. REMAINING: the written vendor answers + the determination (user
+    actions); GA-2.6 key rotation + Keychain move whenever convenient.
+ 6. [CODE SHIPPED 2026-07-04] GA-1.2 track-record page (3 benchmark lines +
+    baked disclaimers + FIFO realized table + config-change log) — data
+    accumulates over the window; attorney reviews it in the GA-0.1a consult.
+ 7. [DONE 2026-07-04] GA-2.7 preflight breadth; GA-2.8 backup script shipped
+    (REMAINING: install the plist/cron on the substrate).
+ 8. GA-3 dogfood real money at the $10-25k floor — after GA-2 complete +
+    GA-3.1 tax note.
+ 9. Shape fork. (a): GA-7.3 packaging + GA-7.4 upgrade path + CI, then
+    GA-7.1 beta.  (b): GA-0.1b written opinion + Alpaca OAuth application
+    first, then GA-4 (incl. capacity model) -> GA-5 (incl. IR) -> GA-6 ->
+    GA-7.1 beta.
+10. GA-7.2 grade the checklist -> GA-7.3 launch.
+
+--------------------------------------------------------------------------------
+COORDINATION WITH Todo-3  (tie-breakers; mirror these into Todo-3 when touched)
+--------------------------------------------------------------------------------
+ - CONFIG FREEZE: GA-1.1's frozen record account supersedes Todo-3 #1's "run
+   the current stack as-is" AND relocates Todo-3 #1-2's mid-window changes
+   (R.3 re-sweeps, C.4 -> X.3 options flip, X.6 leverage, GA-3.3
+   MIN_EDGE_RATIO updates) to the EXPERIMENT paper account. Graduation to
+   the record account only at window boundaries; material risk-knob changes
+   restart the record clock.
+ - EXECUTION MODE: GA-2.3's WHOLE_SHARES_ONLY changes sizing vs the config
+   D.1/D.3 evidence was gathered under — the --stress/--sweep-stops
+   re-validation in GA-2.3 is what keeps the brake-proof and stop-tuning
+   evidence honest for the mode actually being run.
+ - WORKLOAD HONESTY: the merged pre-start gate (GA-2.1/2.2/2.3/2.5/2.6) plus
+   Todo-3's C.4/C.5/C.6 was ~4-6 weeks of solo work scheduled into ~8
+   working days. Resolution: C.4/C.5/C.6 move behind the start; the gate is
+   cut hard; a slip to Aug 1 is announced, not discovered.
+
+--------------------------------------------------------------------------------
+HONEST CAVEATS  (carry into every pitch, README, and landing page)
+--------------------------------------------------------------------------------
+ - The edge is UNPROVEN. D.1's own evidence shows every satellite config
+   trailing QQQ's window; the live record is 2 days. Until GA-1.3 passes on
+   branch 1, the honest value proposition is the RISK MACHINERY — crash-
+   proven brakes, deterministic caps, injection hardening around a
+   benchmark-tracking core ("autopilot with seatbelts") — NOT "beat the
+   market". And the seatbelt has a measurable COST (whipsaw drag; D.3
+   pass-1 fired the daily-loss flatten 2x in a normal year) — GA-1.2 shows
+   it against QQQ + a naive trailing stop rather than hiding it.
+ - A NEGATIVE record is a real possibility and has a real consequence:
+   GA-1.3 branch 3 = no launch. The track-record page publishes whatever
+   happens; the LAUNCH is what's conditional.
+ - Published research agrees (StockBench, arXiv 2505.07078, Alpha Arena
+   live books): LLM stock-picking alone does not beat buy-and-hold; the
+   agent FRAMEWORK is what differentiates. That framework is what we ship.
+ - Timeline realism (corrected after critique — the old Sept-Oct date was
+   arithmetically impossible against our own 3-month gate): record window
+   mid-July -> mid-Oct at the earliest (Aug 1 -> Nov 1 if the pre-start
+   gate slips); beta overlaps the window tail from ~Sept; shape (a) GA =
+   LATE OCT-NOV 2026 at best. Shape (b) GA = Q1-Q2 2027, contingent on the
+   written legal opinion, Alpaca OAuth approval, pen-test scheduling, and
+   shape-(a) support load. Anything faster ships an unproven risk product
+   to strangers.

@@ -359,11 +359,22 @@ class RiskManager:
         deployable = min(deployable, account.buying_power)
         target_notional = min(target_notional, deployable)
 
-        # 4) Convert the capped dollar budget into a quantity. With fractional
-        #    enabled (small accounts) we can deploy any budget >= the min order;
-        #    otherwise we floor to whole shares and need at least one. Execution
-        #    decides whole-share-bracket vs. fractional-notional from this qty.
-        if self.limits.fractional_enabled:
+        # 4) Convert the capped dollar budget into a quantity. Whole-shares mode
+        #    (GA-2.3, default ON) floors DOWN so every entry can rest an
+        #    exchange-side GTC bracket — a budget under one share is REJECTED,
+        #    never downgraded to an unprotected fractional buy. With it off and
+        #    fractional enabled (tiny accounts), any budget >= the min order
+        #    deploys as a notional order whose only stop is the watchdog.
+        if self.limits.whole_shares_only:
+            if target_notional < price:
+                return self._reject(
+                    proposal,
+                    f"Whole-shares mode: budget ${target_notional:,.2f} can't buy "
+                    f"one share at ${price:,.2f} — no unbracketed fractional "
+                    "fallback (GA-2.3).",
+                )
+            qty = float(int(target_notional / price))  # floor to whole shares
+        elif self.limits.fractional_enabled:
             if target_notional < self.limits.min_order_usd:
                 return self._reject(
                     proposal,

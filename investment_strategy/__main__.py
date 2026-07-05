@@ -8,6 +8,7 @@ from __future__ import annotations
 import logging
 import os
 import sys
+from logging.handlers import RotatingFileHandler
 
 from rich.logging import RichHandler
 
@@ -16,11 +17,28 @@ from .orchestrator import Orchestrator
 
 
 def _setup_logging() -> None:
+    # Console (Rich) for a human at the terminal + a rotating file for the
+    # post-mortem nobody was at the terminal for (goGA GA-2.4). LOG_DIR=""
+    # disables the file sink.
+    handlers: list[logging.Handler] = [
+        RichHandler(rich_tracebacks=True, show_path=False)
+    ]
+    log_dir = os.getenv("LOG_DIR", "logs")
+    if log_dir:
+        os.makedirs(log_dir, exist_ok=True)
+        file_handler = RotatingFileHandler(
+            os.path.join(log_dir, "bot.log"),
+            maxBytes=5 * 1024 * 1024, backupCount=5, encoding="utf-8",
+        )
+        file_handler.setFormatter(logging.Formatter(
+            "%(asctime)s %(levelname)s %(name)s | %(message)s"
+        ))
+        handlers.append(file_handler)
     logging.basicConfig(
         level=os.getenv("LOG_LEVEL", "INFO"),
         format="%(name)s | %(message)s",
         datefmt="%H:%M:%S",
-        handlers=[RichHandler(rich_tracebacks=True, show_path=False)],
+        handlers=handlers,
     )
 
 

@@ -59,6 +59,8 @@ That's it. 🎉
 | **Test the strategy on past data first** | `python -m investment_strategy.backtest` |
 | **See if paid data is worth buying** (later) | `python -m investment_strategy.subscriptions` |
 | **Auto-refresh the dashboard while it runs** | it's already on (`DASHBOARD_FILE=dashboard.html` in `.env`) — just refresh the page |
+| **Publish an honest track record** (equity vs QQQ/SPY + a naive trailing stop, disclaimers baked in) | `python -m investment_strategy.track_record` — or set `TRACK_RECORD_FILE=track_record.html` to auto-refresh it each cycle |
+| **Back up the bot's memory nightly** (ledger, equity history, risk state) | `ops/backup_state.sh` — schedule it with `ops/launchd/com.investment-strategy.backup.plist` |
 
 ---
 
@@ -99,7 +101,18 @@ already set up and tested.
 
 1. Run it in **paper mode for weeks** and read what it does.
 2. **Backtest** it: `python -m investment_strategy.backtest` (tests sizing + exits on history).
-3. Start live with **$100–$1000, not your savings** — scale up only from a real track record.
+3. Start live **small — $100–1000, never your savings** — treat it as tuition
+   for a year of improving the model, and scale up only from a real track
+   record. At that size the bot uses **fractional shares** (the default), so a
+   $25 position of a $300 stock still works. Use a **CASH account** (PDT-exempt
+   under $25k). Know the honest trade-off: fractional positions can't carry an
+   exchange-side stop, so their stop is the 30-second watchdog plus the
+   account-level brakes (per-trade ~1% risk cap, daily-loss flatten, drawdown
+   halt, equity floor) — and the absolute worst case is bounded by the small
+   float itself.
+4. If you later fund $10k+, set `WHOLE_SHARES_ONLY=on`: buys floor to whole
+   shares and **every** position rests a real GTC stop at the exchange, which
+   survives crashes, sleep, and the overnight gap.
 
 To go live (deliberate, 3 changes in `.env`): `TRADING_MODE=live` **and**
 `ALPACA_BASE_URL=https://api.alpaca.markets` **and** `KILL_SWITCH=off`, with your

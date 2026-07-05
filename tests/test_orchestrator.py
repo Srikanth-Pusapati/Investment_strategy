@@ -89,6 +89,9 @@ class _FakeBroker:
         self.canceled = []
         self.closed = []
         self.core_buys = []     # (symbol, notional)
+        self.stop_orders = []   # scripted open stop sells (core-stop tests)
+        self.canceled_ids = []
+        self.submitted = []     # OrderRequests via submit()
 
     def cancel_open_orders_for(self, symbol):
         self.canceled.append(symbol)
@@ -107,6 +110,17 @@ class _FakeBroker:
     def submit_notional_buy(self, symbol, notional):
         self.core_buys.append((symbol, round(notional, 2)))
         return f"oid-core-{symbol}"
+
+    def open_stop_sells(self, symbol):
+        return [dict(o) for o in self.stop_orders]
+
+    def cancel_order(self, oid):
+        self.canceled_ids.append(oid)
+        return True
+
+    def submit(self, order):
+        self.submitted.append(order)
+        return f"oid-submit-{len(self.submitted)}"
 
 
 class _FakeLedger:
@@ -134,10 +148,14 @@ def _orch(trim_enabled=True, trim_pct=25.0, state=None,
           thesis_decay_enabled=False, thesis_decay_min_age_days=3.0,
           thesis_min_score=0.1, core_etf="", target_invested_pct=0.0,
           min_cash_buffer_pct=2.0, max_gross_exposure_pct=100.0,
-          kill_switch=False):
+          kill_switch=False, whole_shares_only=False, core_stop_pct=15.0):
     o = Orchestrator.__new__(Orchestrator)
     o.cfg = SimpleNamespace(
         core_etf=core_etf, target_invested_pct=target_invested_pct,
+        core_stop_pct=core_stop_pct,
+        # These reconcile tests assert the LOG output; the enforcing halt
+        # behavior has its own suite in test_ops_hardening.py.
+        reconcile_halt_enabled=False,
         risk=SimpleNamespace(
             regime_trim_enabled=trim_enabled, regime_trim_pct=trim_pct,
             default_stop_loss_pct=5.0, default_take_profit_pct=12.0,
@@ -147,6 +165,7 @@ def _orch(trim_enabled=True, trim_pct=25.0, state=None,
             min_cash_buffer_pct=min_cash_buffer_pct,
             max_gross_exposure_pct=max_gross_exposure_pct,
             min_order_usd=1.0,
+            whole_shares_only=whole_shares_only,
         ),
     )
     o.risk = SimpleNamespace(kill_switch=kill_switch)
@@ -197,6 +216,69 @@ def test_regime_trim_noop_when_disabled():
     assert o.broker.reduced == []
     # But the label is still tracked so enabling it later trims on the next flip.
     assert o.state.get_regime_label() == "risk-off"
+
+
+def test_regime_trim_rounds_to_whole_shares_in_whole_shares_mode():
+    # GA-2.3: a partial sell must not create fractional dust that can't carry a
+    # GTC exit — sub-share trims are floored (to 0 = skipped).
+    o = _orch(trim_enabled=True, trim_pct=25.0, whole_shares_only=True)
+    acct = _acct(cash=0.0, positions=[_pos("AAPL", 400.0), _pos("MSFT", 200.0)])
+    acct.positions[0].qty = 4.0   # 25% -> 1.0 whole share, sells
+    acct.positions[1].qty = 2.0   # 25% -> 0.5 -> floored to 0, skipped
+    o._apply_regime_trim(acct, _regime("risk-off"))
+    assert ("AAPL", 1.0) in o.broker.reduced
+    assert all(sym != "MSFT" for sym, _ in o.broker.reduced)
+
+
+# -- core exchange-side GTC stop (GA-2.3) ------------------------------------- #
+def _core_pos(qty=10.4, basis=500.0):
+    return Position(symbol="QQQ", qty=qty, avg_entry_price=basis,
+                    current_price=basis, market_value=qty * basis,
+                    unrealized_pl=0.0, unrealized_pl_pct=0.0)
+
+
+def test_core_stop_rests_gtc_stop_for_whole_share_part():
+    o = _orch(core_etf="QQQ", core_stop_pct=15.0)
+    acct = _acct(positions=[_core_pos(qty=10.4, basis=500.0)])
+    o._ensure_core_stop(acct)
+    assert len(o.broker.submitted) == 1
+    order = o.broker.submitted[0]
+    assert order.symbol == "QQQ" and order.qty == 10.0          # whole shares only
+    assert order.stop_price == 425.0                            # 15% under basis
+    assert order.tif.value == "gtc" and order.order_type.value == "stop"
+    assert order.side.value == "sell"
+
+
+def test_core_stop_left_alone_when_already_right():
+    o = _orch(core_etf="QQQ", core_stop_pct=15.0)
+    o.broker.stop_orders = [{"id": "s1", "qty": 10.0, "stop_price": 425.0}]
+    acct = _acct(positions=[_core_pos(qty=10.4, basis=500.0)])
+    o._ensure_core_stop(acct)
+    assert o.broker.submitted == [] and o.broker.canceled_ids == []
+
+
+def test_core_stop_replaced_when_position_grows():
+    o = _orch(core_etf="QQQ", core_stop_pct=15.0)
+    o.broker.stop_orders = [{"id": "s1", "qty": 8.0, "stop_price": 425.0}]
+    acct = _acct(positions=[_core_pos(qty=10.4, basis=500.0)])
+    o._ensure_core_stop(acct)
+    assert o.broker.canceled_ids == ["s1"]
+    assert len(o.broker.submitted) == 1 and o.broker.submitted[0].qty == 10.0
+
+
+def test_core_stop_off_when_pct_zero_or_no_core():
+    o = _orch(core_etf="QQQ", core_stop_pct=0.0)   # written-acceptance path
+    o._ensure_core_stop(_acct(positions=[_core_pos()]))
+    o2 = _orch(core_etf="", core_stop_pct=15.0)    # no core configured
+    o2._ensure_core_stop(_acct(positions=[_core_pos()]))
+    assert o.broker.submitted == [] and o2.broker.submitted == []
+
+
+def test_core_stop_skips_sub_share_position():
+    # Alpaca rejects GTC on fractional qty — a sub-share core can't carry one.
+    o = _orch(core_etf="QQQ", core_stop_pct=15.0)
+    o._ensure_core_stop(_acct(positions=[_core_pos(qty=0.6)]))
+    assert o.broker.submitted == []
 
 
 def test_regime_trim_noop_when_not_risk_off():
@@ -435,6 +517,10 @@ class _BackfillLedger:
     def all(self):
         return list(self.records)
 
+    def effective(self):
+        # No corrections in these fixtures — effective == all.
+        return list(self.records)
+
 
 def _backfill_orch(closed_sells, records=None):
     o = Orchestrator.__new__(Orchestrator)
@@ -443,9 +529,9 @@ def _backfill_orch(closed_sells, records=None):
     return o
 
 
-def _buy_rec(symbol="AAPL", entry=100.0, oid="buy-1"):
-    return TradeRecord(symbol=symbol, action="buy", qty=10.0,
-                       entry_price=entry, cost_usd=entry * 10.0, order_id=oid)
+def _buy_rec(symbol="AAPL", entry=100.0, oid="buy-1", qty=10.0):
+    return TradeRecord(symbol=symbol, action="buy", qty=qty,
+                       entry_price=entry, cost_usd=entry * qty, order_id=oid)
 
 
 def _closed(oid, symbol="AAPL", qty=10.0, price=92.0, otype="stop",
@@ -455,27 +541,55 @@ def _closed(oid, symbol="AAPL", qty=10.0, price=92.0, otype="stop",
 
 
 def test_backfill_records_bracket_legs_with_realized_pl():
-    known_sell = TradeRecord(symbol="AAPL", action="sell", order_id="known-1")
     o = _backfill_orch(
         closed_sells=[
-            _closed("known-1"),                                   # already ours
-            _closed("leg-stop", price=92.0, otype="stop"),        # stop leg fill
-            _closed("leg-take", qty=5.0, price=120.0, otype="limit"),
+            _closed("known-1", qty=2.0),                          # already ours
+            _closed("leg-stop", qty=10.0, price=92.0, otype="stop"),
+            _closed("leg-take", symbol="NVDA", qty=5.0, price=240.0,
+                    otype="limit"),
             _closed("manual", symbol="MSFT", qty=1.0, price=50.0,
                     otype="market"),                              # outside actor
         ],
-        records=[_buy_rec("AAPL", entry=100.0), known_sell],
+        records=[
+            _buy_rec("AAPL", entry=100.0),
+            _buy_rec("NVDA", entry=200.0, oid="buy-2"),
+            # A sell we already recorded — dedupes by order id, and its qty
+            # consumed 2 of AAPL's 10 shares before the backfill runs.
+            TradeRecord(symbol="AAPL", action="sell", qty=2.0,
+                        order_id="known-1", exit_price=100.0),
+        ],
     )
     o._backfill_exchange_exits()
-    new = o.ledger.records[2:]
+    new = o.ledger.records[3:]
     assert [r.exit_reason for r in new] == ["bracket_stop", "bracket_take", "external"]
     stop, take, manual = new
+    # FIFO basis: 8 shares remain of the $100 lot -> -8% on what's covered.
     assert abs(stop.realized_pl_pct - (-8.0)) < 1e-9
-    assert abs(stop.realized_pl - (-80.0)) < 1e-9
+    assert abs(stop.realized_pl - (-64.0)) < 1e-9   # (92-100) x 8 covered shares
+    assert stop.exit_price == 92.0                   # recorded for FIFO lot math
     assert stop.ts.isoformat() == "2026-07-02T15:30:00+00:00"  # actual FILL time
     assert abs(take.realized_pl_pct - 20.0) < 1e-9
+    assert abs(take.realized_pl - 200.0) < 1e-9
     assert manual.realized_pl_pct is None      # no ledger entry price for MSFT
     assert manual.symbol == "MSFT"
+
+
+def test_backfill_uses_fifo_basis_across_multiple_lots():
+    # Two lots (5 @ $100, then 5 @ $200); an exchange stop sells all 10 @ $150.
+    # FIFO: +$250 on the first lot, -$250 on the second -> $0 realized. The old
+    # most-recent-buy basis would have booked (150-200)x10 = -$500 (GA-2.5).
+    o = _backfill_orch(
+        closed_sells=[_closed("leg-stop", qty=10.0, price=150.0, otype="stop")],
+        records=[
+            _buy_rec("AAPL", entry=100.0, oid="buy-1", qty=5.0),
+            _buy_rec("AAPL", entry=200.0, oid="buy-2", qty=5.0),
+        ],
+    )
+    o._backfill_exchange_exits()
+    rec = o.ledger.records[-1]
+    assert rec.exit_reason == "bracket_stop"
+    assert abs(rec.realized_pl - 0.0) < 1e-9
+    assert abs(rec.realized_pl_pct - 0.0) < 1e-9   # basis = $150 blended FIFO
 
 
 def test_backfill_is_idempotent_across_cycles():

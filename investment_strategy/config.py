@@ -116,6 +116,22 @@ class RiskLimits:
     # correlation with any already-held satellite (core ETF excluded) is
     # at/above this. Fail-open when price history is unavailable. 0 = off.
     max_pairwise_corr: float = 0.85
+    # --- GA-2.3 whole-shares mode (closes the stop-less-position hole) ---
+    # A fractional (notional) buy cannot carry an exchange bracket, so its ONLY
+    # stop is the 30s watchdog in a killable process. With this ON, satellite
+    # buys round DOWN to whole shares so EVERY entry rests a GTC bracket at the
+    # exchange; a budget under one share is rejected, not downgraded to an
+    # unprotected fractional. Overrides fractional_enabled for NEW buys.
+    # Partial sells (scale-out, regime trim) also round to whole shares so no
+    # fractional dust is left behind.
+    # DEFAULT OFF (2026-07-05 decision): this bot runs solo with a small live
+    # float ($100-1000) where whole shares would exclude nearly every screened
+    # name — fractional sizing + the watchdog/account brakes are the accepted
+    # trade at that size (max loss is bounded by the float; the per-trade risk
+    # cap bounds each position). Turn ON for a $10k+ account, and on the paper
+    # RECORD account, where one share of most names is affordable and every
+    # entry can rest a real exchange bracket.
+    whole_shares_only: bool = False
 
 
 @dataclass(frozen=True)
@@ -189,6 +205,27 @@ class Config:
     # cash isn't a structural short against the benchmark. Off when core_etf="".
     core_etf: str = ""
     target_invested_pct: float = 0.0
+    # GA-2.3: standalone GTC stop protecting the CORE position at the exchange,
+    # this % under its average basis (the core accumulates via notional buys and
+    # previously had NO exchange-side stop — watchdog-only). Covers the whole-
+    # share part of the position (Alpaca rejects GTC on fractional qty); the
+    # sub-share residual stays watchdog-guarded. 0 = off (that is the written-
+    # acceptance path: broad-ETF gap risk accepted, GA-2.2 paging compensates).
+    core_stop_pct: float = 15.0
+    # GA-1.2: auto-regenerated public track-record page ("" = off). Distinct
+    # from dashboard_file: this one carries the benchmark comparison, per-source
+    # attribution, and the baked-in hypothetical-performance disclaimers.
+    track_record_file: str = ""
+
+    # Ops hardening (goGA GA-2.1/2.2). heartbeat_url: an external dead-man
+    # monitor (e.g. healthchecks.io ping URL) GET-pinged from the watchdog
+    # thread each tick — but only while the MAIN loop is also fresh, so a hung
+    # decision thread stops the pings and the external monitor pages. "" = off.
+    # reconcile_halt_enabled: a reject/partial found at reconcile means the
+    # ledger and the real book have DIVERGED — halt new buys (via the kill-
+    # switch file) until a human deletes the file to acknowledge.
+    heartbeat_url: str = ""
+    reconcile_halt_enabled: bool = True
 
     @property
     def is_live(self) -> bool:
@@ -262,6 +299,8 @@ def load_config() -> Config:
         decision_interval_s=_i("DECISION_INTERVAL_SECONDS", 900),
         monitor_interval_s=_i("MONITOR_INTERVAL_SECONDS", 30),
         kill_switch_file=os.getenv("KILL_SWITCH_FILE", "state/KILL"),
+        heartbeat_url=os.getenv("HEARTBEAT_URL", "").strip(),
+        reconcile_halt_enabled=_flag("RECONCILE_HALT", "on"),
         state_file=os.getenv("STATE_FILE", "state/risk_state.json"),
         dashboard_file=os.getenv("DASHBOARD_FILE", "").strip(),
         risk=RiskLimits(
@@ -343,6 +382,11 @@ def load_config() -> Config:
             # R.2: 0 disables; 0.85 = "effectively the same trade" line (two
             # normal tech megacaps sit ~0.6-0.8; near-clones sit above 0.85).
             max_pairwise_corr=_f("MAX_PAIRWISE_CORR", 0.85),
+            # GA-2.3: OFF by default — small-float solo mode runs fractional
+            # (see the RiskLimits field note). Set on for the paper record
+            # account and any $10k+ live account so every entry rests an
+            # exchange-resident GTC bracket.
+            whole_shares_only=_flag("WHOLE_SHARES_ONLY", "off"),
         ),
         screener=ScreenerConfig(
             enabled=_flag("SCREENER_ENABLED", "on"),
@@ -368,6 +412,8 @@ def load_config() -> Config:
         # TARGET_INVESTED_PCT is clamped to the no-leverage gross cap downstream.
         core_etf=os.getenv("CORE_ETF", "").strip().upper(),
         target_invested_pct=_f("TARGET_INVESTED_PCT", 0.0),
+        core_stop_pct=_f("CORE_STOP_PCT", 15.0),
+        track_record_file=os.getenv("TRACK_RECORD_FILE", "").strip(),
     )
 
     missing = [

@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- Nightly state/ backup (goGA GA-2.8). Install:
+       cp ops/launchd/com.investment-strategy.backup.plist ~/Library/LaunchAgents/
+       # edit the two REPLACE_ME paths first, then:
+       launchctl load ~/Library/LaunchAgents/com.investment-strategy.backup.plist
+     Set BACKUP_DIR to a synced folder (iCloud/Dropbox) or add
+     BACKUP_RCLONE_REMOTE to EnvironmentVariables for a real off-machine copy. -->
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.investment-strategy.backup</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>/bin/sh</string>
+        <string>REPLACE_ME/ops/backup_state.sh</string>
+    </array>
+
+    <key>WorkingDirectory</key>
+    <string>REPLACE_ME</string>
+
+    <key>StartCalendarInterval</key>
+    <dict>
+        <key>Hour</key>
+        <integer>2</integer>
+        <key>Minute</key>
+        <integer>15</integer>
+    </dict>
+
+    <key>StandardOutPath</key>
+    <string>REPLACE_ME/logs/backup.log</string>
+    <key>StandardErrorPath</key>
+    <string>REPLACE_ME/logs/backup.log</string>
+</dict>
+</plist>

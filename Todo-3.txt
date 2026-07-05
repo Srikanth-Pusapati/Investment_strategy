@@ -328,13 +328,20 @@ LOWER VALUE / SKIP unless a thesis calls for it (carried from Todo-2)
 
 --------------------------------------------------------------------------------
 RANKED NEXT STEPS  (re-ranked 2026-07-03 PM: R.1/R.2/F.1 SHIPPED same day;
-Robinhood MCP expansion unblocked C.4/C.5 and added C.6)
+Robinhood MCP expansion unblocked C.4/C.5 and added C.6.
+NOTE 2026-07-03: goGA.txt's COORDINATION section supersedes the "as-is"/
+mid-window-change parts of #1-2 — the mid-July RECORD account runs a FROZEN
+config (whole-shares mode, pre-start gate GA-2.1/2.2/2.3/2.5/2.6); R.3
+re-sweeps, C.4->X.3 options, and knob changes run on a SECOND experiment
+paper account and graduate only at window boundaries.)
 --------------------------------------------------------------------------------
  1. D.2  Accumulate live PAPER round-trips under the new config (fresh paper
-    account planned ~mid-July — run the current stack on it as-is); then re-run
+    account planned ~mid-July — see goGA.txt COORDINATION: frozen config on
+    the record account); then re-run
     2.2 (subscriptions) for the first real SUBSCRIBE/HOLD verdicts. F.1 is in,
     so R.3's periodic `--sweep` / `--sweep-stops` re-tune runs on COMPLETE
-    exit data as trips accumulate (human applies knob changes).
+    exit data as trips accumulate (human applies knob changes, experiment
+    account first per goGA.txt).
  2. C.4  Robinhood options-chain SIGNAL (now unblocked: quotes carry full
     greeks) -> then X.3 flip OPTIONS_ENABLED on PAPER (the biggest untapped
     max-risk lever; also needs Alpaca options approval on the new account).

@@ -145,6 +145,21 @@ class Alerter:
             return False
 
 
+def ping_heartbeat(url: str) -> bool:
+    """GET an external dead-man-monitor URL (healthchecks.io-style). The monitor
+    pages when pings STOP, so the failure mode that matters is silence — which
+    is exactly why this must never raise: a ping failure is the monitor's
+    problem to notice, not a reason to disturb the safety loop that called us."""
+    if not url:
+        return False
+    try:
+        with urllib.request.urlopen(url, timeout=5) as resp:
+            return 200 <= resp.status < 300
+    except Exception as e:  # noqa: BLE001 — liveness ping must never raise
+        log.debug("Heartbeat ping failed: %s", e)
+        return False
+
+
 def load_alert_config(getenv) -> AlertConfig:
     """Build AlertConfig from an env-getter (kept out of config.py's giant
     load_config so the alerting knobs live next to the Alerter). `getenv` is

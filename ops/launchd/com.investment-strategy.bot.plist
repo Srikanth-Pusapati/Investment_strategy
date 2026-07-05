@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- launchd supervisor for the trading bot (goGA GA-2.1).
+     Install (adjust WorkingDirectory + venv path first if yours differ):
+       cp ops/launchd/com.investment-strategy.bot.plist ~/Library/LaunchAgents/
+       launchctl load ~/Library/LaunchAgents/com.investment-strategy.bot.plist
+     Stop/uninstall:
+       launchctl unload ~/Library/LaunchAgents/com.investment-strategy.bot.plist
+     KeepAlive restarts the process on crash. NOTE: launchd does NOT prevent
+     macOS sleep — a lid-close still stops the bot (the dark-gap alert + external
+     dead-man monitor will tell you). The track-record host should be an
+     always-on machine (`sudo pmset -a sleep 0 displaysleep 10`) or the Docker
+     image on a small VPS; see ops/README.md. -->
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.investment-strategy.bot</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>/Users/spusapati/Personal/Investment_stratergy/.venv/bin/python</string>
+        <string>-m</string>
+        <string>investment_strategy</string>
+    </array>
+    <key>WorkingDirectory</key>
+    <string>/Users/spusapati/Personal/Investment_stratergy</string>
+    <key>KeepAlive</key>
+    <dict>
+        <!-- Restart on crash; stay stopped after a clean exit (Ctrl-C/launchctl
+             unload), so an intentional shutdown isn't fought by the supervisor. -->
+        <key>SuccessfulExit</key>
+        <false/>
+    </dict>
+    <key>ThrottleInterval</key>
+    <integer>30</integer>
+    <!-- launchd captures stdout/stderr as a last-resort trail; the app's own
+         rotating logs/bot.log (GA-2.4) is the primary log. -->
+    <key>StandardOutPath</key>
+    <string>/Users/spusapati/Personal/Investment_stratergy/logs/launchd.out.log</string>
+    <key>StandardErrorPath</key>
+    <string>/Users/spusapati/Personal/Investment_stratergy/logs/launchd.err.log</string>
+</dict>
+</plist>
