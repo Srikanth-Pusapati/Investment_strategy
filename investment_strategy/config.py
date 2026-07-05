@@ -121,11 +121,17 @@ class RiskLimits:
     # stop is the 30s watchdog in a killable process. With this ON, satellite
     # buys round DOWN to whole shares so EVERY entry rests a GTC bracket at the
     # exchange; a budget under one share is rejected, not downgraded to an
-    # unprotected fractional. Overrides fractional_enabled for NEW buys
-    # (fractional stays available for tiny accounts that turn this off and
-    # accept the watchdog-only risk). Partial sells (scale-out, regime trim)
-    # also round to whole shares so no fractional dust is left behind.
-    whole_shares_only: bool = True
+    # unprotected fractional. Overrides fractional_enabled for NEW buys.
+    # Partial sells (scale-out, regime trim) also round to whole shares so no
+    # fractional dust is left behind.
+    # DEFAULT OFF (2026-07-05 decision): this bot runs solo with a small live
+    # float ($100-1000) where whole shares would exclude nearly every screened
+    # name — fractional sizing + the watchdog/account brakes are the accepted
+    # trade at that size (max loss is bounded by the float; the per-trade risk
+    # cap bounds each position). Turn ON for a $10k+ account, and on the paper
+    # RECORD account, where one share of most names is affordable and every
+    # entry can rest a real exchange bracket.
+    whole_shares_only: bool = False
 
 
 @dataclass(frozen=True)
@@ -376,10 +382,11 @@ def load_config() -> Config:
             # R.2: 0 disables; 0.85 = "effectively the same trade" line (two
             # normal tech megacaps sit ~0.6-0.8; near-clones sit above 0.85).
             max_pairwise_corr=_f("MAX_PAIRWISE_CORR", 0.85),
-            # GA-2.3: default ON — every satellite entry gets an exchange-
-            # resident GTC bracket. Turn off only on a tiny account that
-            # accepts watchdog-only stops on fractional positions.
-            whole_shares_only=_flag("WHOLE_SHARES_ONLY", "on"),
+            # GA-2.3: OFF by default — small-float solo mode runs fractional
+            # (see the RiskLimits field note). Set on for the paper record
+            # account and any $10k+ live account so every entry rests an
+            # exchange-resident GTC bracket.
+            whole_shares_only=_flag("WHOLE_SHARES_ONLY", "off"),
         ),
         screener=ScreenerConfig(
             enabled=_flag("SCREENER_ENABLED", "on"),

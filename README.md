@@ -101,14 +101,18 @@ already set up and tested.
 
 1. Run it in **paper mode for weeks** and read what it does.
 2. **Backtest** it: `python -m investment_strategy.backtest` (tests sizing + exits on history).
-3. Fund a live account at the **$10–25k floor, never your savings** — and scale
-   up only from a real track record. Why the floor: the bot now buys **whole
-   shares only** by default (`WHOLE_SHARES_ONLY=on`), so every position rests a
-   real stop at the exchange. At $25k a 12% position is ~$3k/name and reaches
-   nearly the whole screened universe; at $500 it can't buy one share of most
-   names and the account degenerates to core-only. If you must run smaller,
-   prefer a max-share-price filter over turning whole-shares off — a fractional
-   position's only stop is the 30-second watchdog in a killable process.
+3. Start live **small — $100–1000, never your savings** — treat it as tuition
+   for a year of improving the model, and scale up only from a real track
+   record. At that size the bot uses **fractional shares** (the default), so a
+   $25 position of a $300 stock still works. Use a **CASH account** (PDT-exempt
+   under $25k). Know the honest trade-off: fractional positions can't carry an
+   exchange-side stop, so their stop is the 30-second watchdog plus the
+   account-level brakes (per-trade ~1% risk cap, daily-loss flatten, drawdown
+   halt, equity floor) — and the absolute worst case is bounded by the small
+   float itself.
+4. If you later fund $10k+, set `WHOLE_SHARES_ONLY=on`: buys floor to whole
+   shares and **every** position rests a real GTC stop at the exchange, which
+   survives crashes, sleep, and the overnight gap.
 
 To go live (deliberate, 3 changes in `.env`): `TRADING_MODE=live` **and**
 `ALPACA_BASE_URL=https://api.alpaca.markets` **and** `KILL_SWITCH=off`, with your

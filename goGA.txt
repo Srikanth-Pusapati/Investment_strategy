@@ -5,6 +5,21 @@ Companion to Todo-3.txt (the ALPHA track). Todo-3 proves the edge; this file
 ships the product. Todo-3 items are referenced (D.2, L.1, L.2, G.*), never
 duplicated — when one closes there, it closes here. Where the two files
 conflict, the COORDINATION section at the bottom is the tie-breaker.
+
+>>> PARKED 2026-07-05 (operator decision): SOLO USE ONLY for ~1 year — no
+>>> other users, no product launch. What that changes:
+>>>   - GA-0 legal/vendor work (attorney consult, ToS answers, PRD decisions)
+>>>     is ON HOLD; the drafts in docs/ stay on file for when this resumes.
+>>>   - GA-4/5/6/7 (multi-tenant, service infra, product security, beta) are
+>>>     out of scope until then.
+>>>   - What STILL RUNS: the alpha track (Todo-3), GA-1 evidence base (track
+>>>     record + windowed evaluation — now for judging OUR OWN improvement,
+>>>     not marketing), GA-2 hardening, and GA-3 dogfood — amended: live
+>>>     float is $100-1000 (tuition-sized; improve the model for ~1 year
+>>>     without risking real savings), FRACTIONAL sizing
+>>>     (WHOLE_SHARES_ONLY default flipped to off; set it on for the paper
+>>>     record account, where whole shares are affordable). GA-3.2's $10-25k
+>>>     floor applies only if/when whole-shares live mode is adopted.
 ================================================================================
 
 WHERE WE START (2026-07-03 audit: 4-agent workflow + adversarial verifier that
@@ -184,10 +199,12 @@ the window dirty; a silent slip is the only unacceptable outcome.)
 [x] GA-2.3 (DONE 2026-07-04) Close the stop-less-position hole (fractional
         satellites and the QQQ core had NO exchange-side stop; the 30s
         watchdog was their only protection).
-        SHIPPED: WHOLE_SHARES_ONLY=on default (risk layer floors to whole
+        SHIPPED: WHOLE_SHARES_ONLY mode (risk layer floors to whole
         shares, rejects sub-share budgets — never downgrades to an
         unprotected fractional; execution layer refuses as backstop;
-        scale-out + regime trim round to whole shares so no fractional dust);
+        scale-out + regime trim round to whole shares so no fractional dust).
+        DEFAULT: off as of 2026-07-05 (solo/small-float decision — see the
+        PARKED note atop this file); set on for the record account + $10k+;
         core: standalone GTC stop via CORE_STOP_PCT=15 default (whole-share
         part; cancel/replace as the position grows; 0 = the written-
         acceptance path). RE-VALIDATED under whole-share sizing: --stress
@@ -251,7 +268,12 @@ gate — "we trade our own money on it" is the only honest marketing until GA-1.
 --------------------------------------------------------------------------------
 [ ] GA-3.1 (= Todo-3 L.2) Wash-sale/tax note first; broker 1099-B = source of
         truth; ledger wash-sale flag from GA-2.5.
-[ ] GA-3.2 Live account sized so the whole-shares mode actually works:
+[ ] GA-3.2 (AMENDED 2026-07-05: live starts at $100-1000 with FRACTIONAL
+        sizing — tuition-sized float for a year of model improvement; max
+        loss bounded by the float, per-trade risk cap + account brakes do
+        the guarding. The floor below applies only if/when whole-shares
+        live mode is adopted.) Live account sized so the whole-shares mode
+        actually works:
         $10-25k floor (at $25k, MAX_POSITION_PCT=12 -> $3k/name — whole
         shares reach nearly the whole screened universe; at the README's
         old $1-5k advice, 12% = $120-600 and whole-shares excludes most
@@ -386,7 +408,9 @@ PHASE GA-7 — BETA -> GA
 --------------------------------------------------------------------------------
 RANKED NEXT STEPS  (2026-07-03, post-critique)
 --------------------------------------------------------------------------------
- 1. GA-0.1a email the attorney (TODAY — calendars are the long pole; the
+ 1. [PARKED 2026-07-05 — solo for ~1 year; draft stays in
+    docs/ga0-1a-attorney-email.md for when productization resumes]
+    GA-0.1a email the attorney (calendars are the long pole; the
     answer gates whether GA-4/5/6 exist at all).
     (2026-07-03 note: GA-2.6 key rotation demoted from this slot — .env*
     was never committed/gitignored; local-perms exposure only, chmod 600

@@ -45,7 +45,7 @@ pages. Use one of:
 
 | Env | Default | Meaning |
 |---|---|---|
-| `WHOLE_SHARES_ONLY` | `on` | Satellite buys floor to whole shares so EVERY entry rests an exchange-side GTC bracket; a budget under one share is rejected, never downgraded to an unprotected fractional. Partial sells (scale-out, trim) round to whole shares too. Turn off only on a tiny account that accepts watchdog-only stops. |
+| `WHOLE_SHARES_ONLY` | `off` | ON: satellite buys floor to whole shares so EVERY entry rests an exchange-side GTC bracket; a budget under one share is rejected, never downgraded to an unprotected fractional; partial sells (scale-out, trim) round to whole shares too. OFF (default — 2026-07-05 solo/small-float decision): fractional sizing for a $100–1000 live float; the watchdog + account brakes enforce the stops, and max loss is bounded by the float. Set ON for the paper RECORD account and any $10k+ live account. |
 | `CORE_STOP_PCT` | `15` | Standalone GTC stop protecting the core ETF this % under its average basis (whole-share part; the sub-share residual stays watchdog-guarded). `0` = off — that is the explicit written-acceptance path: broad-ETF gap risk accepted, dead-man paging is the compensating control. |
 
 Re-validated 2026-07-04 under whole-share sizing: `--stress` all 5 brake checks
