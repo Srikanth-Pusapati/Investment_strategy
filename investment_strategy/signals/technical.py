@@ -13,6 +13,7 @@ from __future__ import annotations
 
 from ..config import Config
 from ..models import Signal, SignalKind
+from ..symbols import yahoo_symbol
 from .base import SignalProvider
 
 
@@ -28,7 +29,7 @@ class TechnicalProvider(SignalProvider):
         signals: list[Signal] = []
         for symbol in symbols:
             # ~1y of daily closes so SMA200 and MACD have enough history.
-            hist = yf.Ticker(symbol).history(period="1y", interval="1d")
+            hist = yf.Ticker(yahoo_symbol(symbol)).history(period="1y", interval="1d")
             closes = [float(c) for c in hist["Close"].dropna().tolist()] if not hist.empty else []
             if len(closes) < 35:  # need enough for MACD(26)+signal(9)
                 continue

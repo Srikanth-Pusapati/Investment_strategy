@@ -15,7 +15,7 @@ import logging
 import statistics
 import time
 from datetime import datetime, timedelta, timezone
-from typing import Callable, Optional, TypeVar
+from typing import Callable, NamedTuple, Optional, TypeVar
 
 from requests.exceptions import ConnectionError as RequestsConnectionError
 from requests.exceptions import Timeout as RequestsTimeout
@@ -55,6 +55,22 @@ _SIDE = {Action.BUY: OrderSide.BUY, Action.SELL: OrderSide.SELL}
 _TIF = {TIF.DAY: TimeInForce.DAY, TIF.GTC: TimeInForce.GTC, TIF.IOC: TimeInForce.IOC}
 
 _T = TypeVar("_T")
+
+
+class BuySubmission(NamedTuple):
+    """What was ACTUALLY sent to the broker. The whole-share bracket path floors
+    the risk layer's sized qty and drops the sub-share remainder, so the
+    decision's approved qty/notional can OVERSTATE the real order — the ledger
+    and the intra-cycle capital snapshot must record these numbers, not the
+    decision's (a divergence reconcile can't catch: the floored order fills
+    completely, so fill-vs-order checks see nothing wrong)."""
+    order_id: Optional[str]
+    fractional: bool
+    qty: float        # shares submitted (approx for notional orders: $/price)
+    notional: float   # dollars submitted (approx for whole-share: qty*price)
+
+
+_NO_BUY = BuySubmission(None, False, 0.0, 0.0)
 
 # Transient, self-healing network faults. A "connection reset by peer" (errno 54)
 # mid-read surfaces as requests' ConnectionError wrapping urllib3's ProtocolError;
@@ -255,13 +271,15 @@ class AlpacaClient:
         log.info("Ladder %s %s: %d rungs %.2f–%.2f", side.value, symbol, len(ids), low, high)
         return ids
 
-    def submit_from_decision(self, decision: RiskDecision) -> tuple[Optional[str], bool]:
+    def submit_from_decision(self, decision: RiskDecision) -> BuySubmission:
         """Build a BUY from a risk-approved equity decision.
 
-        Returns (order_id, is_fractional). When at least one WHOLE share is
-        affordable we PREFER a whole-share BRACKET order so the stop/take-profit
-        rest at the exchange (they survive a process crash / market close) and we
-        drop any sub-share remainder. Below one share — only reachable on small
+        Returns a BuySubmission carrying the qty/notional actually submitted —
+        callers must record THOSE, not the decision's. When at least one WHOLE
+        share is affordable we PREFER a whole-share BRACKET order so the
+        stop/take-profit rest at the exchange (they survive a process crash /
+        market close) and we drop any sub-share remainder. Below one share —
+        only reachable on small
         accounts with fractional enabled — we submit a dollar-NOTIONAL order,
         which Alpaca will not let us bracket; its ONLY protection is the watchdog
         stop the caller must then register.
@@ -275,7 +293,7 @@ class AlpacaClient:
         removable, which is exactly why we prefer the exchange-resident bracket
         whenever a whole share is affordable (see 1B.5)."""
         if decision.verdict not in (RiskVerdict.APPROVED, RiskVerdict.RESIZED):
-            return None, False
+            return _NO_BUY
         symbol = decision.proposal.symbol
         if decision.stop_loss_pct <= 0:
             log.warning(
@@ -283,11 +301,11 @@ class AlpacaClient:
                 "unprotected position (whole-share bracket needs a stop leg; a "
                 "fractional buy needs a watchdog stop).", symbol,
             )
-            return None, False
+            return _NO_BUY
         price = self.latest_price(symbol)
         if price <= 0:
             log.warning("Skip %s: no price for order/bracket levels.", symbol)
-            return None, False
+            return _NO_BUY
 
         whole = int(decision.approved_qty)
         if whole >= 1:
@@ -303,7 +321,9 @@ class AlpacaClient:
                 take_profit_price=round(price * (1 + decision.take_profit_pct / 100.0), 2),
                 stop_loss_price=round(price * (1 - decision.stop_loss_pct / 100.0), 2),
             )
-            return self.submit(order), False
+            return BuySubmission(
+                self.submit(order), False, float(whole), round(whole * price, 2),
+            )
 
         # Sub-share: fractional dollar-notional order, no exchange bracket.
         # Whole-shares mode (GA-2.3) must never reach here — the risk layer
@@ -314,18 +334,18 @@ class AlpacaClient:
                 "Skip %s: whole-shares mode — refusing sub-share fractional "
                 "fallback (no exchange bracket).", symbol,
             )
-            return None, False
+            return _NO_BUY
         if not self.cfg.risk.fractional_enabled:
             log.warning("Skip %s: under one share and fractional disabled.", symbol)
-            return None, False
+            return _NO_BUY
         notional = round(decision.approved_notional, 2)
         if notional < self.cfg.risk.min_order_usd:
             log.warning("Skip %s: notional $%.2f below min order.", symbol, notional)
-            return None, False
+            return _NO_BUY
         order = OrderRequest(
             symbol=symbol, side=Action.BUY, order_type=OrderType.MARKET, notional=notional,
         )
-        return self.submit(order), True
+        return BuySubmission(self.submit(order), True, notional / price, notional)
 
     def submit_notional_buy(self, symbol: str, notional: float) -> Optional[str]:
         """Plain dollar-notional MARKET buy (no bracket) — used by the core-ETF

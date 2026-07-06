@@ -186,7 +186,12 @@ class Orchestrator:
         try:
             while not self._stop.is_set():
                 try:
-                    self._note_loop_tick()
+                    # Liveness stamp for the heartbeat gate only. Dark-gap
+                    # detection lives on the WATCHDOG thread (_note_loop_tick):
+                    # this loop blocks for minutes inside a decision cycle
+                    # (LLM + signal fetches), and busy is not dark — the
+                    # watchdog keeps watching positions the whole time.
+                    self._last_main_tick = time.monotonic()
                     self._refresh_runtime_controls()
                     if self._decision_due():
                         self.run_decision_cycle()
@@ -212,6 +217,7 @@ class Orchestrator:
         regardless of the kill switch or what the decision thread is doing."""
         while not self._stop.is_set():
             try:
+                self._note_loop_tick()
                 with self._trade_lock:
                     self.watchdog.check_once()
                 self._maybe_heartbeat()
@@ -225,12 +231,15 @@ class Orchestrator:
             self._stop.wait(self.cfg.monitor_interval_s)
 
     def _note_loop_tick(self) -> None:
-        """Stamp main-loop liveness and detect dark gaps. A wall-clock jump much
-        larger than the tick interval means the process was suspended (laptop
-        sleep) or the host clock jumped — positions moved unwatched, so say so
-        loudly. Trading itself needs no special resume path: the watchdog's next
-        tick re-checks every position and the decision cycle reconciles first."""
-        self._last_main_tick = time.monotonic()
+        """Detect dark gaps. A wall-clock jump much larger than the tick interval
+        means the process was suspended (laptop sleep) or the host clock jumped —
+        positions moved unwatched, so say so loudly. Runs on the WATCHDOG cadence,
+        not the main loop's: the watchdog thread keeps ticking through a
+        minutes-long decision cycle, so a slow LLM call can't masquerade as
+        darkness (it did when this ran on the main loop — every long cycle fired
+        a false CRITICAL). Trading itself needs no special resume path: the
+        watchdog's next tick re-checks every position and the decision cycle
+        reconciles first."""
         now_wall = time.time()
         gap = now_wall - self._last_wall_tick
         self._last_wall_tick = now_wall
@@ -974,11 +983,17 @@ class Orchestrator:
                     # see the freed capital / slot (see _apply_pending_buy).
                     self._apply_pending_close(account, proposal.symbol)
             else:  # buy (approved or resized)
-                oid, fractional = self.broker.submit_from_decision(decision)
-                if oid:
+                sub = self.broker.submit_from_decision(decision)
+                if sub.order_id:
+                    # Record the SUBMITTED qty/notional, not the decision's: the
+                    # whole-share bracket path floors the sized qty (2.5 sh -> 2),
+                    # and the dropped remainder must not live on as phantom
+                    # position/cost in the ledger or the capital snapshot.
                     self.ledger.record(TradeRecord.from_equity(
-                        decision, price, oid, entry_signals=signal_kinds or []))
-                    self._pending_oids.append((oid, proposal.symbol))
+                        decision, price, sub.order_id,
+                        entry_signals=signal_kinds or [],
+                        submitted_qty=sub.qty, submitted_cost=sub.notional))
+                    self._pending_oids.append((sub.order_id, proposal.symbol))
                     # Start (or preserve) the hold clock for the deterministic
                     # time-stop (1B.4). register_entry only stamps a first entry.
                     self.state.register_entry(proposal.symbol)
@@ -986,10 +1001,9 @@ class Orchestrator:
                     # REST of the cycle's proposals treat the capital as deployed
                     # (1B.3 — closes the intra-cycle over-deploy hole).
                     self._apply_pending_buy(
-                        account, proposal.symbol, decision.approved_notional,
-                        price, decision.approved_qty,
+                        account, proposal.symbol, sub.notional, price, sub.qty,
                     )
-                    if fractional:
+                    if sub.fractional:
                         # Fractional orders carry no exchange-side bracket, so the
                         # watchdog enforces the hard stop / take-profit instead.
                         self.state.register_exits(

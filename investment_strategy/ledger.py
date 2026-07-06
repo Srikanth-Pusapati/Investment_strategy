@@ -79,16 +79,26 @@ class TradeRecord(BaseModel):
     def from_equity(
         cls, decision: RiskDecision, entry_price: float,
         order_id: Optional[str], entry_signals: Optional[list[str]] = None,
+        submitted_qty: Optional[float] = None,
+        submitted_cost: Optional[float] = None,
     ) -> "TradeRecord":
+        """`submitted_qty`/`submitted_cost` are what actually went to the broker
+        when it differs from the decision (whole-share flooring drops the
+        sub-share remainder) — the ledger must reflect the order, not the
+        intent, or the divergence is invisible to fill reconciliation."""
         p = decision.proposal
-        cost = decision.approved_notional or (decision.approved_qty * entry_price)
+        qty = submitted_qty if submitted_qty is not None else decision.approved_qty
+        cost = (
+            submitted_cost if submitted_cost is not None
+            else decision.approved_notional or (decision.approved_qty * entry_price)
+        )
         tp_price = sl_price = None
         if entry_price > 0:
             tp_price = round(entry_price * (1 + decision.take_profit_pct / 100.0), 2)
             sl_price = round(entry_price * (1 - decision.stop_loss_pct / 100.0), 2)
         return cls(
             symbol=p.symbol, action=p.action.value, instrument="equity",
-            qty=decision.approved_qty, entry_price=entry_price, cost_usd=cost,
+            qty=qty, entry_price=entry_price, cost_usd=cost,
             conviction=p.conviction,
             take_profit_pct=decision.take_profit_pct,
             stop_loss_pct=decision.stop_loss_pct,

@@ -109,7 +109,8 @@ class RegimeReader:
     def _daily_closes(symbol: str, days: int) -> list[float]:
         try:
             import yfinance as yf
-            hist = yf.Ticker(symbol).history(period=f"{days + 20}d")
+            from .symbols import yahoo_symbol
+            hist = yf.Ticker(yahoo_symbol(symbol)).history(period=f"{days + 20}d")
             return [float(c) for c in hist["Close"].tolist() if c == c]  # drop NaN
         except Exception as e:
             log.debug("regime closes for %s failed: %s", symbol, e)
