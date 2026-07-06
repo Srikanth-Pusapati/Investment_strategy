@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from ..config import Config
 from ..models import Signal, SignalKind
+from ..symbols import yahoo_symbol
 from .base import SignalProvider
 
 
@@ -22,7 +23,7 @@ class FundamentalsProvider(SignalProvider):
 
         signals: list[Signal] = []
         for symbol in symbols:
-            info = yf.Ticker(symbol).info or {}
+            info = yf.Ticker(yahoo_symbol(symbol)).info or {}
             ebitda = info.get("ebitda")
             margins = info.get("ebitdaMargins")          # 0..1
             debt_to_equity = info.get("debtToEquity")    # percent

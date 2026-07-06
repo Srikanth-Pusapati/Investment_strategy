@@ -58,7 +58,8 @@ class SectorMap:
     def _lookup(self, symbol: str) -> str | None:
         try:
             import yfinance as yf  # lazy import so the dep stays optional
-            info = yf.Ticker(symbol).info or {}
+            from .symbols import yahoo_symbol
+            info = yf.Ticker(yahoo_symbol(symbol)).info or {}
             sec = info.get("sector")
             return str(sec) if sec else None
         except Exception as e:  # network/parse/missing — fail OPEN (no cap)

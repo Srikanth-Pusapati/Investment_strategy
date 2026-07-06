@@ -52,7 +52,8 @@ class EarningsCalendar:
     def _lookup(self, symbol: str, today: date) -> int | None:
         try:
             import yfinance as yf  # lazy import so the dep stays optional
-            cal = yf.Ticker(symbol).calendar or {}
+            from .symbols import yahoo_symbol
+            cal = yf.Ticker(yahoo_symbol(symbol)).calendar or {}
         except Exception as e:  # network/parse/missing — fail OPEN (no blackout)
             log.debug("earnings lookup for %s failed: %s", symbol, e)
             return None

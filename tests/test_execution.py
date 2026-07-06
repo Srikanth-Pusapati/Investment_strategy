@@ -56,19 +56,31 @@ def _decision(qty, notional, stop=5.0, take=12.0, verdict=RiskVerdict.APPROVED):
 
 def test_whole_share_uses_bracket_not_fractional():
     c = _client(price=100.0)
-    oid, fractional = c.submit_from_decision(_decision(qty=3.0, notional=300.0))
-    assert oid == "oid-1" and fractional is False
+    sub = c.submit_from_decision(_decision(qty=3.0, notional=300.0))
+    assert sub.order_id == "oid-1" and sub.fractional is False
     order = c.submitted[0]
     assert order.qty == 3.0 and order.notional is None
     # Bracket legs must be present so the stop/take rest at the exchange.
     assert order.stop_loss_price is not None and order.take_profit_price is not None
 
 
+def test_whole_share_floor_reports_actual_qty_and_notional():
+    # The bracket path floors 2.5 sh -> 2 and drops the remainder; the returned
+    # submission must carry the FLOORED numbers so the ledger and the capital
+    # snapshot record the order, not the intent (the LLY 2.50767-vs-2.0 bug).
+    c = _client(price=100.0)
+    sub = c.submit_from_decision(_decision(qty=2.5, notional=250.0))
+    assert sub.order_id == "oid-1" and sub.fractional is False
+    assert sub.qty == 2.0 and sub.notional == 200.0
+    assert c.submitted[0].qty == 2.0
+
+
 def test_sub_share_falls_back_to_fractional_notional():
     c = _client(price=100.0)
     # $40 budget can't buy a whole $100 share -> fractional dollar-notional order.
-    oid, fractional = c.submit_from_decision(_decision(qty=0.4, notional=40.0))
-    assert oid == "oid-1" and fractional is True
+    sub = c.submit_from_decision(_decision(qty=0.4, notional=40.0))
+    assert sub.order_id == "oid-1" and sub.fractional is True
+    assert sub.qty == 0.4 and sub.notional == 40.0
     order = c.submitted[0]
     assert order.notional == 40.0 and order.qty is None
     # Fractional orders carry NO exchange bracket (the watchdog enforces the stop).
@@ -78,15 +90,15 @@ def test_sub_share_falls_back_to_fractional_notional():
 def test_buy_without_stop_is_refused():
     c = _client(price=100.0)
     # No stop => nothing protects the position; refuse to open it (1B.2b).
-    oid, fractional = c.submit_from_decision(_decision(qty=3.0, notional=300.0, stop=0.0))
-    assert oid is None and fractional is False
+    sub = c.submit_from_decision(_decision(qty=3.0, notional=300.0, stop=0.0))
+    assert sub.order_id is None and sub.fractional is False
     assert c.submitted == []
 
 
 def test_sub_share_refused_when_fractional_disabled():
     c = _client(fractional_enabled=False, price=100.0)
-    oid, fractional = c.submit_from_decision(_decision(qty=0.4, notional=40.0))
-    assert oid is None and fractional is False
+    sub = c.submit_from_decision(_decision(qty=0.4, notional=40.0))
+    assert sub.order_id is None and sub.fractional is False
     assert c.submitted == []
 
 
@@ -94,23 +106,23 @@ def test_sub_share_refused_in_whole_shares_mode_even_with_fractional_on():
     # GA-2.3 belt-and-suspenders: the risk layer floors/rejects upstream, but a
     # decision built any other way must not slip an unbracketed buy through.
     c = _client(fractional_enabled=True, whole_shares_only=True, price=100.0)
-    oid, fractional = c.submit_from_decision(_decision(qty=0.4, notional=40.0))
-    assert oid is None and fractional is False
+    sub = c.submit_from_decision(_decision(qty=0.4, notional=40.0))
+    assert sub.order_id is None and sub.fractional is False
     assert c.submitted == []
 
 
 def test_fractional_below_min_order_refused():
     c = _client(min_order_usd=5.0, price=100.0)
-    oid, fractional = c.submit_from_decision(_decision(qty=0.01, notional=1.0))
-    assert oid is None and fractional is False
+    sub = c.submit_from_decision(_decision(qty=0.01, notional=1.0))
+    assert sub.order_id is None and sub.fractional is False
 
 
 def test_rejected_decision_never_submits():
     c = _client()
-    oid, fractional = c.submit_from_decision(
+    sub = c.submit_from_decision(
         _decision(qty=3.0, notional=300.0, verdict=RiskVerdict.REJECTED)
     )
-    assert oid is None and fractional is False
+    assert sub.order_id is None and sub.fractional is False
     assert c.submitted == []
 
 
