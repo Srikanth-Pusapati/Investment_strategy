@@ -203,8 +203,13 @@ class TradeLedger:
             self.path.parent.mkdir(parents=True, exist_ok=True)
             with self.path.open("a", encoding="utf-8") as fh:
                 fh.write(rec.model_dump_json() + "\n")
+            # Sells carry no cost_usd; show the exit proceeds instead so the log
+            # doesn't read "SELL MXL qty=12 $0" for a $1,200 close.
+            value = rec.cost_usd
+            if not value and rec.action == "sell" and rec.exit_price and rec.qty:
+                value = rec.exit_price * rec.qty
             log.info("Ledger: %s %s qty=%g $%.0f",
-                     rec.action.upper(), rec.symbol, rec.qty, rec.cost_usd)
+                     rec.action.upper(), rec.symbol, rec.qty, value)
         except Exception as e:  # never let logging break the trade loop
             log.warning("Ledger write failed for %s: %s", rec.symbol, e)
 

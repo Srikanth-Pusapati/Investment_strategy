@@ -117,6 +117,51 @@ def test_corrupt_state_does_not_crash():
     assert s.halted is False
 
 
+def test_buy_and_exit_clocks_round_trip_across_restart():
+    from datetime import datetime, timedelta, timezone
+
+    path = _tmp()
+    s1 = PortfolioState(path=path)
+    two_h_ago = datetime.now(timezone.utc) - timedelta(hours=2)
+    s1.register_buy("LLY", when=two_h_ago)
+    s1.register_exit("CRWD", when=two_h_ago)
+    s2 = PortfolioState(path=path)  # fresh load == a process restart
+    assert 1.9 < s2.hours_since_buy("LLY") < 2.1
+    assert 1.9 < s2.hours_since_exit("CRWD") < 2.1
+    assert s2.hours_since_buy("TSM") is None      # never bought
+    assert s2.hours_since_exit("TSM") is None     # never exited
+
+
+def test_buy_clock_updates_on_every_buy_unlike_entry_time():
+    from datetime import datetime, timedelta, timezone
+
+    s = PortfolioState(path=_tmp())
+    old = datetime.now(timezone.utc) - timedelta(hours=10)
+    s.register_buy("LLY", when=old)
+    s.register_buy("LLY")  # a top-up RESETS the clock (register_entry wouldn't)
+    assert s.hours_since_buy("LLY") < 0.1
+
+
+def test_clock_stamps_survive_forget_symbol():
+    # forget_symbol drops trailing/exit/entry state when a position closes, but
+    # the re-entry cooldown must still see WHEN it closed.
+    s = PortfolioState(path=_tmp())
+    s.register_exit("MXL")
+    s.forget_symbol("MXL")
+    assert s.hours_since_exit("MXL") is not None
+
+
+def test_old_clock_stamps_are_pruned():
+    from datetime import datetime, timedelta, timezone
+
+    s = PortfolioState(path=_tmp())
+    stale = datetime.now(timezone.utc) - timedelta(days=30)
+    s.register_exit("OLD", when=stale)
+    s.register_exit("NEW")  # any later write prunes week-old stamps
+    assert s.hours_since_exit("OLD") is None
+    assert s.hours_since_exit("NEW") is not None
+
+
 def _run_all():
     fns = [v for k, v in sorted(globals().items()) if k.startswith("test_") and callable(v)]
     failed = 0

@@ -386,3 +386,31 @@ DONE 2026-07-03:
   new regime; 302 tests. Robinhood MCP expansion assessed: S.2 allowlist holds
   (new order tools auto-blocked, new get_* reads auto-allowed); C.4 + C.5
   unblocked, C.6 (RH scanner discovery) added; next steps re-ranked.
+DONE 2026-07-06 (PM session — the "all-LLY day" fixes; from Jul_06_2026.log):
+  DIAGNOSIS: every buy that day was LLY (10 orders, ~$10.7k incl. $2-$8 dust),
+  every other buy (TSM/TDG/BIIB/T/FRHC) rejected "Budget $0.00" all day.
+  Cause chain: near-zero free cash (2% buffer + 90% core target) -> the FIRST
+  (highest-conviction) proposal takes the whole cycle's deployable cash ->
+  everything after starves; no top-up spacing -> LLY re-bought every 30-min
+  cycle. Winners clipped at +4.5% by the 3% trail while AVAV/FRHC rode -8%
+  on old 9-10% stops (realized +$371 vs unrealized -$1,853 that day).
+  ALSO: the bot had been started 07-05 23:03 and ran the whole day on
+  PRE-666f799 code — BRK.B yfinance errors, ledger qty-divergence, and the
+  dark-gap false CRITICAL were all already fixed but not loaded. Lesson:
+  RESTART THE BOT AFTER PULLING FIXES (check ps start time vs last commit).
+  SHIPPED (all deterministic, risk-layer or orchestrator):
+  - Cycle budget fair-share: deployable cash split across ALL buy proposals by
+    conviction (orchestrator._cycle_budget_caps -> risk cycle_budget_cap);
+    single-buy cycles uncapped; leftover still swept by the core fill.
+  - Churn guards in RiskManager (+ persisted clocks in PortfolioState):
+    MIN_ADD_INTERVAL_HOURS=4 (same-symbol top-ups spaced; was: every cycle),
+    REENTRY_COOLDOWN_HOURS=24 (no fresh re-buy of a name just exited — CRWD
+    was back on the slate 11 min after its trail-stop).
+  - Dust guard: MIN_ORDER_PCT=0.05 — min order scales with equity
+    (max of MIN_ORDER_USD and %-of-equity; $49 on the $98k paper book, still
+    $1 on a small float). Applied to satellite buys AND the core fill.
+  - Daily log archive: bot.log now rotates at midnight to per-day
+    logs/Mon_DD_YYYY.log files (full timestamps, untruncated), committed to
+    the repo (.gitignore re-includes logs/*_*_*.log) for backward analysis.
+  - Ledger sell log line shows exit proceeds (was "SELL MXL qty=12 $0").
+  379 tests green (was 302; +cooldown/dust/budget-split/log-namer coverage).

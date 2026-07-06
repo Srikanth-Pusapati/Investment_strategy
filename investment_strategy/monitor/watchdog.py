@@ -343,6 +343,13 @@ class Watchdog:
         """Log a watchdog-driven close to the ledger so attribution sees the exit.
         The position's unrealized P&L at this instant IS the realized outcome.
         Best-effort and never raises into the safety loop."""
+        # Start the re-entry cooldown clock (churn guard). A scale-out is only a
+        # partial exit, but stamping it is harmless: the cooldown applies only
+        # when the symbol is no longer held.
+        try:
+            self.state.register_exit(pos.symbol)
+        except Exception as e:
+            log.warning("Exit-clock stamp failed for %s: %s", pos.symbol, e)
         if self.ledger is None:
             return
         try:

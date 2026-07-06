@@ -392,6 +392,7 @@ class Orchestrator:
 
         proposals = self.engine.decide(bundles, account, bench_line, external, lessons)
         proposals = self._filter_to_slate(proposals, bundles, account)
+        budget_caps = self._cycle_budget_caps(proposals, account)
         if not proposals:
             log.info("No actionable proposals this cycle.")
         else:
@@ -400,7 +401,10 @@ class Orchestrator:
                 if proposal.instrument is Instrument.OPTION:
                     self._handle_option(proposal, account, kinds)
                 else:
-                    self._handle_equity(proposal, account, kinds)
+                    self._handle_equity(
+                        proposal, account, kinds,
+                        cycle_budget_cap=budget_caps.get(proposal.symbol),
+                    )
         # Core-satellite fill (Todo 1.6): deploy whatever cash the single-name book
         # left idle into the broad core ETF, so we're not structurally short the
         # benchmark. Runs EVEN when there were no proposals — that's exactly the
@@ -648,8 +652,43 @@ class Orchestrator:
                     o["symbol"], o["qty"], o["price"], o["type"] or "?", reason,
                     f", {pl_pct:+.1f}%" if pl_pct is not None else "",
                 )
+                # An exchange-side exit also starts the re-entry cooldown —
+                # stamped at the FILL time when known (falls back to now).
+                self.state.register_exit(o["symbol"], when=ts)
         except Exception as e:  # bookkeeping must never break a decision cycle
             log.warning("Exchange-exit backfill failed: %s", e)
+
+    # -- per-cycle budget fair-share (2026-07-06 all-LLY fix) ---------------- #
+    def _cycle_budget_caps(self, proposals, account) -> dict[str, float]:
+        """Split the cycle's deployable cash across ALL equity-buy proposals,
+        weighted by conviction, and return {symbol: $cap}. Proposals are executed
+        in the order Claude returns them, and every hard cap in RiskManager still
+        applies — this only stops the FIRST buy from consuming the whole cycle's
+        cash and starving every later idea to "Budget $0.00" (the 2026-07-06 log:
+        10 LLY top-ups in one day while TSM/TDG/BIIB/T were rejected every
+        cycle). Single-buy cycles get no share cap. Capital freed by sells this
+        cycle isn't re-split; the core-ETF fill sweeps whatever is left."""
+        buys = [
+            p for p in proposals
+            if p.action is Action.BUY and p.instrument is not Instrument.OPTION
+        ]
+        if len(buys) <= 1:
+            return {}
+        r = self.cfg.risk
+        min_cash = account.equity * (r.min_cash_buffer_pct / 100.0)
+        deployable = max(0.0, min(account.cash - min_cash, account.buying_power))
+        # Floor each weight so a zero-conviction proposal can't zero-divide and a
+        # tiny one still gets a sliver (the risk gate handles the rest).
+        weights = {p.symbol: max(p.conviction, 0.05) for p in buys}
+        total = sum(weights.values())
+        caps = {sym: deployable * w / total for sym, w in weights.items()}
+        if deployable > 0:
+            log.info(
+                "Cycle budget $%s split across %d buy(s): %s.",
+                f"{deployable:,.0f}", len(buys),
+                ", ".join(f"{s} ${c:,.0f}" for s, c in caps.items()),
+            )
+        return caps
 
     # -- slate whitelist (Todo-3 S.1) --------------------------------------- #
     @staticmethod
@@ -810,6 +849,8 @@ class Orchestrator:
                 ))
                 if oid:
                     self._pending_oids.append((oid, pos.symbol))
+                    # Start the re-entry cooldown clock (churn guard).
+                    self.state.register_exit(pos.symbol)
                 # Keep this cycle's snapshot honest (frees capital/slot downstream).
                 self._apply_pending_close(account, pos.symbol)
             exited.add(pos.symbol)
@@ -857,7 +898,10 @@ class Orchestrator:
         min_cash = equity * (r.min_cash_buffer_pct / 100.0)
         spendable = max(0.0, account.cash - min_cash)
         notional = round(min(gap, spendable), 2)
-        if notional < max(r.min_order_usd, 1.0):
+        # Same dust guard as satellite buys: a $98k book topping the core up by
+        # $5 every cycle pays spread for nothing (min order scales with equity).
+        min_fill = max(r.min_order_usd, equity * (r.min_order_pct / 100.0), 1.0)
+        if notional < min_fill:
             return
         price = self.broker.latest_price(etf)
         with self._trade_lock:
@@ -929,7 +973,8 @@ class Orchestrator:
 
     # -- equity path -------------------------------------------------------- #
     def _handle_equity(
-        self, proposal: TradeProposal, account, signal_kinds: list[str] | None = None
+        self, proposal: TradeProposal, account, signal_kinds: list[str] | None = None,
+        cycle_budget_cap: float | None = None,
     ) -> None:
         price = self.broker.latest_price(proposal.symbol)
         vol = self.broker.annualized_vol(proposal.symbol)
@@ -951,6 +996,7 @@ class Orchestrator:
             proposal, account, price, vol, pending, days_to_earnings,
             sector, sector_exposure, self._regime_mult,
             max_held_corr=max_corr, corr_symbol=corr_sym,
+            cycle_budget_cap=cycle_budget_cap,
         )
         log.info(
             "%s %s -> %s: %s | %s",
@@ -979,6 +1025,8 @@ class Orchestrator:
                 ))
                 if oid:
                     self._pending_oids.append((oid, proposal.symbol))
+                    # Start the re-entry cooldown clock (churn guard).
+                    self.state.register_exit(proposal.symbol)
                     # Reflect the close in this cycle's snapshot so later proposals
                     # see the freed capital / slot (see _apply_pending_buy).
                     self._apply_pending_close(account, proposal.symbol)
@@ -997,6 +1045,8 @@ class Orchestrator:
                     # Start (or preserve) the hold clock for the deterministic
                     # time-stop (1B.4). register_entry only stamps a first entry.
                     self.state.register_entry(proposal.symbol)
+                    # Stamp EVERY buy for the top-up spacing guard (churn guard).
+                    self.state.register_buy(proposal.symbol)
                     # Fold this fill back into the once-per-cycle snapshot so the
                     # REST of the cycle's proposals treat the capital as deployed
                     # (1B.3 — closes the intra-cycle over-deploy hole).

@@ -28,7 +28,25 @@ pages. Use one of:
 |---|---|---|
 | `HEARTBEAT_URL` | `""` (off) | Dead-man ping URL, GET-pinged every watchdog tick (~30s) **only while the main loop is also fresh** — either thread dying silences pings and the external monitor pages. Create a check at healthchecks.io with a ~2–5 min grace period and paste its ping URL here. |
 | `RECONCILE_HALT` | `on` | A reject/partial found at reconcile = ledger/broker divergence → new buys halt via the kill-switch file (`state/KILL`, reason appended inside). **Delete the file to acknowledge and resume.** Sells and the watchdog are never gated. |
-| `LOG_DIR` | `logs` | Rotating file log directory (`bot.log`, 5 MB × 5). `""` disables. |
+| `LOG_DIR` | `logs` | File log directory. `""` disables. See "Daily log archive" below. |
+
+## Daily log archive (backward analysis)
+
+`logs/bot.log` is the LIVE file. At local midnight — or on the first start of a
+new day (rollover time is computed from the file's mtime, so a bot that isn't
+running at midnight still rotates at the next startup) — the previous day's
+content rotates to a per-day file named like `logs/Jul_06_2026.log`
+(`__main__.dated_log_name`). These dated files are **committed to the repo**
+(`.gitignore` re-includes `logs/*_*_*.log`; `bot.log` stays ignored) so any
+trading day can be replayed later when tuning the model/risk knobs:
+
+```sh
+git add logs/*_*_*.log && git commit -m "log archive"   # end-of-day habit, or let a cron do it
+grep -E "BUY|SELL|REJECT|watchdog" logs/Jul_06_2026.log # one day's trade story
+```
+
+Unlike a terminal copy/paste, the dated files carry full `YYYY-MM-DD HH:MM:SS`
+timestamps and untruncated rationales (the console view wraps and trims).
 
 ## What fires when
 

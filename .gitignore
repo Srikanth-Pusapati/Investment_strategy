@@ -20,5 +20,11 @@ venv/
 *.log
 state/
 
+# ---- Daily log archive (DO commit) ----
+# The live logs/bot.log stays ignored; at midnight it rotates to a per-day
+# Mon_DD_YYYY.log (see __main__.dated_log_name), kept in the repo so any
+# trading day can be re-analyzed later.
+!logs/*_*_*.log
+
 # ---- Generated artifacts ----
 dashboard.html
