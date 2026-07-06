@@ -132,6 +132,20 @@ class RiskLimits:
     # RECORD account, where one share of most names is affordable and every
     # entry can rest a real exchange bracket.
     whole_shares_only: bool = False
+    # --- churn guards (2026-07-06 log: 10 same-day LLY top-ups, incl. $2-$8
+    # dust orders, while every diversifying buy starved on "Budget $0.00") ---
+    # Dust guard: min order also scales with equity (max of min_order_usd and
+    # this % of equity), so a $98k book can't fire $2 orders that pay spread
+    # for nothing while a $500 float still trades. 0 = off.
+    min_order_pct: float = 0.05
+    # Same-symbol top-up spacing: refuse a BUY of a name we already bought less
+    # than this many hours ago. Adds should be spaced decisions, not a reflex
+    # every 30-min cycle. 0 = off.
+    min_add_interval_hours: float = 4.0
+    # Post-exit re-entry cooldown: refuse a fresh BUY of a name we EXITED less
+    # than this many hours ago (trail/stop/take/time/decision). Instant re-buys
+    # pay the spread twice and usually chase the same falling knife. 0 = off.
+    reentry_cooldown_hours: float = 24.0
 
 
 @dataclass(frozen=True)
@@ -387,6 +401,10 @@ def load_config() -> Config:
             # account and any $10k+ live account so every entry rests an
             # exchange-resident GTC bracket.
             whole_shares_only=_flag("WHOLE_SHARES_ONLY", "off"),
+            # Churn guards (see the RiskLimits field notes).
+            min_order_pct=_f("MIN_ORDER_PCT", 0.05),
+            min_add_interval_hours=_f("MIN_ADD_INTERVAL_HOURS", 4.0),
+            reentry_cooldown_hours=_f("REENTRY_COOLDOWN_HOURS", 24.0),
         ),
         screener=ScreenerConfig(
             enabled=_flag("SCREENER_ENABLED", "on"),

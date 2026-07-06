@@ -8,12 +8,27 @@ from __future__ import annotations
 import logging
 import os
 import sys
-from logging.handlers import RotatingFileHandler
+from datetime import datetime
+from logging.handlers import TimedRotatingFileHandler
 
 from rich.logging import RichHandler
 
 from .config import load_config
 from .orchestrator import Orchestrator
+
+
+def dated_log_name(default_name: str) -> str:
+    """TimedRotatingFileHandler namer: turn the default rotated name
+    (`logs/bot.log.2026-07-06`) into a per-day, repo-friendly label
+    (`logs/Jul_06_2026.log`) so each trading day's log is a standalone file
+    that can be committed and diffed for backward analysis. An unparsable
+    suffix falls back to the default name rather than losing the rotation."""
+    base, _, stamp = default_name.rpartition(".log.")
+    try:
+        day = datetime.strptime(stamp, "%Y-%m-%d")
+    except ValueError:
+        return default_name
+    return os.path.join(os.path.dirname(base), day.strftime("%b_%d_%Y") + ".log")
 
 
 def _setup_logging() -> None:
@@ -26,10 +41,17 @@ def _setup_logging() -> None:
     log_dir = os.getenv("LOG_DIR", "logs")
     if log_dir:
         os.makedirs(log_dir, exist_ok=True)
-        file_handler = RotatingFileHandler(
+        # bot.log is the LIVE file; at local midnight (or on the first start of
+        # a new day — rollover time is computed from the file's mtime) the
+        # previous day's content rotates to Jul_06_2026.log-style names, one
+        # file per trading day, kept forever (they're committed to the repo for
+        # backward analysis; backupCount-based deletion never matches the
+        # custom names, by design).
+        file_handler = TimedRotatingFileHandler(
             os.path.join(log_dir, "bot.log"),
-            maxBytes=5 * 1024 * 1024, backupCount=5, encoding="utf-8",
+            when="midnight", backupCount=0, encoding="utf-8",
         )
+        file_handler.namer = dated_log_name
         file_handler.setFormatter(logging.Formatter(
             "%(asctime)s %(levelname)s %(name)s | %(message)s"
         ))

@@ -165,6 +165,7 @@ def _orch(trim_enabled=True, trim_pct=25.0, state=None,
             min_cash_buffer_pct=min_cash_buffer_pct,
             max_gross_exposure_pct=max_gross_exposure_pct,
             min_order_usd=1.0,
+            min_order_pct=0.05,
             whole_shares_only=whole_shares_only,
         ),
     )
@@ -526,6 +527,7 @@ def _backfill_orch(closed_sells, records=None):
     o = Orchestrator.__new__(Orchestrator)
     o.broker = SimpleNamespace(closed_sell_orders=lambda: closed_sells)
     o.ledger = _BackfillLedger(records)
+    o.state = _state_tmp()   # backfilled exits stamp the re-entry cooldown clock
     return o
 
 
@@ -611,6 +613,76 @@ def test_backfill_never_breaks_the_cycle_on_broker_failure():
     o.ledger = _BackfillLedger()
     o._backfill_exchange_exits()               # must swallow, not raise
     assert o.ledger.records == []
+
+
+def test_backfill_stamps_reentry_cooldown_clock():
+    o = _backfill_orch([_closed("stop-1")], records=[_buy_rec()])
+    o._backfill_exchange_exits()
+    # The exchange-side stop fill must start the re-entry cooldown at the FILL
+    # time, so the next cycle can't immediately re-buy the stopped name.
+    assert o.state.hours_since_exit("AAPL") is not None
+
+
+# --------------------------------------------------------------------------- #
+# Per-cycle budget fair-share (the 2026-07-06 all-LLY fix)
+# --------------------------------------------------------------------------- #
+from investment_strategy.models import TradeProposal  # noqa: E402
+from investment_strategy.models import Action, Instrument  # noqa: E402
+
+
+def _buy_prop(symbol, conviction=0.5, action=Action.BUY):
+    return TradeProposal(symbol=symbol, action=action, conviction=conviction,
+                         target_weight_pct=10.0, rationale="test")
+
+
+def test_cycle_budget_split_by_conviction():
+    o = _orch(min_cash_buffer_pct=0.0)
+    acct = _acct(cash=1_000.0)
+    caps = o._cycle_budget_caps(
+        [_buy_prop("LLY", 0.8), _buy_prop("TSM", 0.2)], acct,
+    )
+    # $1,000 deployable split 0.8 : 0.2 -> LLY $800, TSM $200. The first buy
+    # can no longer take the full $1,000 and starve the second to $0.
+    assert abs(caps["LLY"] - 800.0) < 1.0
+    assert abs(caps["TSM"] - 200.0) < 1.0
+
+
+def test_cycle_budget_no_cap_for_single_buy():
+    o = _orch(min_cash_buffer_pct=0.0)
+    caps = o._cycle_budget_caps([_buy_prop("LLY", 0.8)], _acct(cash=1_000.0))
+    assert caps == {}
+
+
+def test_cycle_budget_ignores_sells_and_holds():
+    o = _orch(min_cash_buffer_pct=0.0)
+    caps = o._cycle_budget_caps(
+        [_buy_prop("LLY", 0.8), _buy_prop("SPG", 0.9, action=Action.SELL),
+         _buy_prop("AVAV", 0.5, action=Action.HOLD)],
+        _acct(cash=1_000.0),
+    )
+    assert caps == {}  # only one BUY -> no share cap needed
+
+
+def test_cycle_budget_respects_cash_buffer():
+    o = _orch(min_cash_buffer_pct=10.0)   # 10% of $1,000 equity reserved
+    caps = o._cycle_budget_caps(
+        [_buy_prop("A", 0.5), _buy_prop("B", 0.5)], _acct(cash=1_000.0),
+    )
+    assert abs(sum(caps.values()) - 900.0) < 1.0
+
+
+# --------------------------------------------------------------------------- #
+# Daily dated log names (backward-analysis archive)
+# --------------------------------------------------------------------------- #
+from investment_strategy.__main__ import dated_log_name  # noqa: E402
+
+
+def test_dated_log_name_formats_day_label():
+    assert dated_log_name("logs/bot.log.2026-07-06") == "logs/Jul_06_2026.log"
+
+
+def test_dated_log_name_falls_back_on_unparsable_suffix():
+    assert dated_log_name("logs/bot.log.weird") == "logs/bot.log.weird"
 
 
 def _run_all():

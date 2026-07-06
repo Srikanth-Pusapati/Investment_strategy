@@ -108,6 +108,7 @@ class RiskManager:
         sector: str | None = None, sector_exposure_usd: float = 0.0,
         regime_multiplier: float = 1.0,
         max_held_corr: float | None = None, corr_symbol: str = "",
+        cycle_budget_cap: float | None = None,
     ) -> RiskDecision:
         """`price` is the current market price for proposal.symbol. `volatility`
         is the symbol's annualized realized vol (fraction, e.g. 0.45) used for
@@ -122,7 +123,10 @@ class RiskManager:
         correlation between this symbol and any already-held satellite (None =
         unknown -> guard skipped, fail-open) and `corr_symbol` names that
         position, for the pairwise-correlation guard (R.2). All from the
-        execution client / orchestrator."""
+        execution client / orchestrator. `cycle_budget_cap` is this proposal's
+        fair share of the cycle's deployable cash when several buys compete in
+        one cycle (None = no share cap), so the first buy can't starve the rest
+        to "Budget $0.00"."""
         if proposal.action is Action.HOLD:
             return self._reject(proposal, "HOLD — no action.")
         if proposal.action is Action.SELL:
@@ -130,7 +134,7 @@ class RiskManager:
         return self._evaluate_buy(
             proposal, account, price, volatility, pending_buy_notional,
             days_to_earnings, sector, sector_exposure_usd, regime_multiplier,
-            max_held_corr, corr_symbol,
+            max_held_corr, corr_symbol, cycle_budget_cap,
         )
 
     # -- survival-first sizing: vol-targeted, fractional-Kelly -------------- #
@@ -197,6 +201,7 @@ class RiskManager:
         sector: str | None = None, sector_exposure_usd: float = 0.0,
         regime_multiplier: float = 1.0,
         max_held_corr: float | None = None, corr_symbol: str = "",
+        cycle_budget_cap: float | None = None,
     ) -> RiskDecision:
         halted, why = self.trading_halted(account)
         if halted:
@@ -211,6 +216,34 @@ class RiskManager:
                 f"Conviction {proposal.conviction:.2f} below floor "
                 f"{self.limits.min_conviction:.2f} — no real edge; skip.",
             )
+
+        # Churn guards (2026-07-06 log: LLY bought 10x in one day, every 30-min
+        # cycle, while all other buys starved). (a) Top-up spacing: a name bought
+        # less than min_add_interval_hours ago is not bought again — adds must be
+        # spaced decisions, not a per-cycle reflex. (b) Re-entry cooldown: a name
+        # we EXITED less than reentry_cooldown_hours ago is not re-entered fresh —
+        # an instant re-buy pays the spread twice and usually chases the same
+        # falling knife the stop just saved us from. Both fail open on missing
+        # clocks (first entry ever) and are inert at 0.
+        if self.limits.min_add_interval_hours > 0:
+            since_buy = self.state.hours_since_buy(proposal.symbol)
+            if since_buy is not None and since_buy < self.limits.min_add_interval_hours:
+                return self._reject(
+                    proposal,
+                    f"Bought {proposal.symbol} {since_buy:.1f}h ago — top-ups are "
+                    f"spaced {self.limits.min_add_interval_hours:g}h apart (churn guard).",
+                )
+        if (
+            self.limits.reentry_cooldown_hours > 0
+            and account.position_for(proposal.symbol) is None
+        ):
+            since_exit = self.state.hours_since_exit(proposal.symbol)
+            if since_exit is not None and since_exit < self.limits.reentry_cooldown_hours:
+                return self._reject(
+                    proposal,
+                    f"Exited {proposal.symbol} {since_exit:.1f}h ago — re-entry "
+                    f"waits {self.limits.reentry_cooldown_hours:g}h (churn guard).",
+                )
 
         # Earnings-blackout guard: refuse NEW buys within N days of a scheduled
         # report. Gap risk through the print dwarfs the stop, so a tight stop gives
@@ -359,6 +392,14 @@ class RiskManager:
         deployable = min(deployable, account.buying_power)
         target_notional = min(target_notional, deployable)
 
+        # 3b) Fair share of the CYCLE's cash when several buys compete. The
+        #     orchestrator splits deployable cash across the cycle's buy
+        #     proposals by conviction; without it, the first (highest-conviction)
+        #     buy takes everything and every later proposal — however good —
+        #     dies on "Budget $0.00" (the 2026-07-06 all-LLY failure).
+        if cycle_budget_cap is not None:
+            target_notional = min(target_notional, max(0.0, cycle_budget_cap))
+
         # 4) Convert the capped dollar budget into a quantity. Whole-shares mode
         #    (GA-2.3, default ON) floors DOWN so every entry can rest an
         #    exchange-side GTC bracket — a budget under one share is REJECTED,
@@ -375,11 +416,18 @@ class RiskManager:
                 )
             qty = float(int(target_notional / price))  # floor to whole shares
         elif self.limits.fractional_enabled:
-            if target_notional < self.limits.min_order_usd:
+            # Dust guard: the min order scales with equity (a $98k book firing a
+            # $2 top-up pays spread for nothing — 2026-07-06 log) while the
+            # absolute floor keeps a $500 float tradable.
+            min_order = max(
+                self.limits.min_order_usd,
+                equity * (self.limits.min_order_pct / 100.0),
+            )
+            if target_notional < min_order:
                 return self._reject(
                     proposal,
                     f"Budget ${target_notional:,.2f} below min order "
-                    f"${self.limits.min_order_usd:.2f} after buffers/caps.",
+                    f"${min_order:,.2f} after buffers/caps.",
                 )
             qty = round(target_notional / price, 6)  # fractional shares
         else:

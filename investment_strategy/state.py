@@ -46,6 +46,13 @@ class PortfolioState:
         # the opening buy; the watchdog also stamps a first-seen fallback so a
         # restart or pre-existing position still gets a clock.
         self.entry_times: dict[str, str] = {}
+        # Churn-guard clocks (2026-07-06): last BUY submit time per symbol (the
+        # same-symbol top-up spacing) and last EXIT time per symbol (the post-
+        # exit re-entry cooldown). Persisted so a restart doesn't forget that a
+        # name was topped up / stopped out minutes ago. Pruned on write so they
+        # can't grow unbounded.
+        self.last_buy_times: dict[str, str] = {}
+        self.exit_times: dict[str, str] = {}
         # Order ids submitted but not yet reconciled against their fills, as
         # [order_id, symbol] pairs. Persisted so a restart between cycles still
         # reconciles a reject/partial fill instead of leaving a phantom ledger
@@ -79,6 +86,12 @@ class PortfolioState:
             self.entry_times = {
                 k: str(v) for k, v in d.get("entry_times", {}).items()
             }
+            self.last_buy_times = {
+                k: str(v) for k, v in d.get("last_buy_times", {}).items()
+            }
+            self.exit_times = {
+                k: str(v) for k, v in d.get("exit_times", {}).items()
+            }
             self.pending_orders = [
                 [str(oid), str(sym)] for oid, sym in d.get("pending_orders", [])
             ]
@@ -102,6 +115,8 @@ class PortfolioState:
                         "high_water": self.high_water,
                         "exits": self.exits,
                         "entry_times": self.entry_times,
+                        "last_buy_times": self.last_buy_times,
+                        "exit_times": self.exit_times,
                         "pending_orders": self.pending_orders,
                         "regime_label": self.regime_label,
                     },
@@ -210,6 +225,60 @@ class PortfolioState:
             entered = entered.replace(tzinfo=timezone.utc)
         now = now or datetime.now(timezone.utc)
         return (now - entered).total_seconds() / 86_400.0
+
+    # -- churn-guard clocks (top-up spacing + re-entry cooldown) ------------- #
+    _CLOCK_RETENTION_DAYS = 7.0  # cooldowns are hours-scale; week-old stamps are noise
+
+    def register_buy(self, symbol: str, when: datetime | None = None) -> None:
+        """Stamp the LAST buy-submit time for `symbol` (every buy, unlike
+        register_entry which only stamps the first). Drives the same-symbol
+        top-up spacing guard."""
+        with self._lock:
+            self.last_buy_times[symbol] = (
+                when or datetime.now(timezone.utc)
+            ).isoformat()
+            self._prune_clock(self.last_buy_times)
+            self._save()
+
+    def register_exit(self, symbol: str, when: datetime | None = None) -> None:
+        """Stamp the time `symbol` was exited (any reason: decision sell, trail,
+        stop, take, time-stop, flatten, exchange-side fill). Drives the post-exit
+        re-entry cooldown."""
+        with self._lock:
+            self.exit_times[symbol] = (
+                when or datetime.now(timezone.utc)
+            ).isoformat()
+            self._prune_clock(self.exit_times)
+            self._save()
+
+    def hours_since_buy(self, symbol: str, now: datetime | None = None) -> float | None:
+        return self._hours_since(self.last_buy_times.get(symbol), now)
+
+    def hours_since_exit(self, symbol: str, now: datetime | None = None) -> float | None:
+        return self._hours_since(self.exit_times.get(symbol), now)
+
+    @staticmethod
+    def _hours_since(ts: str | None, now: datetime | None = None) -> float | None:
+        if not ts:
+            return None
+        try:
+            then = datetime.fromisoformat(ts)
+        except ValueError:
+            return None
+        if then.tzinfo is None:
+            then = then.replace(tzinfo=timezone.utc)
+        now = now or datetime.now(timezone.utc)
+        return (now - then).total_seconds() / 3600.0
+
+    def _prune_clock(self, clock: dict[str, str]) -> None:
+        """Drop stamps older than the retention window (call under the lock)."""
+        cutoff_h = self._CLOCK_RETENTION_DAYS * 24.0
+        stale = [
+            sym for sym, ts in clock.items()
+            if (h := self._hours_since(ts)) is None or h > cutoff_h
+        ]
+        for sym in stale:
+            del clock[sym]
 
     # -- pending-order reconciliation list (survives a restart) ------------- #
     def set_pending_orders(self, pairs: list[tuple[str, str]]) -> None:

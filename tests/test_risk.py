@@ -694,6 +694,102 @@ def test_corr_guard_off_at_zero():
     assert d.verdict is not RiskVerdict.REJECTED, d.reason
 
 
+# --------------------------------------------------------------------------- #
+# Churn guards + cycle budget fair-share (the 2026-07-06 all-LLY fixes)
+# --------------------------------------------------------------------------- #
+def _fresh_state() -> PortfolioState:
+    p = os.path.join(tempfile.gettempdir(), f"_rm_test_{uuid.uuid4().hex}.json")
+    return PortfolioState(path=p)
+
+
+def test_top_up_cooldown_rejects_recent_rebuy():
+    # LLY was bought 10 times on 2026-07-06, one per 30-min cycle. With a 4h
+    # spacing, a buy 0.5h after the last one is refused.
+    state = _fresh_state()
+    state.register_buy("LLY")
+    rm = _rm(_limits(min_add_interval_hours=4.0), state=state)
+    d = rm.evaluate(_buy("LLY"), _account(), price=100.0, volatility=0.3)
+    assert d.verdict is RiskVerdict.REJECTED
+    assert "churn guard" in d.reason
+
+
+def test_top_up_cooldown_allows_spaced_add():
+    from datetime import datetime, timedelta, timezone
+
+    state = _fresh_state()
+    state.register_buy("LLY", when=datetime.now(timezone.utc) - timedelta(hours=5))
+    rm = _rm(_limits(min_add_interval_hours=4.0), state=state)
+    d = rm.evaluate(_buy("LLY"), _account(), price=100.0, volatility=0.3)
+    assert d.verdict is not RiskVerdict.REJECTED, d.reason
+
+
+def test_top_up_cooldown_off_at_zero():
+    state = _fresh_state()
+    state.register_buy("LLY")
+    rm = _rm(_limits(min_add_interval_hours=0.0), state=state)
+    d = rm.evaluate(_buy("LLY"), _account(), price=100.0, volatility=0.3)
+    assert d.verdict is not RiskVerdict.REJECTED, d.reason
+
+
+def test_reentry_cooldown_rejects_fresh_rebuy_after_exit():
+    # CRWD trail-stopped at 10:54 and was back on the candidate slate at 11:05.
+    # With no position held and a recent exit, the fresh re-buy is refused.
+    state = _fresh_state()
+    state.register_exit("CRWD")
+    rm = _rm(_limits(reentry_cooldown_hours=24.0), state=state)
+    d = rm.evaluate(_buy("CRWD"), _account(), price=100.0, volatility=0.3)
+    assert d.verdict is RiskVerdict.REJECTED
+    assert "re-entry" in d.reason.lower()
+
+
+def test_reentry_cooldown_does_not_gate_adds_to_held_position():
+    # A recorded exit (e.g. an old scale-out) must not block topping up a name
+    # we STILL hold — only fresh entries are cooled down.
+    state = _fresh_state()
+    state.register_exit("AAPL")
+    rm = _rm(_limits(reentry_cooldown_hours=24.0, min_add_interval_hours=0.0),
+             state=state)
+    acct = _account(positions=[_pos("AAPL", qty=1.0, price=100.0)])
+    d = rm.evaluate(_buy("AAPL"), acct, price=100.0, volatility=0.3)
+    assert d.verdict is not RiskVerdict.REJECTED, d.reason
+
+
+def test_cycle_budget_cap_bounds_the_order():
+    # The orchestrator hands each buy its fair share of the cycle's cash; the
+    # order must not exceed it even when every other cap allows more.
+    rm = _rm(_limits(kelly_fraction=0.0, min_cash_buffer_pct=0.0))
+    d = rm.evaluate(_buy(), _account(), price=100.0, volatility=0.3,
+                    cycle_budget_cap=1_234.0)
+    assert d.verdict in (RiskVerdict.APPROVED, RiskVerdict.RESIZED), d.reason
+    assert d.approved_notional <= 1_234.0 + 1e-6
+
+
+def test_cycle_budget_cap_none_changes_nothing():
+    rm = _rm(_limits(kelly_fraction=0.0))
+    d = rm.evaluate(_buy(), _account(), price=100.0, volatility=0.3,
+                    cycle_budget_cap=None)
+    assert abs(d.approved_notional - 5_000.0) < 1e-6  # the 5% position cap
+
+
+def test_dust_guard_min_order_scales_with_equity():
+    # 0.05% of $100k = $50: a $30 order is dust on this book and refused, even
+    # though it clears the $1 absolute floor.
+    rm = _rm(_limits(min_order_pct=0.05, min_order_usd=1.0, kelly_fraction=0.0))
+    d = rm.evaluate(_buy(), _account(), price=100.0, volatility=0.3,
+                    cycle_budget_cap=30.0)
+    assert d.verdict is RiskVerdict.REJECTED
+    assert "min order" in d.reason.lower()
+
+
+def test_dust_guard_keeps_small_floats_tradable():
+    # On a $2k book the % min is $1 — a $100 order still trades.
+    rm = _rm(_limits(min_order_pct=0.05, kelly_fraction=0.0))
+    acct = _account(equity=2_000.0, cash=2_000.0, buying_power=2_000.0,
+                    last_equity=2_000.0)
+    d = rm.evaluate(_buy(), acct, price=300.0, volatility=0.3)
+    assert d.verdict in (RiskVerdict.APPROVED, RiskVerdict.RESIZED), d.reason
+
+
 def _run_all():
     fns = [v for k, v in sorted(globals().items()) if k.startswith("test_") and callable(v)]
     failed = 0
