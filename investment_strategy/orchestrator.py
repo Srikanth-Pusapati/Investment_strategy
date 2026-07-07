@@ -1107,6 +1107,11 @@ class Orchestrator:
             return
         price = self.broker.latest_price(etf)
         with self._trade_lock:
+            # Cancel the resting GTC stop-sell before buying: Alpaca treats a
+            # buy against an open stop-sell as a potential wash trade and rejects
+            # it. _ensure_core_stop (called right after this) will re-place the
+            # stop at the updated size/level.
+            self.broker.cancel_open_orders_for(etf)
             oid = self.broker.submit_notional_buy(etf, notional)
         if not oid:
             return

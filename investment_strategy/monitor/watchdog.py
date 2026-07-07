@@ -133,6 +133,11 @@ class Watchdog:
         a failed close is left tracked and loudly flagged so the next tick retries
         instead of silently leaving a naked, unmonitored position."""
         for pos in account.positions:
+            if pos.qty <= 0:
+                # Already flat at broker (paper account lag can keep a zero-qty
+                # position in the snapshot briefly after a bracket stop fills).
+                self.state.forget_symbol(pos.symbol)
+                continue
             self.broker.cancel_open_orders_for(pos.symbol)
             oid = self._close_or_rest(pos)
             if oid:
@@ -194,6 +199,7 @@ class Watchdog:
             "Hard %s hit on %s (now %.1f%%). Closing fractional position.",
             hit, pos.symbol, pos.unrealized_pl_pct,
         )
+        self.broker.cancel_open_orders_for(pos.symbol)
         oid = self.broker.close_position(pos.symbol)
         if oid:
             self.state.forget_symbol(pos.symbol)
