@@ -109,22 +109,25 @@ class Alerter:
 
     # -- sinks -------------------------------------------------------------- #
     def _send_email(self, subject: str, body: str) -> bool:
-        try:
-            msg = EmailMessage()
-            msg["Subject"] = f"[trading-bot] {subject}"
-            msg["From"] = self.cfg.smtp_user
-            recipients = [r.strip() for r in self.cfg.email_to.split(",") if r.strip()]
-            msg["To"] = ", ".join(recipients)
-            msg.set_content(body)
-            with smtplib.SMTP(self.cfg.smtp_host, self.cfg.smtp_port, timeout=15) as s:
-                s.starttls()
-                s.login(self.cfg.smtp_user, self.cfg.smtp_password)
-                s.send_message(msg, to_addrs=recipients)
-            log.info("CRITICAL alert emailed to %s: %s", msg["To"], subject)
-            return True
-        except Exception as e:  # never let paging break the safety loop
-            log.warning("Alert email send failed: %s", e)
-            return False
+        msg = EmailMessage()
+        msg["Subject"] = f"[trading-bot] {subject}"
+        msg["From"] = self.cfg.smtp_user
+        recipients = [r.strip() for r in self.cfg.email_to.split(",") if r.strip()]
+        msg["To"] = ", ".join(recipients)
+        msg.set_content(body)
+        for attempt in range(2):
+            try:
+                with smtplib.SMTP(self.cfg.smtp_host, self.cfg.smtp_port, timeout=15) as s:
+                    s.starttls()
+                    s.login(self.cfg.smtp_user, self.cfg.smtp_password)
+                    s.send_message(msg, to_addrs=recipients)
+                log.info("CRITICAL alert emailed to %s: %s", msg["To"], subject)
+                return True
+            except Exception as e:  # never let paging break the safety loop
+                log.warning("Alert email send failed (attempt %d/2): %s", attempt + 1, e)
+                if attempt == 0:
+                    time.sleep(5)  # brief wait for network to settle after wake-from-sleep
+        return False
 
     def _send_webhook(self, subject: str, body: str) -> bool:
         try:
