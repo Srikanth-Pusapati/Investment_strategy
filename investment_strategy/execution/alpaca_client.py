@@ -118,6 +118,38 @@ class AlpacaClient:
 
     # -- read --------------------------------------------------------------- #
     def get_account(self) -> AccountSnapshot:
+        """Account snapshot, validated for internal consistency.
+
+        Alpaca occasionally serves a glitched account row whose equity ignores
+        the held positions entirely (equity == cash while ~$96k of stock is
+        held — seen 2026-07-07, where a single such read latched a false
+        EQUITY FLOOR halt and fired a flatten). Equity is redundant with
+        cash + position market values, so a poisoned read is detectable:
+        re-read, and if the API keeps disagreeing with itself, rebuild equity
+        from the parts that DO agree rather than hand the bad number to the
+        risk layer / watchdog."""
+        snap = self._read_account_once()
+        for attempt in (1, 2):
+            if self._equity_consistent(snap):
+                return snap
+            log.warning(
+                "get_account: INCONSISTENT snapshot (equity $%.2f but cash "
+                "$%.2f + positions $%.2f) — re-reading (%d/2).",
+                snap.equity, snap.cash,
+                sum(p.market_value for p in snap.positions), attempt,
+            )
+            time.sleep(0.5 * attempt)
+            snap = self._read_account_once()
+        if self._equity_consistent(snap):
+            return snap
+        healed = snap.cash + sum(p.market_value for p in snap.positions)
+        log.error(
+            "get_account: equity STILL inconsistent after re-reads (reported "
+            "$%.2f); substituting cash+positions $%.2f.", snap.equity, healed,
+        )
+        return snap.model_copy(update={"equity": healed})
+
+    def _read_account_once(self) -> AccountSnapshot:
         a = _retry_read(self.trading.get_account, what="get_account")
         raw_positions = _retry_read(
             self.trading.get_all_positions, what="get_all_positions"
@@ -132,6 +164,18 @@ class AlpacaClient:
             pattern_day_trader=bool(getattr(a, "pattern_day_trader", False)),
             daytrade_count=int(getattr(a, "daytrade_count", 0) or 0),
         )
+
+    @staticmethod
+    def _equity_consistent(snap: AccountSnapshot) -> bool:
+        """True when reported equity agrees with cash + position market values,
+        within a tolerance for price drift between the two API calls. Trivially
+        true with no positions (equity == cash by definition then, and there is
+        no independent signal to check it against)."""
+        if not snap.positions:
+            return True
+        expected = snap.cash + sum(p.market_value for p in snap.positions)
+        denom = max(abs(expected), abs(snap.equity), 1.0)
+        return abs(snap.equity - expected) / denom <= 0.03
 
     def account_id(self) -> str:
         """Stable identifier for the connected Alpaca account. It changes if the

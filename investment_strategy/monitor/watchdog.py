@@ -103,6 +103,25 @@ class Watchdog:
         floor = peak * (pct / 100.0)
         if account.equity > floor:
             return False
+        # Latch + flatten is terminal, so never act on a single read: a glitched
+        # snapshot (equity==cash, 2026-07-07) must not kill the account. Only a
+        # SUCCESSFUL re-read showing equity back above the floor cancels the
+        # halt; a failed re-read confirms it, so a genuine collapse on a flaky
+        # network still halts.
+        try:
+            confirm = self.broker.get_account()
+            if confirm.equity > floor:
+                log.warning(
+                    "EQUITY FLOOR breach NOT confirmed on re-read (equity $%.0f "
+                    "then $%.0f vs floor $%.0f) — ignoring glitched read.",
+                    account.equity, confirm.equity, floor,
+                )
+                return False
+            account = confirm
+        except Exception as e:
+            log.warning(
+                "EQUITY FLOOR confirm re-read failed (%s) — proceeding with halt.", e,
+            )
         reason = (
             f"Equity ${account.equity:,.0f} <= floor ${floor:,.0f} "
             f"({pct:.0f}% of peak ${peak:,.0f}). "

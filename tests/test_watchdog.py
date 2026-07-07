@@ -29,11 +29,20 @@ class _FakeBroker:
         self.market_close_fails = market_close_fails   # simulate closed/halted market
         # (new_order_id, qty) pairs clear_orders_for_exit "replaces" per call
         self.stuck_replaces = list(stuck_replaces)
+        # What the floor-breach confirming re-read returns. None -> the re-read
+        # raises, which the watchdog treats as breach CONFIRMED (fail-safe), so
+        # fixtures that don't wire an account keep the old one-read behavior.
+        self.account: AccountSnapshot | None = None
         self.closed: list[str] = []
         self.canceled: list[str] = []
         self.reduced: list[tuple[str, float]] = []
         self.rested: list[tuple[str, float, float]] = []
         self.unwedged: list[tuple[str, float]] = []
+
+    def get_account(self):
+        if self.account is None:
+            raise RuntimeError("no confirm account wired")
+        return self.account
 
     def cancel_open_orders_for(self, symbol):
         self.canceled.append(symbol)
@@ -137,6 +146,27 @@ def test_floor_off_when_zero():
     wd = _wd(0.0, state)
     assert wd._equity_floor_breached(_acct(equity=1.0)) is False   # disabled
     assert state.halted is False
+
+
+def test_floor_breach_canceled_by_healthy_confirming_reread():
+    # A single glitched snapshot (the 2026-07-07 equity==cash read) must NOT
+    # latch the halt: the confirming re-read shows equity back above the floor.
+    state = _state()
+    state.peak_equity = 1_000.0           # floor $600
+    wd = _wd(60.0, state)
+    wd.broker.account = _acct(equity=900.0)                       # fresh read: healthy
+    assert wd._equity_floor_breached(_acct(equity=500.0)) is False
+    assert state.halted is False and wd.broker.closed == []
+
+
+def test_floor_breach_confirmed_by_reread_latches():
+    state = _state()
+    state.peak_equity = 1_000.0           # floor $600
+    wd = _wd(60.0, state)
+    wd.broker.account = _acct(equity=480.0)                       # fresh read: still dead
+    assert wd._equity_floor_breached(_acct(equity=500.0)) is True
+    assert state.halted is True
+    assert sorted(wd.broker.closed) == ["AAPL", "MSFT"]
 
 
 # -- market-closed / halt exit fallback (1B.5) ------------------------------- #

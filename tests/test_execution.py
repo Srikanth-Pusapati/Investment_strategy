@@ -319,6 +319,99 @@ def test_clear_orders_for_exit_counts_only_unfilled_qty():
     assert c.clear_orders_for_exit("FRHC", ref_price=50.0) == [("new-live-tp", 40.0)]
 
 
+# -- get_account: glitched-equity guard (the 2026-07-07 false halt) ---------- #
+class _AcctTrading:
+    """Serves queued (account, raw_positions) read cycles; repeats the last."""
+
+    def __init__(self, cycles):
+        self._cycles = list(cycles)
+        self.reads = 0
+
+    def _cur(self):
+        return self._cycles[min(self.reads, len(self._cycles) - 1)]
+
+    def get_account(self):
+        return self._cur()[0]
+
+    def get_all_positions(self):
+        cur = self._cur()[1]
+        self.reads += 1                     # positions end a read cycle
+        return cur
+
+
+def _acct_row(equity, cash):
+    return SimpleNamespace(
+        equity=equity, last_equity=equity, cash=cash, buying_power=cash,
+        pattern_day_trader=False, daytrade_count=0,
+    )
+
+
+def _raw_pos(symbol="QQQ", mv=95_000.0):
+    return SimpleNamespace(
+        symbol=symbol, qty=100.0, qty_available=100.0, avg_entry_price=900.0,
+        current_price=mv / 100.0, market_value=mv, unrealized_pl=0.0,
+        unrealized_plpc=0.0,
+    )
+
+
+def _no_sleep():
+    """Patch out the re-read backoff; returns a restore callable."""
+    import investment_strategy.execution.alpaca_client as ac
+    orig = ac.time.sleep
+    ac.time.sleep = lambda s: None
+    return lambda: setattr(ac.time, "sleep", orig)
+
+
+def test_get_account_consistent_read_passes_through():
+    trading = _AcctTrading([(_acct_row(equity=97_326.75, cash=2_326.75),
+                             [_raw_pos(mv=95_000.0)])])
+    c = AlpacaClient.__new__(AlpacaClient)
+    c.trading = trading
+    snap = c.get_account()
+    assert snap.equity == 97_326.75 and trading.reads == 1
+
+
+def test_get_account_glitch_recovers_on_reread():
+    # First read is the glitch signature (equity == cash while $95k is held);
+    # the re-read is healthy and must be the one returned.
+    glitch = (_acct_row(equity=2_326.75, cash=2_326.75), [_raw_pos(mv=95_000.0)])
+    good = (_acct_row(equity=97_326.75, cash=2_326.75), [_raw_pos(mv=95_000.0)])
+    trading = _AcctTrading([glitch, good])
+    c = AlpacaClient.__new__(AlpacaClient)
+    c.trading = trading
+    restore = _no_sleep()
+    try:
+        snap = c.get_account()
+    finally:
+        restore()
+    assert snap.equity == 97_326.75 and trading.reads == 2
+
+
+def test_get_account_persistent_glitch_self_heals():
+    # Every read is poisoned -> rebuild equity from cash + position values so
+    # the watchdog/risk layer never sees the equity==cash number.
+    glitch = (_acct_row(equity=2_326.75, cash=2_326.75), [_raw_pos(mv=95_000.0)])
+    trading = _AcctTrading([glitch])
+    c = AlpacaClient.__new__(AlpacaClient)
+    c.trading = trading
+    restore = _no_sleep()
+    try:
+        snap = c.get_account()
+    finally:
+        restore()
+    assert snap.equity == 2_326.75 + 95_000.0
+    assert trading.reads == 3               # initial read + 2 re-reads
+
+
+def test_get_account_no_positions_is_trivially_consistent():
+    # All-cash account: equity == cash is the NORMAL state, not a glitch.
+    trading = _AcctTrading([(_acct_row(equity=2_326.75, cash=2_326.75), [])])
+    c = AlpacaClient.__new__(AlpacaClient)
+    c.trading = trading
+    snap = c.get_account()
+    assert snap.equity == 2_326.75 and trading.reads == 1
+
+
 def _run_all():
     fns = [v for k, v in sorted(globals().items()) if k.startswith("test_") and callable(v)]
     failed = 0
