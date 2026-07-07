@@ -135,19 +135,24 @@ def _orch(core_etf="QQQ", guard=None):
 def test_corr_context_excludes_core_etf_and_self():
     g = _FakeGuard()
     o = _orch(core_etf="QQQ", guard=g)
-    corr, sym = o._corr_context("SMCI", _acct("QQQ", "NVDA", "SMCI"))
+    corr, sym, data_missing = o._corr_context("SMCI", _acct("QQQ", "NVDA", "SMCI"))
     assert g.asked == ("SMCI", ["NVDA"])   # no core ETF, no self-compare
     assert (corr, sym) == (0.9, "NVDA")
+    assert data_missing is False  # guard had an answer
 
 
 def test_corr_context_none_when_only_core_held():
     o = _orch(core_etf="QQQ", guard=_FakeGuard())
-    assert o._corr_context("SMCI", _acct("QQQ")) == (None, "")
+    corr, sym, data_missing = o._corr_context("SMCI", _acct("QQQ"))
+    assert (corr, sym) == (None, "")
+    assert data_missing is False  # nothing held to compare → not a data gap
 
 
 def test_corr_context_fails_open_when_guard_has_no_answer():
     o = _orch(guard=_FakeGuard(result=None))
-    assert o._corr_context("SMCI", _acct("QQQ", "NVDA")) == (None, "")
+    corr, sym, data_missing = o._corr_context("SMCI", _acct("QQQ", "NVDA"))
+    assert (corr, sym) == (None, "")
+    assert data_missing is True  # held non-core satellites but guard had no answer
 
 
 def _run_all():

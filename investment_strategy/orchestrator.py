@@ -21,6 +21,7 @@ from requests.exceptions import Timeout as RequestsTimeout
 from urllib3.exceptions import ProtocolError
 
 from .attribution import render_lessons
+from .journal import DecisionJournal, DecisionRecord
 from .benchmark import BenchmarkTracker
 from .config import Config
 from .correlation import CorrelationGuard
@@ -126,6 +127,10 @@ class Orchestrator:
             )
         elif not self.watchlist:
             log.info("Discovery-driven mode: trading scanner-found names + holdings.")
+        # Intra-day decision journal: records every verdict so the 'Today so far'
+        # block in the prompt gives Claude self-awareness within the trading day,
+        # and so rejected proposals have a durable audit trail (not just log.info).
+        self.journal = DecisionJournal()
         # Persisted daily equity snapshots so the account P&L curve survives restarts.
         self.equity_history = EquityHistory()
         self._last_decision_at = 0.0
@@ -319,9 +324,30 @@ class Orchestrator:
         self.risk.kill_switch = desired
 
     # -- the slow cycle ----------------------------------------------------- #
+    def _maybe_run_postmortem(self) -> None:
+        """Fire the nightly post-mortem once per ET trading day, on the first
+        market-closed tick after a day that has journal records."""
+        if not self.cfg.postmortem_enabled:
+            return
+        try:
+            from .journal import _trading_day as _tj
+            day = _tj()
+            if day == self.state.get_postmortem_done_day():
+                return  # already ran today
+            if not self.journal.has_records_today():
+                return  # no decisions today (e.g. weekend restart)
+            log.info("Running nightly post-mortem for %s …", day)
+            from .postmortem import run_postmortem
+            run_postmortem(self.cfg, self.ledger, self.journal, day,
+                           max_lessons=self.cfg.postmortem_max_lessons)
+            self.state.set_postmortem_done(day)
+        except Exception as e:
+            log.warning("Nightly post-mortem failed: %s", e)
+
     def run_decision_cycle(self) -> None:
         if not self.broker.is_market_open():
             log.info("Market closed; skipping decision cycle.")
+            self._maybe_run_postmortem()
             return
 
         self._reconcile_fills()
@@ -390,8 +416,43 @@ class Orchestrator:
             b.symbol: sorted({s.kind.value for s in b.signals}) for b in bundles
         }
 
-        proposals = self.engine.decide(bundles, account, bench_line, external, lessons)
+        # Prompt-time slate filtering: compute per-symbol buy headroom and tell
+        # Claude which symbols are at-cap (A2). Drops fully-blocked not-held names;
+        # keeps held-but-blocked names for SELL/HOLD evaluation.
+        bundles, buy_excluded = self._partition_slate(bundles, account)
+
+        # Journal slate exclusions so they appear in 'Today so far' and the nightly
+        # post-mortem can identify wasted proposal slots.
+        for sym, reason in buy_excluded.items():
+            self._journal_decision(sym, "buy", "equity", 0.0, 0.0, "slate_excluded",
+                                   0.0, reason, "")
+
+        # 'Today so far' block: what Claude has already done this session (trusted).
+        today_block = ""
+        try:
+            today_block = self.journal.render_today(account.equity)
+        except Exception as e:
+            log.warning("Could not render today block: %s", e)
+
+        proposals = self.engine.decide(
+            bundles, account, bench_line, external, lessons,
+            today=today_block, buy_excluded=buy_excluded,
+        )
         proposals = self._filter_to_slate(proposals, bundles, account)
+        # Hard backstop: Claude may still propose an excluded BUY; drop it.
+        dropped = set()
+        proposals_before = proposals
+        proposals = self._drop_excluded_buys(proposals, buy_excluded)
+        for prop in proposals_before:
+            if prop not in proposals:
+                dropped.add(prop.symbol)
+                self._journal_decision(
+                    prop.symbol, prop.action.value,
+                    prop.instrument.value if hasattr(prop.instrument, "value") else str(prop.instrument),
+                    prop.conviction, prop.target_weight_pct, "dropped_buy",
+                    0.0, buy_excluded.get(prop.symbol, "excluded from slate"),
+                    prop.rationale[:120] if prop.rationale else "",
+                )
         budget_caps = self._cycle_budget_caps(proposals, account)
         if not proposals:
             log.info("No actionable proposals this cycle.")
@@ -452,14 +513,12 @@ class Orchestrator:
             log.warning("sector context for %s failed: %s", symbol, e)
             return None, 0.0
 
-    def _corr_context(self, symbol: str, account) -> tuple[float | None, str]:
-        """(max daily-return correlation vs the held book, which holding) for the
-        pairwise-correlation guard (R.2). Exclusions that make it correct:
-          - the candidate itself — topping up an existing position is not a new
-            bet (corr with itself is 1.0 and would block every add-on);
-          - the core ETF — satellites are MEANT to correlate with the index
-            core; comparing against it would block essentially every buy.
-        (None, "") = nothing comparable / data missing -> guard fails open."""
+    def _corr_context(self, symbol: str, account) -> tuple[float | None, str, bool]:
+        """(max_corr, corr_symbol, data_missing) for the pairwise-correlation
+        guard (R.2). Exclusions: the candidate itself (corr=1 would block adds)
+        and the core ETF (satellites are meant to track it). data_missing=True
+        when we DO hold comparable satellites but couldn't compute correlations
+        (data outage) — the risk gate sizes down instead of failing open."""
         try:
             held = [
                 p.symbol for p in account.positions
@@ -467,12 +526,19 @@ class Orchestrator:
                 and not (self.cfg.core_etf and p.symbol == self.cfg.core_etf)
             ]
             if not held:
-                return None, ""
+                return None, "", False
             best = self.corr_guard.max_correlation(symbol, held)
-            return (None, "") if best is None else best
+            if best is None:
+                return None, "", True  # held satellites but no data — blind guard
+            return best[0], best[1], False
         except Exception as e:  # advisory context — never blocks a cycle
             log.warning("correlation context for %s failed: %s", symbol, e)
-            return None, ""
+            held = [
+                p.symbol for p in account.positions
+                if p.symbol != symbol
+                and not (self.cfg.core_etf and p.symbol == self.cfg.core_etf)
+            ]
+            return None, "", bool(held)
 
     def _record_equity_snapshot(self) -> None:
         """Persist a once-per-day account P&L snapshot (true total return from the
@@ -483,11 +549,21 @@ class Orchestrator:
             log.warning("Could not record equity snapshot: %s", e)
 
     def _lessons(self) -> str:
+        parts = []
         try:
-            return render_lessons(self.ledger)
-        except Exception as e:  # attribution must never break the trade loop
+            attr = render_lessons(self.ledger)
+            if attr:
+                parts.append(attr)
+        except Exception as e:
             log.warning("Could not render track-record lessons: %s", e)
-            return ""
+        try:
+            from .postmortem import read_curated
+            curated = read_curated(self.cfg.postmortem_max_lessons)
+            if curated:
+                parts.append(curated)
+        except Exception:
+            pass  # postmortem module may not exist yet; silently skip
+        return "\n\n".join(parts) if parts else ""
 
     def _inject_discovery(
         self, bundles: list[SignalBundle], discovered: list[Candidate]
@@ -682,6 +758,13 @@ class Orchestrator:
         weights = {p.symbol: max(p.conviction, 0.05) for p in buys}
         total = sum(weights.values())
         caps = {sym: deployable * w / total for sym, w in weights.items()}
+        # Per-symbol share cap: even with many candidates, one name can't sweep
+        # >max_cycle_symbol_share_pct% of the cycle's deployable cash. Unused
+        # budget is NOT redistributed — the core-ETF fill sweeps what's left.
+        share_pct = r.max_cycle_symbol_share_pct
+        if 0 < share_pct < 100 and len(buys) >= 2:
+            share_cap = deployable * (share_pct / 100.0)
+            caps = {sym: min(c, share_cap) for sym, c in caps.items()}
         if deployable > 0:
             log.info(
                 "Cycle budget $%s split across %d buy(s): %s.",
@@ -689,6 +772,125 @@ class Orchestrator:
                 ", ".join(f"{s} ${c:,.0f}" for s, c in caps.items()),
             )
         return caps
+
+    # -- prompt-time buy-headroom / slate filtering (A2) --------------------- #
+    def _buy_headroom_usd(self, symbol: str, account) -> tuple[float, str]:
+        """How many dollars can still go into `symbol` as a buy this cycle?
+        Returns (headroom_usd, binding_reason). Reason is '' when headroom > 0
+        and names the binding constraint when headroom is zero/negative.
+        Conservative: uses held market value only (no broker round-trip for
+        pending orders) since the risk gate will count pending anyway."""
+        r = self.cfg.risk
+        equity = account.equity
+        if equity <= 0:
+            return 0.0, "zero equity"
+        min_order = max(r.min_order_usd, equity * (r.min_order_pct / 100.0))
+
+        # Churn clocks
+        if r.min_add_interval_hours > 0:
+            since_buy = self.state.hours_since_buy(symbol)
+            if since_buy is not None and since_buy < r.min_add_interval_hours:
+                return 0.0, f"topped up {since_buy:.1f}h ago (next ok in {r.min_add_interval_hours:g}h)"
+        pos = account.position_for(symbol)
+        if pos is None and r.reentry_cooldown_hours > 0:
+            since_exit = self.state.hours_since_exit(symbol)
+            if since_exit is not None and since_exit < r.reentry_cooldown_hours:
+                return 0.0, f"exited {since_exit:.1f}h ago (cooldown {r.reentry_cooldown_hours:g}h)"
+
+        # Daily buy count cap
+        if r.max_daily_buys_per_symbol > 0:
+            n = self.state.daily_symbol_buys(symbol)
+            if n >= r.max_daily_buys_per_symbol:
+                return 0.0, f"bought {n}x today (daily cap {r.max_daily_buys_per_symbol})"
+
+        # Daily dollar ceiling
+        if r.max_daily_symbol_deploy_pct > 0:
+            day_cap = equity * (r.max_daily_symbol_deploy_pct / 100.0)
+            spent = self.state.daily_symbol_spend(symbol)
+            day_room = day_cap - spent
+            if day_room <= min_order:
+                return 0.0, (
+                    f"daily ceiling ${day_cap:,.0f} nearly exhausted "
+                    f"(${max(0, day_room):,.0f} headroom)"
+                )
+
+        # Symbol exposure cap (held only — conservative)
+        held_val = pos.market_value if pos else 0.0
+        sym_room = equity * (r.max_symbol_exposure_pct / 100.0) - held_val
+        if sym_room <= min_order:
+            return 0.0, f"at {r.max_symbol_exposure_pct:.0f}% symbol cap"
+
+        return min(sym_room, day_room if r.max_daily_symbol_deploy_pct > 0 else sym_room), ""
+
+    def _partition_slate(
+        self, bundles: list, account
+    ) -> tuple[list, dict[str, str]]:
+        """Split bundles into (filtered_bundles, buy_excluded_map).
+        - Not-held + headroom < min_order → drop entirely (nothing to sell; saves tokens).
+        - Held + headroom < min_order → keep for SELL/HOLD, add to buy_excluded.
+        Both paths are also captured in buy_excluded so the prompt's "excluded" section
+        is complete and the backstop pass can check the full set."""
+        r = self.cfg.risk
+        equity = account.equity if account.equity > 0 else 1.0
+        min_order = max(r.min_order_usd, equity * (r.min_order_pct / 100.0))
+        buy_excluded: dict[str, str] = {}
+        filtered: list = []
+        for b in bundles:
+            headroom, reason = self._buy_headroom_usd(b.symbol, account)
+            if headroom < min_order:
+                buy_excluded[b.symbol] = reason or "no buy headroom"
+                if account.position_for(b.symbol) is not None:
+                    filtered.append(b)  # keep: may need SELL/HOLD
+                # else: drop; nothing to sell and buy is blocked
+            else:
+                filtered.append(b)
+        if buy_excluded:
+            log.info(
+                "Buy-excluded from slate this cycle: %s",
+                ", ".join(f"{s} ({r})" for s, r in list(buy_excluded.items())[:5])
+                + (f" …+{len(buy_excluded) - 5} more" if len(buy_excluded) > 5 else ""),
+            )
+        return filtered, buy_excluded
+
+    def _journal_decision(
+        self, symbol: str, action: str, instrument: str,
+        conviction: float, target_weight_pct: float, verdict: str,
+        approved_notional: float, reason: str, rationale: str,
+    ) -> None:
+        try:
+            self.journal.record(DecisionRecord(
+                ts=__import__("datetime").datetime.now(
+                    __import__("datetime").timezone.utc
+                ).isoformat(),
+                symbol=symbol, action=action, instrument=instrument,
+                conviction=conviction, target_weight_pct=target_weight_pct,
+                verdict=verdict,  # type: ignore[arg-type]
+                approved_notional=approved_notional,
+                reason=reason, rationale_head=rationale,
+            ))
+        except Exception as e:
+            log.warning("Journal record failed: %s", e)
+
+    def _drop_excluded_buys(
+        self, proposals: list, buy_excluded: dict[str, str]
+    ) -> list:
+        """Hard backstop: if Claude proposes a BUY for a symbol we explicitly
+        excluded, drop it. SELL and HOLD always pass — closing is never blocked.
+        Logs any drops so it's auditable."""
+        if not buy_excluded:
+            return proposals
+        kept = []
+        for prop in proposals:
+            if prop.action.value == "buy" and prop.symbol in buy_excluded:
+                log.warning(
+                    "DROPPED BUY %s: model ignored buy-exclusion (%s) — "
+                    "the risk gate would also reject it, but we drop it here "
+                    "to save the broker round-trip.",
+                    prop.symbol, buy_excluded[prop.symbol],
+                )
+            else:
+                kept.append(prop)
+        return kept
 
     # -- slate whitelist (Todo-3 S.1) --------------------------------------- #
     @staticmethod
@@ -988,20 +1190,31 @@ class Orchestrator:
             if is_buy else (None, 0.0)
         # Pairwise-correlation context (R.2) — only when the guard is on and
         # this is a buy; the fetches are per-cycle cached in the guard.
-        max_corr, corr_sym = (
+        max_corr, corr_sym, corr_missing = (
             self._corr_context(proposal.symbol, account)
-            if is_buy and self.cfg.risk.max_pairwise_corr > 0 else (None, "")
+            if is_buy and self.cfg.risk.max_pairwise_corr > 0 else (None, "", False)
         )
         decision = self.risk.evaluate(
             proposal, account, price, vol, pending, days_to_earnings,
             sector, sector_exposure, self._regime_mult,
             max_held_corr=max_corr, corr_symbol=corr_sym,
             cycle_budget_cap=cycle_budget_cap,
+            corr_data_missing=corr_missing,
         )
         log.info(
             "%s %s -> %s: %s | %s",
             proposal.action.value.upper(), proposal.symbol,
             decision.verdict.value, decision.reason, proposal.rationale[:100],
+        )
+        # Journal every verdict so rejects have a durable record (not just a log
+        # line), and the 'Today so far' block can surface them to Claude next cycle.
+        instr = proposal.instrument.value if hasattr(proposal.instrument, "value") else str(proposal.instrument)
+        verdict_str = decision.verdict.value
+        self._journal_decision(
+            proposal.symbol, proposal.action.value, instr,
+            proposal.conviction, proposal.target_weight_pct, verdict_str,
+            decision.approved_notional if decision.verdict != RiskVerdict.REJECTED else 0.0,
+            decision.reason, proposal.rationale[:120] if proposal.rationale else "",
         )
         if decision.verdict == RiskVerdict.REJECTED:
             return
@@ -1045,8 +1258,14 @@ class Orchestrator:
                     # Start (or preserve) the hold clock for the deterministic
                     # time-stop (1B.4). register_entry only stamps a first entry.
                     self.state.register_entry(proposal.symbol)
-                    # Stamp EVERY buy for the top-up spacing guard (churn guard).
-                    self.state.register_buy(proposal.symbol)
+                    # Stamp EVERY buy for the top-up spacing guard (churn guard)
+                    # and record conviction for the top-up evidence gate (B4).
+                    self.state.register_buy(
+                        proposal.symbol, conviction=proposal.conviction,
+                    )
+                    # Daily concentration accumulator: count $ against the
+                    # per-symbol daily ceiling (concentration guard A1).
+                    self.state.register_daily_deploy(proposal.symbol, sub.notional)
                     # Fold this fill back into the once-per-cycle snapshot so the
                     # REST of the cycle's proposals treat the capital as deployed
                     # (1B.3 — closes the intra-cycle over-deploy hole).

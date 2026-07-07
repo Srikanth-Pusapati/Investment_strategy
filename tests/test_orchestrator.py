@@ -167,6 +167,7 @@ def _orch(trim_enabled=True, trim_pct=25.0, state=None,
             min_order_usd=1.0,
             min_order_pct=0.05,
             whole_shares_only=whole_shares_only,
+            max_cycle_symbol_share_pct=100.0,  # 100 = off
         ),
     )
     o.risk = SimpleNamespace(kill_switch=kill_switch)

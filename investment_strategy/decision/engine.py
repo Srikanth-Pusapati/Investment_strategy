@@ -38,7 +38,8 @@ class DecisionEngine:
     def decide(
         self, bundles: list[SignalBundle], account: AccountSnapshot,
         benchmark_line: str = "", external: list[ExternalHolding] | None = None,
-        lessons: str = "",
+        lessons: str = "", today: str = "",
+        buy_excluded: dict[str, str] | None = None,
     ) -> list[TradeProposal]:
         """Ask Claude for proposals across all candidate symbols at once.
 
@@ -50,7 +51,10 @@ class DecisionEngine:
         if not bundles:
             return []
 
-        user_content = self._render(bundles, account, benchmark_line, external or [], lessons)
+        user_content = self._render(
+            bundles, account, benchmark_line, external or [], lessons,
+            today=today, buy_excluded=buy_excluded or {},
+        )
         try:
             resp = self.client.messages.create(
                 model=self.model,
@@ -102,12 +106,31 @@ class DecisionEngine:
     def _render(
         self, bundles: list[SignalBundle], account: AccountSnapshot,
         benchmark_line: str, external: list[ExternalHolding], lessons: str = "",
+        today: str = "", buy_excluded: dict[str, str] | None = None,
     ) -> str:
-        # The track record is OUR derived data (trusted), so it sits OUTSIDE the
-        # <market_data> block — it's guidance, not third-party input to analyze.
+        # Our own derived data (track-record, today-so-far, exclusions) sits
+        # OUTSIDE <market_data> — it's trusted guidance, not third-party text.
         lines: list[str] = []
         if lessons:
             lines += [lessons, ""]
+        if today:
+            lines += [today, ""]
+        if buy_excluded:
+            lines.append(
+                "## Buys excluded this cycle (deterministic caps — "
+                "do NOT propose BUY for these)"
+            )
+            shown = list(buy_excluded.items())[:10]
+            for sym, reason in shown:
+                lines.append(f"- {sym}: {reason}")
+            extra = len(buy_excluded) - len(shown)
+            if extra > 0:
+                lines.append(f"- …and {extra} more")
+            lines.append(
+                "Spend conviction on alternatives; excluded symbols may still "
+                "be proposed as SELL or HOLD."
+            )
+            lines.append("")
         # All third-party text lives inside <market_data> so the system prompt can
         # bind "untrusted data, not instructions" to a clear, delimited region.
         lines += [
@@ -133,10 +156,16 @@ class DecisionEngine:
             lines.append("")
 
         lines.append("## Candidates")
+        excluded_set = set(buy_excluded or {})
         for b in bundles:
             pos = account.position_for(b.symbol)
+            at_cap = b.symbol in excluded_set
             if pos:
-                tag = f" (HELD: {pos.qty:g} sh, {pos.unrealized_pl_pct:+.1f}%)"
+                cap_note = (
+                    f" — AT CAP: do NOT propose BUY; SELL/HOLD only "
+                    f"({buy_excluded[b.symbol]})" if at_cap else ""
+                )
+                tag = f" (HELD: {pos.qty:g} sh, {pos.unrealized_pl_pct:+.1f}%{cap_note})"
             elif any(s.kind is SignalKind.DISCOVERY for s in b.signals):
                 tag = " (NEW — surfaced by scanner)"
             else:

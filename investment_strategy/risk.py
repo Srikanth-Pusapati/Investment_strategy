@@ -109,6 +109,7 @@ class RiskManager:
         regime_multiplier: float = 1.0,
         max_held_corr: float | None = None, corr_symbol: str = "",
         cycle_budget_cap: float | None = None,
+        corr_data_missing: bool = False,
     ) -> RiskDecision:
         """`price` is the current market price for proposal.symbol. `volatility`
         is the symbol's annualized realized vol (fraction, e.g. 0.45) used for
@@ -126,7 +127,9 @@ class RiskManager:
         execution client / orchestrator. `cycle_budget_cap` is this proposal's
         fair share of the cycle's deployable cash when several buys compete in
         one cycle (None = no share cap), so the first buy can't starve the rest
-        to "Budget $0.00"."""
+        to "Budget $0.00". `corr_data_missing` is True when we HOLD satellites
+        but couldn't compute correlations against them (data outage) — a blind
+        guard sizes down instead of failing open."""
         if proposal.action is Action.HOLD:
             return self._reject(proposal, "HOLD — no action.")
         if proposal.action is Action.SELL:
@@ -134,7 +137,7 @@ class RiskManager:
         return self._evaluate_buy(
             proposal, account, price, volatility, pending_buy_notional,
             days_to_earnings, sector, sector_exposure_usd, regime_multiplier,
-            max_held_corr, corr_symbol, cycle_budget_cap,
+            max_held_corr, corr_symbol, cycle_budget_cap, corr_data_missing,
         )
 
     # -- survival-first sizing: vol-targeted, fractional-Kelly -------------- #
@@ -202,6 +205,7 @@ class RiskManager:
         regime_multiplier: float = 1.0,
         max_held_corr: float | None = None, corr_symbol: str = "",
         cycle_budget_cap: float | None = None,
+        corr_data_missing: bool = False,
     ) -> RiskDecision:
         halted, why = self.trading_halted(account)
         if halted:
@@ -245,6 +249,39 @@ class RiskManager:
                     f"waits {self.limits.reentry_cooldown_hours:g}h (churn guard).",
                 )
 
+        # Daily concentration brake, count leg (2026-07-06: 10 LLY buys in one
+        # session). Hard cap on submitted buy orders per symbol per ET trading
+        # day; the dollar leg lives below once equity is known. Inert at 0.
+        if self.limits.max_daily_buys_per_symbol > 0:
+            n_today = self.state.daily_symbol_buys(proposal.symbol)
+            if n_today >= self.limits.max_daily_buys_per_symbol:
+                return self._reject(
+                    proposal,
+                    f"Already bought {proposal.symbol} {n_today}x today (daily cap "
+                    f"{self.limits.max_daily_buys_per_symbol}/symbol) — no more "
+                    "buys today (concentration guard).",
+                )
+
+        # Top-up evidence gate: an ADD to a held name must show conviction above
+        # the prior entry's by topup_min_conviction_delta. Re-proposing the same
+        # number every cycle is a reflex ("adding to a winner"), not new
+        # evidence. Fails open on a missing prior; inert at 0.
+        if (
+            self.limits.topup_min_conviction_delta > 0
+            and account.position_for(proposal.symbol) is not None
+        ):
+            prev = self.state.last_buy_conviction(proposal.symbol)
+            if prev is not None and (
+                proposal.conviction < prev + self.limits.topup_min_conviction_delta
+            ):
+                return self._reject(
+                    proposal,
+                    f"Top-up conviction {proposal.conviction:.2f} shows no new "
+                    f"edge over prior entry {prev:.2f} (needs "
+                    f"+{self.limits.topup_min_conviction_delta:g}) — 'adding to "
+                    "a winner' is not a signal.",
+                )
+
         # Earnings-blackout guard: refuse NEW buys within N days of a scheduled
         # report. Gap risk through the print dwarfs the stop, so a tight stop gives
         # false comfort. Fail OPEN — only block on a date we actually have.
@@ -263,6 +300,27 @@ class RiskManager:
         equity = account.equity
         if equity <= 0:
             return self._reject(proposal, "Non-positive equity.")
+
+        # Daily concentration brake, dollar leg: cap the $ deployed into ONE
+        # symbol per ET trading day. Headroom under the min order is a REJECT,
+        # not a resize — resizing-to-headroom is exactly the dust-grinding the
+        # 2026-07-06 log showed ($2-$8 orders against a full cap). Inert at 0.
+        day_room: float | None = None
+        if self.limits.max_daily_symbol_deploy_pct > 0:
+            day_cap = equity * (self.limits.max_daily_symbol_deploy_pct / 100.0)
+            spent = self.state.daily_symbol_spend(proposal.symbol)
+            day_room = day_cap - spent
+            min_order = max(
+                self.limits.min_order_usd,
+                equity * (self.limits.min_order_pct / 100.0),
+            )
+            if day_room <= min_order:
+                return self._reject(
+                    proposal,
+                    f"${spent:,.0f} already deployed into {proposal.symbol} today "
+                    f"vs ${day_cap:,.0f} daily ceiling (headroom ${max(0.0, day_room):,.0f} "
+                    "< min order) — buys resume next trading day (concentration guard).",
+                )
 
         if price <= 0:
             return self._reject(proposal, "No current price available.")
@@ -327,19 +385,31 @@ class RiskManager:
             )
         target_notional = min(target_notional, room)
 
+        # 2e) Daily per-symbol ceiling clamp (dollar leg computed above — the
+        #     exhausted case already rejected; here we just cap the remainder).
+        if day_room is not None:
+            target_notional = min(target_notional, day_room)
+
         # 2b) Sector concentration cap — keep the discovery scanner from quietly
         #     stacking several correlated names (e.g. all big-tech) into one bet.
         #     sector_exposure_usd is the $ already held in this name's sector.
-        if sector and self.limits.max_sector_exposure_pct > 0:
-            max_sector_val = equity * (self.limits.max_sector_exposure_pct / 100.0)
-            sector_room = max_sector_val - max(0.0, sector_exposure_usd)
-            if sector_room <= 0:
-                return self._reject(
-                    proposal,
-                    f"At/over {self.limits.max_sector_exposure_pct:.0f}% sector cap "
-                    f"for '{sector}' (held ${sector_exposure_usd:,.0f}).",
-                )
-            target_notional = min(target_notional, sector_room)
+        #     Fail-closed on missing sector data: size down by missing_data_mult
+        #     instead of silently skipping the guard (the sector cap is blind, so
+        #     "blinder = smaller" is the safe posture).
+        if self.limits.max_sector_exposure_pct > 0:
+            _mdm = max(0.0, min(1.0, self.limits.missing_data_mult))
+            if sector:
+                max_sector_val = equity * (self.limits.max_sector_exposure_pct / 100.0)
+                sector_room = max_sector_val - max(0.0, sector_exposure_usd)
+                if sector_room <= 0:
+                    return self._reject(
+                        proposal,
+                        f"At/over {self.limits.max_sector_exposure_pct:.0f}% sector cap "
+                        f"for '{sector}' (held ${sector_exposure_usd:,.0f}).",
+                    )
+                target_notional = min(target_notional, sector_room)
+            else:
+                target_notional *= _mdm
 
         # 2b-ii) Pairwise-correlation guard (R.2) — the sector cap's finer-
         #     grained sibling. A NEW name whose daily returns track an already-
@@ -349,17 +419,18 @@ class RiskManager:
         #     (core ETF excluded — satellites are MEANT to correlate with the
         #     index core); None (no data / nothing held) fails open. Adding to
         #     the SAME symbol is exempt upstream (a top-up isn't a new bet).
-        if (
-            self.limits.max_pairwise_corr > 0
-            and max_held_corr is not None
-            and max_held_corr >= self.limits.max_pairwise_corr
-        ):
-            return self._reject(
-                proposal,
-                f"Return correlation {max_held_corr:.2f} with held "
-                f"{corr_symbol or 'position'} >= {self.limits.max_pairwise_corr:.2f} "
-                "cap — effectively the same bet; diversify instead.",
-            )
+        #     Fail-closed on missing data when we DO hold satellites: size down.
+        if self.limits.max_pairwise_corr > 0:
+            if max_held_corr is not None and max_held_corr >= self.limits.max_pairwise_corr:
+                return self._reject(
+                    proposal,
+                    f"Return correlation {max_held_corr:.2f} with held "
+                    f"{corr_symbol or 'position'} >= {self.limits.max_pairwise_corr:.2f} "
+                    "cap — effectively the same bet; diversify instead.",
+                )
+            if corr_data_missing:
+                _mdm = max(0.0, min(1.0, self.limits.missing_data_mult))
+                target_notional *= _mdm
 
         # 2c) No-leverage gross cap — never let TOTAL deployed exceed this % of
         #     equity. On a margin account (Alpaca offers ~2x buying power) this is

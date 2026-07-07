@@ -146,6 +146,31 @@ class RiskLimits:
     # than this many hours ago (trail/stop/take/time/decision). Instant re-buys
     # pay the spread twice and usually chase the same falling knife. 0 = off.
     reentry_cooldown_hours: float = 24.0
+    # --- daily concentration brake (2026-07-06: LLY took ~81% of the day's buy
+    # dollars across 10 orders; the guards above space the orders but nothing
+    # capped the DAY). All three are hard, deterministic, and per ET trading
+    # day; accumulators persist in PortfolioState so a restart can't refresh
+    # the budget mid-session. ---
+    # Max % of equity deployed into ONE symbol per trading day. Conviction can
+    # still build a position — over days, not hours. 0 = off.
+    max_daily_symbol_deploy_pct: float = 0.0   # 0 = off; load_config enables 8.0
+    # Max submitted BUY orders per symbol per trading day. 0 = off.
+    max_daily_buys_per_symbol: int = 0          # 0 = off; load_config enables 3
+    # Max share of one CYCLE's deployable cash a single symbol may take when
+    # two or more distinct buys compete (the fair-share split can otherwise
+    # still hand one name nearly everything via conviction weighting). Single-
+    # buy cycles are uncapped — the daily ceiling above covers that grind.
+    # 100 = off.
+    max_cycle_symbol_share_pct: float = 100.0  # 100 = off; load_config enables 60.0
+    # Top-up evidence gate: an ADD to a held name must show conviction at least
+    # this much ABOVE the prior entry's — "adding to a winner" with the same
+    # number is a reflex, not a signal. Fails open on a missing prior. 0 = off.
+    topup_min_conviction_delta: float = 0.0    # 0 = off; load_config enables 0.05
+    # Fail-closed sizing when a concentration guard is BLIND: if sector or
+    # correlation data is missing for a new buy, multiply size by this instead
+    # of skipping the guard (multipliers stack — blinder = smaller). 1.0
+    # restores the old fail-open behavior.
+    missing_data_mult: float = 1.0
 
 
 @dataclass(frozen=True)
@@ -240,6 +265,11 @@ class Config:
     # switch file) until a human deletes the file to acknowledge.
     heartbeat_url: str = ""
     reconcile_halt_enabled: bool = True
+    # Nightly self post-mortem (B2): on the first market-closed decision tick
+    # after a day that has journal entries, feed the day's decisions to Claude
+    # and fold its one-line lessons back into the next day's decision prompt.
+    postmortem_enabled: bool = True
+    postmortem_max_lessons: int = 15
 
     @property
     def is_live(self) -> bool:
@@ -315,6 +345,8 @@ def load_config() -> Config:
         kill_switch_file=os.getenv("KILL_SWITCH_FILE", "state/KILL"),
         heartbeat_url=os.getenv("HEARTBEAT_URL", "").strip(),
         reconcile_halt_enabled=_flag("RECONCILE_HALT", "on"),
+        postmortem_enabled=_flag("POSTMORTEM_ENABLED", "on"),
+        postmortem_max_lessons=_i("POSTMORTEM_MAX_LESSONS", 15),
         state_file=os.getenv("STATE_FILE", "state/risk_state.json"),
         dashboard_file=os.getenv("DASHBOARD_FILE", "").strip(),
         risk=RiskLimits(
@@ -405,6 +437,12 @@ def load_config() -> Config:
             min_order_pct=_f("MIN_ORDER_PCT", 0.05),
             min_add_interval_hours=_f("MIN_ADD_INTERVAL_HOURS", 4.0),
             reentry_cooldown_hours=_f("REENTRY_COOLDOWN_HOURS", 24.0),
+            # Daily concentration brake (see the RiskLimits field notes).
+            max_daily_symbol_deploy_pct=_f("MAX_DAILY_SYMBOL_DEPLOY_PCT", 8.0),
+            max_daily_buys_per_symbol=_i("MAX_DAILY_BUYS_PER_SYMBOL", 3),
+            max_cycle_symbol_share_pct=_f("MAX_CYCLE_SYMBOL_SHARE_PCT", 60.0),
+            topup_min_conviction_delta=_f("TOPUP_MIN_CONVICTION_DELTA", 0.05),
+            missing_data_mult=_f("MISSING_DATA_MULT", 1.0),
         ),
         screener=ScreenerConfig(
             enabled=_flag("SCREENER_ENABLED", "on"),
