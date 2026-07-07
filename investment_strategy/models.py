@@ -10,7 +10,7 @@ from datetime import datetime, timezone
 from enum import Enum
 from typing import Any, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 
 def _now() -> datetime:
@@ -164,12 +164,21 @@ class RiskDecision(BaseModel):
 class Position(BaseModel):
     symbol: str
     qty: float
-    qty_available: float = 0.0  # shares not locked in open orders
+    # Shares NOT reserved by open orders (Alpaca's qty_available). Constructors
+    # that don't know it (backtest, tests) omit it -> assume all sellable, so
+    # exit paths never mistake an unknown for "everything is locked".
+    qty_available: float | None = None
     avg_entry_price: float
     current_price: float
     market_value: float
     unrealized_pl: float
     unrealized_pl_pct: float
+
+    @model_validator(mode="after")
+    def _default_qty_available(self):
+        if self.qty_available is None:
+            self.qty_available = self.qty
+        return self
 
 
 class AccountSnapshot(BaseModel):

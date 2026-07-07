@@ -24,13 +24,16 @@ from investment_strategy.state import PortfolioState
 
 
 class _FakeBroker:
-    def __init__(self, positions, market_close_fails=False):
+    def __init__(self, positions, market_close_fails=False, stuck_replaces=()):
         self._positions = positions
         self.market_close_fails = market_close_fails   # simulate closed/halted market
+        # (new_order_id, qty) pairs clear_orders_for_exit "replaces" per call
+        self.stuck_replaces = list(stuck_replaces)
         self.closed: list[str] = []
         self.canceled: list[str] = []
         self.reduced: list[tuple[str, float]] = []
         self.rested: list[tuple[str, float, float]] = []
+        self.unwedged: list[tuple[str, float]] = []
 
     def cancel_open_orders_for(self, symbol):
         self.canceled.append(symbol)
@@ -51,6 +54,10 @@ class _FakeBroker:
     def close_position_marketable_limit(self, symbol, qty, ref_price):
         self.rested.append((symbol, qty, ref_price))
         return f"rest-{symbol}"
+
+    def clear_orders_for_exit(self, symbol, ref_price):
+        self.unwedged.append((symbol, ref_price))
+        return self.stuck_replaces
 
 
 def _cfg(pct, max_hold_days=0.0, time_stop_min_gain_pct=2.0,
@@ -152,6 +159,83 @@ def test_flatten_prefers_plain_market_close_when_open():
     wd._equity_floor_breached(_acct(equity=500.0))
     assert sorted(broker.closed) == ["AAPL", "MSFT"]   # market close used
     assert broker.rested == []                         # fallback not needed
+
+
+# -- shares locked by stuck pending-cancel orders (the FRHC wedge) ----------- #
+def _pos_locked(symbol="FRHC", qty=110.000186, avail=1.000186, pl_pct=-12.0):
+    """A position whose shares are (partly) reserved by open orders the broker
+    won't release — a full close is rejected with 40310000."""
+    price = 100.0 * (1 + pl_pct / 100.0)
+    return Position(symbol=symbol, qty=qty, qty_available=avail,
+                    avg_entry_price=100.0, current_price=price,
+                    market_value=qty * price, unrealized_pl=qty * pl_pct,
+                    unrealized_pl_pct=pl_pct)
+
+
+def test_qty_available_defaults_to_full_qty():
+    # Constructors that don't know qty_available (backtest, older call sites)
+    # must NOT look "fully locked" (that would reroute every failed close).
+    p = _pos("AAPL")
+    assert p.qty_available == p.qty
+
+
+def test_hard_stop_partial_close_when_shares_held_by_stuck_orders():
+    state = _state()
+    state.register_exits("FRHC", stop_pct=10.0, take_pct=25.0)
+    broker = _FakeBroker([], market_close_fails=True)   # full close rejected
+    wd = Watchdog(_cfg(0.0), broker, state=state)
+    assert wd._enforce_hard_exits(_pos_locked()) is True
+    assert broker.reduced == [("FRHC", 1.000186)]   # available slice sold NOW
+    assert broker.unwedged == [("FRHC", 50.0)]      # resting sells -> exit
+    assert broker.rested == []                      # NOT the market-closed path
+    assert state.get_exits("FRHC")                  # still tracked -> retries
+
+
+def test_hard_stop_zero_available_exits_via_replaced_legs():
+    state = _state()
+    state.register_exits("FRHC", stop_pct=10.0, take_pct=25.0)
+    broker = _FakeBroker([], market_close_fails=True,
+                         stuck_replaces=[("new-1", 48.0), ("new-2", 61.0)])
+    wd = Watchdog(_cfg(0.0), broker, state=state)
+    assert wd._enforce_hard_exits(_pos_locked(avail=0.0)) is True
+    assert broker.reduced == []                     # nothing sellable directly
+    assert broker.unwedged == [("FRHC", 50.0)]      # legs made marketable
+    assert state.get_exits("FRHC")                  # still tracked -> retries
+
+
+def test_hard_stop_locked_and_unwedge_rejected_keeps_retrying():
+    state = _state()
+    state.register_exits("FRHC", stop_pct=10.0, take_pct=25.0)
+    broker = _FakeBroker([], market_close_fails=True)   # replaces rejected: ()
+    wd = Watchdog(_cfg(0.0), broker, state=state)
+    assert wd._enforce_hard_exits(_pos_locked(avail=0.0)) is True  # CRITICAL path
+    assert broker.reduced == [] and broker.rested == []
+    assert state.get_exits("FRHC")                  # never dropped while open
+
+
+def test_flatten_partial_when_shares_locked():
+    state = _state()
+    state.peak_equity = 1_000.0                     # floor 60% -> $600
+    broker = _FakeBroker([], market_close_fails=True)
+    wd = Watchdog(_cfg(60.0), broker, state=state)
+    acct = AccountSnapshot(equity=500.0, last_equity=500.0, cash=0.0,
+                           buying_power=0.0, positions=[_pos_locked()])
+    assert wd._equity_floor_breached(acct) is True
+    assert broker.reduced == [("FRHC", 1.000186)]
+    assert broker.unwedged == [("FRHC", 50.0)]
+    assert broker.rested == []                      # locked path, not market-closed
+
+
+def test_close_hard_tries_plain_close_before_touching_orders():
+    # Cancel-then-close is what manufactures pending-cancel wedges: the close
+    # must be attempted FIRST, and no cancel sweep may run when it succeeds.
+    state = _state()
+    state.register_exits("AAPL", stop_pct=10.0, take_pct=25.0)
+    wd = Watchdog(_cfg(0.0), _FakeBroker([]), state=state)
+    assert wd._enforce_hard_exits(_pos_locked("AAPL")) is True
+    assert wd.broker.closed == ["AAPL"]
+    assert wd.broker.canceled == []                 # nothing was in the way
+    assert wd.broker.unwedged == []
 
 
 # -- scale-out at the take-profit target (1B.8) ------------------------------ #
