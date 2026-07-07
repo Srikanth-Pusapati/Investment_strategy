@@ -164,6 +164,7 @@ class RiskDecision(BaseModel):
 class Position(BaseModel):
     symbol: str
     qty: float
+    qty_available: float = 0.0  # shares not locked in open orders
     avg_entry_price: float
     current_price: float
     market_value: float

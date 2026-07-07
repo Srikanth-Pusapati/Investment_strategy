@@ -643,9 +643,13 @@ class AlpacaClient:
 
     @staticmethod
     def _to_position(p) -> Position:
+        qty = float(p.qty)
+        avail_raw = getattr(p, "qty_available_for_trading", None)
+        qty_available = float(avail_raw) if avail_raw is not None else qty
         return Position(
             symbol=p.symbol,
-            qty=float(p.qty),
+            qty=qty,
+            qty_available=qty_available,
             avg_entry_price=float(p.avg_entry_price),
             current_price=float(p.current_price or 0),
             market_value=float(p.market_value or 0),

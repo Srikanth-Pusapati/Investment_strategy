@@ -205,6 +205,20 @@ class Watchdog:
             self.state.forget_symbol(pos.symbol)
             self._record_exit(pos, oid, "stop" if hit.startswith("stop") else "take")
         else:
+            # Full close failed — often because open orders are in "pending cancel"
+            # state and still holding shares. Sell whatever is immediately available
+            # to reduce exposure now; keep exits registered so the full close retries
+            # next cycle once the pending cancels settle.
+            avail = pos.qty_available
+            if avail > 0 and avail < pos.qty:
+                partial_oid = self.broker.reduce_position(pos.symbol, avail)
+                if partial_oid:
+                    log.warning(
+                        "Partial close %s: sold %.6g available shares; "
+                        "%.6g held for pending-cancel orders — will retry full close.",
+                        pos.symbol, avail, pos.qty - avail,
+                    )
+                    return True  # exits stay registered; retry full close next cycle
             log.critical(
                 "Hard-exit close FAILED for %s — fractional position unprotected. "
                 "Will retry.", pos.symbol,
