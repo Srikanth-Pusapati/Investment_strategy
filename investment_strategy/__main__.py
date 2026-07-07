@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import logging
 import os
+import subprocess
 import sys
 from datetime import datetime
 from logging.handlers import TimedRotatingFileHandler
@@ -64,7 +65,24 @@ def _setup_logging() -> None:
     )
 
 
+def _prevent_sleep() -> None:
+    """Assert a macOS 'prevent system sleep' power assertion for this process.
+
+    Spawns `caffeinate -dims -w <PID>` which holds the assertion until our
+    process exits — no manual cleanup needed. Silent no-op on non-macOS."""
+    if sys.platform != "darwin":
+        return
+    try:
+        subprocess.Popen(
+            ["caffeinate", "-dims", "-w", str(os.getpid())],
+            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+        )
+    except FileNotFoundError:
+        pass  # caffeinate not available (shouldn't happen on macOS)
+
+
 def main() -> int:
+    _prevent_sleep()
     _setup_logging()
     try:
         cfg = load_config()
