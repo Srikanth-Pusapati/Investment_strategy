@@ -20,6 +20,7 @@ import logging
 import threading
 from datetime import datetime, timezone
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 log = logging.getLogger("state")
 
@@ -53,6 +54,20 @@ class PortfolioState:
         # can't grow unbounded.
         self.last_buy_times: dict[str, str] = {}
         self.exit_times: dict[str, str] = {}
+        # Conviction of the LAST buy per symbol — the top-up evidence gate
+        # rejects an add whose conviction shows no new edge over the prior entry
+        # ("adding to a winner" is not a signal).
+        self.last_buy_convictions: dict[str, float] = {}
+        # Daily concentration accumulators (the all-LLY guard): $ submitted and
+        # buy count per symbol for ONE ET trading day. Keyed to the exchange's
+        # calendar (not UTC) so an evening restart doesn't hand back a fresh
+        # budget mid-session; rolled lazily on access so no scheduler is needed.
+        self.daily_deploy_day: str = ""
+        self.daily_deploy_usd: dict[str, float] = {}
+        self.daily_buy_counts: dict[str, int] = {}
+        # Last trading day the nightly post-mortem ran, so the market-closed
+        # tick fires it exactly once per day.
+        self.postmortem_done_day: str = ""
         # Order ids submitted but not yet reconciled against their fills, as
         # [order_id, symbol] pairs. Persisted so a restart between cycles still
         # reconciles a reject/partial fill instead of leaving a phantom ledger
@@ -92,6 +107,17 @@ class PortfolioState:
             self.exit_times = {
                 k: str(v) for k, v in d.get("exit_times", {}).items()
             }
+            self.last_buy_convictions = {
+                k: float(v) for k, v in d.get("last_buy_convictions", {}).items()
+            }
+            self.daily_deploy_day = str(d.get("daily_deploy_day", ""))
+            self.daily_deploy_usd = {
+                k: float(v) for k, v in d.get("daily_deploy_usd", {}).items()
+            }
+            self.daily_buy_counts = {
+                k: int(v) for k, v in d.get("daily_buy_counts", {}).items()
+            }
+            self.postmortem_done_day = str(d.get("postmortem_done_day", ""))
             self.pending_orders = [
                 [str(oid), str(sym)] for oid, sym in d.get("pending_orders", [])
             ]
@@ -117,6 +143,11 @@ class PortfolioState:
                         "entry_times": self.entry_times,
                         "last_buy_times": self.last_buy_times,
                         "exit_times": self.exit_times,
+                        "last_buy_convictions": self.last_buy_convictions,
+                        "daily_deploy_day": self.daily_deploy_day,
+                        "daily_deploy_usd": self.daily_deploy_usd,
+                        "daily_buy_counts": self.daily_buy_counts,
+                        "postmortem_done_day": self.postmortem_done_day,
                         "pending_orders": self.pending_orders,
                         "regime_label": self.regime_label,
                     },
@@ -229,16 +260,30 @@ class PortfolioState:
     # -- churn-guard clocks (top-up spacing + re-entry cooldown) ------------- #
     _CLOCK_RETENTION_DAYS = 7.0  # cooldowns are hours-scale; week-old stamps are noise
 
-    def register_buy(self, symbol: str, when: datetime | None = None) -> None:
+    def register_buy(
+        self, symbol: str, when: datetime | None = None,
+        conviction: float | None = None,
+    ) -> None:
         """Stamp the LAST buy-submit time for `symbol` (every buy, unlike
         register_entry which only stamps the first). Drives the same-symbol
-        top-up spacing guard."""
+        top-up spacing guard. Also records the buy's conviction when given —
+        the top-up evidence gate compares the next add against it."""
         with self._lock:
             self.last_buy_times[symbol] = (
                 when or datetime.now(timezone.utc)
             ).isoformat()
+            if conviction is not None:
+                self.last_buy_convictions[symbol] = float(conviction)
             self._prune_clock(self.last_buy_times)
+            # Convictions ride the same retention as the buy clock: no stamp,
+            # no comparison (the gate fails open on a missing prior).
+            for sym in list(self.last_buy_convictions):
+                if sym not in self.last_buy_times:
+                    del self.last_buy_convictions[sym]
             self._save()
+
+    def last_buy_conviction(self, symbol: str) -> float | None:
+        return self.last_buy_convictions.get(symbol)
 
     def register_exit(self, symbol: str, when: datetime | None = None) -> None:
         """Stamp the time `symbol` was exited (any reason: decision sell, trail,
@@ -279,6 +324,61 @@ class PortfolioState:
         ]
         for sym in stale:
             del clock[sym]
+
+    # -- daily per-symbol concentration accumulators (the all-LLY guard) ----- #
+    @staticmethod
+    def _trading_day(when: datetime | None = None) -> str:
+        """The ET calendar date, e.g. '2026-07-06' — the exchange's day, so a
+        late-evening restart doesn't hand back a fresh daily budget while the
+        session that spent it is still the same trading day."""
+        when = when or datetime.now(timezone.utc)
+        if when.tzinfo is None:
+            when = when.replace(tzinfo=timezone.utc)
+        return when.astimezone(ZoneInfo("America/New_York")).date().isoformat()
+
+    def _roll_daily(self, when: datetime | None = None) -> None:
+        """Reset the accumulators when the ET trading day changes (call under
+        the lock). Lazy: every accessor rolls first, so there's no scheduler to
+        miss and a restart lands on the right day automatically."""
+        day = self._trading_day(when)
+        if self.daily_deploy_day != day:
+            self.daily_deploy_day = day
+            self.daily_deploy_usd = {}
+            self.daily_buy_counts = {}
+            self._save()
+
+    def register_daily_deploy(
+        self, symbol: str, notional: float, when: datetime | None = None,
+    ) -> None:
+        """Count a submitted buy against the symbol's daily budget. Stamped at
+        SUBMIT, not fill — a later reject leaves the budget spent (fail-closed)."""
+        with self._lock:
+            self._roll_daily(when)
+            self.daily_deploy_usd[symbol] = (
+                self.daily_deploy_usd.get(symbol, 0.0) + max(0.0, float(notional))
+            )
+            self.daily_buy_counts[symbol] = self.daily_buy_counts.get(symbol, 0) + 1
+            self._save()
+
+    def daily_symbol_spend(self, symbol: str, when: datetime | None = None) -> float:
+        with self._lock:
+            self._roll_daily(when)
+            return self.daily_deploy_usd.get(symbol, 0.0)
+
+    def daily_symbol_buys(self, symbol: str, when: datetime | None = None) -> int:
+        with self._lock:
+            self._roll_daily(when)
+            return self.daily_buy_counts.get(symbol, 0)
+
+    # -- nightly post-mortem once-per-day marker ----------------------------- #
+    def get_postmortem_done_day(self) -> str:
+        return self.postmortem_done_day
+
+    def set_postmortem_done(self, day: str) -> None:
+        with self._lock:
+            if day != self.postmortem_done_day:
+                self.postmortem_done_day = day
+                self._save()
 
     # -- pending-order reconciliation list (survives a restart) ------------- #
     def set_pending_orders(self, pairs: list[tuple[str, str]]) -> None:

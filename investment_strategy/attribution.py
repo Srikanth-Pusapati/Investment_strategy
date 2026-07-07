@@ -38,6 +38,8 @@ class RoundTrip:
     pl_pct: float
     signals: list[str]            # entry SignalKind values this outcome is attributed to
     exit_reason: str = ""
+    n_lots: int = 1               # how many open lots contributed (proxy for top-up depth)
+    same_day_repeat: bool = False  # True when ≥2 lots opened on the same calendar date
 
 
 @dataclass
@@ -65,21 +67,25 @@ def round_trips(records: list[TradeRecord]) -> list[RoundTrip]:
     remainder open, so it reduces the open lots FIFO rather than flattening them.
     """
     ordered = sorted(records, key=lambda r: r.ts)
-    # Per symbol, a list of open lots as [remaining_qty, entry_signals].
+    # Per symbol, a list of open lots as [remaining_qty, entry_signals, ts_date].
     open_by_symbol: dict[str, list[list]] = {}
     trips: list[RoundTrip] = []
     for r in ordered:
         if r.action == "buy":
+            ts_date = str(r.ts)[:10] if r.ts else ""
             open_by_symbol.setdefault(r.symbol, []).append(
-                [float(r.qty or 0.0), list(r.entry_signals)]
+                [float(r.qty or 0.0), list(r.entry_signals), ts_date]
             )
         elif r.action == "sell":
             lots = open_by_symbol.get(r.symbol, [])
             if r.realized_pl_pct is not None:
-                signals = sorted({k for _, sigs in lots for k in sigs})
+                signals = sorted({k for _, sigs, _d in lots for k in sigs})
+                dates = [d for _, _, d in lots if d]
+                same_day = len(dates) >= 2 and len(set(dates)) == 1
                 trips.append(RoundTrip(
                     symbol=r.symbol, pl_pct=r.realized_pl_pct,
                     signals=signals, exit_reason=r.exit_reason,
+                    n_lots=len(lots), same_day_repeat=same_day,
                 ))
             # A partial exit (with a known qty) trims the open lots and keeps the
             # remainder; anything else — or an unknown qty — fully closes.
@@ -92,8 +98,37 @@ def round_trips(records: list[TradeRecord]) -> list[RoundTrip]:
     return trips
 
 
+def concentration_lessons(trips: list[RoundTrip], min_trips: int = 3) -> list[str]:
+    """Compare single-entry vs multi-lot outcomes and same-day-repeat outcomes.
+    Only emits a lesson when BOTH cohorts have enough data to be meaningful."""
+    lines = []
+
+    single = [t.pl_pct for t in trips if t.n_lots == 1]
+    multi = [t.pl_pct for t in trips if t.n_lots >= 2]
+    if len(single) >= min_trips and len(multi) >= min_trips:
+        single_avg = sum(single) / len(single)
+        multi_avg = sum(multi) / len(multi)
+        direction = "underperform" if multi_avg < single_avg else "outperform"
+        lines.append(
+            f"Same-symbol multi-lot entries: {len(multi)} trips, {multi_avg:+.1f}% avg "
+            f"vs {single_avg:+.1f}% single-entry — repeats {direction}."
+        )
+
+    repeat = [t.pl_pct for t in trips if t.same_day_repeat]
+    non_repeat = [t.pl_pct for t in trips if not t.same_day_repeat]
+    if len(repeat) >= min_trips and len(non_repeat) >= min_trips:
+        repeat_avg = sum(repeat) / len(repeat)
+        nr_avg = sum(non_repeat) / len(non_repeat)
+        direction = "underperform" if repeat_avg < nr_avg else "outperform"
+        lines.append(
+            f"Same-day repeat buys of one symbol: {len(repeat)} trips, "
+            f"{repeat_avg:+.1f}% avg vs {nr_avg:+.1f}% non-repeat — {direction}."
+        )
+    return lines
+
+
 def _reduce_fifo(lots: list[list], qty: float) -> None:
-    """Consume `qty` shares from the front of `lots` (each [remaining_qty, signals]),
+    """Consume `qty` shares from the front of `lots` (each [remaining_qty, signals, date]),
     dropping fully-consumed lots. Mutates `lots` in place."""
     remaining = qty
     while remaining > 1e-9 and lots:
@@ -159,4 +194,7 @@ def render_lessons(
         "from those that haven't — but samples are small and noisy, so treat this "
         "as a prior, never a hard rule, and never act on it against the thesis."
     )
+    conc = concentration_lessons(recent)
+    if conc:
+        lines.extend(conc)
     return "\n".join(lines)

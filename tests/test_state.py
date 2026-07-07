@@ -162,6 +162,78 @@ def test_old_clock_stamps_are_pruned():
     assert s.hours_since_exit("NEW") is not None
 
 
+def test_daily_accumulator_persists_across_restart():
+    from datetime import datetime, timezone
+
+    path = _tmp()
+    when = datetime(2026, 7, 6, 16, 0, 0, tzinfo=timezone.utc)  # Mon 12pm ET
+    s1 = PortfolioState(path=path)
+    s1.register_daily_deploy("LLY", 1000.0, when=when)
+    s1.register_daily_deploy("LLY", 500.0, when=when)
+    s2 = PortfolioState(path=path)  # restart
+    assert abs(s2.daily_symbol_spend("LLY", when=when) - 1500.0) < 0.01
+    assert s2.daily_symbol_buys("LLY", when=when) == 2
+
+
+def test_daily_accumulator_rolls_at_et_midnight():
+    from datetime import datetime, timezone
+
+    path = _tmp()
+    # Jul 6 ET: 14:00 UTC = 10:00 ET
+    day1 = datetime(2026, 7, 6, 14, 0, 0, tzinfo=timezone.utc)
+    # Jul 7 ET: 04:00 UTC = 00:00 ET (next day for exchange)
+    day2 = datetime(2026, 7, 7, 4, 0, 1, tzinfo=timezone.utc)
+    s = PortfolioState(path=path)
+    s.register_daily_deploy("LLY", 2000.0, when=day1)
+    # After ET midnight: fresh day
+    assert s.daily_symbol_spend("LLY", when=day2) == 0.0
+    assert s.daily_symbol_buys("LLY", when=day2) == 0
+
+
+def test_daily_accumulator_utc_vs_et_date():
+    """UTC midnight ≠ ET midnight: accumulators must use ET so an evening restart
+    (e.g. 23:00 ET, 03:00 UTC next day) doesn't hand back a fresh budget."""
+    from datetime import datetime, timezone
+
+    path = _tmp()
+    # 2026-07-06 23:30 ET = 2026-07-07 03:30 UTC
+    evening_et = datetime(2026, 7, 7, 3, 30, 0, tzinfo=timezone.utc)
+    s = PortfolioState(path=path)
+    s.register_daily_deploy("LLY", 3000.0, when=evening_et)
+    # Still the same ET day (Jul 6 23:30 ET), so spend stays at $3k
+    assert abs(s.daily_symbol_spend("LLY", when=evening_et) - 3000.0) < 0.01
+
+
+def test_conviction_clock_round_trip():
+    from datetime import datetime, timezone
+
+    path = _tmp()
+    s1 = PortfolioState(path=path)
+    s1.register_buy("LLY", conviction=0.82)
+    s2 = PortfolioState(path=path)  # restart
+    assert abs(s2.last_buy_conviction("LLY") - 0.82) < 0.001
+
+
+def test_conviction_none_when_not_set():
+    s = PortfolioState(path=_tmp())
+    assert s.last_buy_conviction("UNKNOWN") is None
+
+
+def test_conviction_updates_on_subsequent_buy():
+    s = PortfolioState(path=_tmp())
+    s.register_buy("LLY", conviction=0.70)
+    s.register_buy("LLY", conviction=0.85)
+    assert abs(s.last_buy_conviction("LLY") - 0.85) < 0.001
+
+
+def test_postmortem_done_day_round_trip():
+    path = _tmp()
+    s1 = PortfolioState(path=path)
+    s1.set_postmortem_done("2026-07-06")
+    s2 = PortfolioState(path=path)
+    assert s2.get_postmortem_done_day() == "2026-07-06"
+
+
 def _run_all():
     fns = [v for k, v in sorted(globals().items()) if k.startswith("test_") and callable(v)]
     failed = 0

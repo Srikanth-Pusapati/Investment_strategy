@@ -790,6 +790,149 @@ def test_dust_guard_keeps_small_floats_tradable():
     assert d.verdict in (RiskVerdict.APPROVED, RiskVerdict.RESIZED), d.reason
 
 
+# --------------------------------------------------------------------------- #
+# Daily concentration brake (A1)
+# --------------------------------------------------------------------------- #
+def test_daily_buy_count_cap_rejects_nth_buy():
+    state = _fresh_state()
+    state.register_daily_deploy("LLY", 1000.0)
+    state.register_daily_deploy("LLY", 1000.0)
+    state.register_daily_deploy("LLY", 1000.0)
+    rm = _rm(_limits(max_daily_buys_per_symbol=3, max_daily_symbol_deploy_pct=0), state=state)
+    d = rm.evaluate(_buy("LLY"), _account(), price=100.0, volatility=0.3)
+    assert d.verdict is RiskVerdict.REJECTED
+    assert "concentration guard" in d.reason
+
+
+def test_daily_buy_count_cap_allows_before_limit():
+    state = _fresh_state()
+    state.register_daily_deploy("LLY", 1000.0)
+    rm = _rm(_limits(max_daily_buys_per_symbol=3, max_daily_symbol_deploy_pct=0), state=state)
+    d = rm.evaluate(_buy("LLY"), _account(), price=100.0, volatility=0.3)
+    assert d.verdict is not RiskVerdict.REJECTED, d.reason
+
+
+def test_daily_symbol_ceiling_rejects_when_exhausted():
+    state = _fresh_state()
+    state.register_daily_deploy("LLY", 8000.0)  # 8% of 100k = ceiling
+    rm = _rm(_limits(max_daily_symbol_deploy_pct=8.0, max_daily_buys_per_symbol=0,
+                     min_order_pct=0.05), state=state)
+    d = rm.evaluate(_buy("LLY"), _account(), price=100.0, volatility=0.3)
+    assert d.verdict is RiskVerdict.REJECTED
+    assert "daily ceiling" in d.reason.lower() or "concentration guard" in d.reason
+
+
+def test_daily_symbol_ceiling_clamps_to_remaining_room():
+    state = _fresh_state()
+    state.register_daily_deploy("LLY", 5000.0)  # 5k of 8k used; 3k room
+    rm = _rm(_limits(max_daily_symbol_deploy_pct=8.0, max_daily_buys_per_symbol=0,
+                     min_order_usd=1.0, min_order_pct=0.0,
+                     kelly_fraction=0.0, max_position_pct=100.0,
+                     max_symbol_exposure_pct=100.0, max_gross_exposure_pct=100.0,
+                     max_trade_risk_pct=0.0), state=state)
+    d = rm.evaluate(_buy("LLY", weight=100.0), _account(), price=10.0, volatility=0.3)
+    assert d.verdict in (RiskVerdict.APPROVED, RiskVerdict.RESIZED), d.reason
+    assert d.approved_notional <= 3000.0 + 1.0  # within remaining room (+$1 fp tolerance)
+
+
+def test_daily_gates_off_at_zero():
+    state = _fresh_state()
+    for _ in range(10):
+        state.register_daily_deploy("LLY", 1000.0)
+    rm = _rm(_limits(max_daily_buys_per_symbol=0, max_daily_symbol_deploy_pct=0), state=state)
+    d = rm.evaluate(_buy("LLY"), _account(), price=100.0, volatility=0.3)
+    assert d.verdict is not RiskVerdict.REJECTED, d.reason
+
+
+# --------------------------------------------------------------------------- #
+# Top-up evidence gate (B4)
+# --------------------------------------------------------------------------- #
+def test_topup_evidence_rejects_flat_conviction():
+    state = _fresh_state()
+    state.register_buy("LLY", conviction=0.78)
+    rm = _rm(_limits(topup_min_conviction_delta=0.05, min_add_interval_hours=0), state=state)
+    acct = _account(positions=[_pos("LLY", qty=1.0, price=100.0)])
+    d = rm.evaluate(_buy("LLY", conviction=0.78), acct, price=100.0, volatility=0.3)
+    assert d.verdict is RiskVerdict.REJECTED
+    assert "top-up conviction" in d.reason.lower()
+
+
+def test_topup_evidence_allows_higher_conviction():
+    state = _fresh_state()
+    state.register_buy("LLY", conviction=0.78)
+    rm = _rm(_limits(topup_min_conviction_delta=0.05, min_add_interval_hours=0), state=state)
+    acct = _account(positions=[_pos("LLY", qty=1.0, price=100.0)])
+    d = rm.evaluate(_buy("LLY", conviction=0.85), acct, price=100.0, volatility=0.3)
+    assert d.verdict is not RiskVerdict.REJECTED, d.reason
+
+
+def test_topup_evidence_fails_open_no_prior():
+    state = _fresh_state()  # no prior conviction recorded
+    rm = _rm(_limits(topup_min_conviction_delta=0.05, min_add_interval_hours=0), state=state)
+    acct = _account(positions=[_pos("LLY", qty=1.0, price=100.0)])
+    d = rm.evaluate(_buy("LLY", conviction=0.5), acct, price=100.0, volatility=0.3)
+    assert d.verdict is not RiskVerdict.REJECTED, d.reason
+
+
+def test_topup_evidence_ignores_fresh_entries():
+    # Gate should not fire on a first entry (no position held)
+    state = _fresh_state()
+    state.register_buy("LLY", conviction=0.90)  # prior recorded but no position
+    rm = _rm(_limits(topup_min_conviction_delta=0.05, min_add_interval_hours=0), state=state)
+    d = rm.evaluate(_buy("LLY", conviction=0.50), _account(), price=100.0, volatility=0.3)
+    # No position -> not a top-up -> gate doesn't apply
+    assert d.verdict is not RiskVerdict.REJECTED, d.reason
+
+
+def test_topup_evidence_off_at_zero():
+    state = _fresh_state()
+    state.register_buy("LLY", conviction=0.90)
+    rm = _rm(_limits(topup_min_conviction_delta=0.0, min_add_interval_hours=0), state=state)
+    acct = _account(positions=[_pos("LLY", qty=1.0, price=100.0)])
+    d = rm.evaluate(_buy("LLY", conviction=0.50), acct, price=100.0, volatility=0.3)
+    assert d.verdict is not RiskVerdict.REJECTED, d.reason
+
+
+# --------------------------------------------------------------------------- #
+# Missing-data multipliers (A4)
+# --------------------------------------------------------------------------- #
+def test_missing_sector_sizes_down():
+    rm = _rm(_limits(max_sector_exposure_pct=30.0, missing_data_mult=0.5,
+                     kelly_fraction=0.0, max_position_pct=100.0,
+                     max_trade_risk_pct=0.0))
+    # No sector data passed -> multiplier applied
+    d_no_sector = rm.evaluate(_buy(weight=10.0), _account(), price=100.0,
+                               sector=None, volatility=0.3)
+    d_with_sector = rm.evaluate(_buy(weight=10.0), _account(), price=100.0,
+                                 sector="Technology", sector_exposure_usd=0.0,
+                                 volatility=0.3)
+    assert d_no_sector.verdict in (RiskVerdict.APPROVED, RiskVerdict.RESIZED)
+    assert d_with_sector.verdict in (RiskVerdict.APPROVED, RiskVerdict.RESIZED)
+    assert d_no_sector.approved_notional < d_with_sector.approved_notional - 1
+
+
+def test_missing_corr_data_sizes_down():
+    rm = _rm(_limits(max_pairwise_corr=0.85, missing_data_mult=0.5,
+                     kelly_fraction=0.0, max_position_pct=100.0,
+                     max_sector_exposure_pct=0.0, max_trade_risk_pct=0.0))
+    d_missing = rm.evaluate(_buy(weight=10.0), _account(), price=100.0,
+                             max_held_corr=None, corr_data_missing=True, volatility=0.3)
+    d_no_held = rm.evaluate(_buy(weight=10.0), _account(), price=100.0,
+                             max_held_corr=None, corr_data_missing=False, volatility=0.3)
+    assert d_missing.verdict in (RiskVerdict.APPROVED, RiskVerdict.RESIZED)
+    assert d_no_held.verdict in (RiskVerdict.APPROVED, RiskVerdict.RESIZED)
+    assert d_missing.approved_notional < d_no_held.approved_notional - 1
+
+
+def test_missing_data_mult_one_restores_fail_open():
+    rm = _rm(_limits(max_sector_exposure_pct=30.0, missing_data_mult=1.0,
+                     kelly_fraction=0.0, max_position_pct=100.0, max_trade_risk_pct=0.0))
+    d_no = rm.evaluate(_buy(weight=10.0), _account(), price=100.0, sector=None, volatility=0.3)
+    d_yes = rm.evaluate(_buy(weight=10.0), _account(), price=100.0,
+                         sector="Technology", sector_exposure_usd=0.0, volatility=0.3)
+    assert abs(d_no.approved_notional - d_yes.approved_notional) < 5.0
+
+
 def _run_all():
     fns = [v for k, v in sorted(globals().items()) if k.startswith("test_") and callable(v)]
     failed = 0
