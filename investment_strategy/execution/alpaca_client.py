@@ -32,6 +32,7 @@ from alpaca.trading.requests import (
     LimitOrderRequest,
     MarketOrderRequest,
     OptionLegRequest,
+    ReplaceOrderRequest,
     StopLossRequest,
     StopOrderRequest,
     TakeProfitRequest,
@@ -117,6 +118,38 @@ class AlpacaClient:
 
     # -- read --------------------------------------------------------------- #
     def get_account(self) -> AccountSnapshot:
+        """Account snapshot, validated for internal consistency.
+
+        Alpaca occasionally serves a glitched account row whose equity ignores
+        the held positions entirely (equity == cash while ~$96k of stock is
+        held — seen 2026-07-07, where a single such read latched a false
+        EQUITY FLOOR halt and fired a flatten). Equity is redundant with
+        cash + position market values, so a poisoned read is detectable:
+        re-read, and if the API keeps disagreeing with itself, rebuild equity
+        from the parts that DO agree rather than hand the bad number to the
+        risk layer / watchdog."""
+        snap = self._read_account_once()
+        for attempt in (1, 2):
+            if self._equity_consistent(snap):
+                return snap
+            log.warning(
+                "get_account: INCONSISTENT snapshot (equity $%.2f but cash "
+                "$%.2f + positions $%.2f) — re-reading (%d/2).",
+                snap.equity, snap.cash,
+                sum(p.market_value for p in snap.positions), attempt,
+            )
+            time.sleep(0.5 * attempt)
+            snap = self._read_account_once()
+        if self._equity_consistent(snap):
+            return snap
+        healed = snap.cash + sum(p.market_value for p in snap.positions)
+        log.error(
+            "get_account: equity STILL inconsistent after re-reads (reported "
+            "$%.2f); substituting cash+positions $%.2f.", snap.equity, healed,
+        )
+        return snap.model_copy(update={"equity": healed})
+
+    def _read_account_once(self) -> AccountSnapshot:
         a = _retry_read(self.trading.get_account, what="get_account")
         raw_positions = _retry_read(
             self.trading.get_all_positions, what="get_all_positions"
@@ -131,6 +164,18 @@ class AlpacaClient:
             pattern_day_trader=bool(getattr(a, "pattern_day_trader", False)),
             daytrade_count=int(getattr(a, "daytrade_count", 0) or 0),
         )
+
+    @staticmethod
+    def _equity_consistent(snap: AccountSnapshot) -> bool:
+        """True when reported equity agrees with cash + position market values,
+        within a tolerance for price drift between the two API calls. Trivially
+        true with no positions (equity == cash by definition then, and there is
+        no independent signal to check it against)."""
+        if not snap.positions:
+            return True
+        expected = snap.cash + sum(p.market_value for p in snap.positions)
+        denom = max(abs(expected), abs(snap.equity), 1.0)
+        return abs(snap.equity - expected) / denom <= 0.03
 
     def account_id(self) -> str:
         """Stable identifier for the connected Alpaca account. It changes if the
@@ -452,13 +497,83 @@ class AlpacaClient:
         )
         return str(order.id)
 
+    @staticmethod
+    def _order_status(o) -> str:
+        s = getattr(o, "status", "")
+        return str(getattr(s, "value", s)).lower()
+
     def cancel_open_orders_for(self, symbol: str) -> None:
         for o in self.trading.get_orders():
-            if o.symbol == symbol:
+            if o.symbol != symbol:
+                continue
+            if self._order_status(o) == "pending_cancel":
+                # A cancel is already in flight; re-sending one only errors
+                # (42210000 "order pending cancel") and spams the log.
+                continue
+            try:
+                self.trading.cancel_order_by_id(o.id)
+            except Exception as e:
+                log.warning("cancel order %s failed: %s", o.id, e)
+
+    #: Order states Alpaca refuses to replace (documented for PATCH /v2/orders).
+    #: An order wedged in pending_cancel can be neither canceled (42210000) nor
+    #: replaced — only the venue-side cancel finally settling frees its shares.
+    _UNREPLACEABLE = frozenset(
+        {"accepted", "pending_new", "pending_cancel", "pending_replace"}
+    )
+
+    def clear_orders_for_exit(self, symbol: str, ref_price: float) -> list[tuple[str, float]]:
+        """Make every open order for `symbol` either BE the exit or go away,
+        ahead of a liquidation whose shares they reserve.
+
+        Open SELL orders in a replaceable state get their limit moved down
+        through the market so they fill like a market order. Replacing is
+        atomic at the venue, so unlike cancel-then-resell it can never strand
+        the shares: a cancel that hangs in `pending_cancel` (seen with paper
+        bracket legs) keeps them reserved indefinitely — new sells get
+        40310000, re-cancels get 42210000, and replaces are refused too.
+        Everything else (buys, sells that can't be replaced) gets a cancel,
+        except orders already pending_cancel where re-sending only errors.
+
+        Returns (new_order_id, unfilled_qty) per replaced sell so the caller
+        can ledger those orders as the exit they now are."""
+        limit = (
+            round(ref_price * (1 - self.EXIT_LIMIT_BUFFER_PCT / 100.0), 2)
+            if ref_price > 0 else 0.0
+        )
+        replaced: list[tuple[str, float]] = []
+        for o in self.trading.get_orders():
+            if o.symbol != symbol:
+                continue
+            status = self._order_status(o)
+            is_sell = str(getattr(o, "side", "")).lower().endswith("sell")
+            if is_sell and limit > 0 and status not in self._UNREPLACEABLE:
+                cur_limit = float(getattr(o, "limit_price", None) or 0)
+                if 0 < cur_limit <= limit:
+                    continue  # already marketable (e.g. replaced last tick) — it IS the exit
                 try:
-                    self.trading.cancel_order_by_id(o.id)
+                    new = self.trading.replace_order_by_id(
+                        o.id, ReplaceOrderRequest(limit_price=limit)
+                    )
+                    left = float(o.qty or 0) - float(getattr(o, "filled_qty", 0) or 0)
+                    replaced.append((str(new.id), left))
+                    log.warning(
+                        "Exit via resting sell %s (%s): replaced limit -> %.2f "
+                        "(marketable; new order %s).", o.id, symbol, limit, new.id,
+                    )
+                    continue
                 except Exception as e:
-                    log.warning("cancel order %s failed: %s", o.id, e)
+                    log.warning(
+                        "replace sell %s failed (%s); falling back to cancel.",
+                        o.id, e,
+                    )
+            if status == "pending_cancel":
+                continue  # re-sending a cancel only errors (42210000)
+            try:
+                self.trading.cancel_order_by_id(o.id)
+            except Exception as e:
+                log.warning("cancel order %s failed: %s", o.id, e)
+        return replaced
 
     def cancel_order(self, order_id: str) -> bool:
         """Cancel one order by id. False (logged) on failure."""
@@ -644,7 +759,9 @@ class AlpacaClient:
     @staticmethod
     def _to_position(p) -> Position:
         qty = float(p.qty)
-        avail_raw = getattr(p, "qty_available_for_trading", None)
+        # alpaca-py calls this `qty_available` (= qty minus shares reserved by
+        # open orders). Missing/None -> assume all of it is sellable.
+        avail_raw = getattr(p, "qty_available", None)
         qty_available = float(avail_raw) if avail_raw is not None else qty
         return Position(
             symbol=p.symbol,

@@ -103,6 +103,25 @@ class Watchdog:
         floor = peak * (pct / 100.0)
         if account.equity > floor:
             return False
+        # Latch + flatten is terminal, so never act on a single read: a glitched
+        # snapshot (equity==cash, 2026-07-07) must not kill the account. Only a
+        # SUCCESSFUL re-read showing equity back above the floor cancels the
+        # halt; a failed re-read confirms it, so a genuine collapse on a flaky
+        # network still halts.
+        try:
+            confirm = self.broker.get_account()
+            if confirm.equity > floor:
+                log.warning(
+                    "EQUITY FLOOR breach NOT confirmed on re-read (equity $%.0f "
+                    "then $%.0f vs floor $%.0f) — ignoring glitched read.",
+                    account.equity, confirm.equity, floor,
+                )
+                return False
+            account = confirm
+        except Exception as e:
+            log.warning(
+                "EQUITY FLOOR confirm re-read failed (%s) — proceeding with halt.", e,
+            )
         reason = (
             f"Equity ${account.equity:,.0f} <= floor ${floor:,.0f} "
             f"({pct:.0f}% of peak ${peak:,.0f}). "
@@ -138,11 +157,12 @@ class Watchdog:
                 # position in the snapshot briefly after a bracket stop fills).
                 self.state.forget_symbol(pos.symbol)
                 continue
-            self.broker.cancel_open_orders_for(pos.symbol)
-            oid = self._close_or_rest(pos)
-            if oid:
+            outcome, oid = self._close_hard(pos, "flatten")
+            if outcome == "full":
                 self.state.forget_symbol(pos.symbol)
                 self._record_exit(pos, oid, "flatten")
+            elif outcome == "partial":
+                pass  # ledgered in _close_hard; keep tracked, retry next tick
             else:
                 log.critical(
                     "%s: close FAILED for %s — position may be NAKED. Will retry.",
@@ -157,18 +177,67 @@ class Watchdog:
                     f"may need manual intervention.",
                 )
 
-    # -- close with a market-closed / halt fallback (1B.5) ----------------- #
-    def _close_or_rest(self, pos: Position) -> str | None:
-        """Market-close `pos`; if that can't fill (market closed / LULD-halted — a
-        plain market order is rejected), fall back to resting a GTC marketable-limit
-        so the exit still fills at the reopen instead of leaving a naked position.
-        The fallback is whole-share only (Alpaca rejects GTC/limit on fractional),
-        so a sub-share position's overnight-gap risk stays irreducible."""
+    # -- best-effort hard close (1B.5) -------------------------------------- #
+    def _close_hard(self, pos: Position, reason: str) -> tuple[str, str | None]:
+        """Close `pos` as hard as the broker allows, escalating through every
+        fallback. Partial exits are ledgered here (with `reason`) at submit
+        time; the caller records only a "full" close. Returns (outcome, oid):
+
+          ("full", oid)     the whole position is closing — forget + record it.
+          ("partial", oid?) some shares are reserved by open sell orders. We
+                            replaced the live sells with marketable limits so
+                            they fill AS the exit, and/or sold the available
+                            slice. Caller keeps the position tracked and
+                            retries the full close next tick.
+          ("failed", None)  nothing could be done — caller pages a human.
+
+        The plain close comes FIRST, before touching any order: canceling a
+        bracket leg and re-selling its shares opens a wedge window — a cancel
+        stuck in `pending_cancel` reserves the shares indefinitely (new sells
+        40310000, re-cancels 42210000, replaces refused; seen with FRHC) —
+        whereas replacing a still-live leg into a marketable limit is atomic
+        and cannot strand anything.
+
+        The market-closed / LULD-halt fallback (a plain market order is
+        rejected) rests a GTC marketable-limit so the exit still fills at the
+        reopen. That fallback is whole-share only (Alpaca rejects GTC/limit on
+        fractional), so a sub-share position's overnight-gap risk stays
+        irreducible."""
         oid = self.broker.close_position(pos.symbol)
         if oid:
-            return oid
+            return "full", oid
+        avail = pos.qty_available
+        if avail < pos.qty:
+            # Shares reserved by open sell orders (bracket / GTC legs). Turn
+            # the live legs themselves into the exit, sweep the rest, and sell
+            # whatever is free right now.
+            ref = self.broker.latest_price(pos.symbol)
+            replaced = self.broker.clear_orders_for_exit(pos.symbol, ref)
+            oid = self.broker.reduce_position(pos.symbol, avail) if avail > 0 else None
+            for rid, rqty in replaced:
+                self._record_exit(_partial(pos, rqty), rid, reason)
+            if oid:
+                self._record_exit(_partial(pos, avail), oid, reason)
+            if oid or replaced:
+                log.warning(
+                    "Partial close %s (%s): sold %.6g available share(s), made "
+                    "%d resting sell(s) marketable; %.6g reserved by open "
+                    "orders — will retry the full close next tick.",
+                    pos.symbol, reason, avail if oid else 0.0, len(replaced),
+                    pos.qty - avail,
+                )
+                return "partial", oid
+            return "failed", None
+        # Nothing reserved, yet the close was refused: resting orders (e.g. a
+        # bracket on the buy side / wash-trade block) or a closed / halted
+        # market. Sweep orders, retry once, then rest a GTC exit.
+        self.broker.cancel_open_orders_for(pos.symbol)
+        oid = self.broker.close_position(pos.symbol)
+        if oid:
+            return "full", oid
         ref = self.broker.latest_price(pos.symbol)
-        return self.broker.close_position_marketable_limit(pos.symbol, pos.qty, ref)
+        oid = self.broker.close_position_marketable_limit(pos.symbol, pos.qty, ref)
+        return ("full", oid) if oid else ("failed", None)
 
     # -- hard stop / take-profit for fractional (unbracketed) positions ---- #
     def _enforce_hard_exits(self, pos: Position) -> bool:
@@ -199,26 +268,14 @@ class Watchdog:
             "Hard %s hit on %s (now %.1f%%). Closing fractional position.",
             hit, pos.symbol, pos.unrealized_pl_pct,
         )
-        self.broker.cancel_open_orders_for(pos.symbol)
-        oid = self.broker.close_position(pos.symbol)
-        if oid:
+        reason = "stop" if hit.startswith("stop") else "take"
+        outcome, oid = self._close_hard(pos, reason)
+        if outcome == "full":
             self.state.forget_symbol(pos.symbol)
-            self._record_exit(pos, oid, "stop" if hit.startswith("stop") else "take")
+            self._record_exit(pos, oid, reason)
+        elif outcome == "partial":
+            return True  # exits stay registered; retry the full close next cycle
         else:
-            # Full close failed — often because open orders are in "pending cancel"
-            # state and still holding shares. Sell whatever is immediately available
-            # to reduce exposure now; keep exits registered so the full close retries
-            # next cycle once the pending cancels settle.
-            avail = pos.qty_available
-            if avail > 0 and avail < pos.qty:
-                partial_oid = self.broker.reduce_position(pos.symbol, avail)
-                if partial_oid:
-                    log.warning(
-                        "Partial close %s: sold %.6g available shares; "
-                        "%.6g held for pending-cancel orders — will retry full close.",
-                        pos.symbol, avail, pos.qty - avail,
-                    )
-                    return True  # exits stay registered; retry full close next cycle
             log.critical(
                 "Hard-exit close FAILED for %s — fractional position unprotected. "
                 "Will retry.", pos.symbol,
@@ -301,11 +358,12 @@ class Watchdog:
             "— recycling dead capital.",
             pos.symbol, age, max_days, pos.unrealized_pl_pct, min_gain,
         )
-        self.broker.cancel_open_orders_for(pos.symbol)  # release any resting bracket
-        oid = self.broker.close_position(pos.symbol)
-        if oid:
+        outcome, oid = self._close_hard(pos, "time")
+        if outcome == "full":
             self.state.forget_symbol(pos.symbol)
             self._record_exit(pos, oid, "time")
+        elif outcome == "partial":
+            pass  # ledgered in _close_hard; keep tracked, retry next tick
         else:
             log.critical(
                 "Time-stop close FAILED for %s — position unprotected. Will retry.",
@@ -332,11 +390,12 @@ class Watchdog:
                 "Trailing stop hit on %s: peak %.1f%% -> now %.1f%%. Closing.",
                 pos.symbol, peak, pos.unrealized_pl_pct,
             )
-            self.broker.cancel_open_orders_for(pos.symbol)  # release bracket
-            oid = self.broker.close_position(pos.symbol)
-            if oid:
+            outcome, oid = self._close_hard(pos, "trail")
+            if outcome == "full":
                 self.state.forget_symbol(pos.symbol)
                 self._record_exit(pos, oid, "trail")
+            elif outcome == "partial":
+                pass  # ledgered in _close_hard; keep tracked, retry next tick
             else:
                 # Keep the high-water mark so we retry next tick rather than
                 # leaving the position unprotected (bracket already canceled).

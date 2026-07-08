@@ -143,8 +143,10 @@ class _FailingBroker:
     def close_position_marketable_limit(self, symbol, qty, ref_price):
         return None                      # fallback also fails => truly naked
 
+    confirm_equity = 1000.0   # what the floor-breach confirming re-read reports
+
     def get_account(self):
-        return _acct(1000.0)
+        return _acct(self.confirm_equity)
 
 
 def _pos(symbol="AAPL", pl_pct=-50.0):
@@ -186,7 +188,9 @@ def test_equity_floor_halt_pages():
     state = _state()
     state.peak_equity = 1000.0        # floor $600
     a = _RecordingAlerter(_alert_cfg())
-    wd = Watchdog(_cfg(), _FailingBroker(), state=state, alerter=a)
+    broker = _FailingBroker()
+    broker.confirm_equity = 500.0     # re-read agrees: genuinely below the floor
+    wd = Watchdog(_cfg(), broker, state=state, alerter=a)
     assert wd._equity_floor_breached(_acct(500.0)) is True
     subjects = [s for s, _ in a.emails]
     assert any("EQUITY FLOOR" in s and "HALTED" in s for s in subjects)
