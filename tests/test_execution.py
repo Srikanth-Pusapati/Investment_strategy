@@ -272,16 +272,18 @@ def test_to_position_missing_qty_available_assumes_all_sellable():
 
 # -- clear_orders_for_exit (turn resting sells into the exit) ----------------- #
 def _open_order(oid, side="sell", status="new", limit_price="205.41", qty="48",
-                filled_qty="0", symbol="FRHC"):
+                filled_qty="0", symbol="FRHC", order_type="limit", stop_price=None):
     return SimpleNamespace(id=oid, symbol=symbol, side=side, status=status,
-                           limit_price=limit_price, qty=qty, filled_qty=filled_qty)
+                           limit_price=limit_price, qty=qty, filled_qty=filled_qty,
+                           order_type=order_type, stop_price=stop_price)
 
 
 class _FakeExitTrading:
-    def __init__(self, orders):
+    def __init__(self, orders, replace_errors=()):
         self._orders = orders
+        self._replace_errors = set(replace_errors)
         self.canceled: list[str] = []
-        self.replaced: list[tuple[str, float]] = []
+        self.replaced: list[tuple] = []  # (oid, limit_price, stop_price)
 
     def get_orders(self, *a, **k):
         return self._orders
@@ -290,9 +292,11 @@ class _FakeExitTrading:
         self.canceled.append(oid)
 
     def replace_order_by_id(self, oid, req):
-        if oid == "stop-leg":                 # no limit on a stop order -> 422
+        if oid in self._replace_errors:
             raise RuntimeError("422 invalid replace")
-        self.replaced.append((oid, req.limit_price))
+        self.replaced.append(
+            (oid, getattr(req, "limit_price", None), getattr(req, "stop_price", None))
+        )
         return SimpleNamespace(id=f"new-{oid}")
 
 
@@ -303,20 +307,61 @@ def test_clear_orders_for_exit_replaces_live_sells_and_skips_wedged():
         _open_order("live-tp", status="new", qty="61"),      # replace -> exit
         _open_order("already", status="new", limit_price="49.0"),  # marketable: keep
         _open_order("buy-1", side="buy", status="new"),      # cancel
-        _open_order("stop-leg", status="held", limit_price=None),  # replace fails -> cancel
+        _open_order("err-leg", status="held"),               # replace fails -> cancel
         _open_order("other", symbol="AAPL"),                 # different symbol: skip
-    ])
+    ], replace_errors={"err-leg"})
     out = c.clear_orders_for_exit("FRHC", ref_price=50.0)
     # 2% through 50.0 -> limit 49.0
-    assert c.trading.replaced == [("live-tp", 49.0)]
+    assert c.trading.replaced == [("live-tp", 49.0, None)]
     assert out == [("new-live-tp", 61.0)]
-    assert sorted(c.trading.canceled) == ["buy-1", "stop-leg"]  # never "wedged"
+    assert sorted(c.trading.canceled) == ["buy-1", "err-leg"]  # never "wedged"
 
 
 def test_clear_orders_for_exit_counts_only_unfilled_qty():
     c = AlpacaClient.__new__(AlpacaClient)
     c.trading = _FakeExitTrading([_open_order("live-tp", qty="48", filled_qty="8")])
     assert c.clear_orders_for_exit("FRHC", ref_price=50.0) == [("new-live-tp", 40.0)]
+
+
+def test_clear_orders_for_exit_lifts_stop_trigger_never_sends_limit():
+    # Regression (AVAV 2026-07-08): the leg reserving all the shares was a
+    # bracket stop-MARKET order; replacing it with limit_price gets 42210000
+    # ("market orders must not have limit_price") and the fallback cancel
+    # reopened the pending_cancel wedge window. A stop leg must instead have
+    # its trigger lifted above the market so it fires on the next print.
+    c = AlpacaClient.__new__(AlpacaClient)
+    c.trading = _FakeExitTrading([
+        _open_order("stop-leg", symbol="AVAV", order_type="stop",
+                    limit_price=None, stop_price="44.0", qty="37"),
+    ])
+    out = c.clear_orders_for_exit("AVAV", ref_price=50.0)
+    # 2% above 50.0 -> trigger 51.0; NO limit_price on a market-type order
+    assert c.trading.replaced == [("stop-leg", None, 51.0)]
+    assert out == [("new-stop-leg", 37.0)]
+    assert c.trading.canceled == []
+
+
+def test_clear_orders_for_exit_stop_limit_gets_trigger_and_limit():
+    c = AlpacaClient.__new__(AlpacaClient)
+    c.trading = _FakeExitTrading([
+        _open_order("sl", order_type="stop_limit", limit_price="60.0",
+                    stop_price="44.0"),
+    ])
+    c.clear_orders_for_exit("FRHC", ref_price=50.0)
+    assert c.trading.replaced == [("sl", 49.0, 51.0)]
+
+
+def test_clear_orders_for_exit_skips_stop_already_firing():
+    # A trigger at/above the market fires on the next print (e.g. replaced
+    # last tick) — it IS the exit; replacing again would just churn order ids.
+    c = AlpacaClient.__new__(AlpacaClient)
+    c.trading = _FakeExitTrading([
+        _open_order("armed", order_type="stop", limit_price=None,
+                    stop_price="51.0"),
+    ])
+    assert c.clear_orders_for_exit("FRHC", ref_price=50.0) == []
+    assert c.trading.replaced == []
+    assert c.trading.canceled == []
 
 
 # -- get_account: glitched-equity guard (the 2026-07-07 false halt) ---------- #
