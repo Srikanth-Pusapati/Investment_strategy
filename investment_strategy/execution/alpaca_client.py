@@ -526,14 +526,20 @@ class AlpacaClient:
         """Make every open order for `symbol` either BE the exit or go away,
         ahead of a liquidation whose shares they reserve.
 
-        Open SELL orders in a replaceable state get their limit moved down
-        through the market so they fill like a market order. Replacing is
-        atomic at the venue, so unlike cancel-then-resell it can never strand
-        the shares: a cancel that hangs in `pending_cancel` (seen with paper
-        bracket legs) keeps them reserved indefinitely — new sells get
-        40310000, re-cancels get 42210000, and replaces are refused too.
-        Everything else (buys, sells that can't be replaced) gets a cancel,
-        except orders already pending_cancel where re-sending only errors.
+        Open SELL orders in a replaceable state get re-priced through the
+        market so they execute like a market order — by order type, because a
+        replace can never change the type: limit sells get their limit moved
+        down; stop / stop-limit sells get their trigger lifted ABOVE the last
+        trade so they fire on the next print (PATCHing a stop-market leg with
+        limit_price is refused — 42210000 "market orders must not have
+        limit_price"; seen 2026-07-08 when AVAV's bracket stop held all 37
+        shares). Replacing is atomic at the venue, so unlike cancel-then-resell
+        it can never strand the shares: a cancel that hangs in `pending_cancel`
+        (seen with paper bracket legs) keeps them reserved indefinitely — new
+        sells get 40310000, re-cancels get 42210000, and replaces are refused
+        too. Everything else (buys, sells that can't be replaced) gets a
+        cancel, except orders already pending_cancel where re-sending only
+        errors.
 
         Returns (new_order_id, unfilled_qty) per replaced sell so the caller
         can ledger those orders as the exit they now are."""
@@ -541,6 +547,7 @@ class AlpacaClient:
             round(ref_price * (1 - self.EXIT_LIMIT_BUFFER_PCT / 100.0), 2)
             if ref_price > 0 else 0.0
         )
+        trigger = round(ref_price * (1 + self.EXIT_LIMIT_BUFFER_PCT / 100.0), 2)
         replaced: list[tuple[str, float]] = []
         for o in self.trading.get_orders():
             if o.symbol != symbol:
@@ -548,18 +555,35 @@ class AlpacaClient:
             status = self._order_status(o)
             is_sell = str(getattr(o, "side", "")).lower().endswith("sell")
             if is_sell and limit > 0 and status not in self._UNREPLACEABLE:
+                otype = getattr(o, "order_type", None) or getattr(o, "type", "")
+                kind = str(getattr(otype, "value", otype)).lower()
                 cur_limit = float(getattr(o, "limit_price", None) or 0)
-                if 0 < cur_limit <= limit:
-                    continue  # already marketable (e.g. replaced last tick) — it IS the exit
-                try:
-                    new = self.trading.replace_order_by_id(
-                        o.id, ReplaceOrderRequest(limit_price=limit)
+                cur_stop = float(getattr(o, "stop_price", None) or 0)
+                limit_marketable = 0 < cur_limit <= limit
+                stop_firing = cur_stop >= ref_price
+                if "stop" in kind:
+                    if stop_firing and ("limit" not in kind or limit_marketable):
+                        continue  # fires on the next print (e.g. replaced last tick) — it IS the exit
+                    req = (
+                        ReplaceOrderRequest(stop_price=trigger, limit_price=limit)
+                        if "limit" in kind
+                        else ReplaceOrderRequest(stop_price=trigger)
                     )
+                    new_px = trigger
+                elif kind == "market":
+                    continue  # a live market sell already IS the exit; leave it
+                else:  # limit — or unknown type, where a limit replace is the safe default
+                    if limit_marketable:
+                        continue  # already marketable (e.g. replaced last tick) — it IS the exit
+                    req, new_px = ReplaceOrderRequest(limit_price=limit), limit
+                try:
+                    new = self.trading.replace_order_by_id(o.id, req)
                     left = float(o.qty or 0) - float(getattr(o, "filled_qty", 0) or 0)
                     replaced.append((str(new.id), left))
                     log.warning(
-                        "Exit via resting sell %s (%s): replaced limit -> %.2f "
-                        "(marketable; new order %s).", o.id, symbol, limit, new.id,
+                        "Exit via resting sell %s (%s): replaced %s -> %.2f "
+                        "(marketable; new order %s).", o.id, symbol,
+                        "stop trigger" if "stop" in kind else "limit", new_px, new.id,
                     )
                     continue
                 except Exception as e:

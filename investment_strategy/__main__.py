@@ -5,12 +5,14 @@ configures logging, and starts the orchestrator loop.
 """
 from __future__ import annotations
 
+import fcntl
 import logging
 import os
 import subprocess
 import sys
 from datetime import datetime
 from logging.handlers import TimedRotatingFileHandler
+from pathlib import Path
 
 from rich.logging import RichHandler
 
@@ -81,6 +83,37 @@ def _prevent_sleep() -> None:
         pass  # caffeinate not available (shouldn't happen on macOS)
 
 
+def acquire_single_instance_lock(state_file: str):
+    """flock a lockfile next to the state file so a second bot instance exits
+    instead of trading. Two live loops against one account double every buy
+    and race the ledger/state files — exactly what happened 2026-07-07/08,
+    when a post-fix restart left the old process running and both traded to
+    >100% gross exposure. The fd is returned (and must be kept referenced)
+    because the kernel drops the lock when it is closed; it dies with the
+    process, so a crashed bot never leaves a stale lock behind."""
+    lock_path = Path(state_file).parent / "bot.lock"
+    lock_path.parent.mkdir(parents=True, exist_ok=True)
+    fd = os.open(lock_path, os.O_RDWR | os.O_CREAT, 0o644)
+    try:
+        fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except OSError:
+        holder = ""
+        try:
+            holder = os.read(fd, 32).decode().strip()
+        except OSError:
+            pass
+        os.close(fd)
+        logging.getLogger("main").error(
+            "Another bot instance is already running%s (lock %s held). "
+            "Kill it first — two instances double-trade the account.",
+            f" (pid {holder})" if holder else "", lock_path,
+        )
+        return None
+    os.ftruncate(fd, 0)
+    os.write(fd, f"{os.getpid()}\n".encode())
+    return fd
+
+
 def main() -> int:
     _prevent_sleep()
     _setup_logging()
@@ -89,6 +122,10 @@ def main() -> int:
     except ValueError as e:
         logging.getLogger("main").error("Config error: %s", e)
         logging.getLogger("main").error("Copy .env.example to .env and fill it in.")
+        return 1
+
+    lock = acquire_single_instance_lock(cfg.state_file)
+    if lock is None:
         return 1
 
     Orchestrator(cfg, watchlist=resolve_watchlist(os.getenv("WATCHLIST"))).run()

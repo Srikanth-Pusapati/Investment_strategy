@@ -211,3 +211,22 @@ def test_normal_tick_is_silent():
     o = _orch()
     o._note_loop_tick()
     assert o.alerter.calls == []
+
+
+# -- single-instance lock (the 2026-07-07/08 double-bot incident) -------------- #
+
+def test_second_instance_is_refused_and_lock_frees_on_close(tmp_path):
+    from investment_strategy.__main__ import acquire_single_instance_lock
+
+    state_file = str(tmp_path / "state" / "risk_state.json")
+    first = acquire_single_instance_lock(state_file)
+    assert first is not None
+    # Same lockfile, second acquire -> refused (this is the double-start guard)
+    assert acquire_single_instance_lock(state_file) is None
+    # The pid of the holder is recorded for the error message
+    assert (tmp_path / "state" / "bot.lock").read_text().strip() == str(os.getpid())
+    # Releasing the fd (process death) frees the lock — no stale-lock lockout
+    os.close(first)
+    second = acquire_single_instance_lock(state_file)
+    assert second is not None
+    os.close(second)
