@@ -364,6 +364,36 @@ def test_clear_orders_for_exit_skips_stop_already_firing():
     assert c.trading.canceled == []
 
 
+# -- has_working_exit (is the position covered while waiting to fill?) -------- #
+def test_has_working_exit_true_for_marketable_limit():
+    # LLY (2026-07-08/09): the exit legs were made marketable on a prior tick and
+    # are still resting — the reserved shares are protected, so the watchdog must
+    # NOT page "unprotected". ref 50.0 -> marketable at/below 49.0.
+    c = AlpacaClient.__new__(AlpacaClient)
+    c.trading = _FakeExitTrading([_open_order("mkt", limit_price="49.0", qty="9")])
+    assert c.has_working_exit("FRHC", ref_price=50.0) is True
+
+
+def test_has_working_exit_false_for_pending_cancel_far_legs_and_buys():
+    # The FRHC-class stall: the only sells are a wedged pending_cancel and a far
+    # take-profit that won't fill; a resting buy is irrelevant. -> unprotected.
+    c = AlpacaClient.__new__(AlpacaClient)
+    c.trading = _FakeExitTrading([
+        _open_order("wedged", status="pending_cancel", limit_price="49.0"),
+        _open_order("far-tp", limit_price="205.41"),      # above market: won't fill
+        _open_order("buy-1", side="buy", limit_price="1.0"),
+    ])
+    assert c.has_working_exit("FRHC", ref_price=50.0) is False
+
+
+def test_has_working_exit_true_for_firing_stop():
+    c = AlpacaClient.__new__(AlpacaClient)
+    c.trading = _FakeExitTrading([
+        _open_order("armed", order_type="stop", limit_price=None, stop_price="51.0"),
+    ])
+    assert c.has_working_exit("FRHC", ref_price=50.0) is True
+
+
 # -- get_account: glitched-equity guard (the 2026-07-07 false halt) ---------- #
 class _AcctTrading:
     """Serves queued (account, raw_positions) read cycles; repeats the last."""

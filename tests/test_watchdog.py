@@ -24,11 +24,15 @@ from investment_strategy.state import PortfolioState
 
 
 class _FakeBroker:
-    def __init__(self, positions, market_close_fails=False, stuck_replaces=()):
+    def __init__(self, positions, market_close_fails=False, stuck_replaces=(),
+                 working_exit=False):
         self._positions = positions
         self.market_close_fails = market_close_fails   # simulate closed/halted market
         # (new_order_id, qty) pairs clear_orders_for_exit "replaces" per call
         self.stuck_replaces = list(stuck_replaces)
+        # True -> a marketable sell exit is already resting (made on a prior
+        # tick, not yet filled): the reserved shares are protected, not stranded.
+        self.working_exit = working_exit
         # What the floor-breach confirming re-read returns. None -> the re-read
         # raises, which the watchdog treats as breach CONFIRMED (fail-safe), so
         # fixtures that don't wire an account keep the old one-read behavior.
@@ -67,6 +71,9 @@ class _FakeBroker:
     def clear_orders_for_exit(self, symbol, ref_price):
         self.unwedged.append((symbol, ref_price))
         return self.stuck_replaces
+
+    def has_working_exit(self, symbol, ref_price):
+        return self.working_exit
 
 
 def _cfg(pct, max_hold_days=0.0, time_stop_min_gain_pct=2.0,
@@ -241,6 +248,23 @@ def test_hard_stop_locked_and_unwedge_rejected_keeps_retrying():
     assert wd._enforce_hard_exits(_pos_locked(avail=0.0)) is True  # CRITICAL path
     assert broker.reduced == [] and broker.rested == []
     assert state.get_exits("FRHC")                  # never dropped while open
+
+
+def test_hard_stop_covered_by_resting_marketable_exit_is_partial_not_failed():
+    # LLY (2026-07-08/09): every leg was made marketable on a PRIOR tick, so this
+    # tick has nothing to replace/sell (avail=0, replaces=()) — but the shares
+    # ARE reserved by resting marketable exits, i.e. protected. That must be a
+    # quiet "partial" retry, not the "unprotected" CRITICAL page (which claimed,
+    # wrongly, that the bracket had been canceled).
+    state = _state()
+    state.register_exits("LLY", stop_pct=10.0, take_pct=25.0)
+    broker = _FakeBroker([], market_close_fails=True, working_exit=True)
+    wd = Watchdog(_cfg(0.0), broker, state=state)
+    outcome, oid = wd._close_hard(_pos_locked("LLY", avail=0.0), "trail")
+    assert outcome == "partial"                     # protected, NOT "failed"
+    assert oid is None
+    assert broker.reduced == [] and broker.rested == []
+    assert state.get_exits("LLY")                   # still tracked -> retries
 
 
 def test_flatten_partial_when_shares_locked():

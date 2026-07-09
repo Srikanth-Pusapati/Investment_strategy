@@ -227,6 +227,20 @@ class Watchdog:
                     pos.qty - avail,
                 )
                 return "partial", oid
+            # Nothing new to do this tick — but the reserved shares may already be
+            # covered by marketable exits made on a PRIOR tick that simply haven't
+            # filled yet (clear_orders_for_exit leaves a leg alone once it IS the
+            # exit, so it returns nothing here). That is protected, not a failed
+            # close: page only when no working sell exit is resting (e.g. legs
+            # wedged in pending_cancel, or none at all — the FRHC-class stall).
+            if self.broker.has_working_exit(pos.symbol, ref):
+                log.warning(
+                    "Close %s (%s): %.6g reserved share(s) already covered by a "
+                    "resting marketable exit from a prior tick — protected, "
+                    "waiting to fill. Will retry the full close next tick.",
+                    pos.symbol, reason, pos.qty - avail,
+                )
+                return "partial", None
             return "failed", None
         # Nothing reserved, yet the close was refused: resting orders (e.g. a
         # bracket on the buy side / wash-trade block) or a closed / halted

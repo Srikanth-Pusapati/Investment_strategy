@@ -599,6 +599,45 @@ class AlpacaClient:
                 log.warning("cancel order %s failed: %s", o.id, e)
         return replaced
 
+    def has_working_exit(self, symbol: str, ref_price: float) -> bool:
+        """True if an open SELL order for `symbol` is already priced to fill on
+        the next print — a marketable limit (limit at/through the last trade), a
+        stop whose trigger is at/through it, or a live market sell. Uses the SAME
+        marketability test as clear_orders_for_exit (keep them in sync), so a leg
+        that method left in place because it IS the exit reads as protection
+        here. This lets the watchdog tell a position whose reserved shares are
+        covered by in-flight marketable exits (protected — the sells just haven't
+        filled yet) from one whose only sells are wedged in pending_cancel, or
+        which has none at all (genuinely unprotected — page a human). A
+        pending_cancel leg reserves shares but will never fill, so it does NOT
+        count. Best-effort: False on error, so the caller errs toward paging."""
+        if ref_price <= 0:
+            return False
+        limit = round(ref_price * (1 - self.EXIT_LIMIT_BUFFER_PCT / 100.0), 2)
+        try:
+            for o in self.trading.get_orders():
+                if o.symbol != symbol:
+                    continue
+                if not str(getattr(o, "side", "")).lower().endswith("sell"):
+                    continue
+                if self._order_status(o) == "pending_cancel":
+                    continue  # wedged cancel — reserves shares but never fills
+                otype = getattr(o, "order_type", None) or getattr(o, "type", "")
+                kind = str(getattr(otype, "value", otype)).lower()
+                cur_limit = float(getattr(o, "limit_price", None) or 0)
+                cur_stop = float(getattr(o, "stop_price", None) or 0)
+                if kind == "market":
+                    return True  # a live market sell is already the exit
+                marketable_limit = 0 < cur_limit <= limit
+                if "stop" in kind:
+                    if cur_stop >= ref_price and ("limit" not in kind or marketable_limit):
+                        return True  # trigger fires on the next print
+                elif marketable_limit:
+                    return True
+        except Exception as e:
+            log.warning("has_working_exit(%s) failed: %s", symbol, e)
+        return False
+
     def cancel_order(self, order_id: str) -> bool:
         """Cancel one order by id. False (logged) on failure."""
         try:
