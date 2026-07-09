@@ -156,6 +156,9 @@ def run_postmortem(
                             "lessons": {"type": "array", "items": {"type": "string"}, "maxItems": 3},
                         },
                         "required": ["summary_md", "lessons"],
+                        # The API rejects object schemas without this (400
+                        # "additionalProperties must be explicitly set to false").
+                        "additionalProperties": False,
                     },
                 },
             },
