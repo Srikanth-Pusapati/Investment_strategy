@@ -41,6 +41,7 @@ class SignalKind(str, Enum):
     CONGRESS = "congress"
     OFFEXCHANGE = "offexchange"  # dark-pool / off-exchange short volume (~1d lag)
     GOVCONTRACTS = "govcontracts"  # federal contract awards (revenue catalyst; days lag)
+    OPTIONS_CHAIN = "options_chain"  # per-name IV/skew/OI positioning read (real-time)
     MACRO = "macro"
     DISCOVERY = "discovery"   # why a symbol was surfaced by the market scanner
 

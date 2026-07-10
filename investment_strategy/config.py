@@ -283,6 +283,14 @@ class Config:
     # and fold its one-line lessons back into the next day's decision prompt.
     postmortem_enabled: bool = True
     postmortem_max_lessons: int = 15
+    # C.4 options-chain positioning signal: per-name ATM IV, put-call IV skew
+    # and put/call open-interest lean from Alpaca's option snapshots (the free
+    # 'indicative' feed the execution path already uses — no extra key). Feeds
+    # Claude the options DATA that turns the OPTIONS_ENABLED path from blind
+    # guessing into an informed put/call/spread choice. Off by default; flip
+    # together with OPTIONS_ENABLED.
+    options_chain_signal: bool = False
+    options_chain_max_symbols: int = 25   # per-cycle chain-fetch cap (2 calls/name)
 
     @property
     def is_live(self) -> bool:
@@ -360,6 +368,8 @@ def load_config() -> Config:
         reconcile_halt_enabled=_flag("RECONCILE_HALT", "on"),
         postmortem_enabled=_flag("POSTMORTEM_ENABLED", "on"),
         postmortem_max_lessons=_i("POSTMORTEM_MAX_LESSONS", 15),
+        options_chain_signal=_flag("OPTIONS_CHAIN_SIGNAL"),
+        options_chain_max_symbols=_i("OPTIONS_CHAIN_MAX_SYMBOLS", 25),
         state_file=os.getenv("STATE_FILE", "state/risk_state.json"),
         dashboard_file=os.getenv("DASHBOARD_FILE", "").strip(),
         risk=RiskLimits(
