@@ -81,6 +81,18 @@ class OptionsHelper:
         self.data = OptionHistoricalDataClient(
             cfg.alpaca_api_key, cfg.alpaca_secret_key
         )
+        self._cfg = cfg
+        self._trading = None  # lazy — only liquidity checks need the trading API
+
+    @property
+    def trading(self):
+        if self._trading is None:
+            from alpaca.trading.client import TradingClient
+            self._trading = TradingClient(
+                self._cfg.alpaca_api_key, self._cfg.alpaca_secret_key,
+                paper=not self._cfg.is_live,
+            )
+        return self._trading
 
     def build_legs(self, proposal: TradeProposal) -> list[OptionLegRequest]:
         """Convert a proposal's OptionLeg list to broker OptionLegRequests."""
@@ -108,6 +120,46 @@ class OptionsHelper:
                 return 0.0
             net += mid * leg.ratio if leg.side is Action.BUY else -mid * leg.ratio
         return round(net, 2)
+
+    def leg_liquidity(self, proposal: TradeProposal) -> list[dict]:
+        """Per-leg {'symbol', 'oi', 'rel_spread_pct'} context for the risk
+        gate's liquidity check. OI comes from the trading API's contract
+        metadata; the spread from the same latest quote the premium estimate
+        reads. Any field we can't source is None — the gate fails open on None
+        (est_premium<=0 already refuses quote-less legs)."""
+        out: list[dict] = []
+        for leg in proposal.option_legs:
+            sym = occ_symbol(proposal.symbol, leg.expiry, leg.strike, leg.right)
+            oi = None
+            try:
+                from alpaca.trading.requests import GetOptionContractsRequest
+                resp = self.trading.get_option_contracts(
+                    GetOptionContractsRequest(
+                        underlying_symbols=[proposal.symbol.upper()],
+                        expiration_date=leg.expiry,
+                        strike_price_gte=str(leg.strike),
+                        strike_price_lte=str(leg.strike),
+                        type="call" if leg.right.lower().startswith("c") else "put",
+                    )
+                )
+                for c in (resp.option_contracts or []):
+                    if c.symbol == sym and c.open_interest is not None:
+                        oi = float(c.open_interest)
+                        break
+            except Exception as e:
+                log.warning("open-interest lookup failed for %s: %s", sym, e)
+            spread = None
+            try:
+                q = self.data.get_option_latest_quote(
+                    OptionLatestQuoteRequest(symbol_or_symbols=sym)
+                )[sym]
+                bid, ask = float(q.bid_price or 0), float(q.ask_price or 0)
+                if bid > 0 and ask > bid:
+                    spread = (ask - bid) / ((ask + bid) / 2) * 100.0
+            except Exception as e:
+                log.warning("spread lookup failed for %s: %s", sym, e)
+            out.append({"symbol": sym, "oi": oi, "rel_spread_pct": spread})
+        return out
 
     def _mid_price(self, underlying: str, leg: OptionLeg) -> float:
         sym = occ_symbol(underlying, leg.expiry, leg.strike, leg.right)

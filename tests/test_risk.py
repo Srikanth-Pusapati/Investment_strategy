@@ -554,10 +554,18 @@ def _opt(strategy, legs) -> TradeProposal:
     )
 
 
+def _opt_exp(days: int = 30) -> str:
+    """Dynamic expiry N days out — a fixed date here is a time bomb once the
+    DTE gate exists (it drifts under the 7d minimum and flips approvals to
+    rejections as the calendar advances)."""
+    from datetime import datetime, timedelta, timezone
+    return (datetime.now(timezone.utc) + timedelta(days=days)).strftime("%Y-%m-%d")
+
+
 def test_options_disabled_rejected():
     rm = _rm(_limits(options_enabled=False))
     p = _opt(OptionStrategy.LONG_CALL,
-             [OptionLeg(expiry="2026-07-17", strike=200, right="call", side=Action.BUY)])
+             [OptionLeg(expiry=_opt_exp(30), strike=200, right="call", side=Action.BUY)])
     d = rm.evaluate_option(p, _account(), est_premium_per_contract=2.0)
     assert d.verdict is RiskVerdict.REJECTED
 
@@ -565,7 +573,7 @@ def test_options_disabled_rejected():
 def test_naked_short_call_rejected():
     rm = _rm(_limits(options_enabled=True))
     p = _opt(OptionStrategy.BULL_CALL_SPREAD,
-             [OptionLeg(expiry="2026-07-17", strike=210, right="call", side=Action.SELL)])
+             [OptionLeg(expiry=_opt_exp(30), strike=210, right="call", side=Action.SELL)])
     d = rm.evaluate_option(p, _account(), est_premium_per_contract=2.0)
     assert d.verdict is RiskVerdict.REJECTED
     assert "short call" in d.reason.lower() or "must be one long" in d.reason.lower()
@@ -574,7 +582,7 @@ def test_naked_short_call_rejected():
 def test_net_credit_rejected():
     rm = _rm(_limits(options_enabled=True))
     p = _opt(OptionStrategy.LONG_CALL,
-             [OptionLeg(expiry="2026-07-17", strike=200, right="call", side=Action.BUY)])
+             [OptionLeg(expiry=_opt_exp(30), strike=200, right="call", side=Action.BUY)])
     d = rm.evaluate_option(p, _account(), est_premium_per_contract=-1.0)  # credit
     assert d.verdict is RiskVerdict.REJECTED
 
@@ -582,8 +590,8 @@ def test_net_credit_rejected():
 def test_defined_risk_spread_approved_and_premium_capped():
     rm = _rm(_limits(options_enabled=True, max_option_premium_pct=1.0))
     legs = [
-        OptionLeg(expiry="2026-07-17", strike=200, right="call", side=Action.BUY),
-        OptionLeg(expiry="2026-07-17", strike=210, right="call", side=Action.SELL),
+        OptionLeg(expiry=_opt_exp(30), strike=200, right="call", side=Action.BUY),
+        OptionLeg(expiry=_opt_exp(30), strike=210, right="call", side=Action.SELL),
     ]
     p = _opt(OptionStrategy.BULL_CALL_SPREAD, legs)
     # 1% of 100k = $1000 budget; $2/share -> $200/contract -> 5 contracts.
@@ -955,7 +963,7 @@ def test_option_rejected_when_daily_loss_halted():
     # An option debit is a new position — the account-wide halt gate applies.
     rm = _rm(_limits(options_enabled=True))
     p = _opt(OptionStrategy.LONG_PUT,
-             [OptionLeg(expiry="2026-07-17", strike=200, right="put", side=Action.BUY)])
+             [OptionLeg(expiry=_opt_exp(30), strike=200, right="put", side=Action.BUY)])
     acct = _account(equity=96_000.0, last_equity=100_000.0)  # -4% day >= 3% cap
     d = rm.evaluate_option(p, acct, est_premium_per_contract=2.0)
     assert d.verdict is RiskVerdict.REJECTED
@@ -970,7 +978,7 @@ def test_option_rejected_when_halt_latched():
     state.halted, state.halt_reason = True, "EQUITY FLOOR (test)"
     rm = _rm(_limits(options_enabled=True), state=state)
     p = _opt(OptionStrategy.LONG_CALL,
-             [OptionLeg(expiry="2026-07-17", strike=200, right="call", side=Action.BUY)])
+             [OptionLeg(expiry=_opt_exp(30), strike=200, right="call", side=Action.BUY)])
     d = rm.evaluate_option(p, _account(), est_premium_per_contract=2.0)
     assert d.verdict is RiskVerdict.REJECTED
     assert "halt latch" in d.reason.lower()
@@ -979,8 +987,99 @@ def test_option_rejected_when_halt_latched():
 def test_option_rejected_at_max_open_positions():
     rm = _rm(_limits(options_enabled=True, max_open_positions=1))
     p = _opt(OptionStrategy.LONG_CALL,
-             [OptionLeg(expiry="2026-07-17", strike=200, right="call", side=Action.BUY)])
+             [OptionLeg(expiry=_opt_exp(30), strike=200, right="call", side=Action.BUY)])
     d = rm.evaluate_option(p, _account(positions=[_pos()]),
                            est_premium_per_contract=2.0)
     assert d.verdict is RiskVerdict.REJECTED
     assert "max open positions" in d.reason.lower()
+
+
+def test_option_dte_too_short_rejected():
+    rm = _rm(_limits(options_enabled=True))
+    p = _opt(OptionStrategy.LONG_PUT,
+             [OptionLeg(expiry=_opt_exp(3), strike=200, right="put", side=Action.BUY)])
+    d = rm.evaluate_option(p, _account(), est_premium_per_contract=2.0)
+    assert d.verdict is RiskVerdict.REJECTED
+    assert "minimum" in d.reason and "expires" in d.reason.lower()
+
+
+def test_option_dte_too_long_rejected():
+    rm = _rm(_limits(options_enabled=True))
+    p = _opt(OptionStrategy.LONG_CALL,
+             [OptionLeg(expiry=_opt_exp(90), strike=200, right="call", side=Action.BUY)])
+    d = rm.evaluate_option(p, _account(), est_premium_per_contract=2.0)
+    assert d.verdict is RiskVerdict.REJECTED
+    assert "maximum" in d.reason
+
+
+def test_option_mismatched_vertical_expiries_rejected():
+    # A diagonal mislabeled as a vertical has a different risk shape — refuse.
+    rm = _rm(_limits(options_enabled=True))
+    p = _opt(OptionStrategy.BEAR_PUT_SPREAD, [
+        OptionLeg(expiry=_opt_exp(30), strike=210, right="put", side=Action.BUY),
+        OptionLeg(expiry=_opt_exp(45), strike=200, right="put", side=Action.SELL),
+    ])
+    d = rm.evaluate_option(p, _account(), est_premium_per_contract=2.0)
+    assert d.verdict is RiskVerdict.REJECTED
+    assert "one expiry" in d.reason
+
+
+def _opt_position(underlying, days=30):
+    from investment_strategy.execution.options import occ_symbol
+    sym = occ_symbol(underlying, _opt_exp(days), 100.0, "call")
+    return Position(symbol=sym, qty=1.0, avg_entry_price=2.0, current_price=2.0,
+                    market_value=200.0, unrealized_pl=0.0, unrealized_pl_pct=0.0,
+                    asset_class="us_option")
+
+
+def test_option_concurrent_underlyings_capped():
+    rm = _rm(_limits(options_enabled=True, max_option_positions=3,
+                     max_open_positions=15))
+    held = [_opt_position(u) for u in ("NVDA", "TSM", "AMD")]
+    p = _opt(OptionStrategy.LONG_CALL,   # AAPL would be a 4th underlying
+             [OptionLeg(expiry=_opt_exp(30), strike=200, right="call", side=Action.BUY)])
+    d = rm.evaluate_option(p, _account(positions=held), est_premium_per_contract=2.0)
+    assert d.verdict is RiskVerdict.REJECTED
+    assert "max option positions" in d.reason.lower()
+
+
+def test_option_same_underlying_not_a_new_slot():
+    rm = _rm(_limits(options_enabled=True, max_option_positions=3,
+                     max_open_positions=15))
+    held = [_opt_position(u) for u in ("AAPL", "TSM", "AMD")]  # AAPL already held
+    p = _opt(OptionStrategy.LONG_CALL,
+             [OptionLeg(expiry=_opt_exp(30), strike=200, right="call", side=Action.BUY)])
+    d = rm.evaluate_option(p, _account(positions=held), est_premium_per_contract=2.0)
+    assert d.verdict is RiskVerdict.APPROVED
+
+
+def test_option_low_open_interest_rejected():
+    rm = _rm(_limits(options_enabled=True))
+    p = _opt(OptionStrategy.LONG_CALL,
+             [OptionLeg(expiry=_opt_exp(30), strike=200, right="call", side=Action.BUY)])
+    d = rm.evaluate_option(p, _account(), est_premium_per_contract=2.0,
+                           leg_liquidity=[{"symbol": "X", "oi": 20,
+                                          "rel_spread_pct": 2.0}])
+    assert d.verdict is RiskVerdict.REJECTED
+    assert "open interest" in d.reason.lower()
+
+
+def test_option_wide_spread_rejected():
+    rm = _rm(_limits(options_enabled=True))
+    p = _opt(OptionStrategy.LONG_CALL,
+             [OptionLeg(expiry=_opt_exp(30), strike=200, right="call", side=Action.BUY)])
+    d = rm.evaluate_option(p, _account(), est_premium_per_contract=2.0,
+                           leg_liquidity=[{"symbol": "X", "oi": 500,
+                                          "rel_spread_pct": 18.0}])
+    assert d.verdict is RiskVerdict.REJECTED
+    assert "spread" in d.reason.lower()
+
+
+def test_option_missing_liquidity_data_fails_open():
+    rm = _rm(_limits(options_enabled=True))
+    p = _opt(OptionStrategy.LONG_CALL,
+             [OptionLeg(expiry=_opt_exp(30), strike=200, right="call", side=Action.BUY)])
+    d = rm.evaluate_option(p, _account(), est_premium_per_contract=2.0,
+                           leg_liquidity=[{"symbol": "X", "oi": None,
+                                          "rel_spread_pct": None}])
+    assert d.verdict is RiskVerdict.APPROVED

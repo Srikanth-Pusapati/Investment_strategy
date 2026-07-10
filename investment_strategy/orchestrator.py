@@ -1318,11 +1318,23 @@ class Orchestrator:
             log.info("Option proposal for %s ignored: options disabled.", proposal.symbol)
             return
         premium = self.options.estimate_net_premium(proposal)
-        decision = self.risk.evaluate_option(proposal, account, premium)
+        liquidity = self.options.leg_liquidity(proposal)
+        decision = self.risk.evaluate_option(
+            proposal, account, premium, leg_liquidity=liquidity,
+        )
         log.info(
             "OPTION %s %s -> %s: %s | %s",
             proposal.option_strategy, proposal.symbol,
             decision.verdict.value, decision.reason, proposal.rationale[:100],
+        )
+        # Journal every option verdict too — without this, rejects are invisible
+        # to the 'Today so far' block and the nightly post-mortem.
+        self._journal_decision(
+            proposal.symbol, proposal.action.value, "option",
+            proposal.conviction, proposal.target_weight_pct,
+            decision.verdict.value,
+            decision.approved_notional if decision.verdict != RiskVerdict.REJECTED else 0.0,
+            decision.reason, proposal.rationale[:120] if proposal.rationale else "",
         )
         if decision.verdict == RiskVerdict.REJECTED:
             return
@@ -1333,3 +1345,9 @@ class Orchestrator:
             self.ledger.record(TradeRecord.from_option(
                 decision, premium, oid, entry_signals=signal_kinds or []))
             self._pending_oids.append((oid, proposal.symbol))
+            # Same churn bookkeeping as equity buys: top-up spacing + the
+            # per-symbol daily budget both count option debits.
+            self.state.register_buy(proposal.symbol, conviction=proposal.conviction)
+            self.state.register_daily_deploy(
+                proposal.symbol, decision.approved_notional,
+            )
