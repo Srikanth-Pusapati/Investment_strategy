@@ -84,9 +84,12 @@ class Orchestrator:
         self.quiver = QuiverClient(cfg.quiver_api_key)
         self.signals = SignalAggregator(cfg, self.quiver)
         self.screeners = ScreenerAggregator(cfg, self.quiver)
+        self.robinhood = RobinhoodReader(cfg)
         # Per-cycle-cached next-earnings lookup feeding the risk earnings-blackout
-        # guard (one lookup per symbol per cycle; advisory, fails open).
-        self.earnings = EarningsCalendar()
+        # guard (one lookup per symbol per cycle; advisory, fails open). With the
+        # RH MCP on, ONE market-wide calendar call per cycle replaces the flaky
+        # per-symbol yfinance lookups (C.5); yfinance stays as the fallback.
+        self.earnings = EarningsCalendar(reader=self.robinhood)
         # Per-cycle-cached sector lookup feeding the risk sector-concentration cap.
         self.sectors = SectorMap()
         # Per-cycle-cached pairwise-correlation guard (R.2): measures whether a
@@ -114,7 +117,6 @@ class Orchestrator:
             alerter=self.alerter,
         )
         self.benchmark = BenchmarkTracker(cfg, self.broker, symbol=cfg.benchmark_symbol)
-        self.robinhood = RobinhoodReader(cfg)
         self.options = OptionsHelper(cfg) if cfg.risk.options_enabled else None
         # Discovery-driven by design: default (unset) is no standing watchlist.
         # An explicit list can still force-include names; otherwise we trade only
