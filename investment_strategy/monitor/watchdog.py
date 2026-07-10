@@ -191,26 +191,26 @@ class Watchdog:
                             retries the full close next tick.
           ("failed", None)  nothing could be done — caller pages a human.
 
-        The plain close comes FIRST, before touching any order: canceling a
-        bracket leg and re-selling its shares opens a wedge window — a cancel
-        stuck in `pending_cancel` reserves the shares indefinitely (new sells
-        40310000, re-cancels 42210000, replaces refused; seen with FRHC) —
-        whereas replacing a still-live leg into a marketable limit is atomic
-        and cannot strand anything.
+        When the shares are free, the plain close comes FIRST, before touching
+        any order: canceling a bracket leg and re-selling its shares opens a
+        wedge window — a cancel stuck in `pending_cancel` reserves the shares
+        indefinitely (new sells 40310000, re-cancels 42210000, replaces
+        refused; seen with FRHC) — whereas replacing a still-live leg into a
+        marketable limit is atomic and cannot strand anything. When shares ARE
+        reserved by open sells, the plain close is provably refused with
+        40310000 (seen with BTDR/EQPT), so we skip straight to the
+        replace-live-legs path — same outcome, no doomed ERROR line per tick.
 
         The market-closed / LULD-halt fallback (a plain market order is
         rejected) rests a GTC marketable-limit so the exit still fills at the
         reopen. That fallback is whole-share only (Alpaca rejects GTC/limit on
         fractional), so a sub-share position's overnight-gap risk stays
         irreducible."""
-        oid = self.broker.close_position(pos.symbol)
-        if oid:
-            return "full", oid
         avail = pos.qty_available
         if avail < pos.qty:
             # Shares reserved by open sell orders (bracket / GTC legs). Turn
             # the live legs themselves into the exit, sweep the rest, and sell
-            # whatever is free right now.
+            # whatever is free right now — still never cancel-then-resell.
             ref = self.broker.latest_price(pos.symbol)
             replaced = self.broker.clear_orders_for_exit(pos.symbol, ref)
             oid = self.broker.reduce_position(pos.symbol, avail) if avail > 0 else None
@@ -242,6 +242,9 @@ class Watchdog:
                 )
                 return "partial", None
             return "failed", None
+        oid = self.broker.close_position(pos.symbol)
+        if oid:
+            return "full", oid
         # Nothing reserved, yet the close was refused: resting orders (e.g. a
         # bracket on the buy side / wash-trade block) or a closed / halted
         # market. Sweep orders, retry once, then rest a GTC exit.

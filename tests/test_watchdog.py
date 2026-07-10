@@ -281,15 +281,42 @@ def test_flatten_partial_when_shares_locked():
 
 
 def test_close_hard_tries_plain_close_before_touching_orders():
-    # Cancel-then-close is what manufactures pending-cancel wedges: the close
-    # must be attempted FIRST, and no cancel sweep may run when it succeeds.
+    # Cancel-then-close is what manufactures pending-cancel wedges: when the
+    # shares are FREE the close must be attempted FIRST, and no cancel sweep
+    # may run when it succeeds.
     state = _state()
     state.register_exits("AAPL", stop_pct=10.0, take_pct=25.0)
     wd = Watchdog(_cfg(0.0), _FakeBroker([]), state=state)
-    assert wd._enforce_hard_exits(_pos_locked("AAPL")) is True
+    assert wd._enforce_hard_exits(_pos_locked("AAPL", avail=110.000186)) is True
     assert wd.broker.closed == ["AAPL"]
     assert wd.broker.canceled == []                 # nothing was in the way
     assert wd.broker.unwedged == []
+
+
+def test_close_hard_skips_doomed_plain_close_when_shares_reserved():
+    # BTDR/EQPT (2026-07-10): with every share held_for_orders the plain close
+    # is provably refused 40310000 — the watchdog must go straight to the
+    # replace-live-legs path without emitting the doomed close (ERROR noise).
+    state = _state()
+    state.register_exits("BTDR", stop_pct=10.0, take_pct=25.0)
+    broker = _FakeBroker([], stuck_replaces=[("new-1", 14.09)])
+    wd = Watchdog(_cfg(0.0), broker, state=state)
+    outcome, oid = wd._close_hard(_pos_locked("BTDR", qty=124.0, avail=0.0), "trail")
+    assert outcome == "partial"
+    assert broker.closed == []                      # doomed close never fired
+    assert broker.unwedged == [("BTDR", 50.0)]      # legs made marketable
+    assert broker.reduced == []                     # nothing free to sell
+
+
+def test_close_hard_reserved_with_free_slice_sells_slice_without_plain_close():
+    state = _state()
+    state.register_exits("LLY", stop_pct=10.0, take_pct=25.0)
+    broker = _FakeBroker([], stuck_replaces=[("new-1", 48.0)])
+    wd = Watchdog(_cfg(0.0), broker, state=state)
+    outcome, _oid = wd._close_hard(_pos_locked("LLY", qty=9.34975, avail=0.34975), "stop")
+    assert outcome == "partial"
+    assert broker.closed == []                      # no doomed full close
+    assert broker.reduced == [("LLY", 0.34975)]     # free slice sold NOW
 
 
 # -- scale-out at the take-profit target (1B.8) ------------------------------ #
