@@ -617,7 +617,12 @@ def test_backfill_never_breaks_the_cycle_on_broker_failure():
 
 
 def test_backfill_stamps_reentry_cooldown_clock():
-    o = _backfill_orch([_closed("stop-1")], records=[_buy_rec()])
+    # The fill must be RECENT: register_exit prunes stamps older than the
+    # 7-day clock retention, so a hardcoded fill date turns this test into a
+    # time bomb (it did — written with a Jul 2 stamp, failing from Jul 9 on).
+    from datetime import datetime as _dt, timedelta as _td, timezone as _tz
+    recent = (_dt.now(_tz.utc) - _td(hours=1)).isoformat()
+    o = _backfill_orch([_closed("stop-1", filled_at=recent)], records=[_buy_rec()])
     o._backfill_exchange_exits()
     # The exchange-side stop fill must start the re-entry cooldown at the FILL
     # time, so the next cycle can't immediately re-buy the stopped name.
