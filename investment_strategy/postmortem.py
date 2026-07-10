@@ -49,6 +49,22 @@ session."
 Day data:
 """
 
+# Structured-output schema for the nightly call. The API's json_schema subset
+# rejects array constraints like maxItems (400 "property 'maxItems' is not
+# supported") — the ≤3 limit lives in the prompt text and is enforced by
+# truncation after parsing.
+_POSTMORTEM_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "summary_md": {"type": "string"},
+        "lessons": {"type": "array", "items": {"type": "string"}},
+    },
+    "required": ["summary_md", "lessons"],
+    # The API rejects object schemas without this (400
+    # "additionalProperties must be explicitly set to false").
+    "additionalProperties": False,
+}
+
 
 def read_curated(max_lines: int = 15) -> str:
     """Read the curated lessons file for injection into the decision prompt."""
@@ -147,20 +163,7 @@ def run_postmortem(
             max_tokens=1000,
             output_config={
                 "effort": "low",
-                "format": {
-                    "type": "json_schema",
-                    "schema": {
-                        "type": "object",
-                        "properties": {
-                            "summary_md": {"type": "string"},
-                            "lessons": {"type": "array", "items": {"type": "string"}, "maxItems": 3},
-                        },
-                        "required": ["summary_md", "lessons"],
-                        # The API rejects object schemas without this (400
-                        # "additionalProperties must be explicitly set to false").
-                        "additionalProperties": False,
-                    },
-                },
+                "format": {"type": "json_schema", "schema": _POSTMORTEM_SCHEMA},
             },
             messages=[{"role": "user", "content": user_text}],
         )
@@ -184,10 +187,10 @@ def run_postmortem(
     except Exception as e:
         log.warning("Could not write post-mortem file: %s", e)
 
-    lessons = [l for l in result.get("lessons", []) if isinstance(l, str) and l.strip()]
+    lessons = [l for l in result.get("lessons", []) if isinstance(l, str) and l.strip()][:3]
     if lessons:
         log.info("Post-mortem lessons: %s", " | ".join(lessons))
-        _append_curated(lessons, max_lines)
+        _append_curated(lessons, max_lessons)
     else:
         log.info("Post-mortem found no notable patterns for %s.", day)
 
