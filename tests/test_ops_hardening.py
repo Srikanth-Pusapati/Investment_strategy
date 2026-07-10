@@ -230,3 +230,20 @@ def test_second_instance_is_refused_and_lock_frees_on_close(tmp_path):
     second = acquire_single_instance_lock(state_file)
     assert second is not None
     os.close(second)
+
+
+# -- third-party log noise pinned to WARNING (RH MCP 405/reconnect spam) ------- #
+
+def test_setup_logging_pins_noisy_third_party_loggers(monkeypatch):
+    import logging
+    from investment_strategy.__main__ import _setup_logging
+
+    monkeypatch.setenv("LOG_DIR", "")            # no file sink in tests
+    root = logging.getLogger()
+    saved = root.handlers[:]
+    try:
+        _setup_logging()
+        assert logging.getLogger("mcp.client.streamable_http").level == logging.WARNING
+        assert logging.getLogger("httpx").level == logging.WARNING
+    finally:
+        root.handlers[:] = saved

@@ -65,6 +65,12 @@ def _setup_logging() -> None:
         datefmt="%H:%M:%S",
         handlers=handlers,
     )
+    # The RH MCP client opens a fresh streamable-HTTP session per tool call;
+    # RH's endpoint rejects the follow-up GET stream (405), which the SDK
+    # retries and logs at INFO on every call (~57 line-pairs/day of noise).
+    # Neither logger carries signal below WARNING.
+    logging.getLogger("mcp.client.streamable_http").setLevel(logging.WARNING)
+    logging.getLogger("httpx").setLevel(logging.WARNING)
 
 
 def _prevent_sleep() -> None:
