@@ -440,6 +440,34 @@ class AlpacaClient:
         log.info("OPTION %d-leg order qty=%d (order %s)", len(legs), qty, placed.id)
         return str(placed.id)
 
+    def close_option_group(self, positions: list[Position]) -> Optional[str]:
+        """Close a whole option structure — never gated by the kill switch
+        (closing is risk reduction). One leg -> plain close on the OCC symbol;
+        2+ legs -> ONE closing MLEG order (each leg flipped to its *_TO_CLOSE
+        intent) so a spread never passes through a naked-short intermediate
+        state. Options are DAY-only at Alpaca, so there is no GTC fallback —
+        a failed close is retried by the watchdog next tick."""
+        from .options import build_closing_legs
+        if len(positions) == 1:
+            return self.close_position(positions[0].symbol)
+        try:
+            legs, group_qty = build_closing_legs(positions)
+            req = MarketOrderRequest(
+                qty=group_qty, time_in_force=TimeInForce.DAY,
+                order_class=OrderClass.MLEG, legs=legs,
+            )
+            placed = self.trading.submit_order(req)
+        except Exception as e:
+            log.error(
+                "close_option_group(%s) failed: %s",
+                ",".join(p.symbol for p in positions), e,
+            )
+            return None
+        log.info(
+            "OPTION close %d-leg qty=%d (order %s)", len(legs), group_qty, placed.id,
+        )
+        return str(placed.id)
+
     # -- partial reduce (never gated — risk reduction) --------------------- #
     def reduce_position(self, symbol: str, qty: float) -> Optional[str]:
         """Market-SELL `qty` shares (whole or fractional) of an existing long — a

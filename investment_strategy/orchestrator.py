@@ -28,6 +28,7 @@ from .correlation import CorrelationGuard
 from .decision import DecisionEngine
 from .earnings import EarningsCalendar
 from .execution import AlpacaClient, OptionsHelper
+from .execution.options import parse_occ
 from .ledger import TradeLedger, TradeRecord
 from .models import (
     Action,
@@ -383,7 +384,18 @@ class Orchestrator:
         # this with NEW smart-money names so buy ideas can originate from the
         # market, not just a hand-typed list. Everything still flows through the
         # same signals -> decide -> risk path below.
-        base = set(self.watchlist) | {p.symbol for p in account.positions}
+        # Option rows carry OCC contract symbols — signal providers and
+        # screeners must see the UNDERLYING (keeps the thesis under review each
+        # cycle), never the raw contract symbol.
+        held: set[str] = set()
+        for p in account.positions:
+            if p.is_option:
+                occ = parse_occ(p.symbol)
+                if occ:
+                    held.add(occ[0])
+            else:
+                held.add(p.symbol)
+        base = set(self.watchlist) | held
         # The core-satellite ETF (Todo 1.6) is managed by _apply_core_fill, not by
         # Claude — drop it from the decision slate so the model doesn't churn the
         # core (buy/sell/thesis-decay it); it's held as a passive base allocation.
@@ -507,7 +519,10 @@ class Orchestrator:
             sector = self.sectors.sector_for(symbol)
             if not sector:
                 return None, 0.0
-            held = {p.symbol: p.market_value for p in account.positions}
+            # Option rows are skipped: sector_for(OCC) is meaningless and each
+            # premium is capped at ~1% of equity — immaterial to the sector cap.
+            held = {p.symbol: p.market_value
+                    for p in account.positions if not p.is_option}
             return sector, self.sectors.exposure_by_sector(held).get(sector, 0.0)
         except Exception as e:
             log.warning("sector context for %s failed: %s", symbol, e)
@@ -522,7 +537,7 @@ class Orchestrator:
         try:
             held = [
                 p.symbol for p in account.positions
-                if p.symbol != symbol
+                if not p.is_option and p.symbol != symbol
                 and not (self.cfg.core_etf and p.symbol == self.cfg.core_etf)
             ]
             if not held:
@@ -535,7 +550,7 @@ class Orchestrator:
             log.warning("correlation context for %s failed: %s", symbol, e)
             held = [
                 p.symbol for p in account.positions
-                if p.symbol != symbol
+                if not p.is_option and p.symbol != symbol
                 and not (self.cfg.core_etf and p.symbol == self.cfg.core_etf)
             ]
             return None, "", bool(held)
@@ -982,6 +997,11 @@ class Orchestrator:
         )
         with self._trade_lock:
             for pos in list(account.positions):
+                if pos.is_option:
+                    # A partial trim of an option structure makes no sense
+                    # (contracts, paired legs) — options are premium-capped and
+                    # watchdog-managed; the regime trim de-risks the EQUITY book.
+                    continue
                 sell_qty = round(pos.qty * frac, 6)
                 # Whole-shares mode (GA-2.3): don't leave fractional dust that
                 # can't carry a GTC exit; a sub-share trim is skipped.
@@ -1025,6 +1045,12 @@ class Orchestrator:
         by_symbol = {b.symbol: b for b in bundles}
         exited: set[str] = set()
         for pos in list(account.positions):
+            # Option rows: bundles are keyed by underlying, so an OCC symbol
+            # always looks "uncorroborated" — decay would wrongly fire an
+            # EQUITY close on it. Options already have a DTE-bounded lifecycle
+            # (watchdog premium stop/take + expiry close); leave them to it.
+            if pos.is_option:
+                continue
             # The core-satellite ETF carries no per-name thesis, so signal ABSENCE
             # must not decay-exit it (Todo 1.6) — it's a passive base allocation.
             if self.cfg.core_etf and pos.symbol == self.cfg.core_etf:

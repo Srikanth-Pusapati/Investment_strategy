@@ -90,6 +90,13 @@ class RiskLimits:
     # --- options (defined-risk only) ---
     options_enabled: bool            # master gate for the options path
     max_option_premium_pct: float    # max % equity as debit on one options play
+    # Option positions have NO exchange bracket and per-share P&L math, so the
+    # watchdog runs dedicated deterministic exits on the NET PREMIUM of each
+    # (underlying, expiry) structure. Defaulted fields — existing RiskLimits(...)
+    # call sites keep working; all inert while options_enabled is off.
+    option_stop_loss_pct: float = 50.0    # exit at -X% of premium paid (0=off)
+    option_take_profit_pct: float = 100.0 # exit at +X% of premium paid (0=off)
+    option_close_dte: float = 3.0         # exit <= X days to expiry (0=off)
     # --- R.1 vol-scaled ("ATR-style") dynamic stops ---
     # One fixed stop % is too tight for volatile names (chopped out by normal
     # noise — the exact failure D.1 measured on the old 5% stop) and too loose
@@ -417,6 +424,9 @@ def load_config() -> Config:
             target_annual_vol_pct=_f("TARGET_ANNUAL_VOL_PCT", 25.0),
             options_enabled=_flag("OPTIONS_ENABLED"),
             max_option_premium_pct=_f("MAX_OPTION_PREMIUM_PCT", 1.0),
+            option_stop_loss_pct=_f("OPTION_STOP_LOSS_PCT", 50.0),
+            option_take_profit_pct=_f("OPTION_TAKE_PROFIT_PCT", 100.0),
+            option_close_dte=_f("OPTION_CLOSE_DTE", 3.0),
             # R.1 vol-scaled stops: off until the --sweep-stops evidence says
             # otherwise for this account's basket; flip in .env when it does.
             vol_stops_enabled=_flag("VOL_STOPS_ENABLED"),
