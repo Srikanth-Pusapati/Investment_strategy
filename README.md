@@ -139,3 +139,30 @@ The mechanics of each stage, every config knob, options trading, and the multi-u
 roadmap live in [Todo-2.txt](Todo-2.txt) and [completed.txt](completed.txt), and the
 code is small and commented — start at [orchestrator.py](investment_strategy/orchestrator.py)
 (the loop) and [risk.py](investment_strategy/risk.py) (the safety core).
+
+
+
+
+# 1. Identify the running bot Stop the running bot
+ps aux | grep "[i]nvestment_strategy"
+# Get the PID from above ex: 48896
+
+# 2. Stop the running bot
+kill 48896
+
+# 3. Wait for it to exit and release state/bot.lock (~2s), then confirm it's gone
+sleep 3 && ps aux | grep "[i]nvestment_strategy"     
+# should print nothing
+
+# 4. Start a fresh detached instance
+cd ~/Personal/Investment_stratergy
+nohup .venv/bin/python -m investment_strategy >> logs/stdout.log 2>&1 &
+
+# 5. Confirm exactly one is running and it holds the lock
+sleep 3 && ps aux | grep "[i]nvestment_strategy" | grep -v caffeinate
+cat state/bot.lock          
+
+# should show the new PID
+
+# 6. tail the logs to see whats happening
+tail -f ~/Personal/Investment_stratergy/logs/stdout.log
