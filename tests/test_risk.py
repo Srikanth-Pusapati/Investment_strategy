@@ -949,3 +949,38 @@ def _run_all():
 
 if __name__ == "__main__":
     sys.exit(1 if _run_all() else 0)
+
+
+def test_option_rejected_when_daily_loss_halted():
+    # An option debit is a new position — the account-wide halt gate applies.
+    rm = _rm(_limits(options_enabled=True))
+    p = _opt(OptionStrategy.LONG_PUT,
+             [OptionLeg(expiry="2026-07-17", strike=200, right="put", side=Action.BUY)])
+    acct = _account(equity=96_000.0, last_equity=100_000.0)  # -4% day >= 3% cap
+    d = rm.evaluate_option(p, acct, est_premium_per_contract=2.0)
+    assert d.verdict is RiskVerdict.REJECTED
+    assert "daily loss" in d.reason.lower()
+
+
+def test_option_rejected_when_halt_latched():
+    import tempfile as _tf
+    import uuid as _uuid
+    from investment_strategy.state import PortfolioState as _PS
+    state = _PS(path=os.path.join(_tf.gettempdir(), f"_rm_opt_{_uuid.uuid4().hex}.json"))
+    state.halted, state.halt_reason = True, "EQUITY FLOOR (test)"
+    rm = _rm(_limits(options_enabled=True), state=state)
+    p = _opt(OptionStrategy.LONG_CALL,
+             [OptionLeg(expiry="2026-07-17", strike=200, right="call", side=Action.BUY)])
+    d = rm.evaluate_option(p, _account(), est_premium_per_contract=2.0)
+    assert d.verdict is RiskVerdict.REJECTED
+    assert "halt latch" in d.reason.lower()
+
+
+def test_option_rejected_at_max_open_positions():
+    rm = _rm(_limits(options_enabled=True, max_open_positions=1))
+    p = _opt(OptionStrategy.LONG_CALL,
+             [OptionLeg(expiry="2026-07-17", strike=200, right="call", side=Action.BUY)])
+    d = rm.evaluate_option(p, _account(positions=[_pos()]),
+                           est_premium_per_contract=2.0)
+    assert d.verdict is RiskVerdict.REJECTED
+    assert "max open positions" in d.reason.lower()

@@ -537,8 +537,12 @@ class RiskManager:
         small % of equity. Rejects everything if options are disabled."""
         if not self.limits.options_enabled:
             return self._reject(proposal, "Options trading disabled (OPTIONS_ENABLED=off).")
-        if self.kill_switch:
-            return self._reject(proposal, "KILL_SWITCH is on — no new positions.")
+        # Same account-wide gate as equity buys: halt latch, kill switch, daily
+        # loss, drawdown, max positions, PDT. An option debit is still a new
+        # position — it must never open through a halt.
+        halted, why = self.trading_halted(account)
+        if halted:
+            return self._reject(proposal, why)
         if proposal.option_strategy is None or not proposal.option_legs:
             return self._reject(proposal, "Option proposal missing strategy/legs.")
         ok, why = self._legs_are_defined_risk(proposal)

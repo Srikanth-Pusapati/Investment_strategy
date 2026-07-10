@@ -416,12 +416,23 @@ class AlpacaClient:
         if not self.cfg.can_open_orders:
             log.warning("Option order blocked: new orders disabled (kill switch).")
             return None
-        order_class = OrderClass.MLEG if len(legs) > 1 else OrderClass.SIMPLE
         try:
-            req = MarketOrderRequest(
-                qty=qty, time_in_force=TimeInForce.DAY,
-                order_class=order_class, legs=legs,
-            )
+            if len(legs) == 1:
+                # A 1-leg "MLEG" is rejected by the SDK (MLEG needs 2-4 legs)
+                # and OrderClass.SIMPLE requires symbol+side on the request
+                # itself — so a long call/put goes out as a plain market order
+                # on the OCC symbol, carrying the leg's position intent.
+                leg = legs[0]
+                req = MarketOrderRequest(
+                    symbol=leg.symbol, qty=qty * int(leg.ratio_qty or 1),
+                    side=leg.side, time_in_force=TimeInForce.DAY,
+                    position_intent=leg.position_intent,
+                )
+            else:
+                req = MarketOrderRequest(
+                    qty=qty, time_in_force=TimeInForce.DAY,
+                    order_class=OrderClass.MLEG, legs=legs,
+                )
             placed = self.trading.submit_order(req)
         except Exception as e:
             log.error("submit_option_legs failed: %s", e)
@@ -826,10 +837,13 @@ class AlpacaClient:
         # open orders). Missing/None -> assume all of it is sellable.
         avail_raw = getattr(p, "qty_available", None)
         qty_available = float(avail_raw) if avail_raw is not None else qty
+        ac_raw = getattr(p, "asset_class", None)
+        asset_class = str(getattr(ac_raw, "value", ac_raw) or "us_equity")
         return Position(
             symbol=p.symbol,
             qty=qty,
             qty_available=qty_available,
+            asset_class=asset_class,
             avg_entry_price=float(p.avg_entry_price),
             current_price=float(p.current_price or 0),
             market_value=float(p.market_value or 0),

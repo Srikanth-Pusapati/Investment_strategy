@@ -8,7 +8,9 @@ can bound the debit before anything is placed.
 from __future__ import annotations
 
 import logging
+import re
 from datetime import datetime
+from math import gcd
 
 from alpaca.data.historical.option import OptionHistoricalDataClient
 from alpaca.data.requests import OptionLatestQuoteRequest
@@ -16,7 +18,7 @@ from alpaca.trading.enums import OrderSide, PositionIntent
 from alpaca.trading.requests import OptionLegRequest
 
 from ..config import Config
-from ..models import Action, OptionLeg, TradeProposal
+from ..models import Action, OptionLeg, Position, TradeProposal
 
 log = logging.getLogger("options")
 
@@ -29,6 +31,49 @@ def occ_symbol(underlying: str, expiry: str, strike: float, right: str) -> str:
     cp = "C" if right.lower().startswith("c") else "P"
     strike_int = int(round(strike * 1000))
     return f"{underlying.upper()}{d:%y%m%d}{cp}{strike_int:08d}"
+
+
+_OCC_RE = re.compile(r"^([A-Z][A-Z0-9.]{0,5})(\d{6})([CP])(\d{8})$")
+
+
+def parse_occ(symbol: str) -> tuple[str, str, str, float] | None:
+    """Inverse of occ_symbol: AAPL260116C00150000 ->
+    ("AAPL", "2026-01-16", "C", 150.0). None when not OCC-shaped (an equity
+    ticker never matches — the digits run is too short)."""
+    m = _OCC_RE.match(symbol.upper().strip())
+    if not m:
+        return None
+    under, ymd, right, strike = m.groups()
+    try:
+        expiry = datetime.strptime(ymd, "%y%m%d").strftime("%Y-%m-%d")
+    except ValueError:
+        return None
+    return under, expiry, right, int(strike) / 1000.0
+
+
+def build_closing_legs(positions: list[Position]) -> tuple[list[OptionLegRequest], int]:
+    """Broker-ready legs that CLOSE existing option positions (one Position row
+    per OCC contract; the short leg of a spread carries negative qty). Long ->
+    SELL_TO_CLOSE, short -> BUY_TO_CLOSE, so a spread unwinds as ONE MLEG order
+    and never passes through a naked-short intermediate state. Returns
+    (legs, group_qty) where group_qty x ratio_qty = contracts per leg."""
+    counts = [max(1, int(round(abs(p.qty)))) for p in positions]
+    group_qty = counts[0]
+    for c in counts[1:]:
+        group_qty = gcd(group_qty, c)
+    legs: list[OptionLegRequest] = []
+    for pos, count in zip(positions, counts):
+        is_long = pos.qty > 0
+        legs.append(OptionLegRequest(
+            symbol=pos.symbol,
+            ratio_qty=count // group_qty,
+            side=OrderSide.SELL if is_long else OrderSide.BUY,
+            position_intent=(
+                PositionIntent.SELL_TO_CLOSE if is_long
+                else PositionIntent.BUY_TO_CLOSE
+            ),
+        ))
+    return legs, group_qty
 
 
 class OptionsHelper:

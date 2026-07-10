@@ -503,3 +503,104 @@ def _run_all():
 
 if __name__ == "__main__":
     sys.exit(1 if _run_all() else 0)
+
+
+# -- options: order construction + OCC parsing + closing legs ----------------- #
+from alpaca.trading.enums import OrderClass as _OC
+from alpaca.trading.enums import OrderSide as _OS
+from alpaca.trading.enums import PositionIntent as _PI
+from alpaca.trading.requests import OptionLegRequest as _OLR
+
+from investment_strategy.execution.options import (
+    build_closing_legs,
+    occ_symbol,
+    parse_occ,
+)
+from investment_strategy.models import Position
+
+
+class _FakeOptionTrading:
+    def __init__(self):
+        self.submitted = []
+
+    def submit_order(self, req):
+        self.submitted.append(req)
+        return SimpleNamespace(id="opt-oid-1")
+
+
+def _opt_client():
+    c = AlpacaClient.__new__(AlpacaClient)
+    c.cfg = SimpleNamespace(can_open_orders=True)
+    c.trading = _FakeOptionTrading()
+    return c
+
+
+def test_single_leg_option_submits_plain_order_with_symbol_and_side():
+    # Regression: a 1-leg OrderClass.SIMPLE with legs=[...] and no symbol/side
+    # is refused by the SDK's request validator — long calls/puts could never
+    # submit. Uses the REAL request class so the SDK itself vets the shape.
+    c = _opt_client()
+    leg = _OLR(symbol="AAPL260814P00150000", ratio_qty=1, side=_OS.BUY,
+               position_intent=_PI.BUY_TO_OPEN)
+    oid = c.submit_option_legs([leg], qty=3)
+    assert oid == "opt-oid-1"
+    req = c.trading.submitted[0]
+    assert req.symbol == "AAPL260814P00150000"
+    assert req.side == _OS.BUY
+    assert req.qty == 3
+    assert req.position_intent == _PI.BUY_TO_OPEN
+    assert not req.legs                              # no MLEG wrapper
+
+
+def test_two_leg_option_submits_one_mleg_order():
+    c = _opt_client()
+    legs = [
+        _OLR(symbol="AAPL260814P00160000", ratio_qty=1, side=_OS.BUY,
+             position_intent=_PI.BUY_TO_OPEN),
+        _OLR(symbol="AAPL260814P00150000", ratio_qty=1, side=_OS.SELL,
+             position_intent=_PI.SELL_TO_OPEN),
+    ]
+    oid = c.submit_option_legs(legs, qty=2)
+    assert oid == "opt-oid-1"
+    req = c.trading.submitted[0]
+    assert req.order_class == _OC.MLEG
+    assert len(req.legs) == 2 and req.qty == 2
+
+
+def test_parse_occ_round_trips_and_rejects_equities():
+    sym = occ_symbol("AAPL", "2026-08-14", 150.0, "put")
+    assert sym == "AAPL260814P00150000"
+    assert parse_occ(sym) == ("AAPL", "2026-08-14", "P", 150.0)
+    assert parse_occ("AAPL") is None
+    assert parse_occ("BRK.B") is None
+    assert parse_occ("QQQ") is None
+
+
+def _opt_pos(symbol, qty, basis=3.0, price=2.0):
+    return Position(symbol=symbol, qty=qty, avg_entry_price=basis,
+                    current_price=price, market_value=qty * price * 100,
+                    unrealized_pl=(price - basis) * qty * 100,
+                    unrealized_pl_pct=(price / basis - 1) * 100,
+                    asset_class="us_option")
+
+
+def test_build_closing_legs_flips_sides_and_uses_close_intents():
+    long_leg = _opt_pos("AAPL260814P00160000", qty=2.0)
+    short_leg = _opt_pos("AAPL260814P00150000", qty=-2.0, basis=1.0, price=0.5)
+    legs, group_qty = build_closing_legs([long_leg, short_leg])
+    assert group_qty == 2
+    assert [l.ratio_qty for l in legs] == [1, 1]
+    assert legs[0].side == _OS.SELL
+    assert legs[0].position_intent == _PI.SELL_TO_CLOSE
+    assert legs[1].side == _OS.BUY
+    assert legs[1].position_intent == _PI.BUY_TO_CLOSE
+
+
+def test_to_position_maps_asset_class():
+    sdk = _sdk_position()
+    sdk.asset_class = SimpleNamespace(value="us_option")
+    pos = AlpacaClient._to_position(sdk)
+    assert pos.asset_class == "us_option" and pos.is_option is True
+    # And absent asset_class (backtest fixtures, older SDKs) stays equity.
+    pos2 = AlpacaClient._to_position(_sdk_position())
+    assert pos2.asset_class == "us_equity" and pos2.is_option is False
