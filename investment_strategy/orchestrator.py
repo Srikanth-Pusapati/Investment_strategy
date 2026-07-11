@@ -344,6 +344,12 @@ class Orchestrator:
             run_postmortem(self.cfg, self.ledger, self.journal, day,
                            max_lessons=self.cfg.postmortem_max_lessons)
             self.state.set_postmortem_done(day)
+            from .usage import summarize_day
+            calls, in_tok, out_tok, cost = summarize_day()
+            log.info(
+                "API spend today: $%.2f across %d calls (%s in / %s out tokens).",
+                cost, calls, f"{in_tok:,}", f"{out_tok:,}",
+            )
         except Exception as e:
             log.warning("Nightly post-mortem failed: %s", e)
 

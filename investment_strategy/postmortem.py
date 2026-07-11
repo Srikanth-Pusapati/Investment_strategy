@@ -18,6 +18,8 @@ import logging
 import sys
 from pathlib import Path
 
+from .usage import record_usage
+
 log = logging.getLogger("postmortem")
 
 _LESSONS_DIR = Path("state") / "lessons"
@@ -170,6 +172,8 @@ def run_postmortem(
     except Exception as e:
         log.error("Post-mortem Claude call failed: %s", e)
         return None
+
+    record_usage(resp, cfg.decision_model, "postmortem")
 
     text = next((b.text for b in resp.content if b.type == "text"), "")
     try:
