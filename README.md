@@ -166,3 +166,7 @@ cat state/bot.lock
 
 # 6. tail the logs to see whats happening
 tail -f ~/Personal/Investment_stratergy/logs/stdout.log
+
+
+# 7. When ever the Robinhood token expires perform this
+.venv/bin/python -m investment_strategy.portfolio.robinhood_auth login
