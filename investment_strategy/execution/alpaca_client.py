@@ -416,17 +416,56 @@ class AlpacaClient:
         if not self.cfg.can_open_orders:
             log.warning("Option order blocked: new orders disabled (kill switch).")
             return None
-        order_class = OrderClass.MLEG if len(legs) > 1 else OrderClass.SIMPLE
         try:
-            req = MarketOrderRequest(
-                qty=qty, time_in_force=TimeInForce.DAY,
-                order_class=order_class, legs=legs,
-            )
+            if len(legs) == 1:
+                # A 1-leg "MLEG" is rejected by the SDK (MLEG needs 2-4 legs)
+                # and OrderClass.SIMPLE requires symbol+side on the request
+                # itself — so a long call/put goes out as a plain market order
+                # on the OCC symbol, carrying the leg's position intent.
+                leg = legs[0]
+                req = MarketOrderRequest(
+                    symbol=leg.symbol, qty=qty * int(leg.ratio_qty or 1),
+                    side=leg.side, time_in_force=TimeInForce.DAY,
+                    position_intent=leg.position_intent,
+                )
+            else:
+                req = MarketOrderRequest(
+                    qty=qty, time_in_force=TimeInForce.DAY,
+                    order_class=OrderClass.MLEG, legs=legs,
+                )
             placed = self.trading.submit_order(req)
         except Exception as e:
             log.error("submit_option_legs failed: %s", e)
             return None
         log.info("OPTION %d-leg order qty=%d (order %s)", len(legs), qty, placed.id)
+        return str(placed.id)
+
+    def close_option_group(self, positions: list[Position]) -> Optional[str]:
+        """Close a whole option structure — never gated by the kill switch
+        (closing is risk reduction). One leg -> plain close on the OCC symbol;
+        2+ legs -> ONE closing MLEG order (each leg flipped to its *_TO_CLOSE
+        intent) so a spread never passes through a naked-short intermediate
+        state. Options are DAY-only at Alpaca, so there is no GTC fallback —
+        a failed close is retried by the watchdog next tick."""
+        from .options import build_closing_legs
+        if len(positions) == 1:
+            return self.close_position(positions[0].symbol)
+        try:
+            legs, group_qty = build_closing_legs(positions)
+            req = MarketOrderRequest(
+                qty=group_qty, time_in_force=TimeInForce.DAY,
+                order_class=OrderClass.MLEG, legs=legs,
+            )
+            placed = self.trading.submit_order(req)
+        except Exception as e:
+            log.error(
+                "close_option_group(%s) failed: %s",
+                ",".join(p.symbol for p in positions), e,
+            )
+            return None
+        log.info(
+            "OPTION close %d-leg qty=%d (order %s)", len(legs), group_qty, placed.id,
+        )
         return str(placed.id)
 
     # -- partial reduce (never gated — risk reduction) --------------------- #
@@ -826,10 +865,13 @@ class AlpacaClient:
         # open orders). Missing/None -> assume all of it is sellable.
         avail_raw = getattr(p, "qty_available", None)
         qty_available = float(avail_raw) if avail_raw is not None else qty
+        ac_raw = getattr(p, "asset_class", None)
+        asset_class = str(getattr(ac_raw, "value", ac_raw) or "us_equity")
         return Position(
             symbol=p.symbol,
             qty=qty,
             qty_available=qty_available,
+            asset_class=asset_class,
             avg_entry_price=float(p.avg_entry_price),
             current_price=float(p.current_price or 0),
             market_value=float(p.market_value or 0),

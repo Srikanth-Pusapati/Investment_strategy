@@ -125,3 +125,77 @@ def _run_all():
 
 if __name__ == "__main__":
     sys.exit(1 if _run_all() else 0)
+
+
+# --------------------------------------------------------------------------- #
+# C.5: Robinhood-first market-wide calendar (yfinance stays the fallback)
+# --------------------------------------------------------------------------- #
+class _FakeRHReader:
+    def __init__(self, payload, enabled=True):
+        self.payload = payload
+        self.enabled = enabled
+        self.calls = []
+
+    def call_json(self, tool, arguments=None):
+        self.calls.append((tool, arguments))
+        return self.payload
+
+
+def test_rh_calendar_answers_without_yfinance():
+    reader = _FakeRHReader([
+        {"symbol": "LLY", "report_date": "2026-06-30"},   # 2 days out
+        {"ticker": "TSM", "date": "2026-07-20"},           # alt field names
+        {"symbol": "OLD", "report_date": "2026-06-01"},    # past -> dropped
+    ])
+    cal = EarningsCalendar(reader=reader)
+    cal._yf_lookup = lambda *_: (_ for _ in ()).throw(AssertionError("yf called"))
+    assert cal.days_until_earnings("LLY", today=_TODAY) == 2
+    assert cal.days_until_earnings("TSM", today=_TODAY) == 22
+    # Absent from a SUCCESSFUL window read = no report inside 31d -> None,
+    # and still no yfinance call.
+    assert cal.days_until_earnings("AAPL", today=_TODAY) is None
+    # The market-wide calendar was fetched exactly once for all three lookups.
+    assert len(reader.calls) == 1
+    assert reader.calls[0] == ("get_earnings_calendar", {"days": 31})
+
+
+def test_rh_calendar_keeps_nearest_of_duplicate_reports():
+    reader = _FakeRHReader([
+        {"symbol": "LLY", "report_date": "2026-07-15"},
+        {"symbol": "LLY", "report_date": "2026-06-30"},
+    ])
+    cal = EarningsCalendar(reader=reader)
+    assert cal.days_until_earnings("LLY", today=_TODAY) == 2
+
+
+def test_rh_failure_falls_back_to_yfinance():
+    reader = _FakeRHReader(None)                      # MCP call failed
+    cal = EarningsCalendar(reader=reader)
+    cal._yf_lookup = lambda sym, today: 5
+    assert cal.days_until_earnings("LLY", today=_TODAY) == 5
+
+
+def test_rh_disabled_falls_back_to_yfinance():
+    reader = _FakeRHReader([{"symbol": "LLY", "report_date": "2026-06-30"}],
+                           enabled=False)
+    cal = EarningsCalendar(reader=reader)
+    cal._yf_lookup = lambda sym, today: 7
+    assert cal.days_until_earnings("LLY", today=_TODAY) == 7
+    assert reader.calls == []                         # never called while off
+
+
+def test_rh_calendar_refetched_after_new_cycle():
+    reader = _FakeRHReader([{"symbol": "LLY", "report_date": "2026-06-30"}])
+    cal = EarningsCalendar(reader=reader)
+    cal.days_until_earnings("LLY", today=_TODAY)
+    cal.new_cycle()
+    cal.days_until_earnings("LLY", today=_TODAY)
+    assert len(reader.calls) == 2                     # once per cycle
+
+
+def test_rh_calendar_nested_payload_tolerated():
+    reader = _FakeRHReader({"earnings": [
+        {"symbol": "NVDA", "earnings_date": "2026-07-01"},
+    ]})
+    cal = EarningsCalendar(reader=reader)
+    assert cal.days_until_earnings("NVDA", today=_TODAY) == 3

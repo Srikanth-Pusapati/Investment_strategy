@@ -114,6 +114,52 @@ def _check_robinhood(cfg):
         return False, f"Robinhood MCP read FAILED: {e}"
 
 
+def _check_options(cfg):
+    """Options readiness: the account must be options-approved at Alpaca AND the
+    option-chain data feed must actually serve snapshots — flipping
+    OPTIONS_ENABLED=on without either means every proposal dies at submit time.
+    Skipped (advisory) while options are off."""
+    if not cfg.risk.options_enabled:
+        return True, "Options OFF (optional) — set OPTIONS_ENABLED=on for defined-risk options."
+    try:
+        from alpaca.trading.client import TradingClient
+        raw = TradingClient(
+            cfg.alpaca_api_key, cfg.alpaca_secret_key, paper=not cfg.is_live,
+        ).get_account()
+        level = int(getattr(raw, "options_trading_level", 0) or 0)
+        if level < 2:
+            return False, (
+                f"Alpaca options_trading_level={level} — long options need level 2+. "
+                "Enable options on the account (dashboard -> settings)."
+            )
+        from alpaca.data.historical.option import OptionHistoricalDataClient
+        from alpaca.data.requests import OptionChainRequest
+        from datetime import date, timedelta
+        chain = OptionHistoricalDataClient(
+            cfg.alpaca_api_key, cfg.alpaca_secret_key,
+        ).get_option_chain(OptionChainRequest(
+            underlying_symbol="SPY",
+            expiration_date_gte=date.today() + timedelta(days=7),
+            expiration_date_lte=date.today() + timedelta(days=35),
+        ))
+        if not chain:
+            return False, ("Options data feed returned an EMPTY SPY chain — the "
+                           "options_chain signal and premium estimates would run blind.")
+        with_iv = sum(
+            1 for s in list(chain.values())[:100]
+            if getattr(s, "implied_volatility", None)
+        )
+        spread_note = "" if level >= 3 else (
+            " NOTE: level<3 — single-leg only; Alpaca will refuse MLEG spreads."
+        )
+        return True, (
+            f"Options ready — trading level {level}; SPY chain {len(chain)} "
+            f"contracts ({with_iv}/100 sampled carry IV).{spread_note}"
+        )
+    except Exception as e:
+        return False, f"Options preflight FAILED: {e}"
+
+
 def _check_alert_send(cfg, send: bool):
     """SEND a real test page through the configured sink — the only way to know
     the pager works is to page. Skipped (advisory) when alerts are off/unwired."""
@@ -152,7 +198,7 @@ def main() -> int:
 
     critical_ok = True
     for check in (_check_alpaca, _check_anthropic, _check_quiver,
-                  _check_regime_feed, _check_robinhood):
+                  _check_regime_feed, _check_robinhood, _check_options):
         ok, msg = check(cfg)
         critical_ok = critical_ok and ok
         print(f"  {'✅' if ok else '❌'} {msg}")

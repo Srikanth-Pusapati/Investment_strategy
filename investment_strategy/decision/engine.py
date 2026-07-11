@@ -12,6 +12,7 @@ import logging
 import anthropic
 
 from ..config import Config
+from ..usage import record_usage
 from ..models import (
     AccountSnapshot,
     ExternalHolding,
@@ -64,8 +65,8 @@ class DecisionEngine:
                 max_tokens=16000,
                 thinking={"type": "adaptive"},
                 # Cache the static system prompt so it isn't re-billed every cycle.
-                # 1h TTL (not the 5m default) because cycles are ~15m apart — a 5m
-                # entry would expire between calls and never be read. Note: on Opus
+                # 1h TTL (not the 5m default) so it can survive the gap between
+                # decision cycles (see DECISION_INTERVAL_SECONDS). Note: on Opus
                 # the minimum cacheable prefix is 4096 tokens; until SYSTEM_PROMPT
                 # (plus any future shared context) crosses that, this is a no-op and
                 # cache_creation_input_tokens stays 0. The output_config schema is
@@ -89,6 +90,8 @@ class DecisionEngine:
         except anthropic.APIError as e:
             log.error("Claude decision call failed: %s", e)
             return []
+
+        record_usage(resp, self.model, "decision")
 
         if resp.stop_reason == "refusal":
             log.warning("Decision model refused; treating as no-action this cycle.")
@@ -173,7 +176,9 @@ class DecisionEngine:
             lines.append(f"### {b.symbol}{tag}")
             for s in b.signals:
                 score = f" score={s.score:+.2f}" if s.score is not None else ""
-                lines.append(f"- [{s.kind.value}]{score} {self._safe(s.summary)}")
+                # Bound per-signal text: a pathological news blurb shouldn't be
+                # able to blow up the prompt (and the bill) on its own.
+                lines.append(f"- [{s.kind.value}]{score} {self._safe(s.summary)[:240]}")
             lines.append("")
 
         lines.append("</market_data>")

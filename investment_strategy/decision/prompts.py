@@ -68,6 +68,24 @@ risk layer caps it. Every short leg MUST be covered by a long leg of the same \
 right (no ratio spreads, no naked shorts) and the net must be a DEBIT — the risk \
 layer rejects anything else outright. Singles are one long leg; verticals are \
 one long + one short leg. Default to equity unless options clearly fit better.
+- WHEN an option beats equity: (a) a corroborated BEARISH thesis on a slate \
+name — you cannot short stock, so a long_put or bear_put_spread is the ONLY way \
+to profit from an expected fall; (b) a high-conviction bullish thesis with a \
+defined near-term catalyst where a capped-debit long_call/bull_call_spread \
+expresses it with less capital at risk than shares. Pick expiries 2-8 weeks out \
+(the risk layer rejects <7 or >60 days), strikes at/near the money, both \
+vertical legs on ONE expiry. If the options_chain signal shows a HIGH ATM IV, \
+prefer a spread (the short leg offsets the rich premium); modest IV favors a \
+single long leg. Do not propose stop/take levels for options — exits are \
+managed deterministically (premium stop/take and a forced close near expiry).
+- The options_chain signal is a POSITIONING read from the live option chain: \
+ATM implied volatility (how much movement is priced in), put-call IV skew \
+(puts bid over calls = downside being paid up for), and the put/call \
+open-interest lean. A bearish options_chain lean that corroborates a \
+deteriorating thesis (technical breakdown, insider selling, bad news) is the \
+trigger to consider a long_put/bear_put_spread; a bullish lean corroborates \
+call structures. High ATM IV also means expensive premium — prefer spreads \
+there. It is positioning, not thesis: never act on it alone.
 - If a "## Track record" block is present, it is YOUR realized P&L by entry \
 signal from past closed trades (trusted, not market data). Use it to weight \
 conviction toward sources that have actually predicted P&L and away from those \

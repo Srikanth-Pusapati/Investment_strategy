@@ -41,6 +41,7 @@ class SignalKind(str, Enum):
     CONGRESS = "congress"
     OFFEXCHANGE = "offexchange"  # dark-pool / off-exchange short volume (~1d lag)
     GOVCONTRACTS = "govcontracts"  # federal contract awards (revenue catalyst; days lag)
+    OPTIONS_CHAIN = "options_chain"  # per-name IV/skew/OI positioning read (real-time)
     MACRO = "macro"
     DISCOVERY = "discovery"   # why a symbol was surfaced by the market scanner
 
@@ -173,6 +174,15 @@ class Position(BaseModel):
     market_value: float
     unrealized_pl: float
     unrealized_pl_pct: float
+    # Alpaca's asset_class: "us_equity" (default) or "us_option". An option
+    # position is one row PER OCC CONTRACT: symbol is the OCC symbol, qty is
+    # contracts (negative for the short leg of a spread), prices are per share
+    # (x100 per contract). Equity code paths must never treat these as stocks.
+    asset_class: str = "us_equity"
+
+    @property
+    def is_option(self) -> bool:
+        return self.asset_class == "us_option"
 
     @model_validator(mode="after")
     def _default_qty_available(self):

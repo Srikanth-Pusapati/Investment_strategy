@@ -25,7 +25,7 @@ from investment_strategy.state import PortfolioState
 
 class _FakeBroker:
     def __init__(self, positions, market_close_fails=False, stuck_replaces=(),
-                 working_exit=False):
+                 working_exit=False, option_close_fails=False):
         self._positions = positions
         self.market_close_fails = market_close_fails   # simulate closed/halted market
         # (new_order_id, qty) pairs clear_orders_for_exit "replaces" per call
@@ -42,6 +42,9 @@ class _FakeBroker:
         self.reduced: list[tuple[str, float]] = []
         self.rested: list[tuple[str, float, float]] = []
         self.unwedged: list[tuple[str, float]] = []
+        self.option_close_fails = option_close_fails
+        self.option_groups_closed: list[list[str]] = []
+        self.priced: list[str] = []      # every latest_price() lookup
 
     def get_account(self):
         if self.account is None:
@@ -62,7 +65,14 @@ class _FakeBroker:
         return f"oid-{symbol}"
 
     def latest_price(self, symbol):
+        self.priced.append(symbol)
         return 50.0
+
+    def close_option_group(self, positions):
+        if self.option_close_fails:
+            return None
+        self.option_groups_closed.append([p.symbol for p in positions])
+        return "opt-close-1"
 
     def close_position_marketable_limit(self, symbol, qty, ref_price):
         self.rested.append((symbol, qty, ref_price))
@@ -281,15 +291,42 @@ def test_flatten_partial_when_shares_locked():
 
 
 def test_close_hard_tries_plain_close_before_touching_orders():
-    # Cancel-then-close is what manufactures pending-cancel wedges: the close
-    # must be attempted FIRST, and no cancel sweep may run when it succeeds.
+    # Cancel-then-close is what manufactures pending-cancel wedges: when the
+    # shares are FREE the close must be attempted FIRST, and no cancel sweep
+    # may run when it succeeds.
     state = _state()
     state.register_exits("AAPL", stop_pct=10.0, take_pct=25.0)
     wd = Watchdog(_cfg(0.0), _FakeBroker([]), state=state)
-    assert wd._enforce_hard_exits(_pos_locked("AAPL")) is True
+    assert wd._enforce_hard_exits(_pos_locked("AAPL", avail=110.000186)) is True
     assert wd.broker.closed == ["AAPL"]
     assert wd.broker.canceled == []                 # nothing was in the way
     assert wd.broker.unwedged == []
+
+
+def test_close_hard_skips_doomed_plain_close_when_shares_reserved():
+    # BTDR/EQPT (2026-07-10): with every share held_for_orders the plain close
+    # is provably refused 40310000 — the watchdog must go straight to the
+    # replace-live-legs path without emitting the doomed close (ERROR noise).
+    state = _state()
+    state.register_exits("BTDR", stop_pct=10.0, take_pct=25.0)
+    broker = _FakeBroker([], stuck_replaces=[("new-1", 14.09)])
+    wd = Watchdog(_cfg(0.0), broker, state=state)
+    outcome, oid = wd._close_hard(_pos_locked("BTDR", qty=124.0, avail=0.0), "trail")
+    assert outcome == "partial"
+    assert broker.closed == []                      # doomed close never fired
+    assert broker.unwedged == [("BTDR", 50.0)]      # legs made marketable
+    assert broker.reduced == []                     # nothing free to sell
+
+
+def test_close_hard_reserved_with_free_slice_sells_slice_without_plain_close():
+    state = _state()
+    state.register_exits("LLY", stop_pct=10.0, take_pct=25.0)
+    broker = _FakeBroker([], stuck_replaces=[("new-1", 48.0)])
+    wd = Watchdog(_cfg(0.0), broker, state=state)
+    outcome, _oid = wd._close_hard(_pos_locked("LLY", qty=9.34975, avail=0.34975), "stop")
+    assert outcome == "partial"
+    assert broker.closed == []                      # no doomed full close
+    assert broker.reduced == [("LLY", 0.34975)]     # free slice sold NOW
 
 
 # -- scale-out at the take-profit target (1B.8) ------------------------------ #
@@ -430,3 +467,121 @@ def _run_all():
 
 if __name__ == "__main__":
     sys.exit(1 if _run_all() else 0)
+
+
+# -- option positions: premium stop/take + expiry time-stop ------------------- #
+from datetime import datetime as _dt, timedelta as _td, timezone as _tz
+
+from investment_strategy.execution.options import occ_symbol
+
+
+def _exp(days: int) -> str:
+    return (_dt.now(_tz.utc) + _td(days=days)).strftime("%Y-%m-%d")
+
+
+def _opt_leg(symbol, qty, basis, price):
+    return Position(symbol=symbol, qty=qty, avg_entry_price=basis,
+                    current_price=price, market_value=qty * price * 100.0,
+                    unrealized_pl=(price - basis) * qty * 100.0,
+                    unrealized_pl_pct=(price / basis - 1.0) * 100.0,
+                    asset_class="us_option")
+
+
+class _FakeLedger:
+    def __init__(self):
+        self.records = []
+
+    def record(self, rec):
+        self.records.append(rec)
+
+
+def test_option_premium_stop_closes_group_and_ledgers_under_underlying():
+    state, broker, led = _state(), _FakeBroker([]), _FakeLedger()
+    wd = Watchdog(_cfg(0.0), broker, state=state, ledger=led)
+    put = _opt_leg(occ_symbol("LLY", _exp(30), 700, "put"), qty=2, basis=3.0,
+                   price=1.2)                                  # -60% of premium
+    wd._check_option_positions([put])
+    assert broker.option_groups_closed == [[put.symbol]]
+    rec = led.records[-1]
+    assert rec.symbol == "LLY"                    # pairs with the entry record
+    assert rec.instrument == "option" and rec.exit_reason == "stop"
+    assert state.hours_since_exit("LLY") is not None   # re-entry cooldown stamped
+
+
+def test_option_spread_take_closes_both_legs_as_one_group():
+    state, broker, led = _state(), _FakeBroker([]), _FakeLedger()
+    wd = Watchdog(_cfg(0.0), broker, state=state, ledger=led)
+    exp = _exp(30)
+    long_put = _opt_leg(occ_symbol("AMD", exp, 160, "put"), qty=2, basis=3.0, price=6.5)
+    short_put = _opt_leg(occ_symbol("AMD", exp, 150, "put"), qty=-2, basis=1.0, price=1.5)
+    # net premium 600-200=400; net P&L 700-100=600 -> +150% >= +100% take
+    wd._check_option_positions([long_put, short_put])
+    assert len(broker.option_groups_closed) == 1               # ONE close order
+    assert sorted(broker.option_groups_closed[0]) == sorted(
+        [long_put.symbol, short_put.symbol])
+    assert led.records[-1].exit_reason == "take"
+
+
+def test_option_near_expiry_closes_regardless_of_pl():
+    state, broker, led = _state(), _FakeBroker([]), _FakeLedger()
+    wd = Watchdog(_cfg(0.0), broker, state=state, ledger=led)
+    call = _opt_leg(occ_symbol("TSM", _exp(2), 250, "call"), qty=1, basis=2.0,
+                    price=2.0)                                 # flat, 2 DTE <= 3
+    wd._check_option_positions([call])
+    assert broker.option_groups_closed == [[call.symbol]]
+    assert led.records[-1].exit_reason == "option_expiry"
+
+
+def test_option_within_bounds_left_alone():
+    state, broker = _state(), _FakeBroker([])
+    wd = Watchdog(_cfg(0.0), broker, state=state)
+    call = _opt_leg(occ_symbol("TSM", _exp(20), 250, "call"), qty=1, basis=2.0,
+                    price=1.6)                                 # -20%, 20 DTE
+    wd._check_option_positions([call])
+    assert broker.option_groups_closed == []
+
+
+def test_option_close_failure_pages_and_keeps_retrying():
+    state, broker = _state(), _FakeBroker([], option_close_fails=True)
+    alerts = []
+    wd = Watchdog(_cfg(0.0), broker, state=state,
+                  alerter=SimpleNamespace(critical=lambda k, s, b: alerts.append(k)))
+    put = _opt_leg(occ_symbol("LLY", _exp(30), 700, "put"), qty=1, basis=3.0, price=1.0)
+    wd._check_option_positions([put])
+    assert alerts == ["option-exit-fail:LLY"]
+    assert state.hours_since_exit("LLY") is None    # nothing recorded as closed
+
+
+def test_check_once_routes_options_away_from_equity_paths():
+    # An option row must never hit the equity stop/trail/time paths (they'd
+    # call latest_price on an OCC symbol and register bogus clocks).
+    state, broker = _state(), _FakeBroker([])
+    call = _opt_leg(occ_symbol("TSM", _exp(20), 250, "call"), qty=1, basis=2.0,
+                    price=1.6)                                 # within bounds
+    broker.account = AccountSnapshot(equity=1000.0, last_equity=1000.0, cash=0.0,
+                                     buying_power=0.0, positions=[call])
+    wd = Watchdog(_cfg(0.0, max_hold_days=30.0), broker, state=state)
+    wd.check_once()
+    assert broker.closed == [] and broker.option_groups_closed == []
+    assert call.symbol not in broker.priced         # equity paths never saw it
+    assert state.entry_age_days(call.symbol) is None  # no first-seen hold clock
+
+
+def test_flatten_all_closes_mixed_book_options_first_as_groups():
+    state = _state()
+    state.peak_equity = 1_000.0                     # floor 60% -> $600
+    broker = _FakeBroker([])
+    exp = _exp(30)
+    legs = [
+        _opt_leg(occ_symbol("AMD", exp, 160, "put"), qty=1, basis=3.0, price=3.0),
+        _opt_leg(occ_symbol("AMD", exp, 150, "put"), qty=-1, basis=1.0, price=1.0),
+    ]
+    acct = AccountSnapshot(equity=480.0, last_equity=480.0, cash=0.0,
+                           buying_power=0.0,
+                           positions=[_pos("AAPL"), *legs])
+    broker.account = acct                            # confirming re-read: still dead
+    wd = Watchdog(_cfg(60.0), broker, state=state)
+    assert wd._equity_floor_breached(acct) is True
+    assert broker.closed == ["AAPL"]                            # equity flattened
+    assert len(broker.option_groups_closed) == 1                # spread as ONE order
+    assert sorted(broker.option_groups_closed[0]) == sorted([l.symbol for l in legs])

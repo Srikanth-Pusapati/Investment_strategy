@@ -17,9 +17,11 @@ so a restart doesn't silently reset all protection to "all clear".
 from __future__ import annotations
 
 import logging
+from datetime import datetime, timezone
 
 from ..config import Config
 from ..execution import AlpacaClient
+from ..execution.options import parse_occ
 from ..ledger import TradeLedger, TradeRecord
 from ..models import AccountSnapshot, Position
 from ..notify import Alerter
@@ -76,8 +78,15 @@ class Watchdog:
         if self._emergency_flatten(account):
             return  # everything is being closed; nothing else to do
 
-        live = {p.symbol for p in account.positions}
-        for pos in account.positions:
+        # Option rows (OCC symbols, per-share prices, no exchange bracket) are
+        # invisible to the equity paths below — latest_price() on an OCC symbol
+        # returns garbage and %-P&L math differs. They get their own
+        # deterministic exits (premium stop/take + expiry time-stop).
+        equities = [p for p in account.positions if not p.is_option]
+        option_rows = [p for p in account.positions if p.is_option]
+
+        live = {p.symbol for p in equities}
+        for pos in equities:
             # Hard stop/take first — fractional positions have no exchange bracket,
             # so this loop is their ONLY hard-exit enforcement.
             if self._enforce_hard_exits(pos):
@@ -87,6 +96,7 @@ class Watchdog:
             if self._enforce_time_stop(pos):
                 continue
             self._update_trailing_stop(pos)
+        self._check_option_positions(option_rows)
         # Drop tracking for positions that are gone (filled stop/tp/sell).
         for sym in set(self.state.high_water) | set(self.state.exits):
             if sym not in live:
@@ -151,7 +161,15 @@ class Watchdog:
         """Close every position. Only forget trailing state on CONFIRMED close;
         a failed close is left tracked and loudly flagged so the next tick retries
         instead of silently leaving a naked, unmonitored position."""
+        # Option structures first, whole groups at a time (_close_hard would
+        # half-work on an OCC row: the close itself succeeds but every price
+        # fallback is broken, and a spread must never unwind leg-by-leg).
+        option_rows = [p for p in account.positions if p.is_option]
+        for group in self._option_groups(option_rows).values():
+            self._exit_option_group(group, "flatten")
         for pos in account.positions:
+            if pos.is_option:
+                continue
             if pos.qty <= 0:
                 # Already flat at broker (paper account lag can keep a zero-qty
                 # position in the snapshot briefly after a bracket stop fills).
@@ -191,26 +209,26 @@ class Watchdog:
                             retries the full close next tick.
           ("failed", None)  nothing could be done — caller pages a human.
 
-        The plain close comes FIRST, before touching any order: canceling a
-        bracket leg and re-selling its shares opens a wedge window — a cancel
-        stuck in `pending_cancel` reserves the shares indefinitely (new sells
-        40310000, re-cancels 42210000, replaces refused; seen with FRHC) —
-        whereas replacing a still-live leg into a marketable limit is atomic
-        and cannot strand anything.
+        When the shares are free, the plain close comes FIRST, before touching
+        any order: canceling a bracket leg and re-selling its shares opens a
+        wedge window — a cancel stuck in `pending_cancel` reserves the shares
+        indefinitely (new sells 40310000, re-cancels 42210000, replaces
+        refused; seen with FRHC) — whereas replacing a still-live leg into a
+        marketable limit is atomic and cannot strand anything. When shares ARE
+        reserved by open sells, the plain close is provably refused with
+        40310000 (seen with BTDR/EQPT), so we skip straight to the
+        replace-live-legs path — same outcome, no doomed ERROR line per tick.
 
         The market-closed / LULD-halt fallback (a plain market order is
         rejected) rests a GTC marketable-limit so the exit still fills at the
         reopen. That fallback is whole-share only (Alpaca rejects GTC/limit on
         fractional), so a sub-share position's overnight-gap risk stays
         irreducible."""
-        oid = self.broker.close_position(pos.symbol)
-        if oid:
-            return "full", oid
         avail = pos.qty_available
         if avail < pos.qty:
             # Shares reserved by open sell orders (bracket / GTC legs). Turn
             # the live legs themselves into the exit, sweep the rest, and sell
-            # whatever is free right now.
+            # whatever is free right now — still never cancel-then-resell.
             ref = self.broker.latest_price(pos.symbol)
             replaced = self.broker.clear_orders_for_exit(pos.symbol, ref)
             oid = self.broker.reduce_position(pos.symbol, avail) if avail > 0 else None
@@ -242,6 +260,9 @@ class Watchdog:
                 )
                 return "partial", None
             return "failed", None
+        oid = self.broker.close_position(pos.symbol)
+        if oid:
+            return "full", oid
         # Nothing reserved, yet the close was refused: resting orders (e.g. a
         # bracket on the buy side / wash-trade block) or a closed / halted
         # market. Sweep orders, retry once, then rest a GTC exit.
@@ -426,6 +447,128 @@ class Watchdog:
                     f"position is unprotected. Retrying every "
                     f"~{self.cfg.monitor_interval_s}s.",
                 )
+
+    # -- deterministic option exits (premium stop/take + expiry time-stop) -- #
+    @staticmethod
+    def _option_groups(
+        option_rows: list[Position],
+    ) -> dict[tuple[str, str], list[Position]]:
+        """Group option legs by (underlying, expiry) — a vertical's two legs are
+        ONE structure and must exit together. Unparseable symbols are skipped
+        loudly (they can't be managed deterministically)."""
+        groups: dict[tuple[str, str], list[Position]] = {}
+        for p in option_rows:
+            occ = parse_occ(p.symbol)
+            if occ is None:
+                log.warning("Unrecognized option symbol %s — not managed.", p.symbol)
+                continue
+            groups.setdefault((occ[0], occ[1]), []).append(p)
+        return groups
+
+    def _check_option_positions(self, option_rows: list[Position]) -> None:
+        """Options have no exchange bracket, so this loop is their ONLY
+        protection. Exit the WHOLE structure when its P&L (relative to the net
+        premium paid — the max loss on a debit play) breaches the premium
+        stop/take, or when expiry is close enough that assignment risk and
+        terminal theta outweigh any remaining thesis (the stale-option
+        time-stop), whichever comes first."""
+        if not option_rows:
+            return
+        stop = getattr(self.cfg.risk, "option_stop_loss_pct", 50.0)
+        take = getattr(self.cfg.risk, "option_take_profit_pct", 100.0)
+        close_dte = getattr(self.cfg.risk, "option_close_dte", 3.0)
+        for (under, expiry), group in self._option_groups(option_rows).items():
+            # Net premium PAID: long legs debit, short legs (negative qty)
+            # credit. The risk gate only approves net-debit structures, so this
+            # is positive for anything we opened ourselves.
+            basis = sum(p.avg_entry_price * p.qty * 100.0 for p in group)
+            pl = sum(p.unrealized_pl for p in group)
+            pl_pct = (pl / basis * 100.0) if basis > 1e-9 else 0.0
+            dte = self._days_to_expiry(expiry)
+            if stop > 0 and basis > 1e-9 and pl_pct <= -stop:
+                reason = "stop"
+                hit = f"premium stop -{stop:.0f}% (now {pl_pct:+.1f}%)"
+            elif take > 0 and basis > 1e-9 and pl_pct >= take:
+                reason = "take"
+                hit = f"premium take +{take:.0f}% (now {pl_pct:+.1f}%)"
+            elif close_dte > 0 and dte is not None and dte <= close_dte:
+                reason = "option_expiry"
+                hit = f"{dte:.0f} DTE <= {close_dte:.0f} — closing before expiry"
+            else:
+                continue
+            log.info(
+                "Option exit on %s %s: %s. Closing %d leg(s).",
+                under, expiry, hit, len(group),
+            )
+            self._exit_option_group(group, reason, under=under, pl_pct=pl_pct, pl=pl)
+
+    @staticmethod
+    def _days_to_expiry(expiry: str) -> float | None:
+        """Calendar days until the OCC expiry date. Computed against the UTC
+        date, which after 8pm ET reads one day AHEAD of the exchange calendar —
+        i.e. at worst a day conservative (closes sooner), never late."""
+        try:
+            exp = datetime.strptime(expiry, "%Y-%m-%d").date()
+        except ValueError:
+            return None
+        return float((exp - datetime.now(timezone.utc).date()).days)
+
+    def _exit_option_group(
+        self, group: list[Position], reason: str, *,
+        under: str | None = None, pl_pct: float | None = None,
+        pl: float | None = None,
+    ) -> bool:
+        """Close every leg of one option structure as a single order, ledger the
+        round-trip under the UNDERLYING (pairing it with the entry record so
+        attribution scores option trades), and page on failure. Returns True
+        when the close order went in."""
+        if under is None:
+            occ = parse_occ(group[0].symbol)
+            under = occ[0] if occ else group[0].symbol
+        if pl is None:
+            pl = sum(p.unrealized_pl for p in group)
+        if pl_pct is None:
+            basis = sum(p.avg_entry_price * p.qty * 100.0 for p in group)
+            pl_pct = (pl / basis * 100.0) if basis > 1e-9 else None
+        oid = self.broker.close_option_group(group)
+        if oid:
+            self._record_option_exit(under, group, oid, reason, pl_pct, pl)
+            return True
+        log.critical(
+            "Option close FAILED for %s (%s) — %d leg(s) unprotected. Will retry.",
+            under, reason, len(group),
+        )
+        self._alert(
+            f"option-exit-fail:{under}",
+            f"Option position {under} unprotected — {reason} close FAILED",
+            f"The {reason} exit for the {under} option structure "
+            f"({', '.join(p.symbol for p in group)}) did not go through. Options "
+            f"have no exchange bracket, so this loop is their only hard exit. "
+            f"Retrying every ~{self.cfg.monitor_interval_s}s.",
+        )
+        return False
+
+    def _record_option_exit(
+        self, under: str, group: list[Position], oid: str | None,
+        reason: str, pl_pct: float | None, pl: float,
+    ) -> None:
+        """Best-effort bookkeeping for an option close — mirrors _record_exit."""
+        try:
+            self.state.register_exit(under)  # re-entry cooldown on the NAME
+        except Exception as e:
+            log.warning("Exit-clock stamp failed for %s: %s", under, e)
+        if self.ledger is None:
+            return
+        try:
+            contracts = max(abs(p.qty) for p in group)
+            occs = ",".join(p.symbol for p in group)
+            self.ledger.record(TradeRecord.for_sell(
+                under, f"watchdog option {reason} ({occs})", oid,
+                qty=contracts, realized_pl_pct=pl_pct, realized_pl=pl,
+                exit_reason=reason, instrument="option",
+            ))
+        except Exception as e:  # never let logging break the watchdog
+            log.warning("Ledger option-exit record failed for %s: %s", under, e)
 
     def forget(self, symbol: str) -> None:
         """Drop trailing state when a position is gone (filled stop/tp)."""

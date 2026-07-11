@@ -16,6 +16,7 @@ from .insider_edgar import EdgarInsiderProvider
 from .macro import MacroProvider
 from .news import NewsProvider
 from .offexchange import OffExchangeProvider
+from .options_chain import OptionsChainProvider
 from .options_flow import OptionsFlowProvider
 from .quiver_client import QuiverClient
 from .technical import TechnicalProvider
@@ -38,6 +39,7 @@ class SignalAggregator:
             InsiderProvider(cfg),         # Form 4 insider via Finnhub (if key)
             EdgarInsiderProvider(cfg),    # Form 4 insider via SEC EDGAR (free; no key)
             OptionsFlowProvider(cfg),     # unusual options activity
+            OptionsChainProvider(cfg),    # ATM IV / skew / OI lean (Alpaca; C.4)
         ]
         self.market_wide: list[SignalProvider] = [MacroProvider(cfg)]
 

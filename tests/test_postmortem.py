@@ -10,7 +10,7 @@ from unittest.mock import patch
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import investment_strategy.postmortem as pm_mod
-from investment_strategy.postmortem import _append_curated, read_curated
+from investment_strategy.postmortem import _POSTMORTEM_SCHEMA, _append_curated, read_curated
 
 
 def _tmpdir() -> Path:
@@ -126,6 +126,82 @@ def test_injection_concat_nonempty():
     assert "Track record" in combined
     assert "Operating lessons" in combined
     assert "Cap LLY" in combined
+
+
+# ---- structured-output schema: API-compatible subset only ------------------ #
+
+def test_schema_has_no_unsupported_keywords():
+    """The Anthropic json_schema subset rejects array/string constraints like
+    maxItems (the Jul 9-10 nightly 400s). Guard the whole schema tree."""
+    banned = {"maxItems", "minItems", "maxLength", "minLength", "maxProperties"}
+
+    def walk(node):
+        if isinstance(node, dict):
+            hits = banned & set(node.keys())
+            assert not hits, f"Unsupported schema keyword(s) {hits} in {node}"
+            for v in node.values():
+                walk(v)
+        elif isinstance(node, list):
+            for v in node:
+                walk(v)
+
+    walk(_POSTMORTEM_SCHEMA)
+    assert _POSTMORTEM_SCHEMA.get("additionalProperties") is False
+
+
+# ---- run_postmortem: lesson truncation + curated write ---------------------- #
+
+class _FakeJournalRec:
+    def __init__(self):
+        self.action, self.verdict, self.symbol = "buy", "approved", "AAPL"
+        self.ts, self.conviction, self.approved_notional = "2026-07-10T10:00:00", 0.8, 500.0
+        self.reason = "test"
+
+
+class _FakeJournal:
+    def today(self, _dt):
+        return [_FakeJournalRec()]
+
+
+class _FakeLedger:
+    def effective(self):
+        return []
+
+
+def _fake_anthropic_returning(payload_json: str):
+    from unittest.mock import MagicMock
+    block = MagicMock()
+    block.type, block.text = "text", payload_json
+    resp = MagicMock()
+    resp.content = [block]
+    client = MagicMock()
+    client.messages.create.return_value = resp
+    fake_mod = MagicMock()
+    fake_mod.Anthropic.return_value = client
+    return fake_mod, client
+
+
+def test_run_postmortem_truncates_lessons_to_three_and_writes_curated():
+    import json
+    d = _tmpdir()
+    fake_mod, client = _fake_anthropic_returning(json.dumps({
+        "summary_md": "day summary",
+        "lessons": [f"Lesson {i}" for i in range(5)],
+    }))
+    cfg = type("Cfg", (), {"anthropic_api_key": "k", "decision_model": "m"})()
+    with patch.object(pm_mod, "_LESSONS_DIR", d), \
+         patch.object(pm_mod, "_CURATED_FILE", d / "curated.md"), \
+         patch.dict(sys.modules, {"anthropic": fake_mod}):
+        result = pm_mod.run_postmortem(cfg, _FakeLedger(), _FakeJournal(),
+                                       day="2026-07-10", max_lessons=15)
+    assert result is not None
+    # Only the first 3 of 5 lessons reach the curated file (prompt says 0-3;
+    # code enforces it since the schema no longer can).
+    lines = (d / "curated.md").read_text().splitlines()
+    assert lines == ["Lesson 0", "Lesson 1", "Lesson 2"]
+    # And the request used the module schema (no maxItems regression).
+    schema = client.messages.create.call_args.kwargs["output_config"]["format"]["schema"]
+    assert schema is _POSTMORTEM_SCHEMA
 
 
 def _run_all():

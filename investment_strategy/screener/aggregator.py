@@ -18,6 +18,7 @@ from .congress_feed import CongressFeedScreener
 from .insider_feed import InsiderFeedScreener
 from .options_flow_feed import OptionsFlowScreener
 from .robinhood_feed import RobinhoodMoversScreener
+from .robinhood_scan_feed import RobinhoodScanScreener
 from .wallstreetbets_feed import WallStreetBetsScreener
 
 log = logging.getLogger("screener")
@@ -28,6 +29,7 @@ _REGISTRY: dict[str, type[Screener]] = {
     "insider": InsiderFeedScreener,
     "options_flow": OptionsFlowScreener,
     "robinhood": RobinhoodMoversScreener,
+    "robinhood_scans": RobinhoodScanScreener,
     "wallstreetbets": WallStreetBetsScreener,
 }
 # Quiver-backed screeners take the shared client so they reuse the signal layer's

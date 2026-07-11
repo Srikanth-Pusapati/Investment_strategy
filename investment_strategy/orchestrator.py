@@ -28,6 +28,7 @@ from .correlation import CorrelationGuard
 from .decision import DecisionEngine
 from .earnings import EarningsCalendar
 from .execution import AlpacaClient, OptionsHelper
+from .execution.options import parse_occ
 from .ledger import TradeLedger, TradeRecord
 from .models import (
     Action,
@@ -83,9 +84,12 @@ class Orchestrator:
         self.quiver = QuiverClient(cfg.quiver_api_key)
         self.signals = SignalAggregator(cfg, self.quiver)
         self.screeners = ScreenerAggregator(cfg, self.quiver)
+        self.robinhood = RobinhoodReader(cfg)
         # Per-cycle-cached next-earnings lookup feeding the risk earnings-blackout
-        # guard (one lookup per symbol per cycle; advisory, fails open).
-        self.earnings = EarningsCalendar()
+        # guard (one lookup per symbol per cycle; advisory, fails open). With the
+        # RH MCP on, ONE market-wide calendar call per cycle replaces the flaky
+        # per-symbol yfinance lookups (C.5); yfinance stays as the fallback.
+        self.earnings = EarningsCalendar(reader=self.robinhood)
         # Per-cycle-cached sector lookup feeding the risk sector-concentration cap.
         self.sectors = SectorMap()
         # Per-cycle-cached pairwise-correlation guard (R.2): measures whether a
@@ -113,7 +117,6 @@ class Orchestrator:
             alerter=self.alerter,
         )
         self.benchmark = BenchmarkTracker(cfg, self.broker, symbol=cfg.benchmark_symbol)
-        self.robinhood = RobinhoodReader(cfg)
         self.options = OptionsHelper(cfg) if cfg.risk.options_enabled else None
         # Discovery-driven by design: default (unset) is no standing watchlist.
         # An explicit list can still force-include names; otherwise we trade only
@@ -341,6 +344,12 @@ class Orchestrator:
             run_postmortem(self.cfg, self.ledger, self.journal, day,
                            max_lessons=self.cfg.postmortem_max_lessons)
             self.state.set_postmortem_done(day)
+            from .usage import summarize_day
+            calls, in_tok, out_tok, cost = summarize_day()
+            log.info(
+                "API spend today: $%.2f across %d calls (%s in / %s out tokens).",
+                cost, calls, f"{in_tok:,}", f"{out_tok:,}",
+            )
         except Exception as e:
             log.warning("Nightly post-mortem failed: %s", e)
 
@@ -383,7 +392,18 @@ class Orchestrator:
         # this with NEW smart-money names so buy ideas can originate from the
         # market, not just a hand-typed list. Everything still flows through the
         # same signals -> decide -> risk path below.
-        base = set(self.watchlist) | {p.symbol for p in account.positions}
+        # Option rows carry OCC contract symbols — signal providers and
+        # screeners must see the UNDERLYING (keeps the thesis under review each
+        # cycle), never the raw contract symbol.
+        held: set[str] = set()
+        for p in account.positions:
+            if p.is_option:
+                occ = parse_occ(p.symbol)
+                if occ:
+                    held.add(occ[0])
+            else:
+                held.add(p.symbol)
+        base = set(self.watchlist) | held
         # The core-satellite ETF (Todo 1.6) is managed by _apply_core_fill, not by
         # Claude — drop it from the decision slate so the model doesn't churn the
         # core (buy/sell/thesis-decay it); it's held as a passive base allocation.
@@ -507,7 +527,10 @@ class Orchestrator:
             sector = self.sectors.sector_for(symbol)
             if not sector:
                 return None, 0.0
-            held = {p.symbol: p.market_value for p in account.positions}
+            # Option rows are skipped: sector_for(OCC) is meaningless and each
+            # premium is capped at ~1% of equity — immaterial to the sector cap.
+            held = {p.symbol: p.market_value
+                    for p in account.positions if not p.is_option}
             return sector, self.sectors.exposure_by_sector(held).get(sector, 0.0)
         except Exception as e:
             log.warning("sector context for %s failed: %s", symbol, e)
@@ -522,7 +545,7 @@ class Orchestrator:
         try:
             held = [
                 p.symbol for p in account.positions
-                if p.symbol != symbol
+                if not p.is_option and p.symbol != symbol
                 and not (self.cfg.core_etf and p.symbol == self.cfg.core_etf)
             ]
             if not held:
@@ -535,7 +558,7 @@ class Orchestrator:
             log.warning("correlation context for %s failed: %s", symbol, e)
             held = [
                 p.symbol for p in account.positions
-                if p.symbol != symbol
+                if not p.is_option and p.symbol != symbol
                 and not (self.cfg.core_etf and p.symbol == self.cfg.core_etf)
             ]
             return None, "", bool(held)
@@ -982,6 +1005,11 @@ class Orchestrator:
         )
         with self._trade_lock:
             for pos in list(account.positions):
+                if pos.is_option:
+                    # A partial trim of an option structure makes no sense
+                    # (contracts, paired legs) — options are premium-capped and
+                    # watchdog-managed; the regime trim de-risks the EQUITY book.
+                    continue
                 sell_qty = round(pos.qty * frac, 6)
                 # Whole-shares mode (GA-2.3): don't leave fractional dust that
                 # can't carry a GTC exit; a sub-share trim is skipped.
@@ -1025,6 +1053,12 @@ class Orchestrator:
         by_symbol = {b.symbol: b for b in bundles}
         exited: set[str] = set()
         for pos in list(account.positions):
+            # Option rows: bundles are keyed by underlying, so an OCC symbol
+            # always looks "uncorroborated" — decay would wrongly fire an
+            # EQUITY close on it. Options already have a DTE-bounded lifecycle
+            # (watchdog premium stop/take + expiry close); leave them to it.
+            if pos.is_option:
+                continue
             # The core-satellite ETF carries no per-name thesis, so signal ABSENCE
             # must not decay-exit it (Todo 1.6) — it's a passive base allocation.
             if self.cfg.core_etf and pos.symbol == self.cfg.core_etf:
@@ -1292,11 +1326,23 @@ class Orchestrator:
             log.info("Option proposal for %s ignored: options disabled.", proposal.symbol)
             return
         premium = self.options.estimate_net_premium(proposal)
-        decision = self.risk.evaluate_option(proposal, account, premium)
+        liquidity = self.options.leg_liquidity(proposal)
+        decision = self.risk.evaluate_option(
+            proposal, account, premium, leg_liquidity=liquidity,
+        )
         log.info(
             "OPTION %s %s -> %s: %s | %s",
             proposal.option_strategy, proposal.symbol,
             decision.verdict.value, decision.reason, proposal.rationale[:100],
+        )
+        # Journal every option verdict too — without this, rejects are invisible
+        # to the 'Today so far' block and the nightly post-mortem.
+        self._journal_decision(
+            proposal.symbol, proposal.action.value, "option",
+            proposal.conviction, proposal.target_weight_pct,
+            decision.verdict.value,
+            decision.approved_notional if decision.verdict != RiskVerdict.REJECTED else 0.0,
+            decision.reason, proposal.rationale[:120] if proposal.rationale else "",
         )
         if decision.verdict == RiskVerdict.REJECTED:
             return
@@ -1307,3 +1353,9 @@ class Orchestrator:
             self.ledger.record(TradeRecord.from_option(
                 decision, premium, oid, entry_signals=signal_kinds or []))
             self._pending_oids.append((oid, proposal.symbol))
+            # Same churn bookkeeping as equity buys: top-up spacing + the
+            # per-symbol daily budget both count option debits.
+            self.state.register_buy(proposal.symbol, conviction=proposal.conviction)
+            self.state.register_daily_deploy(
+                proposal.symbol, decision.approved_notional,
+            )

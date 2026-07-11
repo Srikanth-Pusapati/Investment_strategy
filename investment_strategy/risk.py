@@ -8,6 +8,7 @@ trust one file in this repo, trust this one — read it before going live.
 from __future__ import annotations
 
 import logging
+from datetime import datetime, timezone
 
 from .config import RiskLimits
 from .models import (
@@ -531,17 +532,35 @@ class RiskManager:
     def evaluate_option(
         self, proposal: TradeProposal, account: AccountSnapshot,
         est_premium_per_contract: float,
+        leg_liquidity: list[dict] | None = None,
     ) -> RiskDecision:
         """Size a defined-risk options play by capped DEBIT. Max loss on a long
         option / debit spread is the premium paid, so we bound that premium to a
-        small % of equity. Rejects everything if options are disabled."""
+        small % of equity. Rejects everything if options are disabled.
+
+        `leg_liquidity` is per-leg {'symbol', 'oi', 'rel_spread_pct'} context
+        from OptionsHelper.leg_liquidity — optional, and None FIELDS fail open
+        (the est_premium<=0 gate already refuses quote-less legs)."""
         if not self.limits.options_enabled:
             return self._reject(proposal, "Options trading disabled (OPTIONS_ENABLED=off).")
-        if self.kill_switch:
-            return self._reject(proposal, "KILL_SWITCH is on — no new positions.")
+        # Same account-wide gate as equity buys: halt latch, kill switch, daily
+        # loss, drawdown, max positions, PDT. An option debit is still a new
+        # position — it must never open through a halt.
+        halted, why = self.trading_halted(account)
+        if halted:
+            return self._reject(proposal, why)
         if proposal.option_strategy is None or not proposal.option_legs:
             return self._reject(proposal, "Option proposal missing strategy/legs.")
         ok, why = self._legs_are_defined_risk(proposal)
+        if not ok:
+            return self._reject(proposal, why)
+        ok, why = self._legs_dte_sane(proposal)
+        if not ok:
+            return self._reject(proposal, why)
+        ok, why = self._under_option_position_cap(proposal, account)
+        if not ok:
+            return self._reject(proposal, why)
+        ok, why = self._legs_liquid(leg_liquidity)
         if not ok:
             return self._reject(proposal, why)
         if est_premium_per_contract <= 0:
@@ -573,6 +592,88 @@ class RiskManager:
             approved_notional=spent,
             reason=f"{contracts} contract(s), ${spent:,.0f} debit (cap ${cap:,.0f}).",
         )
+
+    # -- option expiry sanity ------------------------------------------------ #
+    def _legs_dte_sane(self, proposal: TradeProposal) -> tuple[bool, str]:
+        """Every leg's expiry inside [min_option_dte, max_option_dte]: too close
+        and theta/assignment dominate any thesis; too far and the debit buys
+        mostly time value the thesis window doesn't need. Verticals must share
+        ONE expiry — a mislabeled diagonal has a different risk shape than the
+        defined-risk check above assumed."""
+        lo = getattr(self.limits, "min_option_dte", 7.0)
+        hi = getattr(self.limits, "max_option_dte", 60.0)
+        today = datetime.now(timezone.utc).date()
+        for leg in proposal.option_legs:
+            try:
+                exp = datetime.strptime(leg.expiry, "%Y-%m-%d").date()
+            except ValueError:
+                return False, f"Unparseable leg expiry {leg.expiry!r}."
+            dte = (exp - today).days
+            if lo > 0 and dte < lo:
+                return False, (
+                    f"Leg expires {leg.expiry} ({dte}d out) < {lo:.0f}d minimum "
+                    f"— too close to expiry."
+                )
+            if hi > 0 and dte > hi:
+                return False, (
+                    f"Leg expires {leg.expiry} ({dte}d out) > {hi:.0f}d maximum "
+                    f"— too far-dated."
+                )
+        if len({leg.expiry for leg in proposal.option_legs}) > 1:
+            return False, (
+                "Vertical legs must share one expiry — a diagonal is not an "
+                "approved defined-risk shape."
+            )
+        return True, ""
+
+    # -- concurrent option-structure cap -------------------------------------- #
+    def _under_option_position_cap(
+        self, proposal: TradeProposal, account: AccountSnapshot,
+    ) -> tuple[bool, str]:
+        """Cap the number of distinct UNDERLYINGS with open option structures.
+        Premium caps bound each play's loss; this bounds how many concurrent
+        theta-decaying bets exist at once. Adding legs on an already-held
+        underlying doesn't consume a new slot."""
+        cap = int(getattr(self.limits, "max_option_positions", 3))
+        if cap <= 0:
+            return True, ""
+        from .execution.options import parse_occ
+        held = {
+            occ[0] for p in account.positions if p.is_option
+            for occ in [parse_occ(p.symbol)] if occ
+        }
+        if proposal.symbol not in held and len(held) >= cap:
+            return False, (
+                f"At max option positions ({cap} underlyings: "
+                f"{', '.join(sorted(held))})."
+            )
+        return True, ""
+
+    # -- option leg liquidity -------------------------------------------------- #
+    def _legs_liquid(self, leg_liquidity: list[dict] | None) -> tuple[bool, str]:
+        """Open-interest floor + bid-ask spread ceiling per leg. A leg that
+        can't be exited near mid turns the premium cap into a fiction. None
+        FIELDS fail open (only act on data we have — the earnings guard's
+        rule); a missing list entirely means the caller had no data source."""
+        if not leg_liquidity:
+            return True, ""
+        min_oi = getattr(self.limits, "min_option_open_interest", 100.0)
+        max_spread = getattr(self.limits, "max_option_spread_pct", 10.0)
+        for liq in leg_liquidity:
+            sym = liq.get("symbol", "?")
+            oi = liq.get("oi")
+            if min_oi > 0 and oi is not None and oi < min_oi:
+                return False, (
+                    f"Leg {sym} open interest {oi:.0f} < {min_oi:.0f} floor "
+                    f"— too illiquid to exit cleanly."
+                )
+            spread = liq.get("rel_spread_pct")
+            if max_spread > 0 and spread is not None and spread > max_spread:
+                return False, (
+                    f"Leg {sym} bid-ask spread {spread:.1f}% > "
+                    f"{max_spread:.1f}% cap — round-trip friction too high."
+                )
+        return True, ""
 
     # -- option structure safety ------------------------------------------- #
     @staticmethod
