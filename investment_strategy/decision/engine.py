@@ -41,6 +41,7 @@ class DecisionEngine:
         benchmark_line: str = "", external: list[ExternalHolding] | None = None,
         lessons: str = "", today: str = "",
         buy_excluded: dict[str, str] | None = None,
+        signal_notes: dict[str, dict[str, str]] | None = None,
     ) -> list[TradeProposal]:
         """Ask Claude for proposals across all candidate symbols at once.
 
@@ -48,6 +49,9 @@ class DecisionEngine:
         model rank candidates against each other rather than in isolation.
         `lessons` is our own derived track-record (signal attribution), passed as
         trusted context so the model can weight by what has actually paid off.
+        `signal_notes` (symbol -> kind -> note) carries OUR deterministic
+        freshness/trend annotations (E.1+R.4) — trusted, computed from persisted
+        history, never from third-party text.
         """
         if not bundles:
             return []
@@ -55,6 +59,7 @@ class DecisionEngine:
         user_content = self._render(
             bundles, account, benchmark_line, external or [], lessons,
             today=today, buy_excluded=buy_excluded or {},
+            signal_notes=signal_notes or {},
         )
         try:
             resp = self.client.messages.create(
@@ -110,6 +115,7 @@ class DecisionEngine:
         self, bundles: list[SignalBundle], account: AccountSnapshot,
         benchmark_line: str, external: list[ExternalHolding], lessons: str = "",
         today: str = "", buy_excluded: dict[str, str] | None = None,
+        signal_notes: dict[str, dict[str, str]] | None = None,
     ) -> str:
         # Our own derived data (track-record, today-so-far, exclusions) sits
         # OUTSIDE <market_data> — it's trusted guidance, not third-party text.
@@ -174,11 +180,18 @@ class DecisionEngine:
             else:
                 tag = ""
             lines.append(f"### {b.symbol}{tag}")
+            sym_notes = (signal_notes or {}).get(b.symbol, {})
             for s in b.signals:
                 score = f" score={s.score:+.2f}" if s.score is not None else ""
+                # Our freshness/trend annotation (E.1+R.4) — deterministic,
+                # computed from persisted history, so safe to render as-is.
+                note = sym_notes.get(s.kind.value, "") if s.score is not None else ""
+                note = f" {note}" if note else ""
                 # Bound per-signal text: a pathological news blurb shouldn't be
                 # able to blow up the prompt (and the bill) on its own.
-                lines.append(f"- [{s.kind.value}]{score} {self._safe(s.summary)[:240]}")
+                lines.append(
+                    f"- [{s.kind.value}]{score}{note} {self._safe(s.summary)[:240]}"
+                )
             lines.append("")
 
         lines.append("</market_data>")

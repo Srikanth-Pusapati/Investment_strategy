@@ -95,29 +95,22 @@ PHASE C — FIX DISCOVERY BREADTH  (found 2026-07-01; largely DONE 2026-07-02)
         options-flow or insider data — Robinhood is a broker, not a flow/insider vendor.
 [ ] C.3 (LOW) Enable the coded-but-inert `wallstreetbets` screener once its plan
         gating clears (already in the registry).
-[ ] C.4 (MED->HIGH; UNBLOCKED 2026-07-03) Robinhood-backed options SIGNAL
-        (partial options_flow replacement). RH's agentic MCP expansion now
-        confirms option chains + contract quotes WITH FULL GREEKS
-        (get_option_chains / get_option_instruments / get_option_quotes — all
-        get_* = auto-allowed by the S.2 allowlist). Compute a per-name call/put
-        volume lean / IV read for candidates already surfaced (a signal-layer
-        input, not a market-wide flow scanner). Routes around the paid Polygon
-        tier. Needs live iteration on the quote volume/OI schema. This is the
-        gate on X.3 (options execution).
-[ ] C.5 (LOW->MED; UNBLOCKED 2026-07-03) Route fundamentals / earnings / sector
-        through Robinhood MCP — the expansion confirms get_equity_fundamentals
-        (PE, market cap, div yield, SECTOR) + get_earnings_calendar +
-        get_equity_historicals. Reduces reliance on flaky yfinance for the
-        fundamentals signal, the earnings-blackout guard, AND the
-        sector-concentration cap (whose outage currently also blinds regime).
-[ ] C.6 (NEW 2026-07-03, MED) Robinhood SCANNER as a discovery source. The MCP
-        expansion adds market scans with RSI / volume / upcoming-earnings
-        filters. run_scan + get_scans are ALREADY on the S.2 allowlist;
-        create_scan / update_scan_* are write-tools and stay BLOCKED — so
-        define scans once by hand in the RH app (e.g. "RSI breakout + volume
-        spike"), then a screener/robinhood_scan_feed.py runs them read-only
-        each cycle. A momentum-technical discovery leg alongside congress/
-        insider/movers — different alpha family from smart-money feeds.
+[DONE 2026-07-10] C.4 Options-chain positioning SIGNAL (partial options_flow
+        replacement) — shipped as signals/options_chain.py (OptionsChainProvider):
+        per-name ATM IV, put-call IV skew, and OI lean for candidates already
+        surfaced (signal-layer input, not a market-wide flow scanner). Built on
+        the ALPACA options chain (not RH quotes as originally sketched — same
+        data, no MCP dependency). Routes around the paid Polygon tier. This was
+        the gate on X.3 — options flipped ON in paper same day (see X.3).
+[DONE 2026-07-10] C.5 Fundamentals/earnings/sector via Robinhood MCP:
+        get_earnings_calendar now feeds the earnings-blackout guard (ONE
+        market-wide call per cycle replaces flaky per-symbol yfinance lookups;
+        yfinance stays as fallback). (earnings.py + RobinhoodReader.)
+[DONE 2026-07-10] C.6 Robinhood SCANNER discovery source shipped as
+        screener/robinhood_scan_feed.py: runs hand-defined saved scans
+        read-only each cycle (run_scan/get_scans on the S.2 allowlist;
+        create/update stay blocked). Momentum-technical discovery leg
+        alongside congress/insider/movers.
 
 --------------------------------------------------------------------------------
 PHASE S — SECURITY  (2026-07-02 audit; graphify + code walk. Close BEFORE giving
@@ -161,13 +154,12 @@ PHASE L — LEGAL / TAX  (absorbs old G.6; single-user posture is CLEAR today)
 --------------------------------------------------------------------------------
 PHASE X — EXECUTION-MODEL GAPS  (new items only; X.1/X.2/X.5 = D.1/D.3/F.1 below)
 --------------------------------------------------------------------------------
-[ ] X.3 (MED — the biggest untapped "max risk" lever) Options are OFF. The
-        defined-risk execution path EXISTS (execution/options.py,
-        RiskManager.evaluate_option) but the model has no options DATA to reason
-        with: options_flow dead on free Polygon, C.4 (RH option-chain signal)
-        unbuilt, and Alpaca options approval must be enabled on the account.
-        SEQUENCE: build C.4 -> flip OPTIONS_ENABLED=on in PAPER -> verify sizing
-        (MAX_OPTION_PREMIUM_PCT) -> only then consider live.
+[~] X.3 (FLIPPED ON in PAPER 2026-07-10) Options enabled: C.4 signal shipped,
+        OPTIONS_ENABLED=on, watchdog premium stop/take + expiry close, hardened
+        risk gate (DTE, liquidity, concurrency caps), preflight checks. The
+        C.4->flip->verify sequence held. REMAINING: watch the first live-paper
+        options cycles (Mon 2026-07-13 open) — verify sizing
+        (MAX_OPTION_PREMIUM_PCT) behaves on real fills before considering live.
 [DONE 2026-07-03] X.4 MAX_DISCOVERED_CANDIDATES 12 -> 18 (.env + config default)
         so the 3-feed discovery breadth actually reaches the model.
 [ ] X.6 (LATER, gated on D.1+D.3 proof) Leverage: MAX_GROSS_EXPOSURE_PCT=100 (no
@@ -222,9 +214,21 @@ PHASE D — PROVE IT (do BEFORE trusting the aggressive config with real money)
 --------------------------------------------------------------------------------
 PHASE E — DECISION QUALITY  (carried from Todo-2 Phase 3)
 --------------------------------------------------------------------------------
-[ ] E.1 (=3.1) Per-signal lag-decay weighting (B.5) — formalize lag-based
-        confidence so a 45d congress filing and a 1d dark-pool print aren't weighted
-        equally. (Especially relevant now that congress is the only live feed.)
+[DONE 2026-07-12] E.1 (=3.1, merged with R.4) Per-signal lag-decay weighting +
+        signal-TREND tracking, shipped as signals/history.py (SignalHistory):
+        - LAG (E.1): per-kind freshness weight w = 0.5^(lag/14d) from each
+          source's typical publication lag (congress 30d -> w=0.23, insider 2d
+          -> 0.91, dark-pool 1d -> 0.95; thesis kinds — fundamentals/macro/
+          discovery — exempt: slow is not stale for them).
+        - TREND (R.4): per-(symbol,kind) score series persisted to
+          state/signal_history.json each cycle (spacing-compressed, 14d
+          retention); least-squares slope classifies improving/decaying/
+          stable, with an INFLECTION override on a sign flip vs the prior
+          series (the earliest tell a thesis is forming/dying).
+        Both render as a compact [w=... trend=...] annotation on each signal
+        line in the decision prompt + a legend in the system prompt. Evidence
+        for the LLM only — no risk-layer or .env change (freeze-friendly).
+        Tests +19 (test_signal_history.py).
 [ ] E.2 (=3.2) Swap yfinance fundamentals/earnings for the paid feed once 2.2 says
         it pays.
 
@@ -305,12 +309,9 @@ VERDICTS:
         evidence and a HUMAN applies them (no self-tuning loop writing .env).
         DEPENDS on F.1: the optimizer is only as good as realized-P&L
         completeness — bracket auto-fills must land in the ledger first.
-[ ] R.4 (MED, folds into E.1) Signal-TREND tracking (their llm/
-        sentiment_tracker.py: per-ticker sentiment time series, linear-
-        regression momentum, inflection detection). Generalize E.1 from static
-        lag-decay to score DYNAMICS: persist per-signal scores each cycle
-        (state/), weight by trend + lag — an IMPROVING 2-day-old signal is not
-        the same as a decaying one.
+[DONE 2026-07-12] R.4 (folded into E.1 — see the E.1 DONE entry above) Signal-
+        TREND tracking shipped: per-ticker score time series, least-squares
+        momentum, inflection detection (signals/history.py).
 [x] R.5 (explicitly NOT adopted — don't re-litigate): LLM personas / debate /
         LLM risk agents (deterministic risk layer is the moat); pgvector memory
         (attribution.py is the frugal equivalent); per-ticker LLM fan-out
@@ -327,37 +328,29 @@ LOWER VALUE / SKIP unless a thesis calls for it (carried from Todo-2)
    Plan-upgrade-blocked: 13F, twitter; insiders already free via Finnhub + SEC EDGAR.
 
 --------------------------------------------------------------------------------
-RANKED NEXT STEPS  (re-ranked 2026-07-03 PM: R.1/R.2/F.1 SHIPPED same day;
-Robinhood MCP expansion unblocked C.4/C.5 and added C.6.
-NOTE 2026-07-03: goGA.txt's COORDINATION section supersedes the "as-is"/
-mid-window-change parts of #1-2 — the mid-July RECORD account runs a FROZEN
-config (whole-shares mode, pre-start gate GA-2.1/2.2/2.3/2.5/2.6); R.3
-re-sweeps, C.4->X.3 options, and knob changes run on a SECOND experiment
-paper account and graduate only at window boundaries.)
+RANKED NEXT STEPS  (re-ranked 2026-07-12: C.4/C.5/C.6 + the X.3 options flip
+shipped 2026-07-10; E.1+R.4 signal trend/lag weighting shipped 2026-07-12.
+The solo/small-float decision (goGA.txt PARKED note, 2026-07-05) softened the
+record/experiment split — one paper account is currently running with options
+ON; re-open the frozen-window question if/when a formal record window starts.)
 --------------------------------------------------------------------------------
- 1. D.2  Accumulate live PAPER round-trips under the new config (fresh paper
-    account planned ~mid-July — see goGA.txt COORDINATION: frozen config on
-    the record account); then re-run
-    2.2 (subscriptions) for the first real SUBSCRIBE/HOLD verdicts. F.1 is in,
-    so R.3's periodic `--sweep` / `--sweep-stops` re-tune runs on COMPLETE
-    exit data as trips accumulate (human applies knob changes, experiment
-    account first per goGA.txt).
- 2. C.4  Robinhood options-chain SIGNAL (now unblocked: quotes carry full
-    greeks) -> then X.3 flip OPTIONS_ENABLED on PAPER (the biggest untapped
-    max-risk lever; also needs Alpaca options approval on the new account).
- 3. C.6  RH scanner discovery feed + C.5 fundamentals/earnings/sector via RH
-    MCP — widens discovery to a technical alpha family and de-flakes the
-    sector/earnings guards' data source before the mid-July start.
- 4. E.1+R.4  Signal lag-decay weighting, generalized to trend/inflection
-    tracking (persist per-signal scores per cycle; weight by trend + lag).
- 5. L.2  Wash-sale/tax note — before real money.
- 6. X.6  Leverage (gross 100 -> ~150 on margin) ONLY after #1 proves the config
-    on live paper round-trips.
- 7. G.*  Multi-user — AFTER the L.1 legal/regulatory gate.
- (SHIPPED 2026-07-03 PM: R.1 vol-scaled stops ON with 2-lookback sweep evidence
-  + stress re-PASS; R.2 correlation guard ON at 0.85; F.1 exchange-exit
-  backfill closing attribution's last blind spot; --sweep-stops mode; sweep
-  log-spam fix. 302 tests green.)
+ 1. WATCH Mon 2026-07-13 open: first options cycles (X.3 verify — sizing via
+    MAX_OPTION_PREMIUM_PCT on real fills; watchdog premium stop/take + expiry
+    close behavior), the at-open paper flatten + clean restart, API spend
+    line vs the cost baseline, and the first [w=... trend=...] annotations in
+    the decision prompt (E.1+R.4 needs ~1 day of history before trends show).
+ 2. D.2  Accumulate live PAPER round-trips; then re-run 2.2 (subscriptions)
+    for the first real SUBSCRIBE/HOLD verdicts, and R.3's periodic `--sweep` /
+    `--sweep-stops` re-tune on COMPLETE exit data (human applies knob changes).
+ 3. C.3  Enable the coded-but-inert wallstreetbets screener once its plan
+    gating clears — the last dormant discovery leg.
+ 4. L.2  Wash-sale/tax note — before real money (the ledger wash-sale FLAG
+    shipped with GA-2.5; remaining: the written "1099-B is source of truth"
+    note + any doc updates).
+ 5. X.6  Leverage (gross 100 -> ~150 on margin) ONLY after #2 proves the
+    config on live paper round-trips.
+ 6. G.*  Multi-user — AFTER the L.1 legal/regulatory gate (both parked ~1yr
+    per goGA.txt).
 
  HONEST CAVEAT (restate before spending real money): NOTHING guarantees beating
  QQQ/SPY over 15-30 days — that window is mostly luck. The Phase-A/B changes remove
@@ -414,3 +407,17 @@ DONE 2026-07-06 (PM session — the "all-LLY day" fixes; from Jul_06_2026.log):
     the repo (.gitignore re-includes logs/*_*_*.log) for backward analysis.
   - Ledger sell log line shows exit proceeds (was "SELL MXL qty=12 $0").
   379 tests green (was 302; +cooldown/dust/budget-split/log-namer coverage).
+DONE 2026-07-10 (the options day — see the C.4/C.5/C.6/X.3 entries above):
+  Options groundwork (single-leg order fix, OCC plumbing, halt gate) ->
+  watchdog option protection (premium stop/take + expiry close) -> hardened
+  options risk gate (DTE, liquidity, concurrency) -> C.4 options-chain signal
+  (Alpaca ATM IV / skew / OI lean) -> C.5 RH earnings calendar -> C.6 RH
+  saved-scan discovery -> OPTIONS_ENABLED=on in paper. Plus: API cost controls
+  (per-call usage ledger state/api_usage.jsonl, daily spend line, prompt
+  trims) and the at-open paper-account flatten + clean-restart script (ops/).
+DONE 2026-07-12:
+  E.1+R.4 signal lag-decay + trend/inflection tracking (signals/history.py;
+  see the DONE entries above) — per-kind freshness weights + persisted
+  per-(symbol,kind) score series -> [w=... trend=...] annotations on every
+  scored signal line in the decision prompt. LLM evidence only; zero risk-
+  layer/.env change. 519 tests green (was 500; +19).

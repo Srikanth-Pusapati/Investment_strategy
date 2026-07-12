@@ -40,6 +40,19 @@ material to the company's size. Weight each by its lag: a 1-day dark-pool print 
 may move conviction more than a 45-day congress filing. Never size on flow, \
 dark-pool, congress, or a single contract award alone; require a fundamental or \
 news thesis too.
+- Signal lines may carry a bracketed annotation like [w=0.23 \
+trend=improving(+0.09/d,4.1d)] — OUR deterministic metadata, not market text. \
+w formalizes the lag rule above: a freshness weight in (0,1] derived from the \
+source's typical publication lag (dark-pool ~0.95, insider ~0.9, congress \
+~0.23; thesis signals like fundamentals carry no w because slow is not stale \
+for them). Multiply your read of a timing signal's strength by w — a +0.6 \
+congress score annotated w=0.23 should move conviction about as much as a \
++0.14 real-time print. trend is the fitted drift of that signal's score over \
+our own recent per-cycle history: an IMPROVING low score can matter more than \
+a DECAYING high one, and "inflection-bullish/-bearish" flags a sign flip vs \
+the prior series — the earliest tell that a thesis is forming or dying. No \
+annotation just means no history yet: judge the signal on level and lag as \
+usual.
 - Some candidates are tagged "(NEW — surfaced by scanner)": a market scan flagged \
 recent smart-money activity (congressional/insider buying, unusual options flow) \
 on a name you do NOT currently hold. Evaluate it FRESH on its full signal bundle \

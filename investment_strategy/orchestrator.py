@@ -50,7 +50,7 @@ from .regime import RegimeReader
 from .reset import maybe_reset_on_account_change
 from .screener import ScreenerAggregator
 from .sectors import SectorMap
-from .signals import SignalAggregator
+from .signals import SignalAggregator, SignalHistory
 from .signals.quiver_client import QuiverClient
 from .state import PortfolioState
 from .status import EquityHistory, compute_status
@@ -83,6 +83,9 @@ class Orchestrator:
         # layer — the double-pull fix that keeps us under Quiver's rate limit.
         self.quiver = QuiverClient(cfg.quiver_api_key)
         self.signals = SignalAggregator(cfg, self.quiver)
+        # Per-(symbol, kind) score series persisted across cycles (E.1+R.4):
+        # feeds the freshness/trend annotations rendered on each signal line.
+        self.signal_history = SignalHistory()
         self.screeners = ScreenerAggregator(cfg, self.quiver)
         self.robinhood = RobinhoodReader(cfg)
         # Per-cycle-cached next-earnings lookup feeding the risk earnings-blackout
@@ -415,6 +418,17 @@ class Orchestrator:
         bundles = self.signals.gather(symbols)
         self._inject_discovery(bundles, discovered)
 
+        # Persist this cycle's scores and build the freshness/trend annotations
+        # (E.1+R.4). Recorded BEFORE thesis-decay exits so a decaying series is
+        # remembered even for names we exit this cycle. Best-effort: history
+        # must never block a decision.
+        signal_notes: dict[str, dict[str, str]] = {}
+        try:
+            self.signal_history.record(bundles)
+            signal_notes = self.signal_history.notes_for(bundles)
+        except Exception as e:
+            log.warning("Signal history unavailable this cycle: %s", e)
+
         # Deterministic thesis-decay exits (1B.4b): sell held names whose fresh
         # signals no longer corroborate the entry thesis, BEFORE asking Claude — so
         # a stale-thesis name is recycled even if the LLM is down, and we don't
@@ -457,6 +471,7 @@ class Orchestrator:
         proposals = self.engine.decide(
             bundles, account, bench_line, external, lessons,
             today=today_block, buy_excluded=buy_excluded,
+            signal_notes=signal_notes,
         )
         proposals = self._filter_to_slate(proposals, bundles, account)
         # Hard backstop: Claude may still propose an excluded BUY; drop it.
