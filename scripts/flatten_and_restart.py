@@ -8,11 +8,14 @@ orders live at Alpaca, and while the market is closed cancels sit in
 pending_cancel wedge), so the account can't be flattened until a session opens.
 
 This script waits for the next regular session (09:31 ET), then:
-  1. cancels every open order and waits for the cancels to finalize
-  2. closes every position (equities + options) and waits until flat
-  3. runs `investment_strategy.reset --yes`  (archives local state)
-  4. runs `investment_strategy.preflight`    (sanity gate)
-  5. starts the bot detached, appending to logs/stdout.log
+  1. stops the RUNNING bot (pid from state/bot.lock; SIGINT -> TERM -> KILL) —
+     it must not trade against the flatten or hold the single-instance flock
+  2. cancels every open order and waits for the cancels to finalize
+  3. closes every position (equities + options) and waits until flat
+  4. runs `investment_strategy.reset --yes`  (archives local state)
+  5. runs `investment_strategy.preflight`    (sanity gate)
+  6. starts the bot detached (fresh code from this working tree), appending
+     to logs/stdout.log
 
 If the account is already flat (e.g. you clicked "Reset" on the Alpaca paper
 dashboard over the weekend — which is also the only way to restore the exact
@@ -26,6 +29,8 @@ PAPER-ONLY: refuses to run unless ALPACA_BASE_URL points at paper-api.
 from __future__ import annotations
 
 import datetime as dt
+import os
+import signal
 import subprocess
 import sys
 import time
@@ -72,6 +77,49 @@ def wait_until(target: dt.datetime) -> None:
         time.sleep(min(600, remaining))
 
 
+def stop_running_bot() -> None:
+    """SIGINT (then escalate) the bot holding state/bot.lock, and wait for it
+    to exit. Without this step the OLD process keeps trading against the
+    flatten, rewrites the freshly-archived state, and its flock makes the new
+    start REFUSE (the single-instance guard) — i.e. the day runs on stale code
+    with reset state. Called only at market open, not at script launch, so the
+    watchdog keeps protecting positions across the weekend wait."""
+    lock = ROOT / "state" / "bot.lock"
+    if not lock.exists():
+        return
+    try:
+        pid = int(lock.read_text().strip() or 0)
+    except ValueError:
+        pid = 0
+    if pid <= 0:
+        return
+    # Only signal a process that is actually the bot — a pid from a stale
+    # lockfile could have been recycled by something unrelated.
+    cmd = subprocess.run(["ps", "-p", str(pid), "-o", "command="],
+                         capture_output=True, text=True).stdout
+    if "investment_strategy" not in cmd:
+        say(f"bot.lock pid {pid} is not a running bot — nothing to stop")
+        return
+    # SIGINT first: the orchestrator's KeyboardInterrupt path is its clean
+    # "Interrupted — shutting down" shutdown. Escalate only if it hangs.
+    for sig, wait_s in ((signal.SIGINT, 30), (signal.SIGTERM, 15),
+                        (signal.SIGKILL, 5)):
+        say(f"stopping the running bot: pid {pid} <- {sig.name}")
+        try:
+            os.kill(pid, sig)
+        except ProcessLookupError:
+            say("old bot exited")
+            return
+        for _ in range(wait_s):
+            time.sleep(1)
+            try:
+                os.kill(pid, 0)
+            except ProcessLookupError:
+                say("old bot exited")
+                return
+    say(f"WARNING: pid {pid} survived SIGKILL?! — continuing anyway")
+
+
 def flatten(tc) -> bool:
     """Cancel all orders, close all positions. True when the account is flat."""
     orders = tc.get_orders()
@@ -115,6 +163,11 @@ def main() -> int:
     target = next_run_time()
     say(f"waiting for market open — will run at {target:%Y-%m-%d %H:%M ET}")
     wait_until(target)
+
+    # Stop the old bot FIRST: it must not trade against the flatten, must not
+    # rewrite state after the reset archives it, and must release the
+    # single-instance flock or the fresh start below gets refused.
+    stop_running_bot()
 
     from alpaca.trading.client import TradingClient
     tc = TradingClient(env_val("ALPACA_API_KEY"), env_val("ALPACA_SECRET_KEY"),
