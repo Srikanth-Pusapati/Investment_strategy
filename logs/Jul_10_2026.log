@@ -1,0 +1,1104 @@
+2026-07-10 00:23:18,876 INFO orchestrator | Market closed; skipping decision cycle.
+2026-07-10 00:23:18,936 INFO alpaca | Alpaca client ready (mode=paper).
+2026-07-10 00:23:21,054 INFO dashboard | Wrote dashboard with 123 trades -> dashboard.html
+2026-07-10 00:53:21,570 INFO orchestrator | Market closed; skipping decision cycle.
+2026-07-10 00:53:21,623 INFO alpaca | Alpaca client ready (mode=paper).
+2026-07-10 00:53:23,932 INFO dashboard | Wrote dashboard with 123 trades -> dashboard.html
+2026-07-10 01:23:24,476 INFO orchestrator | Market closed; skipping decision cycle.
+2026-07-10 01:23:24,512 INFO alpaca | Alpaca client ready (mode=paper).
+2026-07-10 01:23:26,742 INFO dashboard | Wrote dashboard with 123 trades -> dashboard.html
+2026-07-10 01:53:27,447 INFO orchestrator | Market closed; skipping decision cycle.
+2026-07-10 01:53:27,482 INFO alpaca | Alpaca client ready (mode=paper).
+2026-07-10 01:53:29,930 INFO dashboard | Wrote dashboard with 123 trades -> dashboard.html
+2026-07-10 02:23:30,595 INFO orchestrator | Market closed; skipping decision cycle.
+2026-07-10 02:23:30,633 INFO alpaca | Alpaca client ready (mode=paper).
+2026-07-10 02:23:32,935 INFO dashboard | Wrote dashboard with 123 trades -> dashboard.html
+2026-07-10 02:53:33,572 INFO orchestrator | Market closed; skipping decision cycle.
+2026-07-10 02:53:33,612 INFO alpaca | Alpaca client ready (mode=paper).
+2026-07-10 02:53:37,170 INFO dashboard | Wrote dashboard with 123 trades -> dashboard.html
+2026-07-10 03:23:37,762 INFO orchestrator | Market closed; skipping decision cycle.
+2026-07-10 03:23:37,807 INFO alpaca | Alpaca client ready (mode=paper).
+2026-07-10 03:23:39,944 INFO dashboard | Wrote dashboard with 123 trades -> dashboard.html
+2026-07-10 03:53:40,448 INFO orchestrator | Market closed; skipping decision cycle.
+2026-07-10 03:53:40,484 INFO alpaca | Alpaca client ready (mode=paper).
+2026-07-10 03:53:42,671 INFO dashboard | Wrote dashboard with 123 trades -> dashboard.html
+2026-07-10 04:23:43,215 INFO orchestrator | Market closed; skipping decision cycle.
+2026-07-10 04:23:43,254 INFO alpaca | Alpaca client ready (mode=paper).
+2026-07-10 04:23:45,535 INFO dashboard | Wrote dashboard with 123 trades -> dashboard.html
+2026-07-10 04:53:46,136 INFO orchestrator | Market closed; skipping decision cycle.
+2026-07-10 04:53:46,173 INFO alpaca | Alpaca client ready (mode=paper).
+2026-07-10 04:53:48,338 INFO dashboard | Wrote dashboard with 123 trades -> dashboard.html
+2026-07-10 05:23:49,052 INFO orchestrator | Market closed; skipping decision cycle.
+2026-07-10 05:23:49,094 INFO alpaca | Alpaca client ready (mode=paper).
+2026-07-10 05:23:51,435 INFO dashboard | Wrote dashboard with 123 trades -> dashboard.html
+2026-07-10 05:53:52,071 INFO orchestrator | Market closed; skipping decision cycle.
+2026-07-10 05:53:52,108 INFO alpaca | Alpaca client ready (mode=paper).
+2026-07-10 05:53:54,281 INFO dashboard | Wrote dashboard with 123 trades -> dashboard.html
+2026-07-10 06:23:54,841 INFO orchestrator | Market closed; skipping decision cycle.
+2026-07-10 06:23:54,874 INFO alpaca | Alpaca client ready (mode=paper).
+2026-07-10 06:23:57,148 INFO dashboard | Wrote dashboard with 123 trades -> dashboard.html
+2026-07-10 06:53:57,687 INFO orchestrator | Market closed; skipping decision cycle.
+2026-07-10 06:53:57,716 INFO alpaca | Alpaca client ready (mode=paper).
+2026-07-10 06:53:59,820 INFO dashboard | Wrote dashboard with 123 trades -> dashboard.html
+2026-07-10 07:24:00,369 INFO orchestrator | Market closed; skipping decision cycle.
+2026-07-10 07:24:00,407 INFO alpaca | Alpaca client ready (mode=paper).
+2026-07-10 07:24:02,532 INFO dashboard | Wrote dashboard with 123 trades -> dashboard.html
+2026-07-10 07:54:03,248 INFO orchestrator | Market closed; skipping decision cycle.
+2026-07-10 07:54:03,301 INFO alpaca | Alpaca client ready (mode=paper).
+2026-07-10 07:54:05,448 INFO dashboard | Wrote dashboard with 123 trades -> dashboard.html
+2026-07-10 08:24:06,055 INFO orchestrator | Market closed; skipping decision cycle.
+2026-07-10 08:24:06,092 INFO alpaca | Alpaca client ready (mode=paper).
+2026-07-10 08:24:08,464 INFO dashboard | Wrote dashboard with 123 trades -> dashboard.html
+2026-07-10 08:36:12,039 INFO watchdog | Trailing stop hit on BTDR: peak 3.4% -> now 0.4%. Closing.
+2026-07-10 08:36:12,117 ERROR alpaca | close_position(BTDR) failed: {"available":"0","code":40310000,"existing_qty":"124","held_for_orders":"124","message":"insufficient qty available for order (requested: 124, available: 0)","symbol":"BTDR"}
+2026-07-10 08:36:12,556 WARNING alpaca | Exit via resting sell 3b124866-b76c-4bfb-aa45-4ceb037813ad (BTDR): replaced limit -> 14.09 (marketable; new order d17de73f-1add-4d73-95f3-bb6126ca4420).
+2026-07-10 08:36:12,575 INFO ledger | Ledger: SELL BTDR qty=124 $1776
+2026-07-10 08:36:12,578 WARNING watchdog | Partial close BTDR (trail): sold 0 available share(s), made 1 resting sell(s) marketable; 124 reserved by open orders — will retry the full close next tick.
+2026-07-10 08:54:10,554 INFO orchestrator | Market regime: SPY above 200dma (753 vs 691), VIX 16 -> risk-on, size x1.00.
+2026-07-10 08:54:11,237 INFO quiver | Quiver live/congresstrading -> 1000 row(s).
+2026-07-10 08:54:12,402 INFO screener | EDGAR Form-4 feed -> 73 filing(s) (scanning up to 100).
+2026-07-10 08:54:31,795 INFO screener | Options-flow most-actives pool -> 40 name(s).
+2026-07-10 08:54:39,633 INFO httpx | HTTP Request: POST https://agent.robinhood.com/mcp/trading "HTTP/1.1 200 OK"
+2026-07-10 08:54:39,636 INFO mcp.client.streamable_http | Received session ID: RLQQ53B227VOOPDLSOCB5DKZ2M
+2026-07-10 08:54:39,638 INFO mcp.client.streamable_http | Negotiated protocol version: 2025-11-25
+2026-07-10 08:54:39,749 INFO httpx | HTTP Request: POST https://agent.robinhood.com/mcp/trading "HTTP/1.1 202 Accepted"
+2026-07-10 08:54:39,897 INFO httpx | HTTP Request: GET https://agent.robinhood.com/mcp/trading "HTTP/1.1 405 Method Not Allowed"
+2026-07-10 08:54:39,902 INFO mcp.client.streamable_http | GET stream disconnected, reconnecting in 1000ms...
+2026-07-10 08:54:40,223 INFO httpx | HTTP Request: POST https://agent.robinhood.com/mcp/trading "HTTP/1.1 200 OK"
+2026-07-10 08:54:40,423 INFO httpx | HTTP Request: POST https://agent.robinhood.com/mcp/trading "HTTP/1.1 200 OK"
+2026-07-10 08:54:40,601 INFO httpx | HTTP Request: POST https://agent.robinhood.com/mcp/trading "HTTP/1.1 200 OK"
+2026-07-10 08:54:40,603 INFO mcp.client.streamable_http | Received session ID: IYMOMUVMJGQEAAKCI2LAOQ3SKQ
+2026-07-10 08:54:40,605 INFO mcp.client.streamable_http | Negotiated protocol version: 2025-11-25
+2026-07-10 08:54:40,721 INFO httpx | HTTP Request: POST https://agent.robinhood.com/mcp/trading "HTTP/1.1 202 Accepted"
+2026-07-10 08:54:40,807 INFO httpx | HTTP Request: GET https://agent.robinhood.com/mcp/trading "HTTP/1.1 405 Method Not Allowed"
+2026-07-10 08:54:40,810 INFO mcp.client.streamable_http | GET stream disconnected, reconnecting in 1000ms...
+2026-07-10 08:54:41,485 INFO httpx | HTTP Request: POST https://agent.robinhood.com/mcp/trading "HTTP/1.1 200 OK"
+2026-07-10 08:54:41,626 INFO httpx | HTTP Request: POST https://agent.robinhood.com/mcp/trading "HTTP/1.1 200 OK"
+2026-07-10 08:54:41,779 INFO screener | Robinhood 'Daily movers' -> 20 name(s).
+2026-07-10 08:54:41,994 INFO httpx | HTTP Request: POST https://agent.robinhood.com/mcp/trading "HTTP/1.1 200 OK"
+2026-07-10 08:54:41,996 INFO mcp.client.streamable_http | Received session ID: ZXAENLJTYUZGONGZRNMJEPBPM7
+2026-07-10 08:54:41,999 INFO mcp.client.streamable_http | Negotiated protocol version: 2025-11-25
+2026-07-10 08:54:42,110 INFO httpx | HTTP Request: POST https://agent.robinhood.com/mcp/trading "HTTP/1.1 202 Accepted"
+2026-07-10 08:54:42,187 INFO httpx | HTTP Request: GET https://agent.robinhood.com/mcp/trading "HTTP/1.1 405 Method Not Allowed"
+2026-07-10 08:54:42,191 INFO mcp.client.streamable_http | GET stream disconnected, reconnecting in 1000ms...
+2026-07-10 08:54:42,635 INFO httpx | HTTP Request: POST https://agent.robinhood.com/mcp/trading "HTTP/1.1 200 OK"
+2026-07-10 08:54:42,820 INFO httpx | HTTP Request: POST https://agent.robinhood.com/mcp/trading "HTTP/1.1 200 OK"
+2026-07-10 08:54:42,943 INFO screener | Robinhood '100 most popular' -> 100 name(s).
+2026-07-10 08:54:42,945 INFO screener | Discovered 18 candidate(s) from 4 source(s) (280 merged, 189 above min_score, capped to 18).
+2026-07-10 08:54:42,945 INFO screener |   candidate AMD [congress+robinhood] score=+1.10 — Congress: 3 buy / 0 sell filings in last 60d (disclosures lag up to ~45d). | Robinhood 100 Most Popular (retail crowd positioning)
+2026-07-10 08:54:42,946 INFO screener |   candidate T [congress+robinhood] score=+1.06 — Congress: 6 buy / 1 sell filings in last 60d (disclosures lag up to ~45d). | Robinhood 100 Most Popular (retail crowd positioning)
+2026-07-10 08:54:42,947 INFO screener |   candidate BEP [congress] score=+1.00 — Congress: 7 buy / 0 sell filings in last 60d (disclosures lag up to ~45d).
+2026-07-10 08:54:42,948 INFO screener |   candidate HD [congress] score=+0.75 — Congress: 3 buy / 0 sell filings in last 60d (disclosures lag up to ~45d).
+2026-07-10 08:54:42,948 INFO screener |   candidate CZNC [insider] score=+0.67 — Insider: 2 open-market buy filing(s), 207 sh (SEC Form 4, last filings feed).
+2026-07-10 08:54:42,949 INFO screener |   candidate LLY [congress+robinhood] score=+0.60 — Congress: 1 buy / 0 sell filings in last 60d (disclosures lag up to ~45d). | Robinhood 100 Most Popular (retail crowd positioning)
+2026-07-10 08:54:42,950 INFO screener |   candidate CVX [congress+robinhood] score=+0.60 — Congress: 1 buy / 0 sell filings in last 60d (disclosures lag up to ~45d). | Robinhood 100 Most Popular (retail crowd positioning)
+2026-07-10 08:54:42,951 INFO screener |   candidate TSLA [congress+robinhood] score=+0.60 — Congress: 1 buy / 0 sell filings in last 60d (disclosures lag up to ~45d). | Robinhood 100 Most Popular (retail crowd positioning)
+2026-07-10 08:54:42,951 INFO screener |   candidate FRCOY [robinhood] score=+0.60 — Robinhood Daily Movers (today's biggest movers — momentum)
+2026-07-10 08:54:42,952 INFO screener |   candidate VOD [robinhood] score=+0.60 — Robinhood Daily Movers (today's biggest movers — momentum)
+2026-07-10 08:54:42,952 INFO screener |   candidate OEZVY [robinhood] score=+0.60 — Robinhood Daily Movers (today's biggest movers — momentum)
+2026-07-10 08:54:42,953 INFO screener |   candidate CKISY [robinhood] score=+0.60 — Robinhood Daily Movers (today's biggest movers — momentum)
+2026-07-10 08:54:42,953 INFO screener |   candidate CRCL [robinhood] score=+0.60 — Robinhood Daily Movers (today's biggest movers — momentum)
+2026-07-10 08:54:42,954 INFO screener |   candidate WCPRF [robinhood] score=+0.60 — Robinhood Daily Movers (today's biggest movers — momentum)
+2026-07-10 08:54:42,954 INFO screener |   candidate ESYJY [robinhood] score=+0.60 — Robinhood Daily Movers (today's biggest movers — momentum)
+2026-07-10 08:54:42,955 INFO screener |   candidate ACMR [robinhood] score=+0.60 — Robinhood Daily Movers (today's biggest movers — momentum)
+2026-07-10 08:54:42,955 INFO screener |   candidate EQPT [robinhood] score=+0.60 — Robinhood Daily Movers (today's biggest movers — momentum)
+2026-07-10 08:54:42,956 INFO screener |   candidate FRMI [robinhood] score=+0.60 — Robinhood Daily Movers (today's biggest movers — momentum)
+2026-07-10 08:55:08,841 INFO quiver | Quiver live/offexchange -> 5496 row(s).
+2026-07-10 08:55:12,144 INFO quiver | Quiver live/govcontractsall -> 20000 row(s).
+2026-07-10 08:56:54,160 INFO signals | Gathered signals for 31/31 symbols (+3 market signals).
+2026-07-10 08:56:55,318 INFO httpx | HTTP Request: POST https://agent.robinhood.com/mcp/trading "HTTP/1.1 200 OK"
+2026-07-10 08:56:55,322 INFO mcp.client.streamable_http | Received session ID: CRQT2I3HGUPDM33WJFSLJ23TBN
+2026-07-10 08:56:55,330 INFO mcp.client.streamable_http | Negotiated protocol version: 2025-11-25
+2026-07-10 08:56:55,445 INFO httpx | HTTP Request: POST https://agent.robinhood.com/mcp/trading "HTTP/1.1 202 Accepted"
+2026-07-10 08:56:55,584 INFO httpx | HTTP Request: GET https://agent.robinhood.com/mcp/trading "HTTP/1.1 405 Method Not Allowed"
+2026-07-10 08:56:55,588 INFO mcp.client.streamable_http | GET stream disconnected, reconnecting in 1000ms...
+2026-07-10 08:56:55,941 INFO httpx | HTTP Request: POST https://agent.robinhood.com/mcp/trading "HTTP/1.1 200 OK"
+2026-07-10 08:56:56,096 INFO httpx | HTTP Request: POST https://agent.robinhood.com/mcp/trading "HTTP/1.1 200 OK"
+2026-07-10 08:56:56,387 INFO httpx | HTTP Request: POST https://agent.robinhood.com/mcp/trading "HTTP/1.1 200 OK"
+2026-07-10 08:56:56,390 INFO mcp.client.streamable_http | Received session ID: ZO4NA32EWLCYCKOPZOYKBLMRLW
+2026-07-10 08:56:56,392 INFO mcp.client.streamable_http | Negotiated protocol version: 2025-11-25
+2026-07-10 08:56:56,500 INFO httpx | HTTP Request: POST https://agent.robinhood.com/mcp/trading "HTTP/1.1 202 Accepted"
+2026-07-10 08:56:56,577 INFO httpx | HTTP Request: GET https://agent.robinhood.com/mcp/trading "HTTP/1.1 405 Method Not Allowed"
+2026-07-10 08:56:56,581 INFO mcp.client.streamable_http | GET stream disconnected, reconnecting in 1000ms...
+2026-07-10 08:56:56,740 INFO httpx | HTTP Request: POST https://agent.robinhood.com/mcp/trading "HTTP/1.1 200 OK"
+2026-07-10 08:56:56,877 INFO httpx | HTTP Request: POST https://agent.robinhood.com/mcp/trading "HTTP/1.1 200 OK"
+2026-07-10 08:56:57,041 INFO robinhood | Imported 1 Robinhood holding(s) for context (read-only).
+2026-07-10 08:56:57,065 INFO orchestrator | Buy-excluded from slate this cycle: AMD (exited 18.7h ago (cooldown 24h)), BEP (exited 23.0h ago (cooldown 24h)), FRHC (at 18% symbol cap), LLY (exited 23.0h ago (cooldown 24h)), T (exited 23.5h ago (cooldown 24h))
+2026-07-10 08:57:38,016 INFO httpx | HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+2026-07-10 08:57:38,089 INFO decision | Claude returned 11 proposal(s).
+2026-07-10 08:57:38,091 INFO orchestrator | Cycle budget $1,774 split across 6 buy(s): TSM $405, JNJ $363, LASR $311, LPLA $270, EQPT $208, CVX $218.
+2026-07-10 08:57:43,151 INFO orchestrator | BUY TSM -> resized: Sized to 0.934988 sh ($405) within caps. Reduced from request. | Best fundamental profile in book: margin 69.6%, rev growth +35.1%, low D/E. Insider open-market buyi
+2026-07-10 08:57:43,293 INFO alpaca | BUY market TSM qty=None notional=404.7 lim=None (order 12c5ae9d-db42-4a01-881f-fc7f5db39f89)
+2026-07-10 08:57:43,298 INFO ledger | Ledger: BUY TSM qty=0.935247 $405
+2026-07-10 08:57:43,718 INFO orchestrator | BUY JNJ -> resized: Sized to 1.39822 sh ($363) within caps. Reduced from request. | Strong fundamentals (margin 35.6%, rev +9.9%), uptrend with MACD bull and RSI 63, congress buy. Bala
+2026-07-10 08:57:43,817 INFO alpaca | BUY market JNJ qty=1.0 notional=None lim=None (order ae5d69fe-dd0c-4857-b9b8-64a4051cb84c)
+2026-07-10 08:57:43,821 INFO ledger | Ledger: BUY JNJ qty=1 $260
+2026-07-10 08:57:44,297 INFO risk | REJECT buy LASR: Top-up conviction 0.60 shows no new edge over prior entry 0.55 (needs +0.05) — 'adding to a winner' is not a signal.
+2026-07-10 08:57:44,303 INFO orchestrator | BUY LASR -> rejected: Top-up conviction 0.60 shows no new edge over prior entry 0.55 (needs +0.05) — 'adding to a winner' is not a signal. | Strong technical setup (RSI 56, MACD bull, uptrend px>50>200), rev growth +55%, analyst PT raise. No
+2026-07-10 08:57:44,527 INFO risk | REJECT hold CRWD: HOLD — no action.
+2026-07-10 08:57:44,530 INFO orchestrator | HOLD CRWD -> rejected: HOLD — no action. | Uptrend and MACD bull with rev growth +25.6%, but RSI 67 approaching overbought and insider selling.
+2026-07-10 08:57:44,974 INFO risk | REJECT buy LPLA: Top-up conviction 0.52 shows no new edge over prior entry 0.55 (needs +0.05) — 'adding to a winner' is not a signal.
+2026-07-10 08:57:44,977 INFO orchestrator | BUY LPLA -> rejected: Top-up conviction 0.52 shows no new edge over prior entry 0.55 (needs +0.05) — 'adding to a winner' is not a signal. | Rev growth +35%, congress buying (7 buys/0 sells) and insider net positive, MACD bull with RSI 62. M
+2026-07-10 08:57:45,689 INFO orchestrator | BUY EQPT -> resized: Sized to 11.2394 sh ($208) within caps. Reduced from request. | Heavy insider open-market buying (131,803 sh, +1.0) and congress buys — the strongest-performing sig
+2026-07-10 08:57:45,789 INFO alpaca | BUY market EQPT qty=11.0 notional=None lim=None (order 3bdb8685-7d07-46c2-bd29-53edfbfa6f79)
+2026-07-10 08:57:45,792 INFO ledger | Ledger: BUY EQPT qty=11 $203
+2026-07-10 08:57:46,900 INFO risk | REJECT buy CVX: At max open positions (15).
+2026-07-10 08:57:46,907 INFO orchestrator | BUY CVX -> rejected: At max open positions (15). | Solid fundamentals (EBITDA $37.9B, margin 20.4%), congress buy, MACD bull, buy-side off-exchange lea
+2026-07-10 08:57:47,092 INFO orchestrator | SELL ENTG -> approved: Closing existing position. | Position down -3.4% with technical deterioration (MACD bear, RSI 46, technical -0.40) and insider op
+2026-07-10 08:57:47,259 INFO alpaca | CLOSE ENTG (order cbc9e88f-f208-407a-af87-6fad5692fc59)
+2026-07-10 08:57:47,265 INFO ledger | Ledger: SELL ENTG qty=8 $1157
+2026-07-10 08:57:47,415 INFO orchestrator | SELL QCOM -> approved: Closing existing position. | Revenue declining -3.5%, MACD bear, heavy insider selling (31,721 sh). Weakest held semi thesis; fre
+2026-07-10 08:57:47,687 INFO alpaca | CLOSE QCOM (order c38753ad-a54e-4d37-936f-8820c0d32b8d)
+2026-07-10 08:57:47,691 INFO ledger | Ledger: SELL QCOM qty=11 $2078
+2026-07-10 08:57:47,798 INFO risk | REJECT hold BSX: HOLD — no action.
+2026-07-10 08:57:47,801 INFO orchestrator | HOLD BSX -> rejected: HOLD — no action. | Insider open-market buying (+1.0) and congress buys are supportive, but downtrend (px<50<200) vetoes
+2026-07-10 08:57:47,912 INFO risk | REJECT hold TDG: HOLD — no action.
+2026-07-10 08:57:47,915 INFO orchestrator | HOLD TDG -> rejected: HOLD — no action. | Excellent fundamentals (margin 51%, rev +18%) and heavy congress buying, but MACD bear and mixed tre
+2026-07-10 08:57:47,985 INFO alpaca | Alpaca client ready (mode=paper).
+2026-07-10 08:57:50,575 INFO dashboard | Wrote dashboard with 129 trades -> dashboard.html
+2026-07-10 09:13:24,896 INFO watchdog | Trailing stop hit on CRWD: peak 4.9% -> now 1.8%. Closing.
+2026-07-10 09:13:25,057 INFO alpaca | CLOSE CRWD (order 2ea24bfd-91db-4525-9364-6a39452add5c)
+2026-07-10 09:13:25,074 INFO ledger | Ledger: SELL CRWD qty=6 $1163
+2026-07-10 09:27:52,408 INFO orchestrator | Market regime: SPY above 200dma (753 vs 691), VIX 16 -> risk-on, size x1.00.
+2026-07-10 09:27:53,431 INFO quiver | Quiver live/congresstrading -> 1000 row(s).
+2026-07-10 09:27:53,853 INFO screener | EDGAR Form-4 feed -> 68 filing(s) (scanning up to 100).
+2026-07-10 09:28:12,837 INFO screener | Options-flow most-actives pool -> 40 name(s).
+2026-07-10 09:28:21,668 INFO httpx | HTTP Request: POST https://agent.robinhood.com/mcp/trading "HTTP/1.1 200 OK"
+2026-07-10 09:28:21,675 INFO mcp.client.streamable_http | Received session ID: 2AQJNU3BPWKMIRI36NBM3BWRIL
+2026-07-10 09:28:21,683 INFO mcp.client.streamable_http | Negotiated protocol version: 2025-11-25
+2026-07-10 09:28:21,801 INFO httpx | HTTP Request: POST https://agent.robinhood.com/mcp/trading "HTTP/1.1 202 Accepted"
+2026-07-10 09:28:21,906 INFO httpx | HTTP Request: GET https://agent.robinhood.com/mcp/trading "HTTP/1.1 405 Method Not Allowed"
+2026-07-10 09:28:21,908 INFO mcp.client.streamable_http | GET stream disconnected, reconnecting in 1000ms...
+2026-07-10 09:28:22,241 INFO httpx | HTTP Request: POST https://agent.robinhood.com/mcp/trading "HTTP/1.1 200 OK"
+2026-07-10 09:28:22,459 INFO httpx | HTTP Request: POST https://agent.robinhood.com/mcp/trading "HTTP/1.1 200 OK"
+2026-07-10 09:28:22,792 INFO httpx | HTTP Request: POST https://agent.robinhood.com/mcp/trading "HTTP/1.1 200 OK"
+2026-07-10 09:28:22,795 INFO mcp.client.streamable_http | Received session ID: TC6A5EZA7DQNI2M62Z2AB3S5O5
+2026-07-10 09:28:22,798 INFO mcp.client.streamable_http | Negotiated protocol version: 2025-11-25
+2026-07-10 09:28:22,902 INFO httpx | HTTP Request: POST https://agent.robinhood.com/mcp/trading "HTTP/1.1 202 Accepted"
+2026-07-10 09:28:22,980 INFO httpx | HTTP Request: GET https://agent.robinhood.com/mcp/trading "HTTP/1.1 405 Method Not Allowed"
+2026-07-10 09:28:22,983 INFO mcp.client.streamable_http | GET stream disconnected, reconnecting in 1000ms...
+2026-07-10 09:28:23,705 INFO httpx | HTTP Request: POST https://agent.robinhood.com/mcp/trading "HTTP/1.1 200 OK"
+2026-07-10 09:28:23,859 INFO httpx | HTTP Request: POST https://agent.robinhood.com/mcp/trading "HTTP/1.1 200 OK"
+2026-07-10 09:28:24,019 INFO screener | Robinhood 'Daily movers' -> 20 name(s).
+2026-07-10 09:28:24,228 INFO httpx | HTTP Request: POST https://agent.robinhood.com/mcp/trading "HTTP/1.1 200 OK"
+2026-07-10 09:28:24,230 INFO mcp.client.streamable_http | Received session ID: IYC7VZZ5B5XUXD5MO6RBLRHW3A
+2026-07-10 09:28:24,233 INFO mcp.client.streamable_http | Negotiated protocol version: 2025-11-25
+2026-07-10 09:28:24,360 INFO httpx | HTTP Request: POST https://agent.robinhood.com/mcp/trading "HTTP/1.1 202 Accepted"
+2026-07-10 09:28:24,460 INFO httpx | HTTP Request: GET https://agent.robinhood.com/mcp/trading "HTTP/1.1 405 Method Not Allowed"
+2026-07-10 09:28:24,464 INFO mcp.client.streamable_http | GET stream disconnected, reconnecting in 1000ms...
+2026-07-10 09:28:24,906 INFO httpx | HTTP Request: POST https://agent.robinhood.com/mcp/trading "HTTP/1.1 200 OK"
+2026-07-10 09:28:25,055 INFO httpx | HTTP Request: POST https://agent.robinhood.com/mcp/trading "HTTP/1.1 200 OK"
+2026-07-10 09:28:25,182 INFO screener | Robinhood '100 most popular' -> 100 name(s).
+2026-07-10 09:28:25,184 INFO screener | Discovered 18 candidate(s) from 4 source(s) (282 merged, 191 above min_score, capped to 18).
+2026-07-10 09:28:25,185 INFO screener |   candidate AMD [congress+robinhood] score=+1.10 — Congress: 3 buy / 0 sell filings in last 60d (disclosures lag up to ~45d). | Robinhood 100 Most Popular (retail crowd positioning)
+2026-07-10 09:28:25,187 INFO screener |   candidate T [congress+robinhood] score=+1.06 — Congress: 6 buy / 1 sell filings in last 60d (disclosures lag up to ~45d). | Robinhood 100 Most Popular (retail crowd positioning)
+2026-07-10 09:28:25,188 INFO screener |   candidate BEP [congress] score=+1.00 — Congress: 7 buy / 0 sell filings in last 60d (disclosures lag up to ~45d).
+2026-07-10 09:28:25,189 INFO screener |   candidate QCOM [congress+robinhood] score=+0.85 — Congress: 2 buy / 0 sell filings in last 60d (disclosures lag up to ~45d). | Robinhood 100 Most Popular (retail crowd positioning)
+2026-07-10 09:28:25,191 INFO screener |   candidate HD [congress] score=+0.75 — Congress: 3 buy / 0 sell filings in last 60d (disclosures lag up to ~45d).
+2026-07-10 09:28:25,193 INFO screener |   candidate ENTG [congress] score=+0.75 — Congress: 3 buy / 0 sell filings in last 60d (disclosures lag up to ~45d).
+2026-07-10 09:28:25,194 INFO screener |   candidate CZNC [insider] score=+0.67 — Insider: 2 open-market buy filing(s), 207 sh (SEC Form 4, last filings feed).
+2026-07-10 09:28:25,195 INFO screener |   candidate LLY [congress+robinhood] score=+0.60 — Congress: 1 buy / 0 sell filings in last 60d (disclosures lag up to ~45d). | Robinhood 100 Most Popular (retail crowd positioning)
+2026-07-10 09:28:25,196 INFO screener |   candidate CRWD [congress+robinhood] score=+0.60 — Congress: 1 buy / 0 sell filings in last 60d (disclosures lag up to ~45d). | Robinhood 100 Most Popular (retail crowd positioning)
+2026-07-10 09:28:25,197 INFO screener |   candidate CVX [congress+robinhood] score=+0.60 — Congress: 1 buy / 0 sell filings in last 60d (disclosures lag up to ~45d). | Robinhood 100 Most Popular (retail crowd positioning)
+2026-07-10 09:28:25,199 INFO screener |   candidate TSLA [congress+robinhood] score=+0.60 — Congress: 1 buy / 0 sell filings in last 60d (disclosures lag up to ~45d). | Robinhood 100 Most Popular (retail crowd positioning)
+2026-07-10 09:28:25,200 INFO screener |   candidate VOD [robinhood] score=+0.60 — Robinhood Daily Movers (today's biggest movers — momentum)
+2026-07-10 09:28:25,201 INFO screener |   candidate LZRFY [robinhood] score=+0.60 — Robinhood Daily Movers (today's biggest movers — momentum)
+2026-07-10 09:28:25,202 INFO screener |   candidate JXN [robinhood] score=+0.60 — Robinhood Daily Movers (today's biggest movers — momentum)
+2026-07-10 09:28:25,202 INFO screener |   candidate ESYJY [robinhood] score=+0.60 — Robinhood Daily Movers (today's biggest movers — momentum)
+2026-07-10 09:28:25,203 INFO screener |   candidate RGLXY [robinhood] score=+0.60 — Robinhood Daily Movers (today's biggest movers — momentum)
+2026-07-10 09:28:25,204 INFO screener |   candidate FRMI [robinhood] score=+0.60 — Robinhood Daily Movers (today's biggest movers — momentum)
+2026-07-10 09:28:25,205 INFO screener |   candidate WDFC [robinhood] score=+0.60 — Robinhood Daily Movers (today's biggest movers — momentum)
+2026-07-10 09:28:49,416 INFO quiver | Quiver live/offexchange -> 5496 row(s).
+2026-07-10 09:28:50,004 INFO quiver | Quiver live/govcontractsall -> 20000 row(s).
+2026-07-10 09:29:07,583 INFO signals | Gathered signals for 29/29 symbols (+3 market signals).
+2026-07-10 09:29:08,170 INFO httpx | HTTP Request: POST https://agent.robinhood.com/mcp/trading "HTTP/1.1 200 OK"
+2026-07-10 09:29:08,171 INFO mcp.client.streamable_http | Received session ID: NCYG4O5IWHAQ6BRQD3UGQKQLOR
+2026-07-10 09:29:08,173 INFO mcp.client.streamable_http | Negotiated protocol version: 2025-11-25
+2026-07-10 09:29:08,424 INFO httpx | HTTP Request: POST https://agent.robinhood.com/mcp/trading "HTTP/1.1 202 Accepted"
+2026-07-10 09:29:08,506 INFO httpx | HTTP Request: GET https://agent.robinhood.com/mcp/trading "HTTP/1.1 405 Method Not Allowed"
+2026-07-10 09:29:08,510 INFO mcp.client.streamable_http | GET stream disconnected, reconnecting in 1000ms...
+2026-07-10 09:29:08,793 INFO httpx | HTTP Request: POST https://agent.robinhood.com/mcp/trading "HTTP/1.1 200 OK"
+2026-07-10 09:29:08,929 INFO httpx | HTTP Request: POST https://agent.robinhood.com/mcp/trading "HTTP/1.1 200 OK"
+2026-07-10 09:29:09,146 INFO httpx | HTTP Request: POST https://agent.robinhood.com/mcp/trading "HTTP/1.1 200 OK"
+2026-07-10 09:29:09,149 INFO mcp.client.streamable_http | Received session ID: RXXCHOEZXC57MDVCFFRQMSDC24
+2026-07-10 09:29:09,151 INFO mcp.client.streamable_http | Negotiated protocol version: 2025-11-25
+2026-07-10 09:29:09,314 INFO httpx | HTTP Request: POST https://agent.robinhood.com/mcp/trading "HTTP/1.1 202 Accepted"
+2026-07-10 09:29:09,402 INFO httpx | HTTP Request: GET https://agent.robinhood.com/mcp/trading "HTTP/1.1 405 Method Not Allowed"
+2026-07-10 09:29:09,405 INFO mcp.client.streamable_http | GET stream disconnected, reconnecting in 1000ms...
+2026-07-10 09:29:09,529 INFO httpx | HTTP Request: POST https://agent.robinhood.com/mcp/trading "HTTP/1.1 200 OK"
+2026-07-10 09:29:09,671 INFO httpx | HTTP Request: POST https://agent.robinhood.com/mcp/trading "HTTP/1.1 200 OK"
+2026-07-10 09:29:09,895 INFO robinhood | Imported 1 Robinhood holding(s) for context (read-only).
+2026-07-10 09:29:09,905 INFO orchestrator | Buy-excluded from slate this cycle: AMD (exited 19.2h ago (cooldown 24h)), BEP (exited 23.5h ago (cooldown 24h)), CRWD (exited 0.3h ago (cooldown 24h)), ENTG (exited 0.5h ago (cooldown 24h)), EQPT (topped up 0.5h ago (next ok in 4h)) …+5 more
+2026-07-10 09:29:36,694 INFO httpx | HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+2026-07-10 09:29:36,721 INFO decision | Claude returned 5 proposal(s).
+2026-07-10 09:29:36,723 INFO orchestrator | Cycle budget $5,279 split across 4 buy(s): BSX $1,508, LZRFY $1,458, VOD $1,257, HD $1,056.
+2026-07-10 09:29:41,376 INFO orchestrator | BUY BSX -> resized: Sized to 33.5696 sh ($1,508) within caps. Reduced from request. | Add to winner: strong fundamentals (rev +11.6%, 26.7% margin), open-market insider buying 9,800 sh (
+2026-07-10 09:29:41,500 INFO alpaca | BUY market BSX qty=33.0 notional=None lim=None (order c40c348d-fbbf-411b-a198-03476c9670ba)
+2026-07-10 09:29:41,504 INFO ledger | Ledger: BUY BSX qty=33 $1483
+2026-07-10 09:29:41,566 WARNING alpaca | latest_price(LZRFY) failed: 'LZRFY'
+2026-07-10 09:29:41,678 WARNING alpaca | latest_price(LZRFY) failed: 'LZRFY'
+2026-07-10 09:29:42,124 INFO risk | REJECT buy LZRFY: No current price available.
+2026-07-10 09:29:42,126 INFO orchestrator | BUY LZRFY -> rejected: No current price available. | Localiza: solid fundamentals (EBITDA $8.5B, rev +21.2%), strong technical uptrend/bull MACD (score +
+2026-07-10 09:29:42,764 INFO orchestrator | BUY VOD -> resized: Sized to 84.9832 sh ($1,257) within caps. Reduced from request. | Vodafone: uptrend with bull MACD (RSI 60), decent fundamentals (22% margin), off-exchange buy-side l
+2026-07-10 09:29:43,014 INFO alpaca | BUY market VOD qty=84.0 notional=None lim=None (order 4f5aa335-cb26-4335-9ca5-bbb7405de3d7)
+2026-07-10 09:29:43,017 INFO ledger | Ledger: BUY VOD qty=84 $1242
+2026-07-10 09:29:43,639 INFO orchestrator | BUY HD -> resized: Sized to 3.08609 sh ($1,056) within caps. Reduced from request. | Congress buys (3 filings/60d) and heavy insider net buying (+0.98) corroborate smart-money interest,
+2026-07-10 09:29:43,749 INFO alpaca | BUY market HD qty=3.0 notional=None lim=None (order f272be41-541d-4bf5-b1f7-f52bd05cc114)
+2026-07-10 09:29:43,753 INFO ledger | Ledger: BUY HD qty=3 $1026
+2026-07-10 09:29:43,923 INFO risk | REJECT hold CVX: HOLD — no action.
+2026-07-10 09:29:43,925 INFO orchestrator | HOLD CVX -> rejected: HOLD — no action. | Congress/retail interest offset by heavy open-market insider selling (575k sh sold, insider -1.00). 
+2026-07-10 09:29:43,985 INFO alpaca | Alpaca client ready (mode=paper).
+2026-07-10 09:29:46,251 INFO dashboard | Wrote dashboard with 133 trades -> dashboard.html
+2026-07-10 10:13:30,141 CRITICAL orchestrator | DARK GAP: no loop tick for 29 min (sleep/suspend?). Positions were unwatched; reconciling before trading resumes.
+2026-07-10 10:13:33,227 INFO notify | CRITICAL alert emailed to srikanthpusapati1@gmail.com: Bot was dark for 29 min
+2026-07-10 10:13:33,298 WARNING alpaca | get_account: transient network error (ConnectionError); retry 1/2.
+2026-07-10 10:13:34,096 INFO watchdog | Trailing stop hit on EQPT: peak 3.5% -> now -1.2%. Closing.
+2026-07-10 10:13:34,187 ERROR alpaca | close_position(EQPT) failed: {"available":"0","code":40310000,"existing_qty":"11","held_for_orders":"11","message":"insufficient qty available for order (requested: 11, available: 0)","symbol":"EQPT"}
+2026-07-10 10:13:34,493 WARNING alpaca | Exit via resting sell 1e454bc3-7b90-487c-87cd-b212f9a452e5 (EQPT): replaced limit -> 17.94 (marketable; new order 8bcc4537-1096-45f2-aedc-1308d980770c).
+2026-07-10 10:13:34,504 INFO ledger | Ledger: SELL EQPT qty=11 $201
+2026-07-10 10:13:34,506 WARNING watchdog | Partial close EQPT (trail): sold 0 available share(s), made 1 resting sell(s) marketable; 11 reserved by open orders — will retry the full close next tick.
+2026-07-10 10:29:40,383 INFO orchestrator | Market regime: SPY above 200dma (753 vs 691), VIX 16 -> risk-on, size x1.00.
+2026-07-10 10:29:41,432 INFO quiver | Quiver live/congresstrading -> 1000 row(s).
+2026-07-10 10:29:41,789 INFO screener | EDGAR Form-4 feed -> 55 filing(s) (scanning up to 100).
+2026-07-10 10:29:59,011 INFO screener | Options-flow most-actives pool -> 40 name(s).
+2026-07-10 10:30:07,320 INFO httpx | HTTP Request: POST https://agent.robinhood.com/mcp/trading "HTTP/1.1 200 OK"
+2026-07-10 10:30:07,326 INFO mcp.client.streamable_http | Received session ID: MX5APLHROTSKBG32JTFFY5KGD6
+2026-07-10 10:30:07,333 INFO mcp.client.streamable_http | Negotiated protocol version: 2025-11-25
+2026-07-10 10:30:07,461 INFO httpx | HTTP Request: POST https://agent.robinhood.com/mcp/trading "HTTP/1.1 202 Accepted"
+2026-07-10 10:30:07,555 INFO httpx | HTTP Request: GET https://agent.robinhood.com/mcp/trading "HTTP/1.1 405 Method Not Allowed"
+2026-07-10 10:30:07,563 INFO mcp.client.streamable_http | GET stream disconnected, reconnecting in 1000ms...
+2026-07-10 10:30:08,045 INFO httpx | HTTP Request: POST https://agent.robinhood.com/mcp/trading "HTTP/1.1 200 OK"
+2026-07-10 10:30:08,185 INFO httpx | HTTP Request: POST https://agent.robinhood.com/mcp/trading "HTTP/1.1 200 OK"
+2026-07-10 10:30:08,523 INFO httpx | HTTP Request: POST https://agent.robinhood.com/mcp/trading "HTTP/1.1 200 OK"
+2026-07-10 10:30:08,525 INFO mcp.client.streamable_http | Received session ID: KMLM4OH6GT73VY4ZVMK4BPHROQ
+2026-07-10 10:30:08,528 INFO mcp.client.streamable_http | Negotiated protocol version: 2025-11-25
+2026-07-10 10:30:08,636 INFO httpx | HTTP Request: POST https://agent.robinhood.com/mcp/trading "HTTP/1.1 202 Accepted"
+2026-07-10 10:30:08,713 INFO httpx | HTTP Request: GET https://agent.robinhood.com/mcp/trading "HTTP/1.1 405 Method Not Allowed"
+2026-07-10 10:30:08,716 INFO mcp.client.streamable_http | GET stream disconnected, reconnecting in 1000ms...
+2026-07-10 10:30:09,541 INFO httpx | HTTP Request: POST https://agent.robinhood.com/mcp/trading "HTTP/1.1 200 OK"
+2026-07-10 10:30:09,686 INFO httpx | HTTP Request: POST https://agent.robinhood.com/mcp/trading "HTTP/1.1 200 OK"
+2026-07-10 10:30:09,773 INFO screener | Robinhood 'Daily movers' -> 20 name(s).
+2026-07-10 10:30:09,976 INFO httpx | HTTP Request: POST https://agent.robinhood.com/mcp/trading "HTTP/1.1 200 OK"
+2026-07-10 10:30:09,978 INFO mcp.client.streamable_http | Received session ID: X4VJWXZSDW62O2FOVAMQIIW2YR
+2026-07-10 10:30:09,981 INFO mcp.client.streamable_http | Negotiated protocol version: 2025-11-25
+2026-07-10 10:30:10,091 INFO httpx | HTTP Request: POST https://agent.robinhood.com/mcp/trading "HTTP/1.1 202 Accepted"
+2026-07-10 10:30:10,168 INFO httpx | HTTP Request: GET https://agent.robinhood.com/mcp/trading "HTTP/1.1 405 Method Not Allowed"
+2026-07-10 10:30:10,172 INFO mcp.client.streamable_http | GET stream disconnected, reconnecting in 1000ms...
+2026-07-10 10:30:10,712 INFO httpx | HTTP Request: POST https://agent.robinhood.com/mcp/trading "HTTP/1.1 200 OK"
+2026-07-10 10:30:10,939 INFO httpx | HTTP Request: POST https://agent.robinhood.com/mcp/trading "HTTP/1.1 200 OK"
+2026-07-10 10:30:11,000 INFO screener | Robinhood '100 most popular' -> 100 name(s).
+2026-07-10 10:30:11,002 INFO screener | Discovered 18 candidate(s) from 4 source(s) (280 merged, 189 above min_score, capped to 18).
+2026-07-10 10:30:11,002 INFO screener |   candidate AMD [congress+robinhood] score=+1.10 — Congress: 3 buy / 0 sell filings in last 60d (disclosures lag up to ~45d). | Robinhood 100 Most Popular (retail crowd positioning)
+2026-07-10 10:30:11,004 INFO screener |   candidate T [congress+robinhood] score=+1.06 — Congress: 6 buy / 1 sell filings in last 60d (disclosures lag up to ~45d). | Robinhood 100 Most Popular (retail crowd positioning)
+2026-07-10 10:30:11,005 INFO screener |   candidate BEP [congress] score=+1.00 — Congress: 7 buy / 0 sell filings in last 60d (disclosures lag up to ~45d).
+2026-07-10 10:30:11,006 INFO screener |   candidate QCOM [congress+robinhood] score=+0.85 — Congress: 2 buy / 0 sell filings in last 60d (disclosures lag up to ~45d). | Robinhood 100 Most Popular (retail crowd positioning)
+2026-07-10 10:30:11,007 INFO screener |   candidate ENTG [congress] score=+0.75 — Congress: 3 buy / 0 sell filings in last 60d (disclosures lag up to ~45d).
+2026-07-10 10:30:11,008 INFO screener |   candidate LLY [congress+robinhood] score=+0.60 — Congress: 1 buy / 0 sell filings in last 60d (disclosures lag up to ~45d). | Robinhood 100 Most Popular (retail crowd positioning)
+2026-07-10 10:30:11,009 INFO screener |   candidate CRWD [congress+robinhood] score=+0.60 — Congress: 1 buy / 0 sell filings in last 60d (disclosures lag up to ~45d). | Robinhood 100 Most Popular (retail crowd positioning)
+2026-07-10 10:30:11,010 INFO screener |   candidate CVX [congress+robinhood] score=+0.60 — Congress: 1 buy / 0 sell filings in last 60d (disclosures lag up to ~45d). | Robinhood 100 Most Popular (retail crowd positioning)
+2026-07-10 10:30:11,012 INFO screener |   candidate TSLA [congress+robinhood] score=+0.60 — Congress: 1 buy / 0 sell filings in last 60d (disclosures lag up to ~45d). | Robinhood 100 Most Popular (retail crowd positioning)
+2026-07-10 10:30:11,013 INFO screener |   candidate SUOPY [robinhood] score=+0.60 — Robinhood Daily Movers (today's biggest movers — momentum)
+2026-07-10 10:30:11,015 INFO screener |   candidate ESYJY [robinhood] score=+0.60 — Robinhood Daily Movers (today's biggest movers — momentum)
+2026-07-10 10:30:11,016 INFO screener |   candidate RGLXY [robinhood] score=+0.60 — Robinhood Daily Movers (today's biggest movers — momentum)
+2026-07-10 10:30:11,017 INFO screener |   candidate EQPT [robinhood] score=+0.60 — Robinhood Daily Movers (today's biggest movers — momentum)
+2026-07-10 10:30:11,017 INFO screener |   candidate FRMI [robinhood] score=+0.60 — Robinhood Daily Movers (today's biggest movers — momentum)
+2026-07-10 10:30:11,018 INFO screener |   candidate WDFC [robinhood] score=+0.60 — Robinhood Daily Movers (today's biggest movers — momentum)
+2026-07-10 10:30:11,019 INFO screener |   candidate AXTI [robinhood] score=+0.60 — Robinhood Daily Movers (today's biggest movers — momentum)
+2026-07-10 10:30:11,020 INFO screener |   candidate BEAM [robinhood] score=+0.60 — Robinhood Daily Movers (today's biggest movers — momentum)
+2026-07-10 10:30:11,021 INFO screener |   candidate SGHIY [robinhood] score=+0.60 — Robinhood Daily Movers (today's biggest movers — momentum)
+2026-07-10 10:30:44,066 INFO quiver | Quiver live/offexchange -> 5496 row(s).
+2026-07-10 10:30:44,637 INFO quiver | Quiver live/govcontractsall -> 20000 row(s).
+2026-07-10 10:31:02,026 INFO signals | Gathered signals for 30/30 symbols (+3 market signals).
+2026-07-10 10:31:02,655 INFO httpx | HTTP Request: POST https://agent.robinhood.com/mcp/trading "HTTP/1.1 200 OK"
+2026-07-10 10:31:02,658 INFO mcp.client.streamable_http | Received session ID: CN32YG4MRIKK4YIXDVEHK4Q5WC
+2026-07-10 10:31:02,660 INFO mcp.client.streamable_http | Negotiated protocol version: 2025-11-25
+2026-07-10 10:31:02,848 INFO httpx | HTTP Request: POST https://agent.robinhood.com/mcp/trading "HTTP/1.1 202 Accepted"
+2026-07-10 10:31:02,935 INFO httpx | HTTP Request: GET https://agent.robinhood.com/mcp/trading "HTTP/1.1 405 Method Not Allowed"
+2026-07-10 10:31:02,938 INFO mcp.client.streamable_http | GET stream disconnected, reconnecting in 1000ms...
+2026-07-10 10:31:03,117 INFO httpx | HTTP Request: POST https://agent.robinhood.com/mcp/trading "HTTP/1.1 200 OK"
+2026-07-10 10:31:03,275 INFO httpx | HTTP Request: POST https://agent.robinhood.com/mcp/trading "HTTP/1.1 200 OK"
+2026-07-10 10:31:03,534 INFO httpx | HTTP Request: POST https://agent.robinhood.com/mcp/trading "HTTP/1.1 200 OK"
+2026-07-10 10:31:03,537 INFO mcp.client.streamable_http | Received session ID: 245BC7IM3RIDP3BVEYZV6BI4FA
+2026-07-10 10:31:03,540 INFO mcp.client.streamable_http | Negotiated protocol version: 2025-11-25
+2026-07-10 10:31:03,652 INFO httpx | HTTP Request: POST https://agent.robinhood.com/mcp/trading "HTTP/1.1 202 Accepted"
+2026-07-10 10:31:03,736 INFO httpx | HTTP Request: GET https://agent.robinhood.com/mcp/trading "HTTP/1.1 405 Method Not Allowed"
+2026-07-10 10:31:03,739 INFO mcp.client.streamable_http | GET stream disconnected, reconnecting in 1000ms...
+2026-07-10 10:31:03,894 INFO httpx | HTTP Request: POST https://agent.robinhood.com/mcp/trading "HTTP/1.1 200 OK"
+2026-07-10 10:31:04,030 INFO httpx | HTTP Request: POST https://agent.robinhood.com/mcp/trading "HTTP/1.1 200 OK"
+2026-07-10 10:31:04,154 INFO robinhood | Imported 1 Robinhood holding(s) for context (read-only).
+2026-07-10 10:31:04,162 INFO orchestrator | Buy-excluded from slate this cycle: AMD (exited 20.3h ago (cooldown 24h)), BSX (topped up 1.0h ago (next ok in 4h)), CRWD (exited 1.3h ago (cooldown 24h)), ENTG (exited 1.6h ago (cooldown 24h)), EQPT (topped up 1.6h ago (next ok in 4h)) …+6 more
+2026-07-10 10:31:42,475 INFO httpx | HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+2026-07-10 10:31:42,499 INFO decision | Claude returned 5 proposal(s).
+2026-07-10 10:31:42,502 INFO orchestrator | Cycle budget $1,720 split across 3 buy(s): HUBB $645, TDG $591, CVX $484.
+2026-07-10 10:31:48,016 INFO orchestrator | BUY HUBB -> resized: Sized to 1.31268 sh ($645) within caps. Reduced from request. | Held +3.2% and working. Solid fundamentals (24.5% margin, +11.1% rev growth), uptrend (px>50>200), a
+2026-07-10 10:31:48,254 INFO alpaca | BUY market HUBB qty=1.0 notional=None lim=None (order e7fa82f0-a18d-4d0a-8283-e268b5bcfbb9)
+2026-07-10 10:31:48,262 INFO ledger | Ledger: BUY HUBB qty=1 $491
+2026-07-10 10:31:48,727 INFO risk | REJECT buy TDG: Top-up conviction 0.55 shows no new edge over prior entry 0.60 (needs +0.05) — 'adding to a winner' is not a signal.
+2026-07-10 10:31:48,730 INFO orchestrator | BUY TDG -> rejected: Top-up conviction 0.55 shows no new edge over prior entry 0.60 (needs +0.05) — 'adding to a winner' is not a signal. | Best-in-class fundamentals (51% margin, +18.3% rev growth) with strong congressional buying (9 buys/
+2026-07-10 10:31:49,510 INFO orchestrator | BUY CVX -> resized: Sized to 2.77615 sh ($484) within caps. Reduced from request. | Starter energy diversifier: steady fundamentals ($37.9B EBITDA, 20.4% margin), MACD bull, buy-side o
+2026-07-10 10:31:49,624 INFO alpaca | BUY market CVX qty=2.0 notional=None lim=None (order 48eff62d-69ee-4e86-bb00-6e7e0a475752)
+2026-07-10 10:31:49,642 INFO ledger | Ledger: BUY CVX qty=2 $349
+2026-07-10 10:31:49,801 INFO risk | REJECT hold SPCX: HOLD — no action.
+2026-07-10 10:31:49,805 INFO orchestrator | HOLD SPCX -> rejected: HOLD — no action. | Held, modest loss. Decent fundamentals and congressional/insider buying support the thesis, but thin
+2026-07-10 10:31:49,913 INFO risk | REJECT hold TSLA: HOLD — no action.
+2026-07-10 10:31:49,915 INFO orchestrator | HOLD TSLA -> rejected: HOLD — no action. | Conflicting bundle: mixed technicals, insider Form 4 selling, and high off-exchange short pressure (
+2026-07-10 10:31:50,045 INFO alpaca | Alpaca client ready (mode=paper).
+2026-07-10 10:31:52,417 INFO dashboard | Wrote dashboard with 136 trades -> dashboard.html
+2026-07-10 11:01:54,513 INFO orchestrator | Market regime: SPY above 200dma (753 vs 691), VIX 16 -> risk-on, size x1.00.
+2026-07-10 11:01:55,291 INFO quiver | Quiver live/congresstrading -> 1000 row(s).
+2026-07-10 11:01:55,680 INFO screener | EDGAR Form-4 feed -> 67 filing(s) (scanning up to 100).
+2026-07-10 11:02:13,985 INFO screener | Options-flow most-actives pool -> 40 name(s).
+2026-07-10 11:02:22,644 INFO httpx | HTTP Request: POST https://agent.robinhood.com/mcp/trading "HTTP/1.1 200 OK"
+2026-07-10 11:02:22,650 INFO mcp.client.streamable_http | Received session ID: AQXKOUIYWJCMY6DCMRBH4EOZWM
+2026-07-10 11:02:22,655 INFO mcp.client.streamable_http | Negotiated protocol version: 2025-11-25
+2026-07-10 11:02:22,802 INFO httpx | HTTP Request: POST https://agent.robinhood.com/mcp/trading "HTTP/1.1 202 Accepted"
+2026-07-10 11:02:22,945 INFO httpx | HTTP Request: GET https://agent.robinhood.com/mcp/trading "HTTP/1.1 405 Method Not Allowed"
+2026-07-10 11:02:22,948 INFO mcp.client.streamable_http | GET stream disconnected, reconnecting in 1000ms...
+2026-07-10 11:02:23,383 INFO httpx | HTTP Request: POST https://agent.robinhood.com/mcp/trading "HTTP/1.1 200 OK"
+2026-07-10 11:02:23,573 INFO httpx | HTTP Request: POST https://agent.robinhood.com/mcp/trading "HTTP/1.1 200 OK"
+2026-07-10 11:02:23,878 INFO httpx | HTTP Request: POST https://agent.robinhood.com/mcp/trading "HTTP/1.1 200 OK"
+2026-07-10 11:02:23,881 INFO mcp.client.streamable_http | Received session ID: 7674YWBYXJV5DERQUS2M5TNWTR
+2026-07-10 11:02:23,883 INFO mcp.client.streamable_http | Negotiated protocol version: 2025-11-25
+2026-07-10 11:02:23,991 INFO httpx | HTTP Request: POST https://agent.robinhood.com/mcp/trading "HTTP/1.1 202 Accepted"
+2026-07-10 11:02:24,156 INFO httpx | HTTP Request: GET https://agent.robinhood.com/mcp/trading "HTTP/1.1 405 Method Not Allowed"
+2026-07-10 11:02:24,160 INFO mcp.client.streamable_http | GET stream disconnected, reconnecting in 1000ms...
+2026-07-10 11:02:24,901 INFO httpx | HTTP Request: POST https://agent.robinhood.com/mcp/trading "HTTP/1.1 200 OK"
+2026-07-10 11:02:25,141 INFO httpx | HTTP Request: POST https://agent.robinhood.com/mcp/trading "HTTP/1.1 200 OK"
+2026-07-10 11:02:25,203 INFO screener | Robinhood 'Daily movers' -> 20 name(s).
+2026-07-10 11:02:25,315 INFO httpx | HTTP Request: POST https://agent.robinhood.com/mcp/trading "HTTP/1.1 200 OK"
+2026-07-10 11:02:25,317 INFO mcp.client.streamable_http | Received session ID: JUECAX7MFFVD2YB3O5BHY7B2NM
+2026-07-10 11:02:25,319 INFO mcp.client.streamable_http | Negotiated protocol version: 2025-11-25
+2026-07-10 11:02:25,428 INFO httpx | HTTP Request: POST https://agent.robinhood.com/mcp/trading "HTTP/1.1 202 Accepted"
+2026-07-10 11:02:25,708 INFO httpx | HTTP Request: GET https://agent.robinhood.com/mcp/trading "HTTP/1.1 405 Method Not Allowed"
+2026-07-10 11:02:25,712 INFO mcp.client.streamable_http | GET stream disconnected, reconnecting in 1000ms...
+2026-07-10 11:02:26,224 INFO httpx | HTTP Request: POST https://agent.robinhood.com/mcp/trading "HTTP/1.1 200 OK"
+2026-07-10 11:02:26,459 INFO httpx | HTTP Request: POST https://agent.robinhood.com/mcp/trading "HTTP/1.1 200 OK"
+2026-07-10 11:02:26,611 INFO screener | Robinhood '100 most popular' -> 100 name(s).
+2026-07-10 11:02:26,617 INFO screener | Discovered 18 candidate(s) from 4 source(s) (281 merged, 190 above min_score, capped to 18).
+2026-07-10 11:02:26,618 INFO screener |   candidate AMD [congress+robinhood] score=+1.10 — Congress: 3 buy / 0 sell filings in last 60d (disclosures lag up to ~45d). | Robinhood 100 Most Popular (retail crowd positioning)
+2026-07-10 11:02:26,621 INFO screener |   candidate T [congress+robinhood] score=+1.06 — Congress: 6 buy / 1 sell filings in last 60d (disclosures lag up to ~45d). | Robinhood 100 Most Popular (retail crowd positioning)
+2026-07-10 11:02:26,623 INFO screener |   candidate BEP [congress] score=+1.00 — Congress: 7 buy / 0 sell filings in last 60d (disclosures lag up to ~45d).
+2026-07-10 11:02:26,624 INFO screener |   candidate QCOM [congress+robinhood] score=+0.85 — Congress: 2 buy / 0 sell filings in last 60d (disclosures lag up to ~45d). | Robinhood 100 Most Popular (retail crowd positioning)
+2026-07-10 11:02:26,627 INFO screener |   candidate ENTG [congress] score=+0.75 — Congress: 3 buy / 0 sell filings in last 60d (disclosures lag up to ~45d).
+2026-07-10 11:02:26,630 INFO screener |   candidate LLY [congress+robinhood] score=+0.60 — Congress: 1 buy / 0 sell filings in last 60d (disclosures lag up to ~45d). | Robinhood 100 Most Popular (retail crowd positioning)
+2026-07-10 11:02:26,630 INFO screener |   candidate CRWD [congress+robinhood] score=+0.60 — Congress: 1 buy / 0 sell filings in last 60d (disclosures lag up to ~45d). | Robinhood 100 Most Popular (retail crowd positioning)
+2026-07-10 11:02:26,632 INFO screener |   candidate TSLA [congress+robinhood] score=+0.60 — Congress: 1 buy / 0 sell filings in last 60d (disclosures lag up to ~45d). | Robinhood 100 Most Popular (retail crowd positioning)
+2026-07-10 11:02:26,633 INFO screener |   candidate SKHYV [robinhood] score=+0.60 — Robinhood Daily Movers (today's biggest movers — momentum)
+2026-07-10 11:02:26,635 INFO screener |   candidate SUOPY [robinhood] score=+0.60 — Robinhood Daily Movers (today's biggest movers — momentum)
+2026-07-10 11:02:26,636 INFO screener |   candidate LZRFY [robinhood] score=+0.60 — Robinhood Daily Movers (today's biggest movers — momentum)
+2026-07-10 11:02:26,637 INFO screener |   candidate ESYJY [robinhood] score=+0.60 — Robinhood Daily Movers (today's biggest movers — momentum)
+2026-07-10 11:02:26,638 INFO screener |   candidate RGLXY [robinhood] score=+0.60 — Robinhood Daily Movers (today's biggest movers — momentum)
+2026-07-10 11:02:26,639 INFO screener |   candidate EQPT [robinhood] score=+0.60 — Robinhood Daily Movers (today's biggest movers — momentum)
+2026-07-10 11:02:26,640 INFO screener |   candidate FRMI [robinhood] score=+0.60 — Robinhood Daily Movers (today's biggest movers — momentum)
+2026-07-10 11:02:26,641 INFO screener |   candidate BEAM [robinhood] score=+0.60 — Robinhood Daily Movers (today's biggest movers — momentum)
+2026-07-10 11:02:26,642 INFO screener |   candidate SGHIY [robinhood] score=+0.60 — Robinhood Daily Movers (today's biggest movers — momentum)
+2026-07-10 11:02:26,643 INFO screener |   candidate RXT [robinhood] score=+0.60 — Robinhood Daily Movers (today's biggest movers — momentum)
+2026-07-10 11:02:50,082 INFO quiver | Quiver live/offexchange -> 5496 row(s).
+2026-07-10 11:02:50,572 INFO quiver | Quiver live/govcontractsall -> 20000 row(s).
+2026-07-10 11:03:07,999 INFO signals | Gathered signals for 31/31 symbols (+3 market signals).
+2026-07-10 11:03:08,549 INFO httpx | HTTP Request: POST https://agent.robinhood.com/mcp/trading "HTTP/1.1 200 OK"
+2026-07-10 11:03:08,552 INFO mcp.client.streamable_http | Received session ID: 5BWWWEFFHBGVT2ROULIFPF3I2D
+2026-07-10 11:03:08,556 INFO mcp.client.streamable_http | Negotiated protocol version: 2025-11-25
+2026-07-10 11:03:08,760 INFO httpx | HTTP Request: POST https://agent.robinhood.com/mcp/trading "HTTP/1.1 202 Accepted"
+2026-07-10 11:03:08,900 INFO httpx | HTTP Request: GET https://agent.robinhood.com/mcp/trading "HTTP/1.1 405 Method Not Allowed"
+2026-07-10 11:03:08,903 INFO mcp.client.streamable_http | GET stream disconnected, reconnecting in 1000ms...
+2026-07-10 11:03:09,182 INFO httpx | HTTP Request: POST https://agent.robinhood.com/mcp/trading "HTTP/1.1 200 OK"
+2026-07-10 11:03:09,315 INFO httpx | HTTP Request: POST https://agent.robinhood.com/mcp/trading "HTTP/1.1 200 OK"
+2026-07-10 11:03:09,556 INFO httpx | HTTP Request: POST https://agent.robinhood.com/mcp/trading "HTTP/1.1 200 OK"
+2026-07-10 11:03:09,559 INFO mcp.client.streamable_http | Received session ID: I2SGAFJ46NNUBO6Y2AD76DLL2P
+2026-07-10 11:03:09,560 INFO mcp.client.streamable_http | Negotiated protocol version: 2025-11-25
+2026-07-10 11:03:09,705 INFO httpx | HTTP Request: POST https://agent.robinhood.com/mcp/trading "HTTP/1.1 202 Accepted"
+2026-07-10 11:03:09,777 INFO httpx | HTTP Request: GET https://agent.robinhood.com/mcp/trading "HTTP/1.1 405 Method Not Allowed"
+2026-07-10 11:03:09,781 INFO mcp.client.streamable_http | GET stream disconnected, reconnecting in 1000ms...
+2026-07-10 11:03:09,898 INFO httpx | HTTP Request: POST https://agent.robinhood.com/mcp/trading "HTTP/1.1 200 OK"
+2026-07-10 11:03:10,037 INFO httpx | HTTP Request: POST https://agent.robinhood.com/mcp/trading "HTTP/1.1 200 OK"
+2026-07-10 11:03:10,169 INFO robinhood | Imported 1 Robinhood holding(s) for context (read-only).
+2026-07-10 11:03:10,177 INFO orchestrator | Buy-excluded from slate this cycle: AMD (exited 20.8h ago (cooldown 24h)), BSX (topped up 1.6h ago (next ok in 4h)), CRWD (exited 1.8h ago (cooldown 24h)), CVX (topped up 0.5h ago (next ok in 4h)), ENTG (exited 2.1h ago (cooldown 24h)) …+8 more
+2026-07-10 11:03:42,324 INFO httpx | HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+2026-07-10 11:03:42,341 INFO decision | Claude returned 5 proposal(s).
+2026-07-10 11:03:42,344 INFO orchestrator | Cycle budget $881 split across 2 buy(s): SUOPY $464, BRK.B $417.
+2026-07-10 11:03:42,394 WARNING alpaca | latest_price(SUOPY) failed: 'SUOPY'
+2026-07-10 11:03:42,521 WARNING alpaca | latest_price(SUOPY) failed: 'SUOPY'
+2026-07-10 11:03:46,320 INFO risk | REJECT buy SUOPY: No current price available.
+2026-07-10 11:03:46,326 INFO orchestrator | BUY SUOPY -> rejected: No current price available. | Large-cap trading house with $108B EBITDA, 26.5% margin, and a confirmed uptrend (px>50>200) with bu
+2026-07-10 11:03:48,052 INFO orchestrator | BUY BRK.B -> resized: Sized to 0.848482 sh ($417) within caps. Reduced from request. | Solid fundamentals (EBITDA $118B, 31% margin, positive rev growth), positive news sentiment (+0.33) 
+2026-07-10 11:03:48,183 INFO alpaca | BUY market BRK.B qty=None notional=417.19 lim=None (order cc9b5984-b569-4039-9484-dd46980e73fb)
+2026-07-10 11:03:48,190 INFO ledger | Ledger: BUY BRK.B qty=0.848473 $417
+2026-07-10 11:03:48,330 INFO risk | REJECT hold TDG: HOLD — no action.
+2026-07-10 11:03:48,334 INFO orchestrator | HOLD TDG -> rejected: HOLD — no action. | Strong fundamentals (51% margin, 18% rev growth) and heavy congressional buying (9 buys/0 sells) sup
+2026-07-10 11:03:48,509 INFO risk | REJECT hold LASR: HOLD — no action.
+2026-07-10 11:03:48,513 INFO orchestrator | HOLD LASR -> rejected: HOLD — no action. | Position down 6.7% but thesis intact: bullish technicals (uptrend, MACD bull, RSI 53), positive news
+2026-07-10 11:03:48,624 INFO risk | REJECT hold CVX: HOLD — no action.
+2026-07-10 11:03:48,627 INFO orchestrator | HOLD CVX -> rejected: HOLD — no action. | Heavy insider open-market selling (575k sold) is a clear bearish tell that offsets buy-side dark-poo
+2026-07-10 11:03:48,701 INFO alpaca | Alpaca client ready (mode=paper).
+2026-07-10 11:03:51,301 INFO dashboard | Wrote dashboard with 137 trades -> dashboard.html
+2026-07-10 11:33:52,159 INFO ledger | Ledger: SELL JNJ qty=3 $767
+2026-07-10 11:33:52,176 INFO orchestrator | Backfilled exchange exit: JNJ 3 sh @ 255.65 (stop -> bracket_stop, -4.0%).
+2026-07-10 11:33:52,683 INFO orchestrator | Market regime: SPY above 200dma (754 vs 691), VIX 15 -> risk-on, size x1.00.
+2026-07-10 11:33:56,622 INFO quiver | Quiver live/congresstrading -> 1000 row(s).
+2026-07-10 11:33:56,934 INFO screener | EDGAR Form-4 feed -> 66 filing(s) (scanning up to 100).
+2026-07-10 11:34:15,770 INFO screener | Options-flow most-actives pool -> 40 name(s).
+2026-07-10 11:34:23,813 INFO httpx | HTTP Request: POST https://agent.robinhood.com/mcp/trading "HTTP/1.1 200 OK"
+2026-07-10 11:34:23,820 INFO mcp.client.streamable_http | Received session ID: 6SOAKALQ3S2U3UZNF26DWAMOJU
+2026-07-10 11:34:23,825 INFO mcp.client.streamable_http | Negotiated protocol version: 2025-11-25
+2026-07-10 11:34:23,950 INFO httpx | HTTP Request: POST https://agent.robinhood.com/mcp/trading "HTTP/1.1 202 Accepted"
+2026-07-10 11:34:24,183 INFO httpx | HTTP Request: GET https://agent.robinhood.com/mcp/trading "HTTP/1.1 405 Method Not Allowed"
+2026-07-10 11:34:24,190 INFO mcp.client.streamable_http | GET stream disconnected, reconnecting in 1000ms...
+2026-07-10 11:34:24,660 INFO httpx | HTTP Request: POST https://agent.robinhood.com/mcp/trading "HTTP/1.1 200 OK"
+2026-07-10 11:34:24,812 INFO httpx | HTTP Request: POST https://agent.robinhood.com/mcp/trading "HTTP/1.1 200 OK"
+2026-07-10 11:34:25,107 INFO httpx | HTTP Request: POST https://agent.robinhood.com/mcp/trading "HTTP/1.1 200 OK"
+2026-07-10 11:34:25,111 INFO mcp.client.streamable_http | Received session ID: 2QAKRGAPHN5DATK247RPQ5KGQ4
+2026-07-10 11:34:25,114 INFO mcp.client.streamable_http | Negotiated protocol version: 2025-11-25
+2026-07-10 11:34:25,227 INFO httpx | HTTP Request: POST https://agent.robinhood.com/mcp/trading "HTTP/1.1 202 Accepted"
+2026-07-10 11:34:25,306 INFO httpx | HTTP Request: GET https://agent.robinhood.com/mcp/trading "HTTP/1.1 405 Method Not Allowed"
+2026-07-10 11:34:25,311 INFO mcp.client.streamable_http | GET stream disconnected, reconnecting in 1000ms...
+2026-07-10 11:34:26,159 INFO httpx | HTTP Request: POST https://agent.robinhood.com/mcp/trading "HTTP/1.1 200 OK"
+2026-07-10 11:34:26,305 INFO httpx | HTTP Request: POST https://agent.robinhood.com/mcp/trading "HTTP/1.1 200 OK"
+2026-07-10 11:34:26,438 INFO httpx | HTTP Request: GET https://agent.robinhood.com/mcp/trading "HTTP/1.1 405 Method Not Allowed"
+2026-07-10 11:34:26,454 INFO screener | Robinhood 'Daily movers' -> 20 name(s).
+2026-07-10 11:34:26,572 INFO httpx | HTTP Request: POST https://agent.robinhood.com/mcp/trading "HTTP/1.1 200 OK"
+2026-07-10 11:34:26,573 INFO mcp.client.streamable_http | Received session ID: QYH7DOQKW6PDGROFXELD3BE26J
+2026-07-10 11:34:26,576 INFO mcp.client.streamable_http | Negotiated protocol version: 2025-11-25
+2026-07-10 11:34:26,820 INFO httpx | HTTP Request: POST https://agent.robinhood.com/mcp/trading "HTTP/1.1 202 Accepted"
+2026-07-10 11:34:26,898 INFO httpx | HTTP Request: GET https://agent.robinhood.com/mcp/trading "HTTP/1.1 405 Method Not Allowed"
+2026-07-10 11:34:26,902 INFO mcp.client.streamable_http | GET stream disconnected, reconnecting in 1000ms...
+2026-07-10 11:34:27,424 INFO httpx | HTTP Request: POST https://agent.robinhood.com/mcp/trading "HTTP/1.1 200 OK"
+2026-07-10 11:34:27,617 INFO httpx | HTTP Request: POST https://agent.robinhood.com/mcp/trading "HTTP/1.1 200 OK"
+2026-07-10 11:34:27,804 INFO screener | Robinhood '100 most popular' -> 100 name(s).
+2026-07-10 11:34:27,806 INFO screener | Discovered 18 candidate(s) from 4 source(s) (279 merged, 188 above min_score, capped to 18).
+2026-07-10 11:34:27,807 INFO screener |   candidate AMD [congress+robinhood] score=+1.10 — Congress: 3 buy / 0 sell filings in last 60d (disclosures lag up to ~45d). | Robinhood 100 Most Popular (retail crowd positioning)
+2026-07-10 11:34:27,808 INFO screener |   candidate T [congress+robinhood] score=+1.06 — Congress: 6 buy / 1 sell filings in last 60d (disclosures lag up to ~45d). | Robinhood 100 Most Popular (retail crowd positioning)
+2026-07-10 11:34:27,810 INFO screener |   candidate BEP [congress] score=+1.00 — Congress: 7 buy / 0 sell filings in last 60d (disclosures lag up to ~45d).
+2026-07-10 11:34:27,810 INFO screener |   candidate QCOM [congress+robinhood] score=+0.85 — Congress: 2 buy / 0 sell filings in last 60d (disclosures lag up to ~45d). | Robinhood 100 Most Popular (retail crowd positioning)
+2026-07-10 11:34:27,811 INFO screener |   candidate ENTG [congress] score=+0.75 — Congress: 3 buy / 0 sell filings in last 60d (disclosures lag up to ~45d).
+2026-07-10 11:34:27,812 INFO screener |   candidate LLY [congress+robinhood] score=+0.60 — Congress: 1 buy / 0 sell filings in last 60d (disclosures lag up to ~45d). | Robinhood 100 Most Popular (retail crowd positioning)
+2026-07-10 11:34:27,813 INFO screener |   candidate CRWD [congress+robinhood] score=+0.60 — Congress: 1 buy / 0 sell filings in last 60d (disclosures lag up to ~45d). | Robinhood 100 Most Popular (retail crowd positioning)
+2026-07-10 11:34:27,814 INFO screener |   candidate TSLA [congress+robinhood] score=+0.60 — Congress: 1 buy / 0 sell filings in last 60d (disclosures lag up to ~45d). | Robinhood 100 Most Popular (retail crowd positioning)
+2026-07-10 11:34:27,815 INFO screener |   candidate SKHYV [robinhood] score=+0.60 — Robinhood Daily Movers (today's biggest movers — momentum)
+2026-07-10 11:34:27,816 INFO screener |   candidate SUOPY [robinhood] score=+0.60 — Robinhood Daily Movers (today's biggest movers — momentum)
+2026-07-10 11:34:27,817 INFO screener |   candidate ESYJY [robinhood] score=+0.60 — Robinhood Daily Movers (today's biggest movers — momentum)
+2026-07-10 11:34:27,818 INFO screener |   candidate RGLXY [robinhood] score=+0.60 — Robinhood Daily Movers (today's biggest movers — momentum)
+2026-07-10 11:34:27,818 INFO screener |   candidate EQPT [robinhood] score=+0.60 — Robinhood Daily Movers (today's biggest movers — momentum)
+2026-07-10 11:34:27,819 INFO screener |   candidate FRMI [robinhood] score=+0.60 — Robinhood Daily Movers (today's biggest movers — momentum)
+2026-07-10 11:34:27,820 INFO screener |   candidate ENLV [robinhood] score=+0.60 — Robinhood Daily Movers (today's biggest movers — momentum)
+2026-07-10 11:34:27,820 INFO screener |   candidate SGHIY [robinhood] score=+0.60 — Robinhood Daily Movers (today's biggest movers — momentum)
+2026-07-10 11:34:27,821 INFO screener |   candidate RXT [robinhood] score=+0.60 — Robinhood Daily Movers (today's biggest movers — momentum)
+2026-07-10 11:34:27,822 INFO screener |   candidate BVHMY [robinhood] score=+0.60 — Robinhood Daily Movers (today's biggest movers — momentum)
+2026-07-10 11:34:50,833 INFO quiver | Quiver live/offexchange -> 5496 row(s).
+2026-07-10 11:34:51,382 INFO quiver | Quiver live/govcontractsall -> 20000 row(s).
+2026-07-10 11:35:04,804 INFO signals | Gathered signals for 31/31 symbols (+3 market signals).
+2026-07-10 11:35:05,550 INFO httpx | HTTP Request: POST https://agent.robinhood.com/mcp/trading "HTTP/1.1 200 OK"
+2026-07-10 11:35:05,552 INFO mcp.client.streamable_http | Received session ID: RQOXYFQXALBYVVRSX2J6B23P7T
+2026-07-10 11:35:05,555 INFO mcp.client.streamable_http | Negotiated protocol version: 2025-11-25
+2026-07-10 11:35:05,661 INFO httpx | HTTP Request: POST https://agent.robinhood.com/mcp/trading "HTTP/1.1 202 Accepted"
+2026-07-10 11:35:05,741 INFO httpx | HTTP Request: GET https://agent.robinhood.com/mcp/trading "HTTP/1.1 405 Method Not Allowed"
+2026-07-10 11:35:05,745 INFO mcp.client.streamable_http | GET stream disconnected, reconnecting in 1000ms...
+2026-07-10 11:35:06,003 INFO httpx | HTTP Request: POST https://agent.robinhood.com/mcp/trading "HTTP/1.1 200 OK"
+2026-07-10 11:35:06,133 INFO httpx | HTTP Request: POST https://agent.robinhood.com/mcp/trading "HTTP/1.1 200 OK"
+2026-07-10 11:35:06,339 INFO httpx | HTTP Request: POST https://agent.robinhood.com/mcp/trading "HTTP/1.1 200 OK"
+2026-07-10 11:35:06,341 INFO mcp.client.streamable_http | Received session ID: 76M6VIQC4KQFGL73GON6EEIXKN
+2026-07-10 11:35:06,344 INFO mcp.client.streamable_http | Negotiated protocol version: 2025-11-25
+2026-07-10 11:35:06,524 INFO httpx | HTTP Request: POST https://agent.robinhood.com/mcp/trading "HTTP/1.1 202 Accepted"
+2026-07-10 11:35:06,610 INFO httpx | HTTP Request: GET https://agent.robinhood.com/mcp/trading "HTTP/1.1 405 Method Not Allowed"
+2026-07-10 11:35:06,613 INFO mcp.client.streamable_http | GET stream disconnected, reconnecting in 1000ms...
+2026-07-10 11:35:06,726 INFO httpx | HTTP Request: POST https://agent.robinhood.com/mcp/trading "HTTP/1.1 200 OK"
+2026-07-10 11:35:06,866 INFO httpx | HTTP Request: POST https://agent.robinhood.com/mcp/trading "HTTP/1.1 200 OK"
+2026-07-10 11:35:06,958 INFO robinhood | Imported 1 Robinhood holding(s) for context (read-only).
+2026-07-10 11:35:06,963 INFO orchestrator | Buy-excluded from slate this cycle: AMD (exited 21.3h ago (cooldown 24h)), BRK.B (topped up 0.5h ago (next ok in 4h)), BSX (topped up 2.1h ago (next ok in 4h)), CRWD (exited 2.4h ago (cooldown 24h)), CVX (topped up 1.1h ago (next ok in 4h)) …+9 more
+2026-07-10 11:35:38,924 INFO httpx | HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+2026-07-10 11:35:38,939 INFO decision | Claude returned 5 proposal(s).
+2026-07-10 11:35:38,940 INFO orchestrator | Cycle budget $1,227 split across 2 buy(s): BEP $665, SUOPY $562.
+2026-07-10 11:35:44,324 INFO orchestrator | BUY BEP -> resized: Sized to 20.5823 sh ($665) within caps. Reduced from request. | Heavy congressional buying (7 buys/0 sells 60d, corroborated by news of repeated purchases) plus sol
+2026-07-10 11:35:44,434 INFO alpaca | BUY market BEP qty=20.0 notional=None lim=None (order 5d9f049e-56ec-4694-8cdb-f2a930d7b9a5)
+2026-07-10 11:35:44,438 INFO ledger | Ledger: BUY BEP qty=20 $647
+2026-07-10 11:35:44,487 WARNING alpaca | latest_price(SUOPY) failed: 'SUOPY'
+2026-07-10 11:35:44,597 WARNING alpaca | latest_price(SUOPY) failed: 'SUOPY'
+2026-07-10 11:35:45,042 INFO risk | REJECT buy SUOPY: At max open positions (15).
+2026-07-10 11:35:45,045 INFO orchestrator | BUY SUOPY -> rejected: At max open positions (15). | Momentum name with confirming uptrend (px>50>200), MACD bull, RSI 65, and reasonable fundamentals (l
+2026-07-10 11:35:45,161 INFO risk | REJECT hold TDG: HOLD — no action.
+2026-07-10 11:35:45,164 INFO orchestrator | HOLD TDG -> rejected: HOLD — no action. | Strong fundamentals (51% margin, +18% rev growth) and heavy congress buying (9/0), but MACD bear and
+2026-07-10 11:35:45,327 INFO risk | REJECT hold LASR: HOLD — no action.
+2026-07-10 11:35:45,330 INFO orchestrator | HOLD LASR -> rejected: HOLD — no action. | Uptrend and MACD bull with bullish $627M defense deal news, but negative EBITDA margin and insider s
+2026-07-10 11:35:45,486 INFO risk | REJECT hold TSLA: HOLD — no action.
+2026-07-10 11:35:45,490 INFO orchestrator | HOLD TSLA -> rejected: HOLD — no action. | Mixed signals — modest congress buy but high off-exchange short pressure (63%), insider net selling 
+2026-07-10 11:35:45,555 INFO alpaca | Alpaca client ready (mode=paper).
+2026-07-10 11:35:48,171 INFO dashboard | Wrote dashboard with 139 trades -> dashboard.html
+2026-07-10 12:05:49,497 INFO orchestrator | Market regime: SPY above 200dma (754 vs 691), VIX 15 -> risk-on, size x1.00.
+2026-07-10 12:05:50,293 INFO quiver | Quiver live/congresstrading -> 1000 row(s).
+2026-07-10 12:05:50,665 INFO screener | EDGAR Form-4 feed -> 65 filing(s) (scanning up to 100).
+2026-07-10 12:06:09,065 INFO screener | Options-flow most-actives pool -> 40 name(s).
+2026-07-10 12:06:17,332 INFO httpx | HTTP Request: POST https://agent.robinhood.com/mcp/trading "HTTP/1.1 200 OK"
+2026-07-10 12:06:17,339 INFO mcp.client.streamable_http | Received session ID: 6VXARS44KPPS6UKUITGXYBFW43
+2026-07-10 12:06:17,344 INFO mcp.client.streamable_http | Negotiated protocol version: 2025-11-25
+2026-07-10 12:06:17,484 INFO httpx | HTTP Request: POST https://agent.robinhood.com/mcp/trading "HTTP/1.1 202 Accepted"
+2026-07-10 12:06:17,627 INFO httpx | HTTP Request: GET https://agent.robinhood.com/mcp/trading "HTTP/1.1 405 Method Not Allowed"
+2026-07-10 12:06:17,633 INFO mcp.client.streamable_http | GET stream disconnected, reconnecting in 1000ms...
+2026-07-10 12:06:17,943 INFO httpx | HTTP Request: POST https://agent.robinhood.com/mcp/trading "HTTP/1.1 200 OK"
+2026-07-10 12:06:18,139 INFO httpx | HTTP Request: POST https://agent.robinhood.com/mcp/trading "HTTP/1.1 200 OK"
+2026-07-10 12:06:18,406 INFO httpx | HTTP Request: POST https://agent.robinhood.com/mcp/trading "HTTP/1.1 200 OK"
+2026-07-10 12:06:18,409 INFO mcp.client.streamable_http | Received session ID: VUHXR5IRBUL7FUVSJIFFL447O5
+2026-07-10 12:06:18,412 INFO mcp.client.streamable_http | Negotiated protocol version: 2025-11-25
+2026-07-10 12:06:18,544 INFO httpx | HTTP Request: POST https://agent.robinhood.com/mcp/trading "HTTP/1.1 202 Accepted"
+2026-07-10 12:06:18,624 INFO httpx | HTTP Request: GET https://agent.robinhood.com/mcp/trading "HTTP/1.1 405 Method Not Allowed"
+2026-07-10 12:06:18,627 INFO mcp.client.streamable_http | GET stream disconnected, reconnecting in 1000ms...
+2026-07-10 12:06:19,355 INFO httpx | HTTP Request: POST https://agent.robinhood.com/mcp/trading "HTTP/1.1 200 OK"
+2026-07-10 12:06:19,546 INFO httpx | HTTP Request: POST https://agent.robinhood.com/mcp/trading "HTTP/1.1 200 OK"
+2026-07-10 12:06:19,686 INFO screener | Robinhood 'Daily movers' -> 20 name(s).
+2026-07-10 12:06:19,869 INFO httpx | HTTP Request: POST https://agent.robinhood.com/mcp/trading "HTTP/1.1 200 OK"
+2026-07-10 12:06:19,871 INFO mcp.client.streamable_http | Received session ID: HBCTYDN6YN7BL75NEK7QENZHRW
+2026-07-10 12:06:19,873 INFO mcp.client.streamable_http | Negotiated protocol version: 2025-11-25
+2026-07-10 12:06:20,032 INFO httpx | HTTP Request: POST https://agent.robinhood.com/mcp/trading "HTTP/1.1 202 Accepted"
+2026-07-10 12:06:20,110 INFO httpx | HTTP Request: GET https://agent.robinhood.com/mcp/trading "HTTP/1.1 405 Method Not Allowed"
+2026-07-10 12:06:20,113 INFO mcp.client.streamable_http | GET stream disconnected, reconnecting in 1000ms...
+2026-07-10 12:06:20,585 INFO httpx | HTTP Request: POST https://agent.robinhood.com/mcp/trading "HTTP/1.1 200 OK"
+2026-07-10 12:06:20,714 INFO httpx | HTTP Request: POST https://agent.robinhood.com/mcp/trading "HTTP/1.1 200 OK"
+2026-07-10 12:06:20,809 INFO screener | Robinhood '100 most popular' -> 100 name(s).
+2026-07-10 12:06:20,811 INFO screener | Discovered 18 candidate(s) from 4 source(s) (278 merged, 187 above min_score, capped to 18).
+2026-07-10 12:06:20,812 INFO screener |   candidate AMD [congress+robinhood] score=+1.10 — Congress: 3 buy / 0 sell filings in last 60d (disclosures lag up to ~45d). | Robinhood 100 Most Popular (retail crowd positioning)
+2026-07-10 12:06:20,814 INFO screener |   candidate T [congress+robinhood] score=+1.06 — Congress: 6 buy / 1 sell filings in last 60d (disclosures lag up to ~45d). | Robinhood 100 Most Popular (retail crowd positioning)
+2026-07-10 12:06:20,815 INFO screener |   candidate QCOM [congress+robinhood] score=+0.85 — Congress: 2 buy / 0 sell filings in last 60d (disclosures lag up to ~45d). | Robinhood 100 Most Popular (retail crowd positioning)
+2026-07-10 12:06:20,817 INFO screener |   candidate ENTG [congress] score=+0.75 — Congress: 3 buy / 0 sell filings in last 60d (disclosures lag up to ~45d).
+2026-07-10 12:06:20,818 INFO screener |   candidate LLY [congress+robinhood] score=+0.60 — Congress: 1 buy / 0 sell filings in last 60d (disclosures lag up to ~45d). | Robinhood 100 Most Popular (retail crowd positioning)
+2026-07-10 12:06:20,819 INFO screener |   candidate CRWD [congress+robinhood] score=+0.60 — Congress: 1 buy / 0 sell filings in last 60d (disclosures lag up to ~45d). | Robinhood 100 Most Popular (retail crowd positioning)
+2026-07-10 12:06:20,820 INFO screener |   candidate TSLA [congress+robinhood] score=+0.60 — Congress: 1 buy / 0 sell filings in last 60d (disclosures lag up to ~45d). | Robinhood 100 Most Popular (retail crowd positioning)
+2026-07-10 12:06:20,821 INFO screener |   candidate SKHYV [robinhood] score=+0.60 — Robinhood Daily Movers (today's biggest movers — momentum)
+2026-07-10 12:06:20,822 INFO screener |   candidate MRNA [robinhood] score=+0.60 — Robinhood Daily Movers (today's biggest movers — momentum)
+2026-07-10 12:06:20,823 INFO screener |   candidate SUOPY [robinhood] score=+0.60 — Robinhood Daily Movers (today's biggest movers — momentum)
+2026-07-10 12:06:20,824 INFO screener |   candidate ESYJY [robinhood] score=+0.60 — Robinhood Daily Movers (today's biggest movers — momentum)
+2026-07-10 12:06:20,825 INFO screener |   candidate EQPT [robinhood] score=+0.60 — Robinhood Daily Movers (today's biggest movers — momentum)
+2026-07-10 12:06:20,825 INFO screener |   candidate FRMI [robinhood] score=+0.60 — Robinhood Daily Movers (today's biggest movers — momentum)
+2026-07-10 12:06:20,826 INFO screener |   candidate PLBL [robinhood] score=+0.60 — Robinhood Daily Movers (today's biggest movers — momentum)
+2026-07-10 12:06:20,827 INFO screener |   candidate SGHIY [robinhood] score=+0.60 — Robinhood Daily Movers (today's biggest movers — momentum)
+2026-07-10 12:06:20,827 INFO screener |   candidate ENLV [robinhood] score=+0.60 — Robinhood Daily Movers (today's biggest movers — momentum)
+2026-07-10 12:06:20,828 INFO screener |   candidate RXT [robinhood] score=+0.60 — Robinhood Daily Movers (today's biggest movers — momentum)
+2026-07-10 12:06:20,829 INFO screener |   candidate FBRX [robinhood] score=+0.60 — Robinhood Daily Movers (today's biggest movers — momentum)
+2026-07-10 12:06:48,270 INFO quiver | Quiver live/offexchange -> 5496 row(s).
+2026-07-10 12:06:49,165 INFO quiver | Quiver live/govcontractsall -> 20000 row(s).
+2026-07-10 12:07:11,999 INFO signals | Gathered signals for 32/32 symbols (+3 market signals).
+2026-07-10 12:07:12,912 INFO httpx | HTTP Request: POST https://agent.robinhood.com/mcp/trading "HTTP/1.1 200 OK"
+2026-07-10 12:07:12,917 INFO mcp.client.streamable_http | Received session ID: ODWZ22TSY5ZE34FQ7M4V4IUD25
+2026-07-10 12:07:12,922 INFO mcp.client.streamable_http | Negotiated protocol version: 2025-11-25
+2026-07-10 12:07:13,034 INFO httpx | HTTP Request: POST https://agent.robinhood.com/mcp/trading "HTTP/1.1 202 Accepted"
+2026-07-10 12:07:13,144 INFO httpx | HTTP Request: GET https://agent.robinhood.com/mcp/trading "HTTP/1.1 405 Method Not Allowed"
+2026-07-10 12:07:13,148 INFO mcp.client.streamable_http | GET stream disconnected, reconnecting in 1000ms...
+2026-07-10 12:07:13,374 INFO httpx | HTTP Request: POST https://agent.robinhood.com/mcp/trading "HTTP/1.1 200 OK"
+2026-07-10 12:07:13,563 INFO httpx | HTTP Request: POST https://agent.robinhood.com/mcp/trading "HTTP/1.1 200 OK"
+2026-07-10 12:07:13,974 INFO httpx | HTTP Request: POST https://agent.robinhood.com/mcp/trading "HTTP/1.1 200 OK"
+2026-07-10 12:07:13,978 INFO mcp.client.streamable_http | Received session ID: DFUASY35OIIE7FZPWYVNCT27NH
+2026-07-10 12:07:13,983 INFO mcp.client.streamable_http | Negotiated protocol version: 2025-11-25
+2026-07-10 12:07:14,123 INFO httpx | HTTP Request: POST https://agent.robinhood.com/mcp/trading "HTTP/1.1 202 Accepted"
+2026-07-10 12:07:14,225 INFO httpx | HTTP Request: GET https://agent.robinhood.com/mcp/trading "HTTP/1.1 405 Method Not Allowed"
+2026-07-10 12:07:14,230 INFO mcp.client.streamable_http | GET stream disconnected, reconnecting in 1000ms...
+2026-07-10 12:07:14,400 INFO httpx | HTTP Request: POST https://agent.robinhood.com/mcp/trading "HTTP/1.1 200 OK"
+2026-07-10 12:07:14,551 INFO httpx | HTTP Request: POST https://agent.robinhood.com/mcp/trading "HTTP/1.1 200 OK"
+2026-07-10 12:07:14,686 INFO robinhood | Imported 1 Robinhood holding(s) for context (read-only).
+2026-07-10 12:07:14,695 INFO orchestrator | Buy-excluded from slate this cycle: AMD (exited 21.9h ago (cooldown 24h)), BEP (topped up 0.5h ago (next ok in 4h)), BRK.B (topped up 1.1h ago (next ok in 4h)), BSX (topped up 2.6h ago (next ok in 4h)), CRWD (exited 2.9h ago (cooldown 24h)) …+10 more
+2026-07-10 12:07:50,137 INFO httpx | HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+2026-07-10 12:07:50,151 INFO decision | Claude returned 6 proposal(s).
+2026-07-10 12:07:55,585 INFO risk | REJECT buy TDG: At max open positions (15).
+2026-07-10 12:07:55,591 INFO orchestrator | BUY TDG -> rejected: At max open positions (15). | Top-quality fundamentals: EBITDA $4.9B, 51% margin, rev +18.3%. Congress buying (9 buys/0 sells 90d)
+2026-07-10 12:07:55,708 INFO risk | REJECT hold SPCX: HOLD — no action.
+2026-07-10 12:07:55,711 INFO orchestrator | HOLD SPCX -> rejected: HOLD — no action. | Solid fundamentals (EBITDA $4.0B, margin 20.5%, rev +15.4%) and congressional buying, but thin news 
+2026-07-10 12:07:55,991 INFO risk | REJECT hold TSM: HOLD — no action.
+2026-07-10 12:07:55,996 INFO orchestrator | HOLD TSM -> rejected: HOLD — no action. | Best fundamental profile in the book: 69.6% margin, rev +35.1%, low D/E, uptrend px>50>200, Form 4 i
+2026-07-10 12:07:56,144 INFO risk | REJECT hold JNJ: HOLD — no action.
+2026-07-10 12:07:56,147 INFO orchestrator | HOLD JNJ -> rejected: HOLD — no action. | Strong fundamentals (EBITDA $34.3B, 35.6% margin, rev +9.9%), uptrend and bullish MACD support the t
+2026-07-10 12:07:56,384 INFO risk | REJECT hold LASR: HOLD — no action.
+2026-07-10 12:07:56,386 INFO orchestrator | HOLD LASR -> rejected: HOLD — no action. | $627M defense deal catalyst, uptrend px>50>200 and MACD bull support the position despite -4.7% mark
+2026-07-10 12:07:56,536 INFO risk | REJECT hold CVX: HOLD — no action.
+2026-07-10 12:07:56,540 INFO orchestrator | HOLD CVX -> rejected: HOLD — no action. | Decent fundamentals and buy-side off-exchange lean, but strong Form 4 insider selling (575k sold) is
+2026-07-10 12:07:56,618 INFO alpaca | Alpaca client ready (mode=paper).
+2026-07-10 12:07:59,127 INFO dashboard | Wrote dashboard with 139 trades -> dashboard.html
+2026-07-10 12:38:00,503 INFO orchestrator | Market regime: SPY above 200dma (754 vs 691), VIX 15 -> risk-on, size x1.00.
+2026-07-10 12:38:01,598 INFO quiver | Quiver live/congresstrading -> 1000 row(s).
+2026-07-10 12:38:01,873 INFO screener | EDGAR Form-4 feed -> 65 filing(s) (scanning up to 100).
+2026-07-10 12:38:20,133 INFO screener | Options-flow most-actives pool -> 40 name(s).
+2026-07-10 12:38:27,973 INFO httpx | HTTP Request: POST https://agent.robinhood.com/mcp/trading "HTTP/1.1 200 OK"
+2026-07-10 12:38:27,979 INFO mcp.client.streamable_http | Received session ID: QN6YW5KVNVRYJEAXVUVG7O3XPT
+2026-07-10 12:38:27,986 INFO mcp.client.streamable_http | Negotiated protocol version: 2025-11-25
+2026-07-10 12:38:28,104 INFO httpx | HTTP Request: POST https://agent.robinhood.com/mcp/trading "HTTP/1.1 202 Accepted"
+2026-07-10 12:38:28,248 INFO httpx | HTTP Request: GET https://agent.robinhood.com/mcp/trading "HTTP/1.1 405 Method Not Allowed"
+2026-07-10 12:38:28,254 INFO mcp.client.streamable_http | GET stream disconnected, reconnecting in 1000ms...
+2026-07-10 12:38:28,579 INFO httpx | HTTP Request: POST https://agent.robinhood.com/mcp/trading "HTTP/1.1 200 OK"
+2026-07-10 12:38:28,774 INFO httpx | HTTP Request: POST https://agent.robinhood.com/mcp/trading "HTTP/1.1 200 OK"
+2026-07-10 12:38:29,024 INFO httpx | HTTP Request: POST https://agent.robinhood.com/mcp/trading "HTTP/1.1 200 OK"
+2026-07-10 12:38:29,025 INFO mcp.client.streamable_http | Received session ID: GXI3KW7STOPS243Z42YKN6JNN3
+2026-07-10 12:38:29,027 INFO mcp.client.streamable_http | Negotiated protocol version: 2025-11-25
+2026-07-10 12:38:29,144 INFO httpx | HTTP Request: POST https://agent.robinhood.com/mcp/trading "HTTP/1.1 202 Accepted"
+2026-07-10 12:38:29,293 INFO httpx | HTTP Request: GET https://agent.robinhood.com/mcp/trading "HTTP/1.1 405 Method Not Allowed"
+2026-07-10 12:38:29,297 INFO mcp.client.streamable_http | GET stream disconnected, reconnecting in 1000ms...
+2026-07-10 12:38:30,008 INFO httpx | HTTP Request: POST https://agent.robinhood.com/mcp/trading "HTTP/1.1 200 OK"
+2026-07-10 12:38:30,170 INFO httpx | HTTP Request: POST https://agent.robinhood.com/mcp/trading "HTTP/1.1 200 OK"
+2026-07-10 12:38:30,395 INFO screener | Robinhood 'Daily movers' -> 20 name(s).
+2026-07-10 12:38:30,522 INFO httpx | HTTP Request: POST https://agent.robinhood.com/mcp/trading "HTTP/1.1 200 OK"
+2026-07-10 12:38:30,526 INFO mcp.client.streamable_http | Received session ID: XIDRYSK3TNHPH3MWWGRSA2R35N
+2026-07-10 12:38:30,529 INFO mcp.client.streamable_http | Negotiated protocol version: 2025-11-25
+2026-07-10 12:38:30,642 INFO httpx | HTTP Request: POST https://agent.robinhood.com/mcp/trading "HTTP/1.1 202 Accepted"
+2026-07-10 12:38:30,724 INFO httpx | HTTP Request: GET https://agent.robinhood.com/mcp/trading "HTTP/1.1 405 Method Not Allowed"
+2026-07-10 12:38:30,729 INFO mcp.client.streamable_http | GET stream disconnected, reconnecting in 1000ms...
+2026-07-10 12:38:31,133 INFO httpx | HTTP Request: POST https://agent.robinhood.com/mcp/trading "HTTP/1.1 200 OK"
+2026-07-10 12:38:31,302 INFO httpx | HTTP Request: POST https://agent.robinhood.com/mcp/trading "HTTP/1.1 200 OK"
+2026-07-10 12:38:31,461 INFO screener | Robinhood '100 most popular' -> 100 name(s).
+2026-07-10 12:38:31,464 INFO screener | Discovered 18 candidate(s) from 4 source(s) (278 merged, 187 above min_score, capped to 18).
+2026-07-10 12:38:31,465 INFO screener |   candidate AMD [congress+robinhood] score=+1.10 — Congress: 3 buy / 0 sell filings in last 60d (disclosures lag up to ~45d). | Robinhood 100 Most Popular (retail crowd positioning)
+2026-07-10 12:38:31,466 INFO screener |   candidate T [congress+robinhood] score=+1.06 — Congress: 6 buy / 1 sell filings in last 60d (disclosures lag up to ~45d). | Robinhood 100 Most Popular (retail crowd positioning)
+2026-07-10 12:38:31,467 INFO screener |   candidate QCOM [congress+robinhood] score=+0.85 — Congress: 2 buy / 0 sell filings in last 60d (disclosures lag up to ~45d). | Robinhood 100 Most Popular (retail crowd positioning)
+2026-07-10 12:38:31,468 INFO screener |   candidate ENTG [congress] score=+0.75 — Congress: 3 buy / 0 sell filings in last 60d (disclosures lag up to ~45d).
+2026-07-10 12:38:31,469 INFO screener |   candidate LLY [congress+robinhood] score=+0.60 — Congress: 1 buy / 0 sell filings in last 60d (disclosures lag up to ~45d). | Robinhood 100 Most Popular (retail crowd positioning)
+2026-07-10 12:38:31,471 INFO screener |   candidate CRWD [congress+robinhood] score=+0.60 — Congress: 1 buy / 0 sell filings in last 60d (disclosures lag up to ~45d). | Robinhood 100 Most Popular (retail crowd positioning)
+2026-07-10 12:38:31,472 INFO screener |   candidate TSLA [congress+robinhood] score=+0.60 — Congress: 1 buy / 0 sell filings in last 60d (disclosures lag up to ~45d). | Robinhood 100 Most Popular (retail crowd positioning)
+2026-07-10 12:38:31,473 INFO screener |   candidate SKHYV [robinhood] score=+0.60 — Robinhood Daily Movers (today's biggest movers — momentum)
+2026-07-10 12:38:31,474 INFO screener |   candidate MRNA [robinhood] score=+0.60 — Robinhood Daily Movers (today's biggest movers — momentum)
+2026-07-10 12:38:31,475 INFO screener |   candidate SUOPY [robinhood] score=+0.60 — Robinhood Daily Movers (today's biggest movers — momentum)
+2026-07-10 12:38:31,475 INFO screener |   candidate ESYJY [robinhood] score=+0.60 — Robinhood Daily Movers (today's biggest movers — momentum)
+2026-07-10 12:38:31,476 INFO screener |   candidate RGLXY [robinhood] score=+0.60 — Robinhood Daily Movers (today's biggest movers — momentum)
+2026-07-10 12:38:31,477 INFO screener |   candidate EQPT [robinhood] score=+0.60 — Robinhood Daily Movers (today's biggest movers — momentum)
+2026-07-10 12:38:31,478 INFO screener |   candidate FRMI [robinhood] score=+0.60 — Robinhood Daily Movers (today's biggest movers — momentum)
+2026-07-10 12:38:31,479 INFO screener |   candidate PLBL [robinhood] score=+0.60 — Robinhood Daily Movers (today's biggest movers — momentum)
+2026-07-10 12:38:31,480 INFO screener |   candidate SGHIY [robinhood] score=+0.60 — Robinhood Daily Movers (today's biggest movers — momentum)
+2026-07-10 12:38:31,480 INFO screener |   candidate INBX [robinhood] score=+0.60 — Robinhood Daily Movers (today's biggest movers — momentum)
+2026-07-10 12:38:31,481 INFO screener |   candidate RXT [robinhood] score=+0.60 — Robinhood Daily Movers (today's biggest movers — momentum)
+2026-07-10 12:38:55,146 INFO quiver | Quiver live/offexchange -> 5496 row(s).
+2026-07-10 12:38:55,813 INFO quiver | Quiver live/govcontractsall -> 20000 row(s).
+2026-07-10 12:39:10,003 INFO signals | Gathered signals for 32/32 symbols (+3 market signals).
+2026-07-10 12:39:10,600 INFO httpx | HTTP Request: POST https://agent.robinhood.com/mcp/trading "HTTP/1.1 200 OK"
+2026-07-10 12:39:10,606 INFO mcp.client.streamable_http | Received session ID: 5IOOK7EXXXBZC3GAAGHNLFDXKL
+2026-07-10 12:39:10,612 INFO mcp.client.streamable_http | Negotiated protocol version: 2025-11-25
+2026-07-10 12:39:10,806 INFO httpx | HTTP Request: POST https://agent.robinhood.com/mcp/trading "HTTP/1.1 202 Accepted"
+2026-07-10 12:39:10,893 INFO httpx | HTTP Request: GET https://agent.robinhood.com/mcp/trading "HTTP/1.1 405 Method Not Allowed"
+2026-07-10 12:39:10,898 INFO mcp.client.streamable_http | GET stream disconnected, reconnecting in 1000ms...
+2026-07-10 12:39:11,069 INFO httpx | HTTP Request: POST https://agent.robinhood.com/mcp/trading "HTTP/1.1 200 OK"
+2026-07-10 12:39:11,245 INFO httpx | HTTP Request: POST https://agent.robinhood.com/mcp/trading "HTTP/1.1 200 OK"
+2026-07-10 12:39:11,440 INFO httpx | HTTP Request: POST https://agent.robinhood.com/mcp/trading "HTTP/1.1 200 OK"
+2026-07-10 12:39:11,443 INFO mcp.client.streamable_http | Received session ID: TE5XJ7N2JNS77QW7NIAA5WZ2K2
+2026-07-10 12:39:11,446 INFO mcp.client.streamable_http | Negotiated protocol version: 2025-11-25
+2026-07-10 12:39:11,553 INFO httpx | HTTP Request: POST https://agent.robinhood.com/mcp/trading "HTTP/1.1 202 Accepted"
+2026-07-10 12:39:11,636 INFO httpx | HTTP Request: GET https://agent.robinhood.com/mcp/trading "HTTP/1.1 405 Method Not Allowed"
+2026-07-10 12:39:11,638 INFO mcp.client.streamable_http | GET stream disconnected, reconnecting in 1000ms...
+2026-07-10 12:39:11,849 INFO httpx | HTTP Request: POST https://agent.robinhood.com/mcp/trading "HTTP/1.1 200 OK"
+2026-07-10 12:39:11,971 INFO httpx | HTTP Request: POST https://agent.robinhood.com/mcp/trading "HTTP/1.1 200 OK"
+2026-07-10 12:39:12,062 INFO robinhood | Imported 1 Robinhood holding(s) for context (read-only).
+2026-07-10 12:39:12,072 INFO orchestrator | Buy-excluded from slate this cycle: AMD (exited 22.4h ago (cooldown 24h)), BEP (topped up 1.1h ago (next ok in 4h)), BRK.B (topped up 1.6h ago (next ok in 4h)), BSX (topped up 3.2h ago (next ok in 4h)), CRWD (exited 3.4h ago (cooldown 24h)) …+10 more
+2026-07-10 12:39:40,675 INFO httpx | HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+2026-07-10 12:39:40,706 INFO decision | Claude returned 5 proposal(s).
+2026-07-10 12:39:40,710 INFO orchestrator | Cycle budget $577 split across 2 buy(s): TDG $310, LASR $267.
+2026-07-10 12:39:45,850 INFO risk | REJECT buy TDG: At max open positions (15).
+2026-07-10 12:39:45,857 INFO orchestrator | BUY TDG -> rejected: At max open positions (15). | Top-quality fundamentals (51% margin, +18% rev growth, $4.9B EBITDA) plus 9 congressional buys/0 sel
+2026-07-10 12:39:46,369 INFO risk | REJECT buy LASR: At max open positions (15).
+2026-07-10 12:39:46,372 INFO orchestrator | BUY LASR -> rejected: At max open positions (15). | Held -4.5% but thesis intact: strong uptrend (px>50>200), MACD bull, RSI 55, and a hard $627M defens
+2026-07-10 12:39:46,515 INFO risk | REJECT hold SPCX: HOLD — no action.
+2026-07-10 12:39:46,517 INFO orchestrator | HOLD SPCX -> rejected: HOLD — no action. | Decent fundamentals and congressional buying, but no technical read and thin news. Maintain existing
+2026-07-10 12:39:46,663 INFO risk | REJECT hold LPLA: HOLD — no action.
+2026-07-10 12:39:46,666 INFO orchestrator | HOLD LPLA -> rejected: HOLD — no action. | Positive congressional buying (7/0), MACD bull, +2.7% held gain, but insider open-market selling and
+2026-07-10 12:39:46,778 INFO risk | REJECT hold INBX: HOLD — no action.
+2026-07-10 12:39:46,781 INFO orchestrator | HOLD INBX -> rejected: HOLD — no action. | Insider buying 110k/0 and FDA BLA acceptance are real catalysts, but negative EBITDA and very high 7
+2026-07-10 12:39:46,918 INFO alpaca | Alpaca client ready (mode=paper).
+2026-07-10 12:39:49,213 INFO dashboard | Wrote dashboard with 139 trades -> dashboard.html
+2026-07-10 13:09:50,766 INFO orchestrator | Market regime: SPY above 200dma (754 vs 691), VIX 15 -> risk-on, size x1.00.
+2026-07-10 13:09:51,965 INFO quiver | Quiver live/congresstrading -> 1000 row(s).
+2026-07-10 13:09:52,345 INFO screener | EDGAR Form-4 feed -> 58 filing(s) (scanning up to 100).
+2026-07-10 13:10:09,707 INFO screener | Options-flow most-actives pool -> 40 name(s).
+2026-07-10 13:10:17,412 INFO httpx | HTTP Request: POST https://agent.robinhood.com/mcp/trading "HTTP/1.1 200 OK"
+2026-07-10 13:10:17,419 INFO mcp.client.streamable_http | Received session ID: IE3RR65TYRGWOBUEEXZUY7AFJ5
+2026-07-10 13:10:17,424 INFO mcp.client.streamable_http | Negotiated protocol version: 2025-11-25
+2026-07-10 13:10:17,544 INFO httpx | HTTP Request: POST https://agent.robinhood.com/mcp/trading "HTTP/1.1 202 Accepted"
+2026-07-10 13:10:17,626 INFO httpx | HTTP Request: GET https://agent.robinhood.com/mcp/trading "HTTP/1.1 405 Method Not Allowed"
+2026-07-10 13:10:17,629 INFO mcp.client.streamable_http | GET stream disconnected, reconnecting in 1000ms...
+2026-07-10 13:10:17,949 INFO httpx | HTTP Request: POST https://agent.robinhood.com/mcp/trading "HTTP/1.1 200 OK"
+2026-07-10 13:10:18,079 INFO httpx | HTTP Request: POST https://agent.robinhood.com/mcp/trading "HTTP/1.1 200 OK"
+2026-07-10 13:10:18,410 INFO httpx | HTTP Request: POST https://agent.robinhood.com/mcp/trading "HTTP/1.1 200 OK"
+2026-07-10 13:10:18,414 INFO mcp.client.streamable_http | Received session ID: XYXHOIWB7JADCPB26RS7KDYR37
+2026-07-10 13:10:18,417 INFO mcp.client.streamable_http | Negotiated protocol version: 2025-11-25
+2026-07-10 13:10:18,540 INFO httpx | HTTP Request: POST https://agent.robinhood.com/mcp/trading "HTTP/1.1 202 Accepted"
+2026-07-10 13:10:18,627 INFO httpx | HTTP Request: GET https://agent.robinhood.com/mcp/trading "HTTP/1.1 405 Method Not Allowed"
+2026-07-10 13:10:18,631 INFO mcp.client.streamable_http | GET stream disconnected, reconnecting in 1000ms...
+2026-07-10 13:10:19,393 INFO httpx | HTTP Request: POST https://agent.robinhood.com/mcp/trading "HTTP/1.1 200 OK"
+2026-07-10 13:10:19,528 INFO httpx | HTTP Request: POST https://agent.robinhood.com/mcp/trading "HTTP/1.1 200 OK"
+2026-07-10 13:10:19,604 INFO screener | Robinhood 'Daily movers' -> 20 name(s).
+2026-07-10 13:10:19,726 INFO httpx | HTTP Request: POST https://agent.robinhood.com/mcp/trading "HTTP/1.1 200 OK"
+2026-07-10 13:10:19,735 INFO mcp.client.streamable_http | Received session ID: LYN52624LX2PXLU3I5EON2HKR3
+2026-07-10 13:10:19,737 INFO mcp.client.streamable_http | Negotiated protocol version: 2025-11-25
+2026-07-10 13:10:19,875 INFO httpx | HTTP Request: POST https://agent.robinhood.com/mcp/trading "HTTP/1.1 202 Accepted"
+2026-07-10 13:10:20,018 INFO httpx | HTTP Request: GET https://agent.robinhood.com/mcp/trading "HTTP/1.1 405 Method Not Allowed"
+2026-07-10 13:10:20,022 INFO mcp.client.streamable_http | GET stream disconnected, reconnecting in 1000ms...
+2026-07-10 13:10:20,455 INFO httpx | HTTP Request: POST https://agent.robinhood.com/mcp/trading "HTTP/1.1 200 OK"
+2026-07-10 13:10:20,582 INFO httpx | HTTP Request: POST https://agent.robinhood.com/mcp/trading "HTTP/1.1 200 OK"
+2026-07-10 13:10:20,730 INFO screener | Robinhood '100 most popular' -> 100 name(s).
+2026-07-10 13:10:20,733 INFO screener | Discovered 18 candidate(s) from 4 source(s) (279 merged, 188 above min_score, capped to 18).
+2026-07-10 13:10:20,734 INFO screener |   candidate AMD [congress+robinhood] score=+1.10 — Congress: 3 buy / 0 sell filings in last 60d (disclosures lag up to ~45d). | Robinhood 100 Most Popular (retail crowd positioning)
+2026-07-10 13:10:20,735 INFO screener |   candidate T [congress+robinhood] score=+1.06 — Congress: 6 buy / 1 sell filings in last 60d (disclosures lag up to ~45d). | Robinhood 100 Most Popular (retail crowd positioning)
+2026-07-10 13:10:20,737 INFO screener |   candidate QCOM [congress+robinhood] score=+0.85 — Congress: 2 buy / 0 sell filings in last 60d (disclosures lag up to ~45d). | Robinhood 100 Most Popular (retail crowd positioning)
+2026-07-10 13:10:20,738 INFO screener |   candidate ENTG [congress] score=+0.75 — Congress: 3 buy / 0 sell filings in last 60d (disclosures lag up to ~45d).
+2026-07-10 13:10:20,740 INFO screener |   candidate LLY [congress+robinhood] score=+0.60 — Congress: 1 buy / 0 sell filings in last 60d (disclosures lag up to ~45d). | Robinhood 100 Most Popular (retail crowd positioning)
+2026-07-10 13:10:20,741 INFO screener |   candidate CRWD [congress+robinhood] score=+0.60 — Congress: 1 buy / 0 sell filings in last 60d (disclosures lag up to ~45d). | Robinhood 100 Most Popular (retail crowd positioning)
+2026-07-10 13:10:20,743 INFO screener |   candidate TSLA [congress+robinhood] score=+0.60 — Congress: 1 buy / 0 sell filings in last 60d (disclosures lag up to ~45d). | Robinhood 100 Most Popular (retail crowd positioning)
+2026-07-10 13:10:20,744 INFO screener |   candidate SKHYV [robinhood] score=+0.60 — Robinhood Daily Movers (today's biggest movers — momentum)
+2026-07-10 13:10:20,745 INFO screener |   candidate MRNA [robinhood] score=+0.60 — Robinhood Daily Movers (today's biggest movers — momentum)
+2026-07-10 13:10:20,746 INFO screener |   candidate SUOPY [robinhood] score=+0.60 — Robinhood Daily Movers (today's biggest movers — momentum)
+2026-07-10 13:10:20,747 INFO screener |   candidate ESYJY [robinhood] score=+0.60 — Robinhood Daily Movers (today's biggest movers — momentum)
+2026-07-10 13:10:20,748 INFO screener |   candidate RGLXY [robinhood] score=+0.60 — Robinhood Daily Movers (today's biggest movers — momentum)
+2026-07-10 13:10:20,749 INFO screener |   candidate EQPT [robinhood] score=+0.60 — Robinhood Daily Movers (today's biggest movers — momentum)
+2026-07-10 13:10:20,750 INFO screener |   candidate FRMI [robinhood] score=+0.60 — Robinhood Daily Movers (today's biggest movers — momentum)
+2026-07-10 13:10:20,750 INFO screener |   candidate PLBL [robinhood] score=+0.60 — Robinhood Daily Movers (today's biggest movers — momentum)
+2026-07-10 13:10:20,751 INFO screener |   candidate QFIN [robinhood] score=+0.60 — Robinhood Daily Movers (today's biggest movers — momentum)
+2026-07-10 13:10:20,752 INFO screener |   candidate SGHIY [robinhood] score=+0.60 — Robinhood Daily Movers (today's biggest movers — momentum)
+2026-07-10 13:10:20,753 INFO screener |   candidate INBX [robinhood] score=+0.60 — Robinhood Daily Movers (today's biggest movers — momentum)
+2026-07-10 13:10:47,743 INFO quiver | Quiver live/offexchange -> 5496 row(s).
+2026-07-10 13:10:48,327 INFO quiver | Quiver live/govcontractsall -> 20000 row(s).
+2026-07-10 13:11:01,952 INFO signals | Gathered signals for 32/32 symbols (+3 market signals).
+2026-07-10 13:11:02,627 INFO httpx | HTTP Request: POST https://agent.robinhood.com/mcp/trading "HTTP/1.1 200 OK"
+2026-07-10 13:11:02,630 INFO mcp.client.streamable_http | Received session ID: 7CMPWLC677YKNCCTPP6ITLMXTF
+2026-07-10 13:11:02,634 INFO mcp.client.streamable_http | Negotiated protocol version: 2025-11-25
+2026-07-10 13:11:02,738 INFO httpx | HTTP Request: POST https://agent.robinhood.com/mcp/trading "HTTP/1.1 202 Accepted"
+2026-07-10 13:11:02,869 INFO httpx | HTTP Request: GET https://agent.robinhood.com/mcp/trading "HTTP/1.1 405 Method Not Allowed"
+2026-07-10 13:11:02,873 INFO mcp.client.streamable_http | GET stream disconnected, reconnecting in 1000ms...
+2026-07-10 13:11:03,049 INFO httpx | HTTP Request: POST https://agent.robinhood.com/mcp/trading "HTTP/1.1 200 OK"
+2026-07-10 13:11:03,174 INFO httpx | HTTP Request: POST https://agent.robinhood.com/mcp/trading "HTTP/1.1 200 OK"
+2026-07-10 13:11:03,565 INFO httpx | HTTP Request: POST https://agent.robinhood.com/mcp/trading "HTTP/1.1 200 OK"
+2026-07-10 13:11:03,568 INFO mcp.client.streamable_http | Received session ID: 4LQ3HFCSUFN5VONS5EIWVJ2CGM
+2026-07-10 13:11:03,571 INFO mcp.client.streamable_http | Negotiated protocol version: 2025-11-25
+2026-07-10 13:11:03,708 INFO httpx | HTTP Request: POST https://agent.robinhood.com/mcp/trading "HTTP/1.1 202 Accepted"
+2026-07-10 13:11:03,919 INFO httpx | HTTP Request: GET https://agent.robinhood.com/mcp/trading "HTTP/1.1 405 Method Not Allowed"
+2026-07-10 13:11:03,923 INFO mcp.client.streamable_http | GET stream disconnected, reconnecting in 1000ms...
+2026-07-10 13:11:04,086 INFO httpx | HTTP Request: POST https://agent.robinhood.com/mcp/trading "HTTP/1.1 200 OK"
+2026-07-10 13:11:04,221 INFO httpx | HTTP Request: POST https://agent.robinhood.com/mcp/trading "HTTP/1.1 200 OK"
+2026-07-10 13:11:04,299 INFO robinhood | Imported 1 Robinhood holding(s) for context (read-only).
+2026-07-10 13:11:04,307 INFO orchestrator | Buy-excluded from slate this cycle: AMD (exited 22.9h ago (cooldown 24h)), BEP (topped up 1.6h ago (next ok in 4h)), BRK.B (topped up 2.1h ago (next ok in 4h)), BSX (topped up 3.7h ago (next ok in 4h)), CRWD (exited 4.0h ago (cooldown 24h)) …+8 more
+2026-07-10 13:11:33,336 INFO httpx | HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+2026-07-10 13:11:33,353 INFO decision | Claude returned 6 proposal(s).
+2026-07-10 13:11:33,356 INFO orchestrator | Cycle budget $577 split across 3 buy(s): TSM $231, JNJ $186, TDG $160.
+2026-07-10 13:11:38,717 INFO risk | REJECT buy TSM: At max open positions (15).
+2026-07-10 13:11:38,724 INFO orchestrator | BUY TSM -> rejected: At max open positions (15). | Best fundamental profile in the book: EBITDA scale, 69.6% margin, +35% rev growth, low D/E 18; price
+2026-07-10 13:11:39,050 INFO risk | REJECT buy JNJ: At max open positions (15).
+2026-07-10 13:11:39,058 INFO orchestrator | BUY JNJ -> rejected: At max open positions (15). | Strong fundamentals (35.6% margin, +9.9% rev growth) with confirming momentum: RSI 59, MACD bull, up
+2026-07-10 13:11:39,437 INFO risk | REJECT buy TDG: At max open positions (15).
+2026-07-10 13:11:39,440 INFO orchestrator | BUY TDG -> rejected: At max open positions (15). | High-margin (51%) defense supplier with +18% rev growth and heavy congressional buying (9 buys/0 sel
+2026-07-10 13:11:39,644 INFO risk | REJECT hold QFIN: HOLD — no action.
+2026-07-10 13:11:39,647 INFO orchestrator | HOLD QFIN -> rejected: HOLD — no action. | Corroborated smart-money (1M+ insider shares bought, Form-4 open-market buy, buy-side dark pool 18%)
+2026-07-10 13:11:39,878 INFO risk | REJECT hold LASR: HOLD — no action.
+2026-07-10 13:11:39,882 INFO orchestrator | HOLD LASR -> rejected: HOLD — no action. | Uptrend and $627M defense deal are bullish momentum catalysts, but negative EBITDA and net insider o
+2026-07-10 13:11:40,098 INFO risk | REJECT hold CVX: HOLD — no action.
+2026-07-10 13:11:40,102 INFO orchestrator | HOLD CVX -> rejected: HOLD — no action. | Heavy insider open-market selling (575k shares) and net insider negative offset modest fundamentals 
+2026-07-10 13:11:40,174 INFO alpaca | Alpaca client ready (mode=paper).
+2026-07-10 13:11:42,530 INFO dashboard | Wrote dashboard with 139 trades -> dashboard.html
+2026-07-10 13:41:43,888 INFO orchestrator | Market regime: SPY above 200dma (755 vs 691), VIX 15 -> risk-on, size x1.00.
+2026-07-10 13:41:44,783 INFO quiver | Quiver live/congresstrading -> 1000 row(s).
+2026-07-10 13:41:45,317 INFO screener | EDGAR Form-4 feed -> 53 filing(s) (scanning up to 100).
+2026-07-10 13:42:01,591 INFO screener | Options-flow most-actives pool -> 40 name(s).
+2026-07-10 13:42:10,121 INFO httpx | HTTP Request: POST https://agent.robinhood.com/mcp/trading "HTTP/1.1 200 OK"
+2026-07-10 13:42:10,125 INFO mcp.client.streamable_http | Received session ID: 6SFI52S4XLA2OVL5Y7YUEQW4FK
+2026-07-10 13:42:10,130 INFO mcp.client.streamable_http | Negotiated protocol version: 2025-11-25
+2026-07-10 13:42:10,265 INFO httpx | HTTP Request: POST https://agent.robinhood.com/mcp/trading "HTTP/1.1 202 Accepted"
+2026-07-10 13:42:10,443 INFO httpx | HTTP Request: GET https://agent.robinhood.com/mcp/trading "HTTP/1.1 405 Method Not Allowed"
+2026-07-10 13:42:10,453 INFO mcp.client.streamable_http | GET stream disconnected, reconnecting in 1000ms...
+2026-07-10 13:42:10,953 INFO httpx | HTTP Request: POST https://agent.robinhood.com/mcp/trading "HTTP/1.1 200 OK"
+2026-07-10 13:42:11,091 INFO httpx | HTTP Request: POST https://agent.robinhood.com/mcp/trading "HTTP/1.1 200 OK"
+2026-07-10 13:42:11,425 INFO httpx | HTTP Request: POST https://agent.robinhood.com/mcp/trading "HTTP/1.1 200 OK"
+2026-07-10 13:42:11,431 INFO mcp.client.streamable_http | Received session ID: J2BCPARGDUOCLZRCFAGF7VHMIS
+2026-07-10 13:42:11,434 INFO mcp.client.streamable_http | Negotiated protocol version: 2025-11-25
+2026-07-10 13:42:11,550 INFO httpx | HTTP Request: POST https://agent.robinhood.com/mcp/trading "HTTP/1.1 202 Accepted"
+2026-07-10 13:42:11,693 INFO httpx | HTTP Request: GET https://agent.robinhood.com/mcp/trading "HTTP/1.1 405 Method Not Allowed"
+2026-07-10 13:42:11,698 INFO mcp.client.streamable_http | GET stream disconnected, reconnecting in 1000ms...
+2026-07-10 13:42:12,375 INFO httpx | HTTP Request: POST https://agent.robinhood.com/mcp/trading "HTTP/1.1 200 OK"
+2026-07-10 13:42:12,622 INFO httpx | HTTP Request: POST https://agent.robinhood.com/mcp/trading "HTTP/1.1 200 OK"
+2026-07-10 13:42:12,736 INFO screener | Robinhood 'Daily movers' -> 20 name(s).
+2026-07-10 13:42:12,849 INFO httpx | HTTP Request: POST https://agent.robinhood.com/mcp/trading "HTTP/1.1 200 OK"
+2026-07-10 13:42:12,850 INFO mcp.client.streamable_http | Received session ID: 5WSIGFLJT34K76FVHZRCV3UCQW
+2026-07-10 13:42:12,852 INFO mcp.client.streamable_http | Negotiated protocol version: 2025-11-25
+2026-07-10 13:42:12,998 INFO httpx | HTTP Request: POST https://agent.robinhood.com/mcp/trading "HTTP/1.1 202 Accepted"
+2026-07-10 13:42:13,090 INFO httpx | HTTP Request: GET https://agent.robinhood.com/mcp/trading "HTTP/1.1 405 Method Not Allowed"
+2026-07-10 13:42:13,095 INFO mcp.client.streamable_http | GET stream disconnected, reconnecting in 1000ms...
+2026-07-10 13:42:13,617 INFO httpx | HTTP Request: POST https://agent.robinhood.com/mcp/trading "HTTP/1.1 200 OK"
+2026-07-10 13:42:13,803 INFO httpx | HTTP Request: POST https://agent.robinhood.com/mcp/trading "HTTP/1.1 200 OK"
+2026-07-10 13:42:13,927 INFO screener | Robinhood '100 most popular' -> 100 name(s).
+2026-07-10 13:42:13,930 INFO screener | Discovered 18 candidate(s) from 4 source(s) (279 merged, 188 above min_score, capped to 18).
+2026-07-10 13:42:13,931 INFO screener |   candidate AMD [congress+robinhood] score=+1.10 — Congress: 3 buy / 0 sell filings in last 60d (disclosures lag up to ~45d). | Robinhood 100 Most Popular (retail crowd positioning)
+2026-07-10 13:42:13,932 INFO screener |   candidate T [congress+robinhood] score=+1.06 — Congress: 6 buy / 1 sell filings in last 60d (disclosures lag up to ~45d). | Robinhood 100 Most Popular (retail crowd positioning)
+2026-07-10 13:42:13,934 INFO screener |   candidate QCOM [congress+robinhood] score=+0.85 — Congress: 2 buy / 0 sell filings in last 60d (disclosures lag up to ~45d). | Robinhood 100 Most Popular (retail crowd positioning)
+2026-07-10 13:42:13,935 INFO screener |   candidate ENTG [congress] score=+0.75 — Congress: 3 buy / 0 sell filings in last 60d (disclosures lag up to ~45d).
+2026-07-10 13:42:13,936 INFO screener |   candidate LLY [congress+robinhood] score=+0.60 — Congress: 1 buy / 0 sell filings in last 60d (disclosures lag up to ~45d). | Robinhood 100 Most Popular (retail crowd positioning)
+2026-07-10 13:42:13,937 INFO screener |   candidate CRWD [congress+robinhood] score=+0.60 — Congress: 1 buy / 0 sell filings in last 60d (disclosures lag up to ~45d). | Robinhood 100 Most Popular (retail crowd positioning)
+2026-07-10 13:42:13,939 INFO screener |   candidate TSLA [congress+robinhood] score=+0.60 — Congress: 1 buy / 0 sell filings in last 60d (disclosures lag up to ~45d). | Robinhood 100 Most Popular (retail crowd positioning)
+2026-07-10 13:42:13,940 INFO screener |   candidate SKHYV [robinhood] score=+0.60 — Robinhood Daily Movers (today's biggest movers — momentum)
+2026-07-10 13:42:13,941 INFO screener |   candidate MRNA [robinhood] score=+0.60 — Robinhood Daily Movers (today's biggest movers — momentum)
+2026-07-10 13:42:13,941 INFO screener |   candidate SUOPY [robinhood] score=+0.60 — Robinhood Daily Movers (today's biggest movers — momentum)
+2026-07-10 13:42:13,942 INFO screener |   candidate ESYJY [robinhood] score=+0.60 — Robinhood Daily Movers (today's biggest movers — momentum)
+2026-07-10 13:42:13,943 INFO screener |   candidate RGLXY [robinhood] score=+0.60 — Robinhood Daily Movers (today's biggest movers — momentum)
+2026-07-10 13:42:13,944 INFO screener |   candidate EQPT [robinhood] score=+0.60 — Robinhood Daily Movers (today's biggest movers — momentum)
+2026-07-10 13:42:13,945 INFO screener |   candidate FRMI [robinhood] score=+0.60 — Robinhood Daily Movers (today's biggest movers — momentum)
+2026-07-10 13:42:13,945 INFO screener |   candidate PLBL [robinhood] score=+0.60 — Robinhood Daily Movers (today's biggest movers — momentum)
+2026-07-10 13:42:13,946 INFO screener |   candidate QFIN [robinhood] score=+0.60 — Robinhood Daily Movers (today's biggest movers — momentum)
+2026-07-10 13:42:13,947 INFO screener |   candidate SGHIY [robinhood] score=+0.60 — Robinhood Daily Movers (today's biggest movers — momentum)
+2026-07-10 13:42:13,947 INFO screener |   candidate EOSER [robinhood] score=+0.60 — Robinhood Daily Movers (today's biggest movers — momentum)
+2026-07-10 13:42:37,005 INFO quiver | Quiver live/offexchange -> 5496 row(s).
+2026-07-10 13:42:37,718 INFO quiver | Quiver live/govcontractsall -> 20000 row(s).
+2026-07-10 13:42:56,248 INFO signals | Gathered signals for 32/32 symbols (+3 market signals).
+2026-07-10 13:42:56,858 INFO httpx | HTTP Request: POST https://agent.robinhood.com/mcp/trading "HTTP/1.1 200 OK"
+2026-07-10 13:42:56,862 INFO mcp.client.streamable_http | Received session ID: LG7O4GWHPVRU5Z6J7ZZ6U7LN7G
+2026-07-10 13:42:56,866 INFO mcp.client.streamable_http | Negotiated protocol version: 2025-11-25
+2026-07-10 13:42:57,040 INFO httpx | HTTP Request: POST https://agent.robinhood.com/mcp/trading "HTTP/1.1 202 Accepted"
+2026-07-10 13:42:57,175 INFO httpx | HTTP Request: GET https://agent.robinhood.com/mcp/trading "HTTP/1.1 405 Method Not Allowed"
+2026-07-10 13:42:57,179 INFO mcp.client.streamable_http | GET stream disconnected, reconnecting in 1000ms...
+2026-07-10 13:42:57,442 INFO httpx | HTTP Request: POST https://agent.robinhood.com/mcp/trading "HTTP/1.1 200 OK"
+2026-07-10 13:42:57,697 INFO httpx | HTTP Request: POST https://agent.robinhood.com/mcp/trading "HTTP/1.1 200 OK"
+2026-07-10 13:42:58,089 INFO httpx | HTTP Request: POST https://agent.robinhood.com/mcp/trading "HTTP/1.1 200 OK"
+2026-07-10 13:42:58,094 INFO mcp.client.streamable_http | Received session ID: HEYDDVZR256KTHZNBS6OWIJTUA
+2026-07-10 13:42:58,096 INFO mcp.client.streamable_http | Negotiated protocol version: 2025-11-25
+2026-07-10 13:42:58,224 INFO httpx | HTTP Request: POST https://agent.robinhood.com/mcp/trading "HTTP/1.1 202 Accepted"
+2026-07-10 13:42:58,370 INFO httpx | HTTP Request: GET https://agent.robinhood.com/mcp/trading "HTTP/1.1 405 Method Not Allowed"
+2026-07-10 13:42:58,372 INFO mcp.client.streamable_http | GET stream disconnected, reconnecting in 1000ms...
+2026-07-10 13:42:58,618 INFO httpx | HTTP Request: POST https://agent.robinhood.com/mcp/trading "HTTP/1.1 200 OK"
+2026-07-10 13:42:58,780 INFO httpx | HTTP Request: POST https://agent.robinhood.com/mcp/trading "HTTP/1.1 200 OK"
+2026-07-10 13:42:58,859 INFO robinhood | Imported 1 Robinhood holding(s) for context (read-only).
+2026-07-10 13:42:58,865 INFO orchestrator | Buy-excluded from slate this cycle: AMD (exited 23.5h ago (cooldown 24h)), BEP (topped up 2.1h ago (next ok in 4h)), BRK.B (topped up 2.7h ago (next ok in 4h)), CRWD (exited 4.5h ago (cooldown 24h)), CVX (topped up 3.2h ago (next ok in 4h)) …+5 more
+2026-07-10 13:43:31,142 INFO httpx | HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+2026-07-10 13:43:31,166 INFO decision | Claude returned 5 proposal(s).
+2026-07-10 13:43:36,570 INFO risk | REJECT buy QFIN: At max open positions (15).
+2026-07-10 13:43:36,576 INFO orchestrator | BUY QFIN -> rejected: At max open positions (15). | Corroborated smart-money: insider net +1.0M sh, Form4 open-market 4,000 bought, off-exchange 18% sho
+2026-07-10 13:43:36,701 INFO risk | REJECT hold TSM: HOLD — no action.
+2026-07-10 13:43:36,705 INFO orchestrator | HOLD TSM -> rejected: HOLD — no action. | Best fundamental profile in book: 69.6% margin, +35.1% rev growth, uptrend px>50>200, Form4 insider 
+2026-07-10 13:43:36,891 INFO risk | REJECT hold JNJ: HOLD — no action.
+2026-07-10 13:43:36,893 INFO orchestrator | HOLD JNJ -> rejected: HOLD — no action. | Strong fundamentals (35.6% margin, +9.9% growth), uptrend with MACD bull, congress buy and analyst P
+2026-07-10 13:43:37,023 INFO risk | REJECT hold CVX: HOLD — no action.
+2026-07-10 13:43:37,026 INFO orchestrator | HOLD CVX -> rejected: HOLD — no action. | Heavy insider selling (575k sold Form4) offsets positive fundamentals and congress buy; conflicting 
+2026-07-10 13:43:37,144 INFO risk | REJECT hold BSX: HOLD — no action.
+2026-07-10 13:43:37,146 INFO orchestrator | HOLD BSX -> rejected: HOLD — no action. | Fundamentals solid (+11.6% growth, 26.7% margin), Form4 insider open-market buying 9,800 sh, congres
+2026-07-10 13:43:37,217 INFO alpaca | Alpaca client ready (mode=paper).
+2026-07-10 13:43:39,819 INFO dashboard | Wrote dashboard with 139 trades -> dashboard.html
+2026-07-10 14:13:41,288 INFO orchestrator | Market regime: SPY above 200dma (755 vs 691), VIX 15 -> risk-on, size x1.00.
+2026-07-10 14:13:42,230 INFO quiver | Quiver live/congresstrading -> 1000 row(s).
+2026-07-10 14:13:42,588 INFO screener | EDGAR Form-4 feed -> 65 filing(s) (scanning up to 100).
+2026-07-10 14:14:00,407 INFO screener | Options-flow most-actives pool -> 40 name(s).
+2026-07-10 14:14:08,174 INFO httpx | HTTP Request: POST https://agent.robinhood.com/mcp/trading "HTTP/1.1 200 OK"
+2026-07-10 14:14:08,180 INFO mcp.client.streamable_http | Received session ID: 4RBTJEG2LCGJNY3EAYV54IOUW5
+2026-07-10 14:14:08,188 INFO mcp.client.streamable_http | Negotiated protocol version: 2025-11-25
+2026-07-10 14:14:08,308 INFO httpx | HTTP Request: POST https://agent.robinhood.com/mcp/trading "HTTP/1.1 202 Accepted"
+2026-07-10 14:14:08,388 INFO httpx | HTTP Request: GET https://agent.robinhood.com/mcp/trading "HTTP/1.1 405 Method Not Allowed"
+2026-07-10 14:14:08,391 INFO mcp.client.streamable_http | GET stream disconnected, reconnecting in 1000ms...
+2026-07-10 14:14:08,724 INFO httpx | HTTP Request: POST https://agent.robinhood.com/mcp/trading "HTTP/1.1 200 OK"
+2026-07-10 14:14:08,929 INFO httpx | HTTP Request: POST https://agent.robinhood.com/mcp/trading "HTTP/1.1 200 OK"
+2026-07-10 14:14:09,222 INFO httpx | HTTP Request: POST https://agent.robinhood.com/mcp/trading "HTTP/1.1 200 OK"
+2026-07-10 14:14:09,225 INFO mcp.client.streamable_http | Received session ID: OFDIQOSFCT3LZ64SN6LVB267CD
+2026-07-10 14:14:09,229 INFO mcp.client.streamable_http | Negotiated protocol version: 2025-11-25
+2026-07-10 14:14:09,349 INFO httpx | HTTP Request: POST https://agent.robinhood.com/mcp/trading "HTTP/1.1 202 Accepted"
+2026-07-10 14:14:09,436 INFO httpx | HTTP Request: GET https://agent.robinhood.com/mcp/trading "HTTP/1.1 405 Method Not Allowed"
+2026-07-10 14:14:09,439 INFO mcp.client.streamable_http | GET stream disconnected, reconnecting in 1000ms...
+2026-07-10 14:14:10,140 INFO httpx | HTTP Request: POST https://agent.robinhood.com/mcp/trading "HTTP/1.1 200 OK"
+2026-07-10 14:14:10,395 INFO httpx | HTTP Request: POST https://agent.robinhood.com/mcp/trading "HTTP/1.1 200 OK"
+2026-07-10 14:14:10,520 INFO screener | Robinhood 'Daily movers' -> 20 name(s).
+2026-07-10 14:14:10,645 INFO httpx | HTTP Request: POST https://agent.robinhood.com/mcp/trading "HTTP/1.1 200 OK"
+2026-07-10 14:14:10,647 INFO mcp.client.streamable_http | Received session ID: RQV45VIQ2R3KMLZC6ZLU3IFGJD
+2026-07-10 14:14:10,648 INFO mcp.client.streamable_http | Negotiated protocol version: 2025-11-25
+2026-07-10 14:14:10,796 INFO httpx | HTTP Request: POST https://agent.robinhood.com/mcp/trading "HTTP/1.1 202 Accepted"
+2026-07-10 14:14:10,877 INFO httpx | HTTP Request: GET https://agent.robinhood.com/mcp/trading "HTTP/1.1 405 Method Not Allowed"
+2026-07-10 14:14:10,881 INFO mcp.client.streamable_http | GET stream disconnected, reconnecting in 1000ms...
+2026-07-10 14:14:11,346 INFO httpx | HTTP Request: POST https://agent.robinhood.com/mcp/trading "HTTP/1.1 200 OK"
+2026-07-10 14:14:11,511 INFO httpx | HTTP Request: POST https://agent.robinhood.com/mcp/trading "HTTP/1.1 200 OK"
+2026-07-10 14:14:11,631 INFO screener | Robinhood '100 most popular' -> 100 name(s).
+2026-07-10 14:14:11,633 INFO screener | Discovered 18 candidate(s) from 4 source(s) (278 merged, 187 above min_score, capped to 18).
+2026-07-10 14:14:11,633 INFO screener |   candidate AMD [congress+robinhood] score=+1.10 — Congress: 3 buy / 0 sell filings in last 60d (disclosures lag up to ~45d). | Robinhood 100 Most Popular (retail crowd positioning)
+2026-07-10 14:14:11,634 INFO screener |   candidate T [congress+robinhood] score=+1.06 — Congress: 6 buy / 1 sell filings in last 60d (disclosures lag up to ~45d). | Robinhood 100 Most Popular (retail crowd positioning)
+2026-07-10 14:14:11,634 INFO screener |   candidate QCOM [congress+robinhood] score=+0.85 — Congress: 2 buy / 0 sell filings in last 60d (disclosures lag up to ~45d). | Robinhood 100 Most Popular (retail crowd positioning)
+2026-07-10 14:14:11,635 INFO screener |   candidate ENTG [congress] score=+0.75 — Congress: 3 buy / 0 sell filings in last 60d (disclosures lag up to ~45d).
+2026-07-10 14:14:11,636 INFO screener |   candidate LLY [congress+robinhood] score=+0.60 — Congress: 1 buy / 0 sell filings in last 60d (disclosures lag up to ~45d). | Robinhood 100 Most Popular (retail crowd positioning)
+2026-07-10 14:14:11,636 INFO screener |   candidate CRWD [congress+robinhood] score=+0.60 — Congress: 1 buy / 0 sell filings in last 60d (disclosures lag up to ~45d). | Robinhood 100 Most Popular (retail crowd positioning)
+2026-07-10 14:14:11,637 INFO screener |   candidate TSLA [congress+robinhood] score=+0.60 — Congress: 1 buy / 0 sell filings in last 60d (disclosures lag up to ~45d). | Robinhood 100 Most Popular (retail crowd positioning)
+2026-07-10 14:14:11,638 INFO screener |   candidate SKHYV [robinhood] score=+0.60 — Robinhood Daily Movers (today's biggest movers — momentum)
+2026-07-10 14:14:11,638 INFO screener |   candidate MRNA [robinhood] score=+0.60 — Robinhood Daily Movers (today's biggest movers — momentum)
+2026-07-10 14:14:11,639 INFO screener |   candidate SUOPY [robinhood] score=+0.60 — Robinhood Daily Movers (today's biggest movers — momentum)
+2026-07-10 14:14:11,640 INFO screener |   candidate ESYJY [robinhood] score=+0.60 — Robinhood Daily Movers (today's biggest movers — momentum)
+2026-07-10 14:14:11,640 INFO screener |   candidate RGLXY [robinhood] score=+0.60 — Robinhood Daily Movers (today's biggest movers — momentum)
+2026-07-10 14:14:11,641 INFO screener |   candidate EQPT [robinhood] score=+0.60 — Robinhood Daily Movers (today's biggest movers — momentum)
+2026-07-10 14:14:11,641 INFO screener |   candidate FRMI [robinhood] score=+0.60 — Robinhood Daily Movers (today's biggest movers — momentum)
+2026-07-10 14:14:11,642 INFO screener |   candidate CBUMY [robinhood] score=+0.60 — Robinhood Daily Movers (today's biggest movers — momentum)
+2026-07-10 14:14:11,642 INFO screener |   candidate PLBL [robinhood] score=+0.60 — Robinhood Daily Movers (today's biggest movers — momentum)
+2026-07-10 14:14:11,643 INFO screener |   candidate QFIN [robinhood] score=+0.60 — Robinhood Daily Movers (today's biggest movers — momentum)
+2026-07-10 14:14:11,643 INFO screener |   candidate SGHIY [robinhood] score=+0.60 — Robinhood Daily Movers (today's biggest movers — momentum)
+2026-07-10 14:14:35,706 INFO quiver | Quiver live/offexchange -> 5496 row(s).
+2026-07-10 14:14:36,098 INFO quiver | Quiver live/govcontractsall -> 20000 row(s).
+2026-07-10 14:14:47,811 INFO signals | Gathered signals for 32/32 symbols (+3 market signals).
+2026-07-10 14:14:48,331 INFO httpx | HTTP Request: POST https://agent.robinhood.com/mcp/trading "HTTP/1.1 200 OK"
+2026-07-10 14:14:48,334 INFO mcp.client.streamable_http | Received session ID: 6AS6NXXWXKQJJANYKY4EEFEKQK
+2026-07-10 14:14:48,338 INFO mcp.client.streamable_http | Negotiated protocol version: 2025-11-25
+2026-07-10 14:14:48,546 INFO httpx | HTTP Request: POST https://agent.robinhood.com/mcp/trading "HTTP/1.1 202 Accepted"
+2026-07-10 14:14:48,691 INFO httpx | HTTP Request: GET https://agent.robinhood.com/mcp/trading "HTTP/1.1 405 Method Not Allowed"
+2026-07-10 14:14:48,695 INFO mcp.client.streamable_http | GET stream disconnected, reconnecting in 1000ms...
+2026-07-10 14:14:48,880 INFO httpx | HTTP Request: POST https://agent.robinhood.com/mcp/trading "HTTP/1.1 200 OK"
+2026-07-10 14:14:49,071 INFO httpx | HTTP Request: POST https://agent.robinhood.com/mcp/trading "HTTP/1.1 200 OK"
+2026-07-10 14:14:49,263 INFO httpx | HTTP Request: POST https://agent.robinhood.com/mcp/trading "HTTP/1.1 200 OK"
+2026-07-10 14:14:49,266 INFO mcp.client.streamable_http | Received session ID: YHXW4JXOZBZH22Y4SUVKLN2BBI
+2026-07-10 14:14:49,269 INFO mcp.client.streamable_http | Negotiated protocol version: 2025-11-25
+2026-07-10 14:14:49,395 INFO httpx | HTTP Request: POST https://agent.robinhood.com/mcp/trading "HTTP/1.1 202 Accepted"
+2026-07-10 14:14:49,475 INFO httpx | HTTP Request: GET https://agent.robinhood.com/mcp/trading "HTTP/1.1 405 Method Not Allowed"
+2026-07-10 14:14:49,478 INFO mcp.client.streamable_http | GET stream disconnected, reconnecting in 1000ms...
+2026-07-10 14:14:49,694 INFO httpx | HTTP Request: POST https://agent.robinhood.com/mcp/trading "HTTP/1.1 200 OK"
+2026-07-10 14:14:49,828 INFO httpx | HTTP Request: POST https://agent.robinhood.com/mcp/trading "HTTP/1.1 200 OK"
+2026-07-10 14:14:49,990 INFO robinhood | Imported 1 Robinhood holding(s) for context (read-only).
+2026-07-10 14:14:49,997 INFO orchestrator | Buy-excluded from slate this cycle: AMD (exited 24.0h ago (cooldown 24h)), BEP (topped up 2.7h ago (next ok in 4h)), BRK.B (topped up 3.2h ago (next ok in 4h)), CRWD (exited 5.0h ago (cooldown 24h)), CVX (topped up 3.7h ago (next ok in 4h)) …+5 more
+2026-07-10 14:15:16,202 INFO httpx | HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+2026-07-10 14:15:16,224 INFO decision | Claude returned 6 proposal(s).
+2026-07-10 14:15:16,227 INFO orchestrator | Cycle budget $576 split across 3 buy(s): TSM $233, JNJ $179, BSX $164.
+2026-07-10 14:15:23,150 INFO risk | REJECT buy TSM: At max open positions (15).
+2026-07-10 14:15:23,156 INFO orchestrator | BUY TSM -> rejected: At max open positions (15). | Best-in-class fundamentals (69.6% margin, +35% rev growth, low D/E 18), uptrend px>50>200, Form 4 in
+2026-07-10 14:15:23,485 INFO risk | REJECT buy JNJ: At max open positions (15).
+2026-07-10 14:15:23,486 INFO orchestrator | BUY JNJ -> rejected: At max open positions (15). | Solid fundamentals (35.6% margin, +9.9% rev growth), uptrend px>50>200 with MACD bull confirming tim
+2026-07-10 14:15:23,863 INFO risk | REJECT buy BSX: At max open positions (15).
+2026-07-10 14:15:23,864 INFO orchestrator | BUY BSX -> rejected: At max open positions (15). | Strong fundamentals (+11.6% rev growth, 26.7% margin), MACD turning bull, Form 4 insider open-market
+2026-07-10 14:15:24,040 INFO risk | REJECT hold LASR: HOLD — no action.
+2026-07-10 14:15:24,043 INFO orchestrator | HOLD LASR -> rejected: HOLD — no action. | Strong technical uptrend and $627M defense deal support the thesis, but heavy insider open-market se
+2026-07-10 14:15:24,327 INFO risk | REJECT hold CVX: HOLD — no action.
+2026-07-10 14:15:24,329 INFO orchestrator | HOLD CVX -> rejected: HOLD — no action. | Fundamentals and buy-side dark-pool lean positive, but massive insider open-market selling (575k sol
+2026-07-10 14:15:24,490 INFO risk | REJECT hold TDG: HOLD — no action.
+2026-07-10 14:15:24,492 INFO orchestrator | HOLD TDG -> rejected: HOLD — no action. | Excellent fundamentals (51% margin, +18% rev growth) and strong congressional buying, but MACD bear 
+2026-07-10 14:15:24,565 INFO alpaca | Alpaca client ready (mode=paper).
+2026-07-10 14:15:27,002 INFO dashboard | Wrote dashboard with 139 trades -> dashboard.html
+2026-07-10 14:45:28,467 INFO orchestrator | Market regime: SPY above 200dma (755 vs 691), VIX 15 -> risk-on, size x1.00.
+2026-07-10 14:45:29,165 INFO quiver | Quiver live/congresstrading -> 1000 row(s).
+2026-07-10 14:45:29,612 INFO screener | EDGAR Form-4 feed -> 73 filing(s) (scanning up to 100).
+2026-07-10 14:45:49,381 INFO screener | Options-flow most-actives pool -> 40 name(s).
+2026-07-10 14:45:57,766 INFO httpx | HTTP Request: POST https://agent.robinhood.com/mcp/trading "HTTP/1.1 200 OK"
+2026-07-10 14:45:57,773 INFO mcp.client.streamable_http | Received session ID: 7OGDAC4BQEPTTAL25ULP5Q7NRV
+2026-07-10 14:45:57,778 INFO mcp.client.streamable_http | Negotiated protocol version: 2025-11-25
+2026-07-10 14:45:57,954 INFO httpx | HTTP Request: POST https://agent.robinhood.com/mcp/trading "HTTP/1.1 202 Accepted"
+2026-07-10 14:45:58,103 INFO httpx | HTTP Request: GET https://agent.robinhood.com/mcp/trading "HTTP/1.1 405 Method Not Allowed"
+2026-07-10 14:45:58,107 INFO mcp.client.streamable_http | GET stream disconnected, reconnecting in 1000ms...
+2026-07-10 14:45:58,409 INFO httpx | HTTP Request: POST https://agent.robinhood.com/mcp/trading "HTTP/1.1 200 OK"
+2026-07-10 14:45:58,571 INFO httpx | HTTP Request: POST https://agent.robinhood.com/mcp/trading "HTTP/1.1 200 OK"
+2026-07-10 14:45:58,946 INFO httpx | HTTP Request: POST https://agent.robinhood.com/mcp/trading "HTTP/1.1 200 OK"
+2026-07-10 14:45:58,949 INFO mcp.client.streamable_http | Received session ID: F3RUTUYUQGETTZNEEILFPV4WT7
+2026-07-10 14:45:58,952 INFO mcp.client.streamable_http | Negotiated protocol version: 2025-11-25
+2026-07-10 14:45:59,062 INFO httpx | HTTP Request: POST https://agent.robinhood.com/mcp/trading "HTTP/1.1 202 Accepted"
+2026-07-10 14:45:59,146 INFO httpx | HTTP Request: GET https://agent.robinhood.com/mcp/trading "HTTP/1.1 405 Method Not Allowed"
+2026-07-10 14:45:59,151 INFO mcp.client.streamable_http | GET stream disconnected, reconnecting in 1000ms...
+2026-07-10 14:46:00,712 INFO httpx | HTTP Request: POST https://agent.robinhood.com/mcp/trading "HTTP/1.1 200 OK"
+2026-07-10 14:46:01,006 INFO httpx | HTTP Request: GET https://agent.robinhood.com/mcp/trading "HTTP/1.1 405 Method Not Allowed"
+2026-07-10 14:46:01,157 INFO httpx | HTTP Request: POST https://agent.robinhood.com/mcp/trading "HTTP/1.1 200 OK"
+2026-07-10 14:46:01,277 INFO screener | Robinhood 'Daily movers' -> 20 name(s).
+2026-07-10 14:46:01,537 INFO httpx | HTTP Request: POST https://agent.robinhood.com/mcp/trading "HTTP/1.1 200 OK"
+2026-07-10 14:46:01,543 INFO mcp.client.streamable_http | Received session ID: 4GIDR2Z6M2UMZIFL3WEOEJXV3Q
+2026-07-10 14:46:01,546 INFO mcp.client.streamable_http | Negotiated protocol version: 2025-11-25
+2026-07-10 14:46:01,674 INFO httpx | HTTP Request: POST https://agent.robinhood.com/mcp/trading "HTTP/1.1 202 Accepted"
+2026-07-10 14:46:01,786 INFO httpx | HTTP Request: GET https://agent.robinhood.com/mcp/trading "HTTP/1.1 405 Method Not Allowed"
+2026-07-10 14:46:01,791 INFO mcp.client.streamable_http | GET stream disconnected, reconnecting in 1000ms...
+2026-07-10 14:46:02,340 INFO httpx | HTTP Request: POST https://agent.robinhood.com/mcp/trading "HTTP/1.1 200 OK"
+2026-07-10 14:46:02,515 INFO httpx | HTTP Request: POST https://agent.robinhood.com/mcp/trading "HTTP/1.1 200 OK"
+2026-07-10 14:46:02,650 INFO screener | Robinhood '100 most popular' -> 100 name(s).
+2026-07-10 14:46:02,652 INFO screener | Discovered 18 candidate(s) from 4 source(s) (277 merged, 186 above min_score, capped to 18).
+2026-07-10 14:46:02,654 INFO screener |   candidate AMD [congress+robinhood] score=+1.10 — Congress: 3 buy / 0 sell filings in last 60d (disclosures lag up to ~45d). | Robinhood 100 Most Popular (retail crowd positioning)
+2026-07-10 14:46:02,655 INFO screener |   candidate T [congress+robinhood] score=+1.06 — Congress: 6 buy / 1 sell filings in last 60d (disclosures lag up to ~45d). | Robinhood 100 Most Popular (retail crowd positioning)
+2026-07-10 14:46:02,657 INFO screener |   candidate QCOM [congress+robinhood] score=+0.85 — Congress: 2 buy / 0 sell filings in last 60d (disclosures lag up to ~45d). | Robinhood 100 Most Popular (retail crowd positioning)
+2026-07-10 14:46:02,659 INFO screener |   candidate ENTG [congress] score=+0.75 — Congress: 3 buy / 0 sell filings in last 60d (disclosures lag up to ~45d).
+2026-07-10 14:46:02,660 INFO screener |   candidate LLY [congress+robinhood] score=+0.60 — Congress: 1 buy / 0 sell filings in last 60d (disclosures lag up to ~45d). | Robinhood 100 Most Popular (retail crowd positioning)
+2026-07-10 14:46:02,661 INFO screener |   candidate CRWD [congress+robinhood] score=+0.60 — Congress: 1 buy / 0 sell filings in last 60d (disclosures lag up to ~45d). | Robinhood 100 Most Popular (retail crowd positioning)
+2026-07-10 14:46:02,662 INFO screener |   candidate TSLA [congress+robinhood] score=+0.60 — Congress: 1 buy / 0 sell filings in last 60d (disclosures lag up to ~45d). | Robinhood 100 Most Popular (retail crowd positioning)
+2026-07-10 14:46:02,664 INFO screener |   candidate SKHYV [robinhood] score=+0.60 — Robinhood Daily Movers (today's biggest movers — momentum)
+2026-07-10 14:46:02,664 INFO screener |   candidate MRNA [robinhood] score=+0.60 — Robinhood Daily Movers (today's biggest movers — momentum)
+2026-07-10 14:46:02,666 INFO screener |   candidate SUOPY [robinhood] score=+0.60 — Robinhood Daily Movers (today's biggest movers — momentum)
+2026-07-10 14:46:02,667 INFO screener |   candidate ESYJY [robinhood] score=+0.60 — Robinhood Daily Movers (today's biggest movers — momentum)
+2026-07-10 14:46:02,667 INFO screener |   candidate RGLXY [robinhood] score=+0.60 — Robinhood Daily Movers (today's biggest movers — momentum)
+2026-07-10 14:46:02,668 INFO screener |   candidate EQPT [robinhood] score=+0.60 — Robinhood Daily Movers (today's biggest movers — momentum)
+2026-07-10 14:46:02,669 INFO screener |   candidate FRMI [robinhood] score=+0.60 — Robinhood Daily Movers (today's biggest movers — momentum)
+2026-07-10 14:46:02,670 INFO screener |   candidate CBUMY [robinhood] score=+0.60 — Robinhood Daily Movers (today's biggest movers — momentum)
+2026-07-10 14:46:02,671 INFO screener |   candidate PLBL [robinhood] score=+0.60 — Robinhood Daily Movers (today's biggest movers — momentum)
+2026-07-10 14:46:02,671 INFO screener |   candidate QFIN [robinhood] score=+0.60 — Robinhood Daily Movers (today's biggest movers — momentum)
+2026-07-10 14:46:02,672 INFO screener |   candidate SGHIY [robinhood] score=+0.60 — Robinhood Daily Movers (today's biggest movers — momentum)
+2026-07-10 14:46:26,763 INFO quiver | Quiver live/offexchange -> 5496 row(s).
+2026-07-10 14:46:27,245 INFO quiver | Quiver live/govcontractsall -> 20000 row(s).
+2026-07-10 14:46:41,599 INFO signals | Gathered signals for 32/32 symbols (+3 market signals).
+2026-07-10 14:46:42,197 INFO httpx | HTTP Request: POST https://agent.robinhood.com/mcp/trading "HTTP/1.1 200 OK"
+2026-07-10 14:46:42,200 INFO mcp.client.streamable_http | Received session ID: PHDJ6FCIOSKFYSM4UPHIPQD2QK
+2026-07-10 14:46:42,203 INFO mcp.client.streamable_http | Negotiated protocol version: 2025-11-25
+2026-07-10 14:46:42,402 INFO httpx | HTTP Request: POST https://agent.robinhood.com/mcp/trading "HTTP/1.1 202 Accepted"
+2026-07-10 14:46:42,478 INFO httpx | HTTP Request: GET https://agent.robinhood.com/mcp/trading "HTTP/1.1 405 Method Not Allowed"
+2026-07-10 14:46:42,482 INFO mcp.client.streamable_http | GET stream disconnected, reconnecting in 1000ms...
+2026-07-10 14:46:42,659 INFO httpx | HTTP Request: POST https://agent.robinhood.com/mcp/trading "HTTP/1.1 200 OK"
+2026-07-10 14:46:42,856 INFO httpx | HTTP Request: POST https://agent.robinhood.com/mcp/trading "HTTP/1.1 200 OK"
+2026-07-10 14:46:43,066 INFO httpx | HTTP Request: POST https://agent.robinhood.com/mcp/trading "HTTP/1.1 200 OK"
+2026-07-10 14:46:43,069 INFO mcp.client.streamable_http | Received session ID: JFUKX3QSF3YPKECKZVCECRCTAA
+2026-07-10 14:46:43,072 INFO mcp.client.streamable_http | Negotiated protocol version: 2025-11-25
+2026-07-10 14:46:43,187 INFO httpx | HTTP Request: POST https://agent.robinhood.com/mcp/trading "HTTP/1.1 202 Accepted"
+2026-07-10 14:46:43,266 INFO httpx | HTTP Request: GET https://agent.robinhood.com/mcp/trading "HTTP/1.1 405 Method Not Allowed"
+2026-07-10 14:46:43,271 INFO mcp.client.streamable_http | GET stream disconnected, reconnecting in 1000ms...
+2026-07-10 14:46:43,478 INFO httpx | HTTP Request: POST https://agent.robinhood.com/mcp/trading "HTTP/1.1 200 OK"
+2026-07-10 14:46:43,645 INFO httpx | HTTP Request: POST https://agent.robinhood.com/mcp/trading "HTTP/1.1 200 OK"
+2026-07-10 14:46:43,776 INFO robinhood | Imported 1 Robinhood holding(s) for context (read-only).
+2026-07-10 14:46:43,787 INFO orchestrator | Buy-excluded from slate this cycle: BEP (topped up 3.2h ago (next ok in 4h)), BRK.B (topped up 3.7h ago (next ok in 4h)), CRWD (exited 5.6h ago (cooldown 24h)), ENTG (exited 5.8h ago (cooldown 24h)), EQPT (exited 4.6h ago (cooldown 24h)) …+2 more
+2026-07-10 14:47:46,165 INFO httpx | HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+2026-07-10 14:47:46,188 INFO decision | Claude returned 4 proposal(s).
+2026-07-10 14:47:46,357 INFO orchestrator | SELL LASR -> approved: Closing existing position. | Position down -4.6% and worst-in-book. Insider Form 4 shows 432k shares sold, 0 bought (90d) — clear
+2026-07-10 14:47:46,532 INFO alpaca | CLOSE LASR (order dc6ead80-e2ff-452d-bebe-0fde636aae5d)
+2026-07-10 14:47:46,542 INFO ledger | Ledger: SELL LASR qty=19 $1368
+2026-07-10 14:47:46,637 INFO risk | REJECT hold TSM: HOLD — no action.
+2026-07-10 14:47:46,639 INFO orchestrator | HOLD TSM -> rejected: HOLD — no action. | Best fundamental profile in book: 69.6% margin, +35.1% rev growth, uptrend px>50>200, Form 4 insider
+2026-07-10 14:47:46,824 INFO risk | REJECT hold JNJ: HOLD — no action.
+2026-07-10 14:47:46,825 INFO orchestrator | HOLD JNJ -> rejected: HOLD — no action. | Strong fundamentals (35.6% margin, +9.9% rev growth), bullish MACD and uptrend px>50>200. Insider Fo
+2026-07-10 14:47:46,987 INFO risk | REJECT hold HUBB: HOLD — no action.
+2026-07-10 14:47:46,990 INFO orchestrator | HOLD HUBB -> rejected: HOLD — no action. | Up +2.9%, strong congress buying (10 buys/0 sells), positive insider net, uptrend px>50>200 and soli
+2026-07-10 14:47:47,056 INFO alpaca | Alpaca client ready (mode=paper).
+2026-07-10 14:47:49,348 INFO dashboard | Wrote dashboard with 140 trades -> dashboard.html
+2026-07-10 15:17:50,112 INFO orchestrator | Market closed; skipping decision cycle.
+2026-07-10 15:17:50,151 INFO orchestrator | Running nightly post-mortem for 2026-07-10 …
+2026-07-10 15:17:50,528 INFO httpx | HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 400 Bad Request"
+2026-07-10 15:17:50,536 ERROR postmortem | Post-mortem Claude call failed: Error code: 400 - {'type': 'error', 'error': {'type': 'invalid_request_error', 'message': "output_config.format.schema: For 'array' type, property 'maxItems' is not supported"}, 'request_id': 'req_011CctzcTeeTa9xV8D83ERRM'}
+2026-07-10 15:17:50,573 INFO alpaca | Alpaca client ready (mode=paper).
+2026-07-10 15:17:52,954 INFO dashboard | Wrote dashboard with 140 trades -> dashboard.html
+2026-07-10 15:47:53,695 INFO orchestrator | Market closed; skipping decision cycle.
+2026-07-10 15:47:53,748 INFO alpaca | Alpaca client ready (mode=paper).
+2026-07-10 15:47:56,203 INFO dashboard | Wrote dashboard with 140 trades -> dashboard.html
+2026-07-10 16:17:56,818 INFO orchestrator | Market closed; skipping decision cycle.
+2026-07-10 16:17:56,887 INFO alpaca | Alpaca client ready (mode=paper).
+2026-07-10 16:17:59,295 INFO dashboard | Wrote dashboard with 140 trades -> dashboard.html
+2026-07-10 16:47:59,807 INFO orchestrator | Market closed; skipping decision cycle.
+2026-07-10 16:47:59,862 INFO alpaca | Alpaca client ready (mode=paper).
+2026-07-10 16:48:02,779 INFO dashboard | Wrote dashboard with 140 trades -> dashboard.html
+2026-07-10 17:18:03,778 INFO orchestrator | Market closed; skipping decision cycle.
+2026-07-10 17:18:03,828 INFO alpaca | Alpaca client ready (mode=paper).
+2026-07-10 17:18:07,067 INFO dashboard | Wrote dashboard with 140 trades -> dashboard.html
+2026-07-10 17:48:07,950 INFO orchestrator | Market closed; skipping decision cycle.
+2026-07-10 17:48:08,037 INFO alpaca | Alpaca client ready (mode=paper).
+2026-07-10 17:48:10,551 INFO dashboard | Wrote dashboard with 140 trades -> dashboard.html
+2026-07-10 17:59:31,838 INFO orchestrator | Interrupted — shutting down.
+2026-07-10 17:59:49,326 INFO alpaca | Alpaca client ready (mode=paper).
+2026-07-10 17:59:49,625 INFO orchestrator | Discovery-driven mode: trading scanner-found names + holdings.
+2026-07-10 17:59:49,625 INFO orchestrator | Loaded 1 pending order(s) from state to reconcile.
+2026-07-10 17:59:49,626 INFO orchestrator | Starting orchestrator (paper). Kill switch: off. Options: on. Benchmark: QQQ.
+2026-07-10 17:59:49,761 INFO orchestrator | Market closed; skipping decision cycle.
+2026-07-10 17:59:49,779 INFO alpaca | Alpaca client ready (mode=paper).
+2026-07-10 17:59:52,151 INFO dashboard | Wrote dashboard with 140 trades -> dashboard.html
+2026-07-10 18:29:52,763 INFO orchestrator | Market closed; skipping decision cycle.
+2026-07-10 18:29:52,814 INFO alpaca | Alpaca client ready (mode=paper).
+2026-07-10 18:29:55,312 INFO dashboard | Wrote dashboard with 140 trades -> dashboard.html
+2026-07-10 18:59:55,985 INFO orchestrator | Market closed; skipping decision cycle.
+2026-07-10 18:59:56,006 INFO alpaca | Alpaca client ready (mode=paper).
+2026-07-10 18:59:58,372 INFO dashboard | Wrote dashboard with 140 trades -> dashboard.html
+2026-07-10 19:29:59,106 INFO orchestrator | Market closed; skipping decision cycle.
+2026-07-10 19:29:59,138 INFO alpaca | Alpaca client ready (mode=paper).
+2026-07-10 19:30:04,559 INFO dashboard | Wrote dashboard with 140 trades -> dashboard.html
+2026-07-10 20:00:05,177 INFO orchestrator | Market closed; skipping decision cycle.
+2026-07-10 20:00:05,207 INFO alpaca | Alpaca client ready (mode=paper).
+2026-07-10 20:00:07,655 INFO dashboard | Wrote dashboard with 140 trades -> dashboard.html
+2026-07-10 20:30:08,252 INFO orchestrator | Market closed; skipping decision cycle.
+2026-07-10 20:30:08,339 INFO alpaca | Alpaca client ready (mode=paper).
+2026-07-10 20:30:10,691 INFO dashboard | Wrote dashboard with 140 trades -> dashboard.html
+2026-07-10 21:00:11,567 INFO orchestrator | Market closed; skipping decision cycle.
+2026-07-10 21:00:11,599 INFO alpaca | Alpaca client ready (mode=paper).
+2026-07-10 21:00:14,049 INFO dashboard | Wrote dashboard with 140 trades -> dashboard.html
+2026-07-10 21:30:14,638 INFO orchestrator | Market closed; skipping decision cycle.
+2026-07-10 21:30:14,673 INFO alpaca | Alpaca client ready (mode=paper).
+2026-07-10 21:30:17,145 INFO dashboard | Wrote dashboard with 140 trades -> dashboard.html
+2026-07-10 22:00:17,727 INFO orchestrator | Market closed; skipping decision cycle.
+2026-07-10 22:00:17,753 INFO alpaca | Alpaca client ready (mode=paper).
+2026-07-10 22:00:20,514 INFO dashboard | Wrote dashboard with 140 trades -> dashboard.html
+2026-07-10 23:41:06,185 INFO alpaca | Alpaca client ready (mode=paper).
+2026-07-10 23:41:06,461 INFO orchestrator | Discovery-driven mode: trading scanner-found names + holdings.
+2026-07-10 23:41:06,462 INFO orchestrator | Starting orchestrator (paper). Kill switch: off. Options: on. Benchmark: QQQ.
+2026-07-10 23:41:06,760 INFO orchestrator | Market closed; skipping decision cycle.
+2026-07-10 23:41:06,767 INFO alpaca | Alpaca client ready (mode=paper).
+2026-07-10 23:41:07,112 INFO dashboard | Wrote dashboard with 0 trades -> dashboard.html
+2026-07-10 23:41:28,035 INFO orchestrator | Interrupted — shutting down.
+2026-07-10 23:41:33,880 INFO alpaca | Alpaca client ready (mode=paper).
+2026-07-10 23:41:34,106 INFO orchestrator | Discovery-driven mode: trading scanner-found names + holdings.
+2026-07-10 23:41:34,107 INFO orchestrator | Starting orchestrator (paper). Kill switch: off. Options: on. Benchmark: QQQ.
+2026-07-10 23:41:34,503 INFO orchestrator | Market closed; skipping decision cycle.
+2026-07-10 23:41:34,515 INFO alpaca | Alpaca client ready (mode=paper).
+2026-07-10 23:41:34,903 INFO dashboard | Wrote dashboard with 0 trades -> dashboard.html
