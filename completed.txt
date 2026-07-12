@@ -399,3 +399,40 @@ round-trips, re-run subscriptions.
 MAX_DISCOVERED_CANDIDATES 12 -> 18 (.env + config.py default): 12 re-throttled the
 now-3-feed discovery (congress + insider + robinhood) at the aggregator; 18 lets
 the surfaced breadth actually reach the model.
+
+################################################################################
+PHASE E/R (Todo-3) — Decision quality: signal dynamics
+################################################################################
+
+--- E.1 + R.4 Signal lag-decay weighting + trend/inflection tracking — DONE 2026-07-12 ---
+signals/history.py (SignalHistory): the decision model now sees signal DYNAMICS,
+not just levels.
+  LAG (E.1): per-kind freshness weight w = 0.5^(typical_publication_lag / 14d) —
+  congress (~30d STOCK Act lag) -> w=0.23, insider (Form 4, 2 biz days) -> 0.91,
+  dark-pool (T+1) -> 0.95, news 0.98, technical/options_chain 1.0. Thesis-class
+  kinds (fundamentals, macro, discovery) are EXEMPT: slow is not stale for them.
+  Kind-level because providers carry no uniform per-event dates (congress data
+  is already an aggregate).
+  TREND (R.4, enving/TradeAgent's sentiment_tracker idea, done frugally): per-
+  (symbol, kind) score series persisted to state/signal_history.json each cycle
+  (one point per 2h unless the score jumps >=0.05 — inflections land
+  immediately; 14d retention, 48-point cap, atomic tmp-swap save, corrupt file
+  = clean start). Least-squares slope over the window classifies improving /
+  decaying / stable (needs >=3 obs spanning >=1d), with an INFLECTION override
+  when the latest score flips sign vs the prior series mean (both sides
+  >=0.1) — the earliest tell a thesis is forming or dying.
+  RENDERING: compact [w=0.23 trend=improving(+0.09/d,4.1d)] annotation appended
+  to each scored signal line by DecisionEngine._render (notes built once per
+  cycle by SignalHistory.notes_for, handed through decide() — engine stays
+  decoupled from the store); legend added to the cached system prompt.
+  Recorded BEFORE thesis-decay exits so a dying series is remembered for names
+  exited this cycle; best-effort (history can never block a decision).
+  DELIBERATE SCOPE: evidence for the LLM only — no risk-layer change, no .env
+  knob (record-window freeze friendly); market-wide (symbol-less) signals not
+  tracked; survives account resets by design (market observations, not account
+  state — reset.py untouched).
+Tests: test_signal_history.py (+19: weight ordering, thesis exemption, restart
+persistence, spacing compression vs jump capture, same-cycle averaging,
+retention pruning, corrupt-file recovery, improving/decaying/stable, min-
+history gates, both inflection directions, noise-floor guard, annotation
+formats, notes map, engine render with/without notes). 519 green.
