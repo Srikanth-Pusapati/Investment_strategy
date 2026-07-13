@@ -1,0 +1,264 @@
+2026-07-12 00:56:39,255 CRITICAL orchestrator | DARK GAP: no loop tick for 49 min (sleep/suspend?). Positions were unwatched; reconciling before trading resumes.
+2026-07-12 01:12:44,456 WARNING notify | Alert email send failed (attempt 1/2): Connection unexpectedly closed: [Errno 54] Connection reset by peer
+2026-07-12 02:08:57,201 WARNING notify | Alert email send failed (attempt 2/2): Connection unexpectedly closed: The read operation timed out
+2026-07-12 02:08:57,231 ERROR notify | ALERT not delivered (no working sink): Bot was dark for 49 min
+2026-07-12 02:09:28,297 CRITICAL orchestrator | DARK GAP: no loop tick for 73 min (sleep/suspend?). Positions were unwatched; reconciling before trading resumes.
+2026-07-12 02:09:31,238 INFO notify | CRITICAL alert emailed to srikanthpusapati1@gmail.com: Bot was dark for 73 min
+2026-07-12 02:28:25,748 CRITICAL orchestrator | DARK GAP: no loop tick for 19 min (sleep/suspend?). Positions were unwatched; reconciling before trading resumes.
+2026-07-12 02:28:25,882 WARNING alpaca | get_account: transient network error (ConnectionError); retry 1/2.
+2026-07-12 02:56:37,815 CRITICAL orchestrator | DARK GAP: no loop tick for 28 min (sleep/suspend?). Positions were unwatched; reconciling before trading resumes.
+2026-07-12 02:56:38,025 WARNING alpaca | get_account: transient network error (ConnectionError); retry 1/2.
+2026-07-12 03:01:57,680 CRITICAL orchestrator | DARK GAP: no loop tick for 5 min (sleep/suspend?). Positions were unwatched; reconciling before trading resumes.
+2026-07-12 03:01:57,767 WARNING alpaca | get_account: transient network error (ConnectionError); retry 1/2.
+2026-07-12 03:21:44,752 CRITICAL orchestrator | DARK GAP: no loop tick for 19 min (sleep/suspend?). Positions were unwatched; reconciling before trading resumes.
+2026-07-12 03:21:44,831 WARNING alpaca | get_account: transient network error (ConnectionError); retry 1/2.
+2026-07-12 05:01:02,247 CRITICAL orchestrator | DARK GAP: no loop tick for 99 min (sleep/suspend?). Positions were unwatched; reconciling before trading resumes.
+2026-07-12 05:01:02,630 WARNING alpaca | get_account: transient network error (ConnectionError); retry 1/2.
+2026-07-12 06:03:12,745 CRITICAL orchestrator | DARK GAP: no loop tick for 62 min (sleep/suspend?). Positions were unwatched; reconciling before trading resumes.
+2026-07-12 06:03:12,830 WARNING alpaca | get_account: transient network error (ConnectionError); retry 1/2.
+2026-07-12 06:18:28,877 CRITICAL orchestrator | DARK GAP: no loop tick for 14 min (sleep/suspend?). Positions were unwatched; reconciling before trading resumes.
+2026-07-12 06:18:28,969 WARNING alpaca | get_account: transient network error (ConnectionError); retry 1/2.
+2026-07-12 07:07:00,627 CRITICAL orchestrator | DARK GAP: no loop tick for 48 min (sleep/suspend?). Positions were unwatched; reconciling before trading resumes.
+2026-07-12 07:07:01,027 WARNING alpaca | get_account: transient network error (ConnectionError); retry 1/2.
+2026-07-12 07:25:39,347 CRITICAL orchestrator | DARK GAP: no loop tick for 17 min (sleep/suspend?). Positions were unwatched; reconciling before trading resumes.
+2026-07-12 07:25:39,426 WARNING alpaca | get_account: transient network error (ConnectionError); retry 1/2.
+2026-07-12 08:20:41,547 CRITICAL orchestrator | DARK GAP: no loop tick for 55 min (sleep/suspend?). Positions were unwatched; reconciling before trading resumes.
+2026-07-12 08:20:41,623 WARNING alpaca | get_account: transient network error (ConnectionError); retry 1/2.
+2026-07-12 09:10:08,305 CRITICAL orchestrator | DARK GAP: no loop tick for 49 min (sleep/suspend?). Positions were unwatched; reconciling before trading resumes.
+2026-07-12 09:10:08,397 WARNING alpaca | get_account: transient network error (ConnectionError); retry 1/2.
+2026-07-12 09:26:43,515 CRITICAL orchestrator | DARK GAP: no loop tick for 17 min (sleep/suspend?). Positions were unwatched; reconciling before trading resumes.
+2026-07-12 09:26:43,607 WARNING alpaca | get_account: transient network error (ConnectionError); retry 1/2.
+2026-07-12 10:01:43,611 CRITICAL orchestrator | DARK GAP: no loop tick for 35 min (sleep/suspend?). Positions were unwatched; reconciling before trading resumes.
+2026-07-12 10:01:43,678 WARNING alpaca | get_account: transient network error (ConnectionError); retry 1/2.
+2026-07-12 10:12:41,985 INFO orchestrator | Market closed; skipping decision cycle.
+2026-07-12 10:12:42,026 INFO alpaca | Alpaca client ready (mode=paper).
+2026-07-12 10:12:42,417 INFO dashboard | Wrote dashboard with 0 trades -> dashboard.html
+2026-07-12 11:12:43,524 INFO orchestrator | Market closed; skipping decision cycle.
+2026-07-12 11:12:43,553 INFO alpaca | Alpaca client ready (mode=paper).
+2026-07-12 11:12:43,992 INFO dashboard | Wrote dashboard with 0 trades -> dashboard.html
+2026-07-12 12:12:44,966 INFO orchestrator | Market closed; skipping decision cycle.
+2026-07-12 12:12:44,991 INFO alpaca | Alpaca client ready (mode=paper).
+2026-07-12 12:12:45,442 INFO dashboard | Wrote dashboard with 0 trades -> dashboard.html
+2026-07-12 13:12:46,524 INFO orchestrator | Market closed; skipping decision cycle.
+2026-07-12 13:12:46,550 INFO alpaca | Alpaca client ready (mode=paper).
+2026-07-12 13:12:46,964 INFO dashboard | Wrote dashboard with 0 trades -> dashboard.html
+2026-07-12 14:12:47,992 INFO orchestrator | Market closed; skipping decision cycle.
+2026-07-12 14:12:48,021 INFO alpaca | Alpaca client ready (mode=paper).
+2026-07-12 14:12:48,538 INFO dashboard | Wrote dashboard with 0 trades -> dashboard.html
+2026-07-12 15:12:49,825 INFO orchestrator | Market closed; skipping decision cycle.
+2026-07-12 15:12:49,852 INFO alpaca | Alpaca client ready (mode=paper).
+2026-07-12 15:12:50,243 INFO dashboard | Wrote dashboard with 0 trades -> dashboard.html
+2026-07-12 16:12:51,341 INFO orchestrator | Market closed; skipping decision cycle.
+2026-07-12 16:12:51,373 INFO alpaca | Alpaca client ready (mode=paper).
+2026-07-12 16:12:51,890 INFO dashboard | Wrote dashboard with 0 trades -> dashboard.html
+2026-07-12 17:12:52,998 INFO orchestrator | Market closed; skipping decision cycle.
+2026-07-12 17:12:53,024 INFO alpaca | Alpaca client ready (mode=paper).
+2026-07-12 17:12:53,423 INFO dashboard | Wrote dashboard with 0 trades -> dashboard.html
+2026-07-12 22:20:17,395 CRITICAL orchestrator | DARK GAP: no loop tick for 302 min (sleep/suspend?). Positions were unwatched; reconciling before trading resumes.
+2026-07-12 22:20:18,538 WARNING notify | Alert email send failed (attempt 1/2): [Errno 8] nodename nor servname provided, or not known
+2026-07-12 22:20:23,750 WARNING notify | Alert email send failed (attempt 2/2): [Errno 8] nodename nor servname provided, or not known
+2026-07-12 22:20:23,777 ERROR notify | ALERT not delivered (no working sink): Bot was dark for 302 min
+2026-07-12 22:20:32,305 WARNING alpaca | get_account: transient network error (ConnectionError); retry 1/2.
+2026-07-12 22:22:11,461 WARNING alpaca | get_account: transient network error (ConnectionError); retry 1/2.
+2026-07-12 22:24:43,337 ERROR orchestrator | Watchdog tick failed; continuing.
+Traceback (most recent call last):
+  File "/Users/spusapati/Personal/Investment_stratergy/investment_strategy/orchestrator.py", line 230, in _watchdog_loop
+    try:
+    
+  File "/Users/spusapati/Personal/Investment_stratergy/investment_strategy/monitor/watchdog.py", line 73, in check_once
+    account = self.broker.get_account()
+  File "/Users/spusapati/Personal/Investment_stratergy/investment_strategy/execution/alpaca_client.py", line 131, in get_account
+    snap = self._read_account_once()
+  File "/Users/spusapati/Personal/Investment_stratergy/investment_strategy/execution/alpaca_client.py", line 153, in _read_account_once
+    a = _retry_read(self.trading.get_account, what="get_account")
+  File "/Users/spusapati/Personal/Investment_stratergy/investment_strategy/execution/alpaca_client.py", line 94, in _retry_read
+    return fn()
+  File "/Users/spusapati/Personal/Investment_stratergy/.venv/lib/python3.13/site-packages/alpaca/trading/client.py", line 479, in get_account
+    return TradeAccount(**response)
+  File "/Users/spusapati/Personal/Investment_stratergy/.venv/lib/python3.13/site-packages/pydantic/main.py", line 263, in __init__
+    validated_self = self.__pydantic_validator__.validate_python(data, self_instance=self)
+pydantic_core._pydantic_core.ValidationError: 1 validation error for TradeAccount
+status
+  Input should be 'ACCOUNT_CLOSED', 'ACCOUNT_UPDATED', 'ACTION_REQUIRED', 'ACTIVE', 'AML_REVIEW', 'APPROVAL_PENDING', 'APPROVED', 'DISABLED', 'DISABLE_PENDING', 'EDITED', 'INACTIVE', 'KYC_SUBMITTED', 'LIMITED', 'ONBOARDING', 'PAPER_ONLY', 'REAPPROVAL_PENDING', 'REJECTED', 'RESUBMITTED', 'SIGNED_UP', 'SUBMISSION_FAILED' or 'SUBMITTED' [type=enum, input_value='ACCOUNT_CLOSED_PENDING', input_type=str]
+    For further information visit https://errors.pydantic.dev/2.13/v/enum
+2026-07-12 22:25:14,384 ERROR orchestrator | Watchdog tick failed; continuing.
+Traceback (most recent call last):
+  File "/Users/spusapati/Personal/Investment_stratergy/investment_strategy/orchestrator.py", line 230, in _watchdog_loop
+    try:
+    
+  File "/Users/spusapati/Personal/Investment_stratergy/investment_strategy/monitor/watchdog.py", line 73, in check_once
+    account = self.broker.get_account()
+  File "/Users/spusapati/Personal/Investment_stratergy/investment_strategy/execution/alpaca_client.py", line 131, in get_account
+    snap = self._read_account_once()
+  File "/Users/spusapati/Personal/Investment_stratergy/investment_strategy/execution/alpaca_client.py", line 153, in _read_account_once
+    a = _retry_read(self.trading.get_account, what="get_account")
+  File "/Users/spusapati/Personal/Investment_stratergy/investment_strategy/execution/alpaca_client.py", line 94, in _retry_read
+    return fn()
+  File "/Users/spusapati/Personal/Investment_stratergy/.venv/lib/python3.13/site-packages/alpaca/trading/client.py", line 479, in get_account
+    return TradeAccount(**response)
+  File "/Users/spusapati/Personal/Investment_stratergy/.venv/lib/python3.13/site-packages/pydantic/main.py", line 263, in __init__
+    validated_self = self.__pydantic_validator__.validate_python(data, self_instance=self)
+pydantic_core._pydantic_core.ValidationError: 1 validation error for TradeAccount
+status
+  Input should be 'ACCOUNT_CLOSED', 'ACCOUNT_UPDATED', 'ACTION_REQUIRED', 'ACTIVE', 'AML_REVIEW', 'APPROVAL_PENDING', 'APPROVED', 'DISABLED', 'DISABLE_PENDING', 'EDITED', 'INACTIVE', 'KYC_SUBMITTED', 'LIMITED', 'ONBOARDING', 'PAPER_ONLY', 'REAPPROVAL_PENDING', 'REJECTED', 'RESUBMITTED', 'SIGNED_UP', 'SUBMISSION_FAILED' or 'SUBMITTED' [type=enum, input_value='ACCOUNT_CLOSED_PENDING', input_type=str]
+    For further information visit https://errors.pydantic.dev/2.13/v/enum
+2026-07-12 22:25:44,598 ERROR orchestrator | Watchdog tick failed; continuing.
+Traceback (most recent call last):
+  File "/Users/spusapati/Personal/Investment_stratergy/investment_strategy/orchestrator.py", line 230, in _watchdog_loop
+    try:
+    
+  File "/Users/spusapati/Personal/Investment_stratergy/investment_strategy/monitor/watchdog.py", line 73, in check_once
+    account = self.broker.get_account()
+  File "/Users/spusapati/Personal/Investment_stratergy/investment_strategy/execution/alpaca_client.py", line 131, in get_account
+    snap = self._read_account_once()
+  File "/Users/spusapati/Personal/Investment_stratergy/investment_strategy/execution/alpaca_client.py", line 153, in _read_account_once
+    a = _retry_read(self.trading.get_account, what="get_account")
+  File "/Users/spusapati/Personal/Investment_stratergy/investment_strategy/execution/alpaca_client.py", line 94, in _retry_read
+    return fn()
+  File "/Users/spusapati/Personal/Investment_stratergy/.venv/lib/python3.13/site-packages/alpaca/trading/client.py", line 479, in get_account
+    return TradeAccount(**response)
+  File "/Users/spusapati/Personal/Investment_stratergy/.venv/lib/python3.13/site-packages/pydantic/main.py", line 263, in __init__
+    validated_self = self.__pydantic_validator__.validate_python(data, self_instance=self)
+pydantic_core._pydantic_core.ValidationError: 1 validation error for TradeAccount
+status
+  Input should be 'ACCOUNT_CLOSED', 'ACCOUNT_UPDATED', 'ACTION_REQUIRED', 'ACTIVE', 'AML_REVIEW', 'APPROVAL_PENDING', 'APPROVED', 'DISABLED', 'DISABLE_PENDING', 'EDITED', 'INACTIVE', 'KYC_SUBMITTED', 'LIMITED', 'ONBOARDING', 'PAPER_ONLY', 'REAPPROVAL_PENDING', 'REJECTED', 'RESUBMITTED', 'SIGNED_UP', 'SUBMISSION_FAILED' or 'SUBMITTED' [type=enum, input_value='ACCOUNT_CLOSED_PENDING', input_type=str]
+    For further information visit https://errors.pydantic.dev/2.13/v/enum
+2026-07-12 22:26:14,868 ERROR orchestrator | Watchdog tick failed; continuing.
+Traceback (most recent call last):
+  File "/Users/spusapati/Personal/Investment_stratergy/investment_strategy/orchestrator.py", line 230, in _watchdog_loop
+    try:
+    
+  File "/Users/spusapati/Personal/Investment_stratergy/investment_strategy/monitor/watchdog.py", line 73, in check_once
+    account = self.broker.get_account()
+  File "/Users/spusapati/Personal/Investment_stratergy/investment_strategy/execution/alpaca_client.py", line 131, in get_account
+    snap = self._read_account_once()
+  File "/Users/spusapati/Personal/Investment_stratergy/investment_strategy/execution/alpaca_client.py", line 153, in _read_account_once
+    a = _retry_read(self.trading.get_account, what="get_account")
+  File "/Users/spusapati/Personal/Investment_stratergy/investment_strategy/execution/alpaca_client.py", line 94, in _retry_read
+    return fn()
+  File "/Users/spusapati/Personal/Investment_stratergy/.venv/lib/python3.13/site-packages/alpaca/trading/client.py", line 479, in get_account
+    return TradeAccount(**response)
+  File "/Users/spusapati/Personal/Investment_stratergy/.venv/lib/python3.13/site-packages/pydantic/main.py", line 263, in __init__
+    validated_self = self.__pydantic_validator__.validate_python(data, self_instance=self)
+pydantic_core._pydantic_core.ValidationError: 1 validation error for TradeAccount
+status
+  Input should be 'ACCOUNT_CLOSED', 'ACCOUNT_UPDATED', 'ACTION_REQUIRED', 'ACTIVE', 'AML_REVIEW', 'APPROVAL_PENDING', 'APPROVED', 'DISABLED', 'DISABLE_PENDING', 'EDITED', 'INACTIVE', 'KYC_SUBMITTED', 'LIMITED', 'ONBOARDING', 'PAPER_ONLY', 'REAPPROVAL_PENDING', 'REJECTED', 'RESUBMITTED', 'SIGNED_UP', 'SUBMISSION_FAILED' or 'SUBMITTED' [type=enum, input_value='ACCOUNT_CLOSED_PENDING', input_type=str]
+    For further information visit https://errors.pydantic.dev/2.13/v/enum
+2026-07-12 22:26:45,320 ERROR orchestrator | Watchdog tick failed; continuing.
+Traceback (most recent call last):
+  File "/Users/spusapati/Personal/Investment_stratergy/investment_strategy/orchestrator.py", line 230, in _watchdog_loop
+    try:
+    
+  File "/Users/spusapati/Personal/Investment_stratergy/investment_strategy/monitor/watchdog.py", line 73, in check_once
+    account = self.broker.get_account()
+  File "/Users/spusapati/Personal/Investment_stratergy/investment_strategy/execution/alpaca_client.py", line 131, in get_account
+    snap = self._read_account_once()
+  File "/Users/spusapati/Personal/Investment_stratergy/investment_strategy/execution/alpaca_client.py", line 153, in _read_account_once
+    a = _retry_read(self.trading.get_account, what="get_account")
+  File "/Users/spusapati/Personal/Investment_stratergy/investment_strategy/execution/alpaca_client.py", line 94, in _retry_read
+    return fn()
+  File "/Users/spusapati/Personal/Investment_stratergy/.venv/lib/python3.13/site-packages/alpaca/trading/client.py", line 479, in get_account
+    return TradeAccount(**response)
+  File "/Users/spusapati/Personal/Investment_stratergy/.venv/lib/python3.13/site-packages/pydantic/main.py", line 263, in __init__
+    validated_self = self.__pydantic_validator__.validate_python(data, self_instance=self)
+pydantic_core._pydantic_core.ValidationError: 1 validation error for TradeAccount
+status
+  Input should be 'ACCOUNT_CLOSED', 'ACCOUNT_UPDATED', 'ACTION_REQUIRED', 'ACTIVE', 'AML_REVIEW', 'APPROVAL_PENDING', 'APPROVED', 'DISABLED', 'DISABLE_PENDING', 'EDITED', 'INACTIVE', 'KYC_SUBMITTED', 'LIMITED', 'ONBOARDING', 'PAPER_ONLY', 'REAPPROVAL_PENDING', 'REJECTED', 'RESUBMITTED', 'SIGNED_UP', 'SUBMISSION_FAILED' or 'SUBMITTED' [type=enum, input_value='ACCOUNT_CLOSED_PENDING', input_type=str]
+    For further information visit https://errors.pydantic.dev/2.13/v/enum
+2026-07-12 22:27:15,521 ERROR orchestrator | Watchdog tick failed; continuing.
+Traceback (most recent call last):
+  File "/Users/spusapati/Personal/Investment_stratergy/investment_strategy/orchestrator.py", line 230, in _watchdog_loop
+    try:
+    
+  File "/Users/spusapati/Personal/Investment_stratergy/investment_strategy/monitor/watchdog.py", line 73, in check_once
+    account = self.broker.get_account()
+  File "/Users/spusapati/Personal/Investment_stratergy/investment_strategy/execution/alpaca_client.py", line 131, in get_account
+    snap = self._read_account_once()
+  File "/Users/spusapati/Personal/Investment_stratergy/investment_strategy/execution/alpaca_client.py", line 153, in _read_account_once
+    a = _retry_read(self.trading.get_account, what="get_account")
+  File "/Users/spusapati/Personal/Investment_stratergy/investment_strategy/execution/alpaca_client.py", line 94, in _retry_read
+    return fn()
+  File "/Users/spusapati/Personal/Investment_stratergy/.venv/lib/python3.13/site-packages/alpaca/trading/client.py", line 479, in get_account
+    return TradeAccount(**response)
+  File "/Users/spusapati/Personal/Investment_stratergy/.venv/lib/python3.13/site-packages/pydantic/main.py", line 263, in __init__
+    validated_self = self.__pydantic_validator__.validate_python(data, self_instance=self)
+pydantic_core._pydantic_core.ValidationError: 1 validation error for TradeAccount
+status
+  Input should be 'ACCOUNT_CLOSED', 'ACCOUNT_UPDATED', 'ACTION_REQUIRED', 'ACTIVE', 'AML_REVIEW', 'APPROVAL_PENDING', 'APPROVED', 'DISABLED', 'DISABLE_PENDING', 'EDITED', 'INACTIVE', 'KYC_SUBMITTED', 'LIMITED', 'ONBOARDING', 'PAPER_ONLY', 'REAPPROVAL_PENDING', 'REJECTED', 'RESUBMITTED', 'SIGNED_UP', 'SUBMISSION_FAILED' or 'SUBMITTED' [type=enum, input_value='ACCOUNT_CLOSED_PENDING', input_type=str]
+    For further information visit https://errors.pydantic.dev/2.13/v/enum
+2026-07-12 22:27:45,717 ERROR orchestrator | Watchdog tick failed; continuing.
+Traceback (most recent call last):
+  File "/Users/spusapati/Personal/Investment_stratergy/investment_strategy/orchestrator.py", line 230, in _watchdog_loop
+    try:
+    
+  File "/Users/spusapati/Personal/Investment_stratergy/investment_strategy/monitor/watchdog.py", line 73, in check_once
+    account = self.broker.get_account()
+  File "/Users/spusapati/Personal/Investment_stratergy/investment_strategy/execution/alpaca_client.py", line 131, in get_account
+    snap = self._read_account_once()
+  File "/Users/spusapati/Personal/Investment_stratergy/investment_strategy/execution/alpaca_client.py", line 153, in _read_account_once
+    a = _retry_read(self.trading.get_account, what="get_account")
+  File "/Users/spusapati/Personal/Investment_stratergy/investment_strategy/execution/alpaca_client.py", line 94, in _retry_read
+    return fn()
+  File "/Users/spusapati/Personal/Investment_stratergy/.venv/lib/python3.13/site-packages/alpaca/trading/client.py", line 479, in get_account
+    return TradeAccount(**response)
+  File "/Users/spusapati/Personal/Investment_stratergy/.venv/lib/python3.13/site-packages/pydantic/main.py", line 263, in __init__
+    validated_self = self.__pydantic_validator__.validate_python(data, self_instance=self)
+pydantic_core._pydantic_core.ValidationError: 1 validation error for TradeAccount
+status
+  Input should be 'ACCOUNT_CLOSED', 'ACCOUNT_UPDATED', 'ACTION_REQUIRED', 'ACTIVE', 'AML_REVIEW', 'APPROVAL_PENDING', 'APPROVED', 'DISABLED', 'DISABLE_PENDING', 'EDITED', 'INACTIVE', 'KYC_SUBMITTED', 'LIMITED', 'ONBOARDING', 'PAPER_ONLY', 'REAPPROVAL_PENDING', 'REJECTED', 'RESUBMITTED', 'SIGNED_UP', 'SUBMISSION_FAILED' or 'SUBMITTED' [type=enum, input_value='ACCOUNT_CLOSED_PENDING', input_type=str]
+    For further information visit https://errors.pydantic.dev/2.13/v/enum
+2026-07-12 22:28:15,967 ERROR orchestrator | Watchdog tick failed; continuing.
+Traceback (most recent call last):
+  File "/Users/spusapati/Personal/Investment_stratergy/.venv/lib/python3.13/site-packages/alpaca/common/rest.py", line 198, in _one_request
+    response.raise_for_status()
+    ~~~~~~~~~~~~~~~~~~~~~~~~~^^
+  File "/Users/spusapati/Personal/Investment_stratergy/.venv/lib/python3.13/site-packages/requests/models.py", line 1167, in raise_for_status
+    raise HTTPError(http_error_msg, response=self)
+requests.exceptions.HTTPError: 401 Client Error: Unauthorized for url: https://paper-api.alpaca.markets/v2/account
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/Users/spusapati/Personal/Investment_stratergy/investment_strategy/orchestrator.py", line 230, in _watchdog_loop
+    try:
+    
+  File "/Users/spusapati/Personal/Investment_stratergy/investment_strategy/monitor/watchdog.py", line 73, in check_once
+    account = self.broker.get_account()
+  File "/Users/spusapati/Personal/Investment_stratergy/investment_strategy/execution/alpaca_client.py", line 131, in get_account
+    snap = self._read_account_once()
+  File "/Users/spusapati/Personal/Investment_stratergy/investment_strategy/execution/alpaca_client.py", line 153, in _read_account_once
+    a = _retry_read(self.trading.get_account, what="get_account")
+  File "/Users/spusapati/Personal/Investment_stratergy/investment_strategy/execution/alpaca_client.py", line 94, in _retry_read
+    return fn()
+  File "/Users/spusapati/Personal/Investment_stratergy/.venv/lib/python3.13/site-packages/alpaca/trading/client.py", line 474, in get_account
+    response = self.get("/account")
+  File "/Users/spusapati/Personal/Investment_stratergy/.venv/lib/python3.13/site-packages/alpaca/common/rest.py", line 225, in get
+    return self._request("GET", path, data, **kwargs)
+           ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/spusapati/Personal/Investment_stratergy/.venv/lib/python3.13/site-packages/alpaca/common/rest.py", line 131, in _request
+    return self._one_request(method, url, opts, retry)
+           ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/spusapati/Personal/Investment_stratergy/.venv/lib/python3.13/site-packages/alpaca/common/rest.py", line 207, in _one_request
+    raise APIError(error, http_error)
+alpaca.common.exceptions.APIError: {"message": "unauthorized."}
+
+2026-07-12 22:28:31,318 INFO orchestrator | Interrupted — shutting down.
+2026-07-12 22:30:07,918 INFO alpaca | Alpaca client ready (mode=paper).
+2026-07-12 22:30:08,190 INFO orchestrator | Discovery-driven mode: trading scanner-found names + holdings.
+2026-07-12 22:30:08,192 INFO orchestrator | Starting orchestrator (paper). Kill switch: off. Options: on. Benchmark: QQQ.
+2026-07-12 22:30:08,473 INFO orchestrator | Market closed; skipping decision cycle.
+2026-07-12 22:30:08,481 INFO alpaca | Alpaca client ready (mode=paper).
+2026-07-12 22:30:08,777 INFO dashboard | Wrote dashboard with 0 trades -> dashboard.html
+2026-07-12 23:08:28,020 ERROR main | Another bot instance is already running (pid 83075) (lock state/bot.lock held). Kill it first — two instances double-trade the account.
+2026-07-12 23:09:17,420 INFO alpaca | Alpaca client ready (mode=paper).
+2026-07-12 23:09:17,748 INFO orchestrator | Discovery-driven mode: trading scanner-found names + holdings.
+2026-07-12 23:09:17,749 INFO orchestrator | Starting orchestrator (paper). Kill switch: off. Options: on. Benchmark: QQQ.
+2026-07-12 23:09:17,968 INFO orchestrator | Market closed; skipping decision cycle.
+2026-07-12 23:09:17,974 INFO alpaca | Alpaca client ready (mode=paper).
+2026-07-12 23:09:18,290 INFO dashboard | Wrote dashboard with 0 trades -> dashboard.html
+2026-07-12 23:28:46,589 INFO alpaca | Alpaca client ready (mode=paper).
+2026-07-12 23:28:47,422 INFO orchestrator | Discovery-driven mode: trading scanner-found names + holdings.
+2026-07-12 23:28:47,424 INFO orchestrator | Starting orchestrator (paper). Kill switch: off. Options: on. Benchmark: QQQ.
+2026-07-12 23:28:47,810 INFO orchestrator | Market closed; skipping decision cycle.
+2026-07-12 23:28:47,847 INFO alpaca | Alpaca client ready (mode=paper).
+2026-07-12 23:28:48,257 INFO dashboard | Wrote dashboard with 0 trades -> dashboard.html
