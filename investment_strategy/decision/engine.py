@@ -125,9 +125,10 @@ class DecisionEngine:
         if today:
             lines += [today, ""]
         if buy_excluded:
+            options_on = bool(getattr(self.cfg.risk, "options_enabled", False))
             lines.append(
                 "## Buys excluded this cycle (deterministic caps — "
-                "do NOT propose BUY for these)"
+                "do NOT propose an equity BUY for these)"
             )
             shown = list(buy_excluded.items())[:10]
             for sym, reason in shown:
@@ -137,7 +138,14 @@ class DecisionEngine:
                 lines.append(f"- …and {extra} more")
             lines.append(
                 "Spend conviction on alternatives; excluded symbols may still "
-                "be proposed as SELL or HOLD."
+                "be proposed as SELL or HOLD"
+                + (
+                    ", or as a defined-risk OPTION play — the exclusions above "
+                    "are EQUITY sizing caps; options have their own premium "
+                    "budget and gate. A corroborated bearish thesis on an "
+                    "excluded name is a long_put/bear_put_spread candidate."
+                    if options_on else "."
+                )
             )
             lines.append("")
         # All third-party text lives inside <market_data> so the system prompt can
@@ -171,7 +179,7 @@ class DecisionEngine:
             at_cap = b.symbol in excluded_set
             if pos:
                 cap_note = (
-                    f" — AT CAP: do NOT propose BUY; SELL/HOLD only "
+                    f" — AT CAP: do NOT propose equity BUY "
                     f"({buy_excluded[b.symbol]})" if at_cap else ""
                 )
                 tag = f" (HELD: {pos.qty:g} sh, {pos.unrealized_pl_pct:+.1f}%{cap_note})"
