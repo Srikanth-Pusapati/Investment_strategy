@@ -3,8 +3,9 @@
 signals/options_flow.py checks call/put imbalance for symbols you already track;
 this scans a pool of the day's most-active stocks (Alpaca's screener — free, uses
 your existing keys) and surfaces the ones showing a strong directional options
-lean via Polygon's snapshot. The most-actives list is only the *scan pool* — a
-name surfaces for unusual flow, not merely for being active. Needs POLYGON_API_KEY.
+lean via Alpaca's free indicative option snapshots (same keys again — no extra
+vendor). The most-actives list is only the *scan pool* — a name surfaces for
+unusual flow, not merely for being active.
 """
 from __future__ import annotations
 
@@ -38,13 +39,14 @@ class OptionsFlowScreener(Screener):
 
     @property
     def enabled(self) -> bool:
-        return bool(self.cfg.polygon_api_key)
+        return self._flow.enabled
 
     def scan(self) -> list[Candidate]:
         pool = self._most_actives()
         # Surface the scan-pool size so an empty most-actives pull is visible
         # rather than silently becoming "0 candidates" downstream.
         log.info("Options-flow most-actives pool -> %d name(s).", len(pool))
+        self._flow.begin_cycle()
         candidates: list[Candidate] = []
         for symbol in pool:
             agg = self._flow._call_put_volume(symbol)
@@ -65,6 +67,7 @@ class OptionsFlowScreener(Screener):
                        f"({lean} imbalance {imbalance:+.2f}) on a most-active name.",
                 score=imbalance,
             ))
+        self._flow.log_failures("screener")
         return candidates
 
     def _most_actives(self) -> list[str]:
