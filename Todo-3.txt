@@ -421,3 +421,16 @@ DONE 2026-07-12:
   per-(symbol,kind) score series -> [w=... trend=...] annotations on every
   scored signal line in the decision prompt. LLM evidence only; zero risk-
   layer/.env change. 519 tests green (was 500; +19).
+  PM session (Monday-readiness): paper account reset (web-UI $100k) + local
+  reset + preflight ALL GREEN (options level 3, chain feed live, test alert
+  sent); stale bot + queued flatten waiter stopped, bot restarted on current
+  code. AUDIT FIX — bearish option plays were silently throttled: equity
+  buy-exclusions vetoed long_put/bear_put_spread proposals
+  (_drop_excluded_buys) and dropped not-held BEARISH scanner candidates from
+  the slate (_partition_slate) exactly when the book was full. Option
+  proposals now pass to their own gate; bearish candidates stay slated when
+  options are on; prompt exclusion text now invites defined-risk option
+  plays on excluded names. Tests +6 (525 green).
+  OPEN USER ACTIONS: REGIME_TRIM_ENABLED=off (consider on for down-market
+  de-risk); HEARTBEAT_URL unset (GA-2.2 healthchecks.io); .env.preview is a
+  STALE pre-July config the bot never reads — delete to avoid confusion.
