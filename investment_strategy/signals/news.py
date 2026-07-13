@@ -45,6 +45,9 @@ class NewsProvider(SignalProvider):
 
     def __init__(self, cfg: Config):
         self.cfg = cfg
+        # Set once we see a 403: the key's plan doesn't include news-sentiment
+        # (plan gating is stable, so stop paying per-symbol latency for it).
+        self._finnhub_gated = False
 
     def fetch(self, symbols: list[str]) -> list[Signal]:
         from alpaca.data.historical.news import NewsClient
@@ -79,13 +82,22 @@ class NewsProvider(SignalProvider):
         return signals
 
     def _finnhub_sentiment(self, symbol: str) -> tuple[float | None, str]:
-        if not self.cfg.finnhub_api_key:
+        if not self.cfg.finnhub_api_key or self._finnhub_gated:
             return None, ""
         try:
             r = requests.get(_FINNHUB_SENTIMENT, params={
                 "symbol": symbol, "token": self.cfg.finnhub_api_key,
             }, timeout=15)
+            if r.status_code == 403:
+                # Premium-gated endpoint on this key — say so ONCE instead of
+                # silently degrading (the silent-403 lesson from options flow).
+                self._finnhub_gated = True
+                log.warning(
+                    "Finnhub news-sentiment is premium-gated on this key "
+                    "(HTTP 403) — using the VADER fallback for this run.")
+                return None, ""
             if r.status_code != 200:
+                log.debug("finnhub sentiment HTTP %d for %s", r.status_code, symbol)
                 return None, ""
             data = r.json()
             # companyNewsScore is 0..1; bullishPercent 0..1. Map to [-1, 1].
