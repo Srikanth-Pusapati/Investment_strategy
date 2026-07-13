@@ -186,8 +186,13 @@ the window dirty; a silent slip is the only unacceptable outcome.)
         pages on wake-after-sleep. Tests +12 in test_ops_hardening.py.)
 [~] GA-2.2 (HIGH; CODE DONE 2026-07-03 — HEARTBEAT_URL ping each watchdog
         tick, gated on main-loop freshness so either thread dying silences
-        it; REMAINING: create the healthchecks.io check + set HEARTBEAT_URL,
-        and the auto-flatten teeth stay deferred to GA-5.1)
+        it. 2026-07-13: LOCAL half SHIPPED+INSTALLED — ops/deadman.py launchd
+        job (5-min) pages via SMTP on dead/wedged bot in market hours; plus
+        ops/control_panel.py (localhost:8787) for kill/restart/logs/dashboard.
+        REMAINING: the free healthchecks.io signup + paste ping URL into
+        HEARTBEAT_URL (covers laptop-dead/sleep — the only failure domain the
+        local deadman can't see), and the auto-flatten teeth stay deferred to
+        GA-5.1)
         Dead-man switch with TEETH. Heartbeat ping
         (healthchecks.io or equivalent) each decision cycle + watchdog
         tick; external page when silent > 2 intervals. Solo-operator

@@ -39,6 +39,7 @@ from .models import (
     Position,
     RiskVerdict,
     SignalBundle,
+    SignalKind,
     TIF,
     TradeProposal,
 )
@@ -879,6 +880,14 @@ class Orchestrator:
                 buy_excluded[b.symbol] = reason or "no buy headroom"
                 if account.position_for(b.symbol) is not None:
                     filtered.append(b)  # keep: may need SELL/HOLD
+                elif self.options is not None and self._bearish_lean(b):
+                    # Keep: the equity buy is blocked, but a BEARISH candidate's
+                    # whole reason for being on the slate is a defined-risk PUT
+                    # play (the screener admits score<=-min_score names only when
+                    # options are on). Options spend from their own budget —
+                    # dropping these silently disabled "profit from the downside"
+                    # exactly when the book was full.
+                    filtered.append(b)
                 # else: drop; nothing to sell and buy is blocked
             else:
                 filtered.append(b)
@@ -889,6 +898,23 @@ class Orchestrator:
                 + (f" …+{len(buy_excluded) - 5} more" if len(buy_excluded) > 5 else ""),
             )
         return filtered, buy_excluded
+
+    def _bearish_lean(self, bundle) -> bool:
+        """True when the bundle's evidence leans bearish enough to justify
+        keeping an equity-blocked, not-held name on the slate as a PUT
+        candidate. The discovery signal (the screener's smart-money lean that
+        surfaced the name) is the primary read — mirror the aggregator's
+        bearish intake bar; without one, fall back to the mean of the scored
+        signals."""
+        bar = max(0.2, self.cfg.screener.min_score)
+        disc = [
+            s.score for s in bundle.signals
+            if s.kind is SignalKind.DISCOVERY and s.score is not None
+        ]
+        if disc:
+            return min(disc) <= -bar
+        scores = [s.score for s in bundle.signals if s.score is not None]
+        return bool(scores) and sum(scores) / len(scores) <= -bar
 
     def _journal_decision(
         self, symbol: str, action: str, instrument: str,
@@ -914,12 +940,18 @@ class Orchestrator:
     ) -> list:
         """Hard backstop: if Claude proposes a BUY for a symbol we explicitly
         excluded, drop it. SELL and HOLD always pass — closing is never blocked.
-        Logs any drops so it's auditable."""
+        OPTION proposals also pass: the buy-exclusions are EQUITY sizing
+        headroom (symbol/position/cash/gross caps); options spend from their
+        own budget (premium cap, concurrency cap, halt gate — all enforced in
+        evaluate_option). Dropping them here silently blocked long_put /
+        bear_put_spread on exactly the capped names whose decline we most
+        need to be able to profit from. Logs any drops so it's auditable."""
         if not buy_excluded:
             return proposals
         kept = []
         for prop in proposals:
-            if prop.action.value == "buy" and prop.symbol in buy_excluded:
+            if (prop.action.value == "buy" and prop.symbol in buy_excluded
+                    and prop.instrument is not Instrument.OPTION):
                 log.warning(
                     "DROPPED BUY %s: model ignored buy-exclusion (%s) — "
                     "the risk gate would also reject it, but we drop it here "

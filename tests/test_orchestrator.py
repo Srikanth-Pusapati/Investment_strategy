@@ -707,3 +707,77 @@ def _run_all():
 
 if __name__ == "__main__":
     sys.exit(1 if _run_all() else 0)
+
+
+# --------------------------------------------------------------------------- #
+# Bearish option path through slate exclusions (the "earn on lows" fix)
+# --------------------------------------------------------------------------- #
+def _slate_orch(options_on=True, headroom=0.0, min_score=0.2):
+    o = Orchestrator.__new__(Orchestrator)
+    o.cfg = SimpleNamespace(
+        risk=SimpleNamespace(min_order_usd=1.0, min_order_pct=0.0),
+        screener=SimpleNamespace(min_score=min_score),
+    )
+    o.options = object() if options_on else None
+    o._buy_headroom_usd = lambda sym, acct: (headroom, "at gross exposure cap")
+    return o
+
+
+def _discovery_bundle(symbol="XYZ", score=-0.5):
+    sig = Signal(kind=SignalKind.DISCOVERY, symbol=symbol, summary="scan", score=score)
+    return SignalBundle(symbol=symbol, signals=[sig])
+
+
+def test_partition_keeps_bearish_notheld_candidate_when_options_on():
+    # A bearish scanner name (admitted for a PUT play) must survive equity
+    # buy-exclusion — dropping it silently disabled profiting from declines.
+    o = _slate_orch(options_on=True)
+    kept, excluded = o._partition_slate([_discovery_bundle(score=-0.5)], _acct())
+    assert [b.symbol for b in kept] == ["XYZ"]
+    assert "XYZ" in excluded  # the equity buy stays blocked
+
+
+def test_partition_drops_bearish_notheld_when_options_off():
+    # Without options there is no way to act on a blocked bearish name — drop
+    # it as before (token savings).
+    o = _slate_orch(options_on=False)
+    kept, excluded = o._partition_slate([_discovery_bundle(score=-0.5)], _acct())
+    assert kept == []
+    assert "XYZ" in excluded
+
+
+def test_partition_drops_bullish_notheld_when_blocked():
+    # A BULLISH blocked name offers nothing actionable; still dropped.
+    o = _slate_orch(options_on=True)
+    kept, _ = o._partition_slate([_discovery_bundle(score=0.5)], _acct())
+    assert kept == []
+
+
+def test_bearish_lean_falls_back_to_mean_of_scored_signals():
+    o = _slate_orch()
+    sigs = [
+        Signal(kind=SignalKind.NEWS, symbol="XYZ", summary="bad", score=-0.4),
+        Signal(kind=SignalKind.TECHNICAL, symbol="XYZ", summary="down", score=-0.2),
+    ]
+    assert o._bearish_lean(SignalBundle(symbol="XYZ", signals=sigs)) is True
+    assert o._bearish_lean(SignalBundle(symbol="XYZ", signals=[])) is False
+
+
+def test_drop_excluded_buys_passes_option_proposals():
+    # Equity buy-exclusions must not veto defined-risk option plays: the
+    # option gate (premium/concurrency/DTE/halt) is their authority.
+    o = Orchestrator.__new__(Orchestrator)
+    put = TradeProposal(
+        symbol="AMD", action=Action.BUY, conviction=0.7, target_weight_pct=0.0,
+        rationale="bearish", instrument=Instrument.OPTION,
+    )
+    equity = _buy_prop("AMD", 0.7)
+    kept = o._drop_excluded_buys([put, equity], {"AMD": "at symbol cap"})
+    assert kept == [put]          # option passes, equity buy dropped
+
+
+def test_drop_excluded_buys_still_drops_equity_and_passes_sells():
+    o = Orchestrator.__new__(Orchestrator)
+    sell = _buy_prop("AMD", 0.7, action=Action.SELL)
+    kept = o._drop_excluded_buys([_buy_prop("AMD"), sell], {"AMD": "capped"})
+    assert kept == [sell]

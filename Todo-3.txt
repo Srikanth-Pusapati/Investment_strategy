@@ -421,3 +421,27 @@ DONE 2026-07-12:
   per-(symbol,kind) score series -> [w=... trend=...] annotations on every
   scored signal line in the decision prompt. LLM evidence only; zero risk-
   layer/.env change. 519 tests green (was 500; +19).
+  PM session (Monday-readiness): paper account reset (web-UI $100k) + local
+  reset + preflight ALL GREEN (options level 3, chain feed live, test alert
+  sent); stale bot + queued flatten waiter stopped, bot restarted on current
+  code. AUDIT FIX — bearish option plays were silently throttled: equity
+  buy-exclusions vetoed long_put/bear_put_spread proposals
+  (_drop_excluded_buys) and dropped not-held BEARISH scanner candidates from
+  the slate (_partition_slate) exactly when the book was full. Option
+  proposals now pass to their own gate; bearish candidates stay slated when
+  options are on; prompt exclusion text now invites defined-risk option
+  plays on excluded names. Tests +6 (525 green).
+  LATE-PM session (all three flags CLOSED, 2026-07-13 00:30 ET):
+  - REGIME_TRIM_ENABLED=on (operator-delegated DECISION): one-shot 25% trim
+    on a risk-off flip = the defensive half of "profit on lows"; whipsaw
+    bounded by the regime_label latch + 24h re-entry cooldown.
+  - Dead-man watchdog SHIPPED + INSTALLED (ops/deadman.py + launchd, 5-min
+    cadence): pages via the proven SMTP sink when the bot is dead OR wedged
+    (live pid, stale log) during market hours. External laptop-dead half
+    still needs the free healthchecks.io signup -> paste ping URL into
+    HEARTBEAT_URL (.env line exists, empty).
+  - CONTROL PANEL shipped + running (ops/control_panel.py + launchd
+    KeepAlive, http://127.0.0.1:8787, localhost-only): status cards, kill
+    switch on/off, restart bot, preflight button, log tail, dashboard
+    iframe. Restart/kill/preflight all exercised end-to-end.
+  - .env.preview (stale June config) removed. Tests 535 green (+10 ops).
