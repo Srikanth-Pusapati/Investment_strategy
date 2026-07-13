@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Dead-man watchdog (goGA GA-2.2): every 5 min, page via the bot's SMTP
+     alert sink if the bot is dead or wedged during market hours. Runs
+     OUTSIDE the bot so it survives what it detects. Laptop-wide failures
+     (sleep, power) need the external healthchecks.io half — see ops/deadman.py.
+     Install:
+       cp ops/launchd/com.investment-strategy.deadman.plist ~/Library/LaunchAgents/
+       launchctl load ~/Library/LaunchAgents/com.investment-strategy.deadman.plist
+     Uninstall:
+       launchctl unload ~/Library/LaunchAgents/com.investment-strategy.deadman.plist -->
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.investment-strategy.deadman</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>/Users/spusapati/Personal/Investment_stratergy/.venv/bin/python</string>
+        <string>ops/deadman.py</string>
+    </array>
+    <key>WorkingDirectory</key>
+    <string>/Users/spusapati/Personal/Investment_stratergy</string>
+    <key>StartInterval</key>
+    <integer>300</integer>
+    <key>RunAtLoad</key>
+    <true/>
+    <key>StandardOutPath</key>
+    <string>/Users/spusapati/Personal/Investment_stratergy/logs/deadman.log</string>
+    <key>StandardErrorPath</key>
+    <string>/Users/spusapati/Personal/Investment_stratergy/logs/deadman.log</string>
+</dict>
+</plist>

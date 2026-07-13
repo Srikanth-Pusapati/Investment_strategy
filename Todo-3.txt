@@ -431,6 +431,17 @@ DONE 2026-07-12:
   proposals now pass to their own gate; bearish candidates stay slated when
   options are on; prompt exclusion text now invites defined-risk option
   plays on excluded names. Tests +6 (525 green).
-  OPEN USER ACTIONS: REGIME_TRIM_ENABLED=off (consider on for down-market
-  de-risk); HEARTBEAT_URL unset (GA-2.2 healthchecks.io); .env.preview is a
-  STALE pre-July config the bot never reads — delete to avoid confusion.
+  LATE-PM session (all three flags CLOSED, 2026-07-13 00:30 ET):
+  - REGIME_TRIM_ENABLED=on (operator-delegated DECISION): one-shot 25% trim
+    on a risk-off flip = the defensive half of "profit on lows"; whipsaw
+    bounded by the regime_label latch + 24h re-entry cooldown.
+  - Dead-man watchdog SHIPPED + INSTALLED (ops/deadman.py + launchd, 5-min
+    cadence): pages via the proven SMTP sink when the bot is dead OR wedged
+    (live pid, stale log) during market hours. External laptop-dead half
+    still needs the free healthchecks.io signup -> paste ping URL into
+    HEARTBEAT_URL (.env line exists, empty).
+  - CONTROL PANEL shipped + running (ops/control_panel.py + launchd
+    KeepAlive, http://127.0.0.1:8787, localhost-only): status cards, kill
+    switch on/off, restart bot, preflight button, log tail, dashboard
+    iframe. Restart/kill/preflight all exercised end-to-end.
+  - .env.preview (stale June config) removed. Tests 535 green (+10 ops).

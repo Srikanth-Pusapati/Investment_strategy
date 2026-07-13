@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Local control panel (http://127.0.0.1:8787): status, kill switch,
+     restart, logs, dashboard. Localhost-only by design — never expose it.
+     Install:
+       cp ops/launchd/com.investment-strategy.panel.plist ~/Library/LaunchAgents/
+       launchctl load ~/Library/LaunchAgents/com.investment-strategy.panel.plist -->
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.investment-strategy.panel</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>/Users/spusapati/Personal/Investment_stratergy/.venv/bin/python</string>
+        <string>ops/control_panel.py</string>
+    </array>
+    <key>WorkingDirectory</key>
+    <string>/Users/spusapati/Personal/Investment_stratergy</string>
+    <key>KeepAlive</key>
+    <true/>
+    <key>ThrottleInterval</key>
+    <integer>10</integer>
+    <key>StandardOutPath</key>
+    <string>/Users/spusapati/Personal/Investment_stratergy/logs/panel.log</string>
+    <key>StandardErrorPath</key>
+    <string>/Users/spusapati/Personal/Investment_stratergy/logs/panel.log</string>
+</dict>
+</plist>
