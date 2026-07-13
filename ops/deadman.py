@@ -11,7 +11,9 @@ failure it exists to detect. During market hours it checks:
 
 On failure it pages through the SAME SMTP/webhook sink the bot's CRITICAL
 alerts use (proven by preflight's test alert), throttled to one page per
-condition per ~30 min by the Alerter's own cooldown.
+~30 min by an on-disk stamp file — the Alerter's own cooldown lives in
+process memory and dies with each 5-min launchd run, so it cannot throttle
+across runs.
 
 SCOPE: this covers "bot died / wedged while the laptop is up". If the whole
 laptop sleeps or dies, this script dies with it — that failure domain needs
@@ -33,9 +35,24 @@ from zoneinfo import ZoneInfo
 ROOT = Path(__file__).resolve().parent.parent
 ET = ZoneInfo("America/New_York")
 
-# The bot logs at least each decision cycle (30-60 min) and every watchdog
-# CRITICAL; a log silent for 40+ min during market hours means wedged/dead.
-STALE_LOG_MINUTES = 40.0
+# The log is only guaranteed to move once per decision cycle, so the alarm
+# must sit ABOVE the cycle interval or every healthy cycle's tail pages
+# (2026-07-13: DECISION_INTERVAL_SECONDS=3600 vs a hardcoded 40 here paged
+# every hour). Derive it from the bot's own .env cadence + grace.
+STALE_GRACE_MINUTES = 15.0
+PAGE_COOLDOWN_S = 1800.0
+
+
+def stale_log_minutes() -> float:
+    try:
+        from dotenv import dotenv_values
+
+        interval_s = float(
+            dotenv_values(ROOT / ".env").get("DECISION_INTERVAL_SECONDS") or 900.0
+        )
+    except Exception:
+        interval_s = 3600.0
+    return max(40.0, interval_s / 60.0 + STALE_GRACE_MINUTES)
 
 
 def market_hours(now: dt.datetime | None = None) -> bool:
@@ -93,14 +110,32 @@ def diagnose(now: dt.datetime | None = None) -> str | None:
             ">> logs/stdout.log 2>&1 &"
         )
     age = log_age_minutes(now=now)
-    if age is None or age > STALE_LOG_MINUTES:
+    stale_after = stale_log_minutes()
+    if age is None or age > stale_after:
         shown = "missing" if age is None else f"{age:.0f} min old"
         return (
             f"Bot pid {pid} is alive but logs/bot.log is {shown} "
-            f"(> {STALE_LOG_MINUTES:.0f} min) — likely WEDGED. It still holds "
+            f"(> {stale_after:.0f} min) — likely WEDGED. It still holds "
             f"the instance lock, so kill it (kill -TERM {pid}) and restart."
         )
     return None
+
+
+def should_page(stamp: Path = ROOT / "state" / "deadman.page-stamp") -> bool:
+    """Cross-run throttle: each launchd run is a fresh process, so the
+    Alerter's in-memory cooldown never applies here. One page per ~30 min."""
+    import time
+
+    try:
+        if time.time() - stamp.stat().st_mtime < PAGE_COOLDOWN_S:
+            return False
+    except OSError:
+        pass
+    try:
+        stamp.touch()
+    except OSError:
+        pass
+    return True
 
 
 def main() -> int:
@@ -112,9 +147,11 @@ def main() -> int:
     if problem is None:
         print(f"{stamp} ok", flush=True)
         return 0
+    if not should_page():
+        print(f"{stamp} STALE (page throttled): {problem}", flush=True)
+        return 1
     print(f"{stamp} PAGING: {problem}", flush=True)
-    # The bot's own alert sink (SMTP/webhook) — configured, preflight-tested,
-    # and throttled per key so a dead bot pages ~2x/hour, not every 5 min.
+    # The bot's own alert sink (SMTP/webhook) — configured and preflight-tested.
     sys.path.insert(0, str(ROOT))
     from investment_strategy.config import load_config
     from investment_strategy.notify import Alerter
