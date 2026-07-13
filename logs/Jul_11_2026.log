@@ -1,0 +1,51 @@
+2026-07-11 08:31:30,840 INFO alpaca | Alpaca client ready (mode=paper).
+2026-07-11 08:31:31,157 INFO orchestrator | Discovery-driven mode: trading scanner-found names + holdings.
+2026-07-11 08:31:31,158 INFO orchestrator | Starting orchestrator (paper). Kill switch: off. Options: on. Benchmark: QQQ.
+2026-07-11 08:31:31,381 INFO orchestrator | Market closed; skipping decision cycle.
+2026-07-11 08:31:31,388 INFO alpaca | Alpaca client ready (mode=paper).
+2026-07-11 08:31:31,751 INFO dashboard | Wrote dashboard with 0 trades -> dashboard.html
+2026-07-11 09:31:33,344 INFO orchestrator | Market closed; skipping decision cycle.
+2026-07-11 09:31:33,393 INFO alpaca | Alpaca client ready (mode=paper).
+2026-07-11 09:31:33,854 INFO dashboard | Wrote dashboard with 0 trades -> dashboard.html
+2026-07-11 10:31:34,835 INFO orchestrator | Market closed; skipping decision cycle.
+2026-07-11 10:31:34,862 INFO alpaca | Alpaca client ready (mode=paper).
+2026-07-11 10:31:35,656 INFO dashboard | Wrote dashboard with 0 trades -> dashboard.html
+2026-07-11 11:31:36,904 INFO orchestrator | Market closed; skipping decision cycle.
+2026-07-11 11:31:36,928 INFO alpaca | Alpaca client ready (mode=paper).
+2026-07-11 11:31:37,386 INFO dashboard | Wrote dashboard with 0 trades -> dashboard.html
+2026-07-11 12:31:38,676 INFO orchestrator | Market closed; skipping decision cycle.
+2026-07-11 12:31:38,698 INFO alpaca | Alpaca client ready (mode=paper).
+2026-07-11 12:31:39,120 INFO dashboard | Wrote dashboard with 0 trades -> dashboard.html
+2026-07-11 13:31:40,383 INFO orchestrator | Market closed; skipping decision cycle.
+2026-07-11 13:31:40,412 INFO alpaca | Alpaca client ready (mode=paper).
+2026-07-11 13:31:40,854 INFO dashboard | Wrote dashboard with 0 trades -> dashboard.html
+2026-07-11 14:31:42,046 INFO orchestrator | Market closed; skipping decision cycle.
+2026-07-11 14:31:42,078 INFO alpaca | Alpaca client ready (mode=paper).
+2026-07-11 14:31:45,541 INFO dashboard | Wrote dashboard with 0 trades -> dashboard.html
+2026-07-11 15:31:46,613 INFO orchestrator | Market closed; skipping decision cycle.
+2026-07-11 15:31:46,638 INFO alpaca | Alpaca client ready (mode=paper).
+2026-07-11 15:31:47,097 INFO dashboard | Wrote dashboard with 0 trades -> dashboard.html
+2026-07-11 16:31:48,281 INFO orchestrator | Market closed; skipping decision cycle.
+2026-07-11 16:31:48,299 INFO alpaca | Alpaca client ready (mode=paper).
+2026-07-11 16:31:48,758 INFO dashboard | Wrote dashboard with 0 trades -> dashboard.html
+2026-07-11 17:31:49,650 INFO orchestrator | Market closed; skipping decision cycle.
+2026-07-11 17:31:49,663 INFO alpaca | Alpaca client ready (mode=paper).
+2026-07-11 17:31:50,075 INFO dashboard | Wrote dashboard with 0 trades -> dashboard.html
+2026-07-11 18:31:51,299 INFO orchestrator | Market closed; skipping decision cycle.
+2026-07-11 18:31:51,345 INFO alpaca | Alpaca client ready (mode=paper).
+2026-07-11 18:31:51,768 INFO dashboard | Wrote dashboard with 0 trades -> dashboard.html
+2026-07-11 19:31:52,797 INFO orchestrator | Market closed; skipping decision cycle.
+2026-07-11 19:31:52,822 INFO alpaca | Alpaca client ready (mode=paper).
+2026-07-11 19:31:53,266 INFO dashboard | Wrote dashboard with 0 trades -> dashboard.html
+2026-07-11 20:31:54,349 INFO orchestrator | Market closed; skipping decision cycle.
+2026-07-11 20:31:54,364 INFO alpaca | Alpaca client ready (mode=paper).
+2026-07-11 20:31:54,823 INFO dashboard | Wrote dashboard with 0 trades -> dashboard.html
+2026-07-11 21:31:55,794 INFO orchestrator | Market closed; skipping decision cycle.
+2026-07-11 21:31:55,820 INFO alpaca | Alpaca client ready (mode=paper).
+2026-07-11 21:31:56,238 INFO dashboard | Wrote dashboard with 0 trades -> dashboard.html
+2026-07-11 22:31:57,478 INFO orchestrator | Market closed; skipping decision cycle.
+2026-07-11 22:31:57,502 INFO alpaca | Alpaca client ready (mode=paper).
+2026-07-11 22:31:57,965 INFO dashboard | Wrote dashboard with 0 trades -> dashboard.html
+2026-07-11 23:31:59,008 INFO orchestrator | Market closed; skipping decision cycle.
+2026-07-11 23:31:59,035 INFO alpaca | Alpaca client ready (mode=paper).
+2026-07-11 23:31:59,462 INFO dashboard | Wrote dashboard with 0 trades -> dashboard.html
