@@ -307,7 +307,7 @@ def test_clear_orders_for_exit_replaces_live_sells_and_skips_wedged():
         _open_order("live-tp", status="new", qty="61"),      # replace -> exit
         _open_order("already", status="new", limit_price="49.0"),  # marketable: keep
         _open_order("buy-1", side="buy", status="new"),      # cancel
-        _open_order("err-leg", status="held"),               # replace fails -> cancel
+        _open_order("err-leg", status="new", qty="7"),       # replace fails -> cancel
         _open_order("other", symbol="AAPL"),                 # different symbol: skip
     ], replace_errors={"err-leg"})
     out = c.clear_orders_for_exit("FRHC", ref_price=50.0)
@@ -351,6 +351,25 @@ def test_clear_orders_for_exit_stop_limit_gets_trigger_and_limit():
     assert c.trading.replaced == [("sl", 49.0, 51.0)]
 
 
+def test_clear_orders_for_exit_never_touches_held_oco_sibling():
+    # A bracket's stop leg rests as status "held" while its take-profit sibling
+    # is live. Replacing it would hand the caller a SECOND full-qty exit for
+    # the same shares (double-ledgered sell), and canceling it cancels every
+    # remaining order in the OCO group — including the live leg just made
+    # marketable, leaving the position with no exit. It must be skipped
+    # entirely; the venue cancels it itself when the sibling fills.
+    c = AlpacaClient.__new__(AlpacaClient)
+    c.trading = _FakeExitTrading([
+        _open_order("tp-leg", status="new", qty="37"),
+        _open_order("stop-leg", status="held", order_type="stop",
+                    limit_price=None, stop_price="44.0", qty="37"),
+    ])
+    out = c.clear_orders_for_exit("FRHC", ref_price=50.0)
+    assert out == [("new-tp-leg", 37.0, "tp-leg", 0.0)]  # ONE exit, not two
+    assert c.trading.replaced == [("tp-leg", 49.0, None)]
+    assert c.trading.canceled == []
+
+
 def test_clear_orders_for_exit_skips_stop_already_firing():
     # A trigger at/above the market fires on the next print (e.g. replaced
     # last tick) — it IS the exit; replacing again would just churn order ids.
@@ -392,6 +411,17 @@ def test_has_working_exit_true_for_firing_stop():
         _open_order("armed", order_type="stop", limit_price=None, stop_price="51.0"),
     ])
     assert c.has_working_exit("FRHC", ref_price=50.0) is True
+
+
+def test_has_working_exit_false_for_held_oco_sibling():
+    # A held stop leg cannot execute while held — even with its trigger through
+    # the market it is NOT protection on its own; only a live leg counts.
+    c = AlpacaClient.__new__(AlpacaClient)
+    c.trading = _FakeExitTrading([
+        _open_order("parked", status="held", order_type="stop",
+                    limit_price=None, stop_price="51.0"),
+    ])
+    assert c.has_working_exit("FRHC", ref_price=50.0) is False
 
 
 # -- get_account: glitched-equity guard (the 2026-07-07 false halt) ---------- #

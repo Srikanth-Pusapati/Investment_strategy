@@ -635,7 +635,18 @@ class AlpacaClient:
         replaced sell so the caller can ledger those orders as the exit they
         now are — and, when the SAME exit gets re-replaced on a later tick
         (price fell, the old marketable limit went stale), void the SELL it
-        already ledgered for old_order_id instead of double-counting."""
+        already ledgered for old_order_id instead of double-counting.
+
+        A `held` sell is the parked OCO sibling of a live bracket leg (Alpaca
+        rests the stop as `held` while the take-profit works) and is left
+        entirely alone: replacing it would return a SECOND full-qty exit for
+        the same shares (the caller would ledger the position sold twice), and
+        canceling it cancels every remaining order in the OCO group — including
+        the live leg this pass just made marketable, leaving the position with
+        no exit at all. The venue cancels the held leg itself when its sibling
+        fills. (The default non-nested open-orders query currently hides held
+        legs, so this guard is armed for the day one shows up — e.g. an API
+        change or a nested query.)"""
         limit = (
             round(ref_price * (1 - self.EXIT_LIMIT_BUFFER_PCT / 100.0), 2)
             if ref_price > 0 else 0.0
@@ -647,6 +658,8 @@ class AlpacaClient:
                 continue
             status = self._order_status(o)
             is_sell = str(getattr(o, "side", "")).lower().endswith("sell")
+            if is_sell and status == "held":
+                continue  # parked OCO sibling — see docstring; never touch it
             if is_sell and limit > 0 and status not in self._UNREPLACEABLE:
                 otype = getattr(o, "order_type", None) or getattr(o, "type", "")
                 kind = str(getattr(otype, "value", otype)).lower()
@@ -704,7 +717,9 @@ class AlpacaClient:
         filled yet) from one whose only sells are wedged in pending_cancel, or
         which has none at all (genuinely unprotected — page a human). A
         pending_cancel leg reserves shares but will never fill, so it does NOT
-        count. Best-effort: False on error, so the caller errs toward paging."""
+        count; neither does a `held` OCO sibling — it cannot execute while its
+        live leg works, so only the live leg is real protection.
+        Best-effort: False on error, so the caller errs toward paging."""
         if ref_price <= 0:
             return False
         limit = round(ref_price * (1 - self.EXIT_LIMIT_BUFFER_PCT / 100.0), 2)
@@ -714,8 +729,8 @@ class AlpacaClient:
                     continue
                 if not str(getattr(o, "side", "")).lower().endswith("sell"):
                     continue
-                if self._order_status(o) == "pending_cancel":
-                    continue  # wedged cancel — reserves shares but never fills
+                if self._order_status(o) in ("pending_cancel", "held"):
+                    continue  # wedged cancel / parked OCO sibling — can't fill as-is
                 otype = getattr(o, "order_type", None) or getattr(o, "type", "")
                 kind = str(getattr(otype, "value", otype)).lower()
                 cur_limit = float(getattr(o, "limit_price", None) or 0)
