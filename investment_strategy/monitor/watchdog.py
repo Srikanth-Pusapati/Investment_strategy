@@ -232,7 +232,14 @@ class Watchdog:
             ref = self.broker.latest_price(pos.symbol)
             replaced = self.broker.clear_orders_for_exit(pos.symbol, ref)
             oid = self.broker.reduce_position(pos.symbol, avail) if avail > 0 else None
-            for rid, rqty in replaced:
+            for rid, rqty, old_id, old_filled in replaced:
+                # A falling price can re-replace the SAME exit on a later tick
+                # (new order id each time). If we already ledgered a SELL for
+                # the superseded id, void/resize that record first — otherwise
+                # each declining 30s tick stacks another full-qty exit.
+                self._supersede_exit_record(
+                    pos.symbol, old_id, old_filled, old_filled + rqty,
+                )
                 self._record_exit(_partial(pos, rqty), rid, reason)
             if oid:
                 self._record_exit(_partial(pos, avail), oid, reason)
@@ -596,3 +603,38 @@ class Watchdog:
             ))
         except Exception as e:  # never let logging break the watchdog
             log.warning("Ledger exit-record failed for %s: %s", pos.symbol, e)
+        if not oid:
+            return
+        try:
+            # This SELL record is an INTENT at submit/replace-time marks, not a
+            # fill. Queue it for the orchestrator's reconcile pass so a
+            # canceled/expired/partial outcome corrects the ledger (a phantom
+            # sell otherwise lives forever), and remember we ledgered this id
+            # so a later re-replace can supersede it.
+            self.state.add_pending_order(oid, pos.symbol)
+            self.state.note_exit_ledgered(pos.symbol, oid)
+        except Exception as e:  # bookkeeping must never break the safety loop
+            log.warning("Exit-order bookkeeping failed for %s: %s", pos.symbol, e)
+
+    def _supersede_exit_record(
+        self, symbol: str, old_id: str, old_filled: float, old_qty: float,
+    ) -> None:
+        """Void (or resize to what actually filled) the SELL we ledgered for a
+        now-replaced exit order, so re-replaces don't double-count the exit.
+        Only touches ids WE ledgered — a bracket leg replaced on its first tick
+        was never in the ledger and needs no correction. Never raises."""
+        if self.ledger is None or not old_id:
+            return
+        try:
+            if not self.state.exit_was_ledgered(symbol, old_id):
+                return
+            self.ledger.record(TradeRecord.correction(
+                old_id, symbol, "replaced", old_filled, old_qty,
+            ))
+            log.info(
+                "Superseded exit %s (%s): prior SELL record corrected to "
+                "%.6g/%.6g filled; the replacement order carries the exit.",
+                old_id, symbol, old_filled, old_qty,
+            )
+        except Exception as e:  # never let bookkeeping break the watchdog
+            log.warning("Supersede correction failed for %s: %s", symbol, e)

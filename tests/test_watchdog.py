@@ -28,7 +28,8 @@ class _FakeBroker:
                  working_exit=False, option_close_fails=False):
         self._positions = positions
         self.market_close_fails = market_close_fails   # simulate closed/halted market
-        # (new_order_id, qty) pairs clear_orders_for_exit "replaces" per call
+        # (new_order_id, qty, old_order_id, old_filled_qty) tuples
+        # clear_orders_for_exit "replaces" per call
         self.stuck_replaces = list(stuck_replaces)
         # True -> a marketable sell exit is already resting (made on a prior
         # tick, not yet filled): the reserved shares are protected, not stranded.
@@ -242,7 +243,7 @@ def test_hard_stop_zero_available_exits_via_replaced_legs():
     state = _state()
     state.register_exits("FRHC", stop_pct=10.0, take_pct=25.0)
     broker = _FakeBroker([], market_close_fails=True,
-                         stuck_replaces=[("new-1", 48.0), ("new-2", 61.0)])
+                         stuck_replaces=[("new-1", 48.0, "old-1", 0.0), ("new-2", 61.0, "old-2", 0.0)])
     wd = Watchdog(_cfg(0.0), broker, state=state)
     assert wd._enforce_hard_exits(_pos_locked(avail=0.0)) is True
     assert broker.reduced == []                     # nothing sellable directly
@@ -309,7 +310,7 @@ def test_close_hard_skips_doomed_plain_close_when_shares_reserved():
     # replace-live-legs path without emitting the doomed close (ERROR noise).
     state = _state()
     state.register_exits("BTDR", stop_pct=10.0, take_pct=25.0)
-    broker = _FakeBroker([], stuck_replaces=[("new-1", 14.09)])
+    broker = _FakeBroker([], stuck_replaces=[("new-1", 14.09, "old-1", 0.0)])
     wd = Watchdog(_cfg(0.0), broker, state=state)
     outcome, oid = wd._close_hard(_pos_locked("BTDR", qty=124.0, avail=0.0), "trail")
     assert outcome == "partial"
@@ -321,7 +322,7 @@ def test_close_hard_skips_doomed_plain_close_when_shares_reserved():
 def test_close_hard_reserved_with_free_slice_sells_slice_without_plain_close():
     state = _state()
     state.register_exits("LLY", stop_pct=10.0, take_pct=25.0)
-    broker = _FakeBroker([], stuck_replaces=[("new-1", 48.0)])
+    broker = _FakeBroker([], stuck_replaces=[("new-1", 48.0, "old-1", 0.0)])
     wd = Watchdog(_cfg(0.0), broker, state=state)
     outcome, _oid = wd._close_hard(_pos_locked("LLY", qty=9.34975, avail=0.34975), "stop")
     assert outcome == "partial"
@@ -585,3 +586,53 @@ def test_flatten_all_closes_mixed_book_options_first_as_groups():
     assert broker.closed == ["AAPL"]                            # equity flattened
     assert len(broker.option_groups_closed) == 1                # spread as ONE order
     assert sorted(broker.option_groups_closed[0]) == sorted([l.symbol for l in legs])
+
+
+# -- exit-via-replace bookkeeping (supersede + reconcile queue) --------------- #
+
+def test_replaced_exit_supersedes_prior_ledger_record():
+    # Falling price: tick 1 turns the resting leg into the exit (SELL ledgered
+    # under new-1); tick 2 re-replaces the now-stale limit (new-2 supersedes
+    # new-1). The prior SELL must be corrected (voided at 0 filled), not left
+    # to double-count the exit — one effective SELL per actual exit.
+    state, led = _state(), _FakeLedger()
+    state.register_exits("NU", stop_pct=10.0, take_pct=25.0)
+    broker = _FakeBroker([], stuck_replaces=[("new-1", 172.0, "leg-0", 0.0)])
+    wd = Watchdog(_cfg(0.0), broker, state=state, ledger=led)
+    pos = _pos_locked("NU", qty=172.0, avail=0.0)
+    wd._close_hard(pos, "trail")
+    assert [r.action for r in led.records] == ["sell"]
+    assert state.exit_was_ledgered("NU", "new-1")
+    broker.stuck_replaces = [("new-2", 172.0, "new-1", 0.0)]
+    wd._close_hard(pos, "trail")
+    assert [r.action for r in led.records] == ["sell", "correct", "sell"]
+    corr = led.records[1]
+    assert corr.order_id == "new-1" and corr.qty == 0.0
+
+
+def test_replaced_exit_with_partial_fill_resizes_not_voids():
+    # If the superseded order partially filled between ticks, those shares
+    # really sold — the correction must resize to the filled qty, not void.
+    state, led = _state(), _FakeLedger()
+    state.register_exits("NU", stop_pct=10.0, take_pct=25.0)
+    broker = _FakeBroker([], stuck_replaces=[("new-1", 172.0, "leg-0", 0.0)])
+    wd = Watchdog(_cfg(0.0), broker, state=state, ledger=led)
+    pos = _pos_locked("NU", qty=172.0, avail=0.0)
+    wd._close_hard(pos, "trail")
+    broker.stuck_replaces = [("new-2", 130.0, "new-1", 42.0)]  # 42 filled first
+    wd._close_hard(pos, "trail")
+    corr = led.records[1]
+    assert corr.action == "correct" and corr.order_id == "new-1"
+    assert corr.qty == 42.0
+
+
+def test_watchdog_exit_orders_queued_for_reconcile():
+    # A replace-time SELL is an intent, not a fill: the order id must land in
+    # the persisted pending list so the orchestrator's reconcile checks its
+    # real outcome (canceled/expired -> ledger correction, no phantom sell).
+    state, led = _state(), _FakeLedger()
+    state.register_exits("NU", stop_pct=10.0, take_pct=25.0)
+    broker = _FakeBroker([], stuck_replaces=[("new-1", 172.0, "leg-0", 0.0)])
+    wd = Watchdog(_cfg(0.0), broker, state=state, ledger=led)
+    wd._close_hard(_pos_locked("NU", qty=172.0, avail=0.0), "trail")
+    assert ("new-1", "NU") in state.get_pending_orders()

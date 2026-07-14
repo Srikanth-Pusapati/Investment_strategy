@@ -53,7 +53,13 @@ class NewsProvider(SignalProvider):
         from alpaca.data.historical.news import NewsClient
         from alpaca.data.requests import NewsRequest
 
-        client = NewsClient(self.cfg.alpaca_api_key, self.cfg.alpaca_secret_key)
+        from ..execution.alpaca_client import bound_client
+
+        # Finite read timeout: this exact call wedged 2026-07-14 with
+        # "Read timed out. (read timeout=None)" and stalled the cycle.
+        client = bound_client(
+            NewsClient(self.cfg.alpaca_api_key, self.cfg.alpaca_secret_key)
+        )
         signals: list[Signal] = []
         for symbol in symbols:
             req = NewsRequest(symbols=symbol, limit=10)

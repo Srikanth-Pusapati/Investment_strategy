@@ -55,28 +55,34 @@ class OptionsChainProvider(SignalProvider):
     def data(self):
         if self._data is None:
             from alpaca.data.historical.option import OptionHistoricalDataClient
-            self._data = OptionHistoricalDataClient(
+
+            from ..execution.alpaca_client import bound_client
+            self._data = bound_client(OptionHistoricalDataClient(
                 self.cfg.alpaca_api_key, self.cfg.alpaca_secret_key,
-            )
+            ))
         return self._data
 
     @property
     def trading(self):
         if self._trading is None:
             from alpaca.trading.client import TradingClient
-            self._trading = TradingClient(
+
+            from ..execution.alpaca_client import bound_client
+            self._trading = bound_client(TradingClient(
                 self.cfg.alpaca_api_key, self.cfg.alpaca_secret_key,
                 paper=not self.cfg.is_live,
-            )
+            ))
         return self._trading
 
     @property
     def stock(self):
         if self._stock is None:
             from alpaca.data.historical import StockHistoricalDataClient
-            self._stock = StockHistoricalDataClient(
+
+            from ..execution.alpaca_client import bound_client
+            self._stock = bound_client(StockHistoricalDataClient(
                 self.cfg.alpaca_api_key, self.cfg.alpaca_secret_key,
-            )
+            ))
         return self._stock
 
     # -- fetch ---------------------------------------------------------------- #

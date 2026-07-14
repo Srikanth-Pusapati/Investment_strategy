@@ -4,7 +4,7 @@ Two independent loops run concurrently from one process (`orchestrator.run`):
 
 | Loop | Cadence | Thread | Gated by kill switch / market-open? | Job |
 |------|---------|--------|-------------------------------------|-----|
-| **Decision cycle** | `DECISION_INTERVAL_SECONDS` (default **900s = 15m**) | main | YES — only runs when market is open; new buys gated by kill switch | Discover → judge → size → place / thesis-exit |
+| **Decision cycle** | `DECISION_INTERVAL_SECONDS` (default **900s = 15m**; production runs **3600s = 60m** per the 2026-07 API-cost decision) | main | YES — only runs when market is open; new buys gated by kill switch | Discover → judge → size → place / thesis-exit |
 | **Watchdog** | `MONITOR_INTERVAL_SECONDS` (default **30s**) | daemon | NO — closing is *never* gated | Hard stop / take-profit / trailing / emergency flatten / equity floor |
 
 The watchdog is the fast safety net; the decision cycle is the slow brain. The

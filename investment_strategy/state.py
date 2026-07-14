@@ -73,6 +73,11 @@ class PortfolioState:
         # reconciles a reject/partial fill instead of leaving a phantom ledger
         # intent that never gets checked (1B.9).
         self.pending_orders: list[list[str]] = []
+        # Exit order ids the WATCHDOG has already ledgered, per symbol. A
+        # falling-price re-replace supersedes the prior exit order with a new
+        # id; this set lets the watchdog void the superseded SELL record
+        # instead of stacking a duplicate full-qty exit each 30s tick.
+        self.ledgered_exit_oids: dict[str, list[str]] = {}
         # Last market-regime label seen, so the regime-off book TRIM (1B.6) fires
         # ONCE on the transition into risk-off, not every cycle we stay there.
         self.regime_label: str = ""
@@ -121,6 +126,10 @@ class PortfolioState:
             self.pending_orders = [
                 [str(oid), str(sym)] for oid, sym in d.get("pending_orders", [])
             ]
+            self.ledgered_exit_oids = {
+                k: [str(o) for o in v]
+                for k, v in d.get("ledgered_exit_oids", {}).items()
+            }
             self.regime_label = str(d.get("regime_label", ""))
             if self.halted:
                 log.warning("Loaded LATCHED HALT from state: %s", self.halt_reason)
@@ -149,6 +158,7 @@ class PortfolioState:
                         "daily_buy_counts": self.daily_buy_counts,
                         "postmortem_done_day": self.postmortem_done_day,
                         "pending_orders": self.pending_orders,
+                        "ledgered_exit_oids": self.ledgered_exit_oids,
                         "regime_label": self.regime_label,
                     },
                     indent=2,
@@ -205,6 +215,7 @@ class PortfolioState:
             dropped = self.high_water.pop(symbol, None) is not None
             dropped |= self.exits.pop(symbol, None) is not None
             dropped |= self.entry_times.pop(symbol, None) is not None
+            dropped |= self.ledgered_exit_oids.pop(symbol, None) is not None
             if dropped:
                 self._save()
 
@@ -391,6 +402,59 @@ class PortfolioState:
     def get_pending_orders(self) -> list[tuple[str, str]]:
         """The persisted pending (order_id, symbol) pairs, as tuples."""
         return [(oid, sym) for oid, sym in self.pending_orders]
+
+    def add_pending_order(self, oid: str, symbol: str) -> None:
+        """Append ONE pair from any thread. The watchdog queues its exit orders
+        here so _reconcile_fills checks their real outcome next cycle (a
+        replace-time SELL record is an intent, not a fill) — appended under the
+        lock so it can't interleave with the orchestrator's list writes."""
+        with self._lock:
+            if not any(p[0] == str(oid) for p in self.pending_orders):
+                self.pending_orders.append([str(oid), str(symbol)])
+                self._save()
+
+    def drain_pending_orders(self) -> list[tuple[str, str]]:
+        """Atomically take-and-clear the persisted pairs. Reconcile is about to
+        check them, and a crash mid-reconcile must not re-examine (or
+        re-strand) them next boot — the same contract the old clear-then-check
+        had, but race-free against a concurrent watchdog add."""
+        with self._lock:
+            pairs = [(oid, sym) for oid, sym in self.pending_orders]
+            self.pending_orders = []
+            self._save()
+            return pairs
+
+    def merge_pending_orders(self, pairs: list[tuple[str, str]]) -> None:
+        """Union `pairs` into the persisted list (dedupe by order id). The
+        orchestrator's end-of-cycle persist uses this instead of a plain
+        overwrite, which silently dropped any exit the watchdog thread queued
+        DURING the minutes-long decision cycle."""
+        with self._lock:
+            seen = {p[0] for p in self.pending_orders}
+            added = False
+            for oid, sym in pairs:
+                if str(oid) not in seen:
+                    self.pending_orders.append([str(oid), str(sym)])
+                    seen.add(str(oid))
+                    added = True
+            if added:
+                self._save()
+
+    # -- watchdog-ledgered exit orders (re-replace supersede tracking) ------ #
+    def note_exit_ledgered(self, symbol: str, oid: str) -> None:
+        """Remember that the watchdog ledgered a SELL for exit order `oid`, so
+        a later re-replace of that same order can void the superseded record
+        instead of double-counting the exit. Capped per symbol — the set only
+        needs to cover the short window an exit is being chased."""
+        with self._lock:
+            oids = self.ledgered_exit_oids.setdefault(symbol, [])
+            if str(oid) not in oids:
+                oids.append(str(oid))
+                del oids[:-20]  # bound growth; an exit chase is a few ticks
+                self._save()
+
+    def exit_was_ledgered(self, symbol: str, oid: str) -> bool:
+        return str(oid) in self.ledgered_exit_oids.get(symbol, [])
 
     # -- last regime label (for the risk-off trim transition, 1B.6) --------- #
     def get_regime_label(self) -> str:

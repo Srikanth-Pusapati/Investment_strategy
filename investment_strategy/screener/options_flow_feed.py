@@ -16,6 +16,7 @@ from alpaca.data.historical.screener import ScreenerClient
 from alpaca.data.requests import MostActivesRequest
 
 from ..config import Config
+from ..execution.alpaca_client import bound_client
 from ..models import Candidate
 from ..signals.options_flow import OptionsFlowProvider
 from .base import Screener
@@ -35,7 +36,9 @@ class OptionsFlowScreener(Screener):
         # Reuse the per-symbol call/put-volume probe; the screener just decides
         # WHICH symbols to probe (the most-active pool) and which to surface.
         self._flow = OptionsFlowProvider(cfg)
-        self._screener = ScreenerClient(cfg.alpaca_api_key, cfg.alpaca_secret_key)
+        self._screener = bound_client(
+            ScreenerClient(cfg.alpaca_api_key, cfg.alpaca_secret_key)
+        )
 
     @property
     def enabled(self) -> bool:
