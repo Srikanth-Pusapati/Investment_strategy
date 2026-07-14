@@ -111,6 +111,15 @@ class _FakeBroker:
         self.core_buys.append((symbol, round(notional, 2)))
         return f"oid-core-{symbol}"
 
+    def order_fill(self, order_id):
+        # Instantly terminal so _apply_core_fill's wait-for-fill poll (which
+        # lets the core stop rest the same cycle) never sleeps in tests.
+        # filled=0 keeps the post-poll fold reconciliation a no-op.
+        return ("filled", 0.0, 0.0)
+
+    def next_market_open(self):
+        return None  # closed-path stash: None = no wake-up armed
+
     def open_stop_sells(self, symbol):
         return [dict(o) for o in self.stop_orders]
 
@@ -781,3 +790,104 @@ def test_drop_excluded_buys_still_drops_equity_and_passes_sells():
     sell = _buy_prop("AMD", 0.7, action=Action.SELL)
     kept = o._drop_excluded_buys([_buy_prop("AMD"), sell], {"AMD": "capped"})
     assert kept == [sell]
+
+
+# -- decision cadence: at-the-bell wake-up + core-fill wait-for-fill --------- #
+# (2026-07-13 incidents: first cycle ran 10:30 ET after a 09:29:43 tick missed
+# the open; core stop wash-trade-rejected against its own still-open buy.)
+import time  # noqa: E402
+from unittest.mock import patch  # noqa: E402
+
+
+def test_decision_due_fires_at_stashed_next_open_and_not_before():
+    o = Orchestrator.__new__(Orchestrator)
+    o.cfg = SimpleNamespace(decision_interval_s=3600)
+    o._last_decision_at = time.monotonic()   # hourly grid not due
+    o._next_open_utc = None
+    assert not o._decision_due()
+    o._next_open_utc = datetime.now(timezone.utc) + timedelta(seconds=30)
+    assert not o._decision_due()
+    o._next_open_utc = datetime.now(timezone.utc) - timedelta(seconds=1)
+    assert o._decision_due()
+
+
+def test_closed_tick_arms_the_bell_wakeup():
+    o = Orchestrator.__new__(Orchestrator)
+    o.cfg = SimpleNamespace(postmortem_enabled=False)
+    bell = datetime.now(timezone.utc) + timedelta(hours=1)
+    o.broker = SimpleNamespace(is_market_open=lambda: False,
+                               next_market_open=lambda: bell)
+    o._next_open_utc = None
+    o.run_decision_cycle()
+    assert o._next_open_utc == bell
+
+
+def test_bell_stash_survives_failed_cycle_and_clears_on_success():
+    # An exception AT the open must keep the stash armed (30s retry at the
+    # bell); only a successful cycle consumes it; a FUTURE stash survives.
+    o = Orchestrator.__new__(Orchestrator)
+    o.cfg = SimpleNamespace(decision_interval_s=3600)
+    o._last_main_tick = 0.0
+    o._last_decision_at = 0.0            # hourly due -> _tick runs the cycle
+    o._refresh_runtime_controls = lambda: None
+    o._refresh_dashboard = lambda: None
+    bell = datetime.now(timezone.utc) - timedelta(seconds=1)  # consumed stash
+    o._next_open_utc = bell
+
+    def _boom():
+        raise RuntimeError("transient at the bell")
+    o.run_decision_cycle = _boom
+    try:
+        o._tick()
+    except RuntimeError:
+        pass
+    assert o._next_open_utc == bell      # still armed: retry at the bell
+
+    o.run_decision_cycle = lambda: None
+    o._tick()
+    assert o._next_open_utc is None      # consumed on success
+
+    o._next_open_utc = datetime.now(timezone.utc) + timedelta(hours=12)
+    o._last_decision_at = 0.0
+    o._tick()
+    assert o._next_open_utc is not None  # future stash survives success
+
+
+def test_core_fill_poll_waits_through_open_statuses_until_terminal():
+    o = _orch(core_etf="SPY", target_invested_pct=50.0, min_cash_buffer_pct=0.0)
+    seq = iter(["new", "accepted", "partially_filled", "filled"])
+    o.broker.order_fill = lambda oid: (next(seq), 0.0, 0.0)
+    sleeps = []
+    with patch("investment_strategy.orchestrator.time.sleep", sleeps.append):
+        o._apply_core_fill(_acct(cash=1_000.0))
+    assert len(sleeps) == 3
+
+
+def test_core_fill_poll_breaks_immediately_on_rejected():
+    o = _orch(core_etf="SPY", target_invested_pct=50.0, min_cash_buffer_pct=0.0)
+    o.broker.order_fill = lambda oid: ("rejected", 0.0, 0.0)
+    sleeps = []
+    with patch("investment_strategy.orchestrator.time.sleep", sleeps.append):
+        o._apply_core_fill(_acct(cash=1_000.0))
+    assert sleeps == []
+
+
+def test_core_fill_poll_is_bounded_when_order_never_goes_terminal():
+    o = _orch(core_etf="SPY", target_invested_pct=50.0, min_cash_buffer_pct=0.0)
+    o.broker.order_fill = lambda oid: ("new", 0.0, 0.0)
+    sleeps = []
+    with patch("investment_strategy.orchestrator.time.sleep", sleeps.append):
+        o._apply_core_fill(_acct(cash=1_000.0))
+    assert len(sleeps) == 15
+
+
+def test_core_fill_rejected_buy_reverts_the_snapshot_fold():
+    # A broker-side rejected core buy must not leave phantom shares for
+    # _ensure_core_stop (or later buys this cycle) to size against.
+    o = _orch(core_etf="SPY", target_invested_pct=50.0, min_cash_buffer_pct=0.0)
+    o.broker.order_fill = lambda oid: ("rejected", 0.0, 0.0)
+    acct = _acct(cash=1_000.0)
+    with patch("investment_strategy.orchestrator.time.sleep", lambda s: None):
+        o._apply_core_fill(acct)
+    assert acct.position_for("SPY") is None
+    assert acct.cash == 1_000.0

@@ -131,6 +131,17 @@ it by accident.
 - **Alerts.** You get an email (already configured & tested) if a position is left
   unprotected or the account hits its floor.
 
+- **Laptop-dead paging (HEARTBEAT_URL).** Two watchdogs cover two failure
+  domains: `ops/deadman.py` (launchd, every 5 min) pages when the BOT dies
+  while the laptop is up; `HEARTBEAT_URL` covers the laptop itself dying.
+  It is NOT the dashboard and NOT the control panel (`localhost:8787`) — a
+  self-ping can't page you when the machine is off. Setup: create a free
+  check at [healthchecks.io](https://healthchecks.io) (period 10 min, grace
+  10 min), paste its ping URL (`https://hc-ping.com/<uuid>`) into
+  `HEARTBEAT_URL` in `.env`, restart the bot. The bot pings it every healthy
+  watchdog tick; when pings stop (bot dead, laptop asleep, power lost),
+  healthchecks.io emails you. Empty = disabled, and the bot warns at startup.
+
 ---
 
 ## Want the deep dive?

@@ -70,10 +70,6 @@ class RiskManager:
                 f"Drawdown {dd:.2f}% from peak ${self.state.peak_equity:,.0f} "
                 f">= limit {self.limits.max_drawdown_pct:.2f}% — halting new buys."
             )
-        if len(account.positions) >= self.limits.max_open_positions:
-            return True, (
-                f"At max open positions ({self.limits.max_open_positions})."
-            )
         pdt_block, pdt_why = self._pdt_block(account)
         if pdt_block:
             return True, pdt_why
@@ -211,6 +207,19 @@ class RiskManager:
         halted, why = self.trading_halted(account)
         if halted:
             return self._reject(proposal, why)
+
+        # The slot cap blocks NEW names only. A top-up of a held symbol reuses
+        # its position row, so counting it against the cap froze ALL buying
+        # once the book filled (2026-07-13: NU top-up rejected at 15/15 while
+        # the churn guard's own message said the next add was fine in 4h).
+        if (
+            len(account.positions) >= self.limits.max_open_positions
+            and account.position_for(proposal.symbol) is None
+        ):
+            return self._reject(
+                proposal,
+                f"At max open positions ({self.limits.max_open_positions}).",
+            )
 
         # Conviction floor: a barely-there idea that only clears the friction floor
         # still pays spread + slippage and dilutes the book. Require a real edge
@@ -544,11 +553,19 @@ class RiskManager:
         if not self.limits.options_enabled:
             return self._reject(proposal, "Options trading disabled (OPTIONS_ENABLED=off).")
         # Same account-wide gate as equity buys: halt latch, kill switch, daily
-        # loss, drawdown, max positions, PDT. An option debit is still a new
-        # position — it must never open through a halt.
+        # loss, drawdown, PDT. An option debit is still a new position — it
+        # must never open through a halt.
         halted, why = self.trading_halted(account)
         if halted:
             return self._reject(proposal, why)
+        # Strict slot cap for options: every debit opens a NEW position row
+        # (its own OCC contract), even when the underlying is already held —
+        # unlike equity top-ups, which reuse their row and are exempt.
+        if len(account.positions) >= self.limits.max_open_positions:
+            return self._reject(
+                proposal,
+                f"At max open positions ({self.limits.max_open_positions}).",
+            )
         if proposal.option_strategy is None or not proposal.option_legs:
             return self._reject(proposal, "Option proposal missing strategy/legs.")
         ok, why = self._legs_are_defined_risk(proposal)

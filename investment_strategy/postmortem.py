@@ -117,13 +117,17 @@ def run_postmortem(
 ) -> dict | None:
     """Core post-mortem logic. Returns parsed output dict or None on failure."""
     import json
+    from datetime import datetime
+
     import anthropic
 
-    recs = journal.today(
-        __import__("datetime").datetime.strptime(day, "%Y-%m-%d").replace(
-            tzinfo=__import__("datetime").timezone.utc
-        )
-    )
+    from .journal import _ET
+
+    # `day` labels an ET trading day, so anchor the lookup datetime in ET.
+    # Anchored at UTC midnight it lands on the PREVIOUS ET date and reads a
+    # journal file that doesn't exist (2026-07-13's post-mortem skipped with
+    # "No journal records" despite a 22 KB decisions file).
+    recs = journal.today(datetime.strptime(day, "%Y-%m-%d").replace(tzinfo=_ET))
     if not recs:
         log.info("No journal records for %s; skipping post-mortem.", day)
         return None

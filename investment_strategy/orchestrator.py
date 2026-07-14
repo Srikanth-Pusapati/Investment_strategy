@@ -14,7 +14,7 @@ import logging
 import os
 import threading
 import time
-from datetime import datetime
+from datetime import datetime, timezone
 
 from requests.exceptions import ConnectionError as RequestsConnectionError
 from requests.exceptions import Timeout as RequestsTimeout
@@ -141,6 +141,10 @@ class Orchestrator:
         # Persisted daily equity snapshots so the account P&L curve survives restarts.
         self.equity_history = EquityHistory()
         self._last_decision_at = 0.0
+        # Next session open (UTC), stashed by closed-market ticks so the loop
+        # can fire a decision AT the bell instead of at the next hourly tick
+        # (2026-07-13: a tick 17s before the open slept through the first hour).
+        self._next_open_utc: datetime | None = None
         # Serializes broker order mutations so the watchdog's emergency closes and
         # the decision cycle's order placement can't interleave (e.g. double-close).
         # It guards only the quick submit/close calls — never the slow LLM call —
@@ -198,17 +202,7 @@ class Orchestrator:
         try:
             while not self._stop.is_set():
                 try:
-                    # Liveness stamp for the heartbeat gate only. Dark-gap
-                    # detection lives on the WATCHDOG thread (_note_loop_tick):
-                    # this loop blocks for minutes inside a decision cycle
-                    # (LLM + signal fetches), and busy is not dark — the
-                    # watchdog keeps watching positions the whole time.
-                    self._last_main_tick = time.monotonic()
-                    self._refresh_runtime_controls()
-                    if self._decision_due():
-                        self.run_decision_cycle()
-                        self._refresh_dashboard()
-                        self._last_decision_at = time.monotonic()
+                    self._tick()
                 except _TRANSIENT_NET as e:
                     log.warning(
                         "Decision tick skipped on a transient network error (%s); "
@@ -284,8 +278,43 @@ class Orchestrator:
             return
         ping_heartbeat(self.cfg.heartbeat_url)
 
+    def _tick(self) -> None:
+        """One monitor-cadence pass of the decision-loop body (extracted from
+        run() so the cadence/bell semantics are unit-testable)."""
+        # Liveness stamp for the heartbeat gate only. Dark-gap detection lives
+        # on the WATCHDOG thread (_note_loop_tick): this loop blocks for
+        # minutes inside a decision cycle (LLM + signal fetches), and busy is
+        # not dark — the watchdog keeps watching positions the whole time.
+        self._last_main_tick = time.monotonic()
+        self._refresh_runtime_controls()
+        if not self._decision_due():
+            return
+        cycle_start = time.monotonic()
+        self.run_decision_cycle()
+        self._refresh_dashboard()
+        # Stamp the cycle START, not the end: an end stamp adds each cycle's
+        # own runtime (~3-4 min of signal fetches + LLM) to the cadence, so
+        # ticks drifted later every hour (Jul 13: 10:30 -> 11:34 -> ... ->
+        # 15:45 ET). Still stamped only on success — a failed cycle keeps
+        # retrying on the 30s monitor tick, as before.
+        self._last_decision_at = cycle_start
+        # One-shot bell: clear a CONSUMED (past) stash only after a SUCCESSFUL
+        # cycle, so an exception at the open keeps it armed and the 30s tick
+        # retries at the bell instead of sleeping to the hourly grid. A FUTURE
+        # stash (just re-armed by this closed tick) survives.
+        if (self._next_open_utc is not None
+                and datetime.now(timezone.utc) >= self._next_open_utc):
+            self._next_open_utc = None
+
     def _decision_due(self) -> bool:
-        return (time.monotonic() - self._last_decision_at) >= self.cfg.decision_interval_s
+        if (time.monotonic() - self._last_decision_at) >= self.cfg.decision_interval_s:
+            return True
+        # The hourly grid rarely lands on the bell: when the last closed-market
+        # tick stashed the next session open, fire at that moment too instead
+        # of sleeping into the first (usually busiest) hour of the session.
+        if self._next_open_utc is not None:
+            return datetime.now(timezone.utc) >= self._next_open_utc
+        return False
 
     def _warn_on_weak_safety_config(self) -> None:
         """Loudly flag safety nets that are disabled, so an off-by-default setting
@@ -300,6 +329,22 @@ class Orchestrator:
                 "Robinhood MCP enabled — we call READ tools only, but a "
                 "trade-capable token could place orders if misused. Use a "
                 "read-scoped token."
+            )
+        hb = (self.cfg.heartbeat_url or "").strip()
+        if not hb:
+            log.warning(
+                "HEARTBEAT_URL is empty — laptop-dead paging is DISABLED. The "
+                "deadman launchd job only covers 'bot died while the laptop is "
+                "up'; for the other half, create a free healthchecks.io check "
+                "and put its ping URL (https://hc-ping.com/<uuid>) in "
+                "HEARTBEAT_URL."
+            )
+        elif any(h in hb for h in ("localhost", "127.0.0.1", "0.0.0.0")):
+            log.warning(
+                "HEARTBEAT_URL points at THIS machine (%s) — a self-ping can't "
+                "page when the laptop dies. It must be an EXTERNAL monitor's "
+                "ping URL (healthchecks.io: https://hc-ping.com/<uuid>), not "
+                "the dashboard or the control panel.", hb,
             )
         # Tiny-float sanity: if the per-name budget after the position cap can't
         # clear the min order, the bot can never fill MAX_OPEN_POSITIONS slots and
@@ -345,9 +390,13 @@ class Orchestrator:
                 return  # no decisions today (e.g. weekend restart)
             log.info("Running nightly post-mortem for %s …", day)
             from .postmortem import run_postmortem
-            run_postmortem(self.cfg, self.ledger, self.journal, day,
-                           max_lessons=self.cfg.postmortem_max_lessons)
-            self.state.set_postmortem_done(day)
+            result = run_postmortem(self.cfg, self.ledger, self.journal, day,
+                                    max_lessons=self.cfg.postmortem_max_lessons)
+            # Latch only on success: latching a failed run marked the day done
+            # and permanently skipped it (Jul 7 + Jul 13 post-mortems were lost
+            # this way). A None result retries on the next closed tick.
+            if result is not None:
+                self.state.set_postmortem_done(day)
             from .usage import summarize_day
             calls, in_tok, out_tok, cost = summarize_day()
             log.info(
@@ -361,6 +410,9 @@ class Orchestrator:
         if not self.broker.is_market_open():
             log.info("Market closed; skipping decision cycle.")
             self._maybe_run_postmortem()
+            # Arm the at-the-bell wake-up (see _decision_due; _tick clears it
+            # only after the first SUCCESSFUL open-market cycle consumes it).
+            self._next_open_utc = self.broker.next_market_open()
             return
 
         self._reconcile_fills()
@@ -1208,6 +1260,40 @@ class Orchestrator:
         self._apply_pending_buy(
             account, etf, notional, price, notional / price if price > 0 else 0.0,
         )
+        # _ensure_core_stop runs right after this, and Alpaca wash-trade-rejects
+        # its STOP SELL while this market BUY is still open (40310000 "opposite
+        # side market/stop order exists", 2026-07-13 09:34: the stop went out
+        # 160ms behind the buy and the core sat without exchange-side protection
+        # for a full cycle). Wait briefly for the buy to go terminal so the stop
+        # can rest THIS cycle; on timeout, _ensure_core_stop's warn-and-retry-
+        # next-cycle path applies unchanged. Deliberately OUTSIDE the trade lock
+        # so the watchdog's exits are never delayed behind this wait.
+        status, filled = "unknown", 0.0
+        for _ in range(15):
+            status, filled, _qty = self.broker.order_fill(oid)
+            if status not in ("new", "accepted", "pending_new", "partially_filled"):
+                break
+            time.sleep(1)
+        # Reconcile the fold with the REAL outcome: _ensure_core_stop floors
+        # its stop qty with int(), so sizing from the pre-submit estimate
+        # rejects the stop whenever up-slippage fills fractionally fewer
+        # shares than estimated — and a rejected/canceled buy must not leave
+        # phantom shares in the snapshot for the stop (or later buys this
+        # cycle) to size against.
+        pos = account.position_for(etf)
+        est_qty = notional / price if price > 0 else 0.0
+        if pos is not None and est_qty > 0:
+            if status == "filled" and filled > 0:
+                pos.qty += filled - est_qty
+            elif status in ("rejected", "canceled", "expired"):
+                pos.qty -= est_qty
+                pos.market_value = max(0.0, pos.market_value - notional)
+                account.cash += notional
+                account.buying_power += notional
+                if pos.qty <= 0:
+                    account.positions = [
+                        p for p in account.positions if p.symbol != etf
+                    ]
 
     # -- core exchange-side stop (GA-2.3) ----------------------------------- #
     def _ensure_core_stop(self, account) -> None:
