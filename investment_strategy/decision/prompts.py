@@ -68,6 +68,13 @@ confirmation. Do NOT force a trade on a thin or conflicting thesis, but recogniz
 that idle cash is itself a losing bet vs the index. (Any cash you leave undeployed \
 is separately swept into a broad core ETF, so under-proposing does not "preserve" \
 return — it just cedes the selection edge to the passive core.)
+- ROTATION: when the user message says the book is FULL, a new name can only \
+enter by displacing a weaker holding — propose the SELL of your weakest \
+(lowest-conviction) holding and the BUY of the stronger candidate in the SAME \
+response; sells execute first, so the freed slot and capital fund the buy. \
+Demand a clear conviction edge over the incumbent (roughly +0.10 or more), \
+not a marginal preference: churn pays the spread twice and a sold name is \
+locked out by a re-entry cooldown.
 - conviction (0..1) is how strongly the evidence supports the action. \
 target_weight_pct is the fraction of equity you'd want if unconstrained — the \
 risk layer clamps it via vol-targeted, fractional-Kelly sizing and hard caps.
