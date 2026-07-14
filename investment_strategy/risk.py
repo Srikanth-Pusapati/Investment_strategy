@@ -128,7 +128,13 @@ class RiskManager:
         but couldn't compute correlations against them (data outage) — a blind
         guard sizes down instead of failing open."""
         if proposal.action is Action.HOLD:
-            return self._reject(proposal, "HOLD — no action.")
+            # Same REJECTED verdict (nothing downstream may execute a HOLD),
+            # but without _reject's "REJECT hold X" log line — a no-op HOLD is
+            # not a failure, and the orchestrator logs it once, quietly.
+            return RiskDecision(
+                proposal=proposal, verdict=RiskVerdict.REJECTED,
+                reason="HOLD — no action.",
+            )
         if proposal.action is Action.SELL:
             return self._evaluate_sell(proposal, account)
         return self._evaluate_buy(
@@ -212,8 +218,12 @@ class RiskManager:
         # its position row, so counting it against the cap froze ALL buying
         # once the book filled (2026-07-13: NU top-up rejected at 15/15 while
         # the churn guard's own message said the next add was fine in 4h).
+        # Option rows don't count either: they have their own concurrency cap
+        # (max_option_positions) and premium cap, and letting a ~1%-of-equity
+        # debit eat an equity slot starves the equity book.
+        equity_rows = [p for p in account.positions if not p.is_option]
         if (
-            len(account.positions) >= self.limits.max_open_positions
+            len(equity_rows) >= self.limits.max_open_positions
             and account.position_for(proposal.symbol) is None
         ):
             return self._reject(
@@ -558,14 +568,15 @@ class RiskManager:
         halted, why = self.trading_halted(account)
         if halted:
             return self._reject(proposal, why)
-        # Strict slot cap for options: every debit opens a NEW position row
-        # (its own OCC contract), even when the underlying is already held —
-        # unlike equity top-ups, which reuse their row and are exempt.
-        if len(account.positions) >= self.limits.max_open_positions:
-            return self._reject(
-                proposal,
-                f"At max open positions ({self.limits.max_open_positions}).",
-            )
+        # NO global slot-cap check here — deliberately. The old strict cap
+        # rejected every option play exactly when the LLM proposes them: the
+        # prompt steers to defined-risk options when equity buys are capped, so
+        # the book was 15/15 for all 8 option proposals of 2026-07-13/14 and
+        # OPTIONS_ENABLED was structurally dead. An option debit is not an
+        # equity-sized position: concurrency is bounded by its OWN gates below
+        # (_under_option_position_cap underlyings + the ~1%-of-equity premium
+        # cap), so worst-case marginal exposure is a few % of equity, and the
+        # account-wide halt gates above still apply.
         if proposal.option_strategy is None or not proposal.option_legs:
             return self._reject(proposal, "Option proposal missing strategy/legs.")
         ok, why = self._legs_are_defined_risk(proposal)

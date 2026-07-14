@@ -313,14 +313,14 @@ def test_clear_orders_for_exit_replaces_live_sells_and_skips_wedged():
     out = c.clear_orders_for_exit("FRHC", ref_price=50.0)
     # 2% through 50.0 -> limit 49.0
     assert c.trading.replaced == [("live-tp", 49.0, None)]
-    assert out == [("new-live-tp", 61.0)]
+    assert out == [("new-live-tp", 61.0, "live-tp", 0.0)]
     assert sorted(c.trading.canceled) == ["buy-1", "err-leg"]  # never "wedged"
 
 
 def test_clear_orders_for_exit_counts_only_unfilled_qty():
     c = AlpacaClient.__new__(AlpacaClient)
     c.trading = _FakeExitTrading([_open_order("live-tp", qty="48", filled_qty="8")])
-    assert c.clear_orders_for_exit("FRHC", ref_price=50.0) == [("new-live-tp", 40.0)]
+    assert c.clear_orders_for_exit("FRHC", ref_price=50.0) == [("new-live-tp", 40.0, "live-tp", 8.0)]
 
 
 def test_clear_orders_for_exit_lifts_stop_trigger_never_sends_limit():
@@ -337,7 +337,7 @@ def test_clear_orders_for_exit_lifts_stop_trigger_never_sends_limit():
     out = c.clear_orders_for_exit("AVAV", ref_price=50.0)
     # 2% above 50.0 -> trigger 51.0; NO limit_price on a market-type order
     assert c.trading.replaced == [("stop-leg", None, 51.0)]
-    assert out == [("new-stop-leg", 37.0)]
+    assert out == [("new-stop-leg", 37.0, "stop-leg", 0.0)]
     assert c.trading.canceled == []
 
 
@@ -604,3 +604,31 @@ def test_to_position_maps_asset_class():
     # And absent asset_class (backtest fixtures, older SDKs) stays equity.
     pos2 = AlpacaClient._to_position(_sdk_position())
     assert pos2.asset_class == "us_equity" and pos2.is_option is False
+
+
+# -- flooring visibility + HTTP timeout injection ----------------------------- #
+
+def test_whole_share_floor_reports_dropped_notional():
+    # LLY 2026-07-14: 1.73433 sh floored to 1 dropped $847 with no trace.
+    # The submission must carry the dropped $ so the cycle can total the drag.
+    c = _client(price=100.0)
+    sub = c.submit_from_decision(_decision(qty=2.5, notional=250.0))
+    assert sub.dropped_notional == 50.0
+    c2 = _client(price=100.0)
+    sub2 = c2.submit_from_decision(_decision(qty=3.0, notional=300.0))
+    assert sub2.dropped_notional == 0.0
+
+
+def test_bound_client_injects_session_timeout():
+    # alpaca-py exposes no timeout surface, so we bind one onto the private
+    # Session ("read timeout=None" hung the news fetch 2026-07-14). This test
+    # fails loudly if an SDK upgrade renames _session or starts passing its
+    # own timeout.
+    from alpaca.trading.client import TradingClient
+
+    from investment_strategy.execution.alpaca_client import (
+        HTTP_TIMEOUT,
+        bound_client,
+    )
+    client = bound_client(TradingClient("key", "secret", paper=True))
+    assert client._session.request.keywords["timeout"] == HTTP_TIMEOUT

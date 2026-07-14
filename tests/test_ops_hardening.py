@@ -32,10 +32,24 @@ class _FillBroker:
 
 class _FakeState:
     def __init__(self):
-        self.pending = None
+        self.pending = []
 
     def set_pending_orders(self, oids):
         self.pending = list(oids)
+
+    def get_pending_orders(self):
+        return list(self.pending)
+
+    def drain_pending_orders(self):
+        pairs, self.pending = list(self.pending), []
+        return pairs
+
+    def merge_pending_orders(self, pairs):
+        seen = {p[0] for p in self.pending}
+        for oid, sym in pairs:
+            if oid not in seen:
+                self.pending.append((oid, sym))
+                seen.add(oid)
 
 
 class _FakeLedger:
@@ -132,6 +146,28 @@ def test_clean_fills_do_not_halt():
     assert o.state.pending == []  # cleared list persisted before checking
 
 
+def test_reconcile_checks_watchdog_queued_exits():
+    # Watchdog exits are queued via state.add_pending_order from its own
+    # thread; reconcile must check them even though the orchestrator's own
+    # in-process list never saw them (they used to be clobbered/ignored).
+    o = _orch({"wd-1": ("canceled", 0.0, 5.0)})
+    o._pending_oids = []                      # orchestrator never saw it
+    o.state.pending = [("wd-1", "NU")]
+    o._reconcile_fills()
+    assert o.ledger.records and o.ledger.records[0].action == "correct"
+    os.remove(o.cfg.kill_switch_file)
+
+
+def test_reconcile_skips_replaced_orders():
+    # A superseded (replaced) watchdog exit was already corrected at replace
+    # time by the supersede path; reconcile must not correct it again.
+    o = _orch({"old-1": ("replaced", 0.0, 5.0)})
+    o._reconcile_fills()
+    assert o.ledger.records == []
+    assert o.risk.kill_switch is False
+    assert not os.path.exists(o.cfg.kill_switch_file)
+
+
 def test_still_pending_order_warns_without_halting():
     # A slow-but-alive order may still fill — not a confirmed divergence.
     o = _orch({"o1": ("accepted", 0.0, 5.0)})
@@ -199,12 +235,52 @@ def test_heartbeat_off_when_unconfigured(monkeypatch):
 
 # -- dark-gap detection -------------------------------------------------------- #
 
-def test_dark_gap_pages_and_restamps():
+def test_dark_gap_pages_and_restamps(monkeypatch):
     o = _orch()
+    # Force the market-hours overlap so the test is deterministic regardless
+    # of when the suite runs (paging is gated to gaps touching 09:25-16:05 ET).
+    monkeypatch.setattr(type(o), "_overlaps_paging_hours",
+                        staticmethod(lambda s, e: True))
     o._last_wall_tick = time.time() - 1_000   # ~17 min dark vs 150s threshold
     o._note_loop_tick()
     assert [c[0] for c in o.alerter.calls] == ["dark_gap"]
     assert time.time() - o._last_wall_tick < 5   # restamped; won't re-fire
+
+
+def test_dark_gap_closed_market_logs_but_does_not_page(monkeypatch):
+    # 2026-07-14: 10 overnight laptop-sleep gaps produced 2 CRITICAL pager
+    # emails while the market was closed — pure noise; nothing was at risk.
+    o = _orch()
+    monkeypatch.setattr(type(o), "_overlaps_paging_hours",
+                        staticmethod(lambda s, e: False))
+    o._last_wall_tick = time.time() - 1_000
+    o._note_loop_tick()
+    assert o.alerter.calls == []
+    assert time.time() - o._last_wall_tick < 5   # still restamped
+
+
+def test_overlaps_paging_hours_clock_math():
+    from datetime import datetime
+    from zoneinfo import ZoneInfo
+    from investment_strategy.orchestrator import Orchestrator
+    et = ZoneInfo("America/New_York")
+    ts = lambda *a: datetime(*a, tzinfo=et).timestamp()  # noqa: E731
+    # Tue 2026-07-14 02:00-03:00 ET: fully closed -> no page.
+    assert not Orchestrator._overlaps_paging_hours(
+        ts(2026, 7, 14, 2, 0), ts(2026, 7, 14, 3, 0))
+    # Tue 10:00-10:30 ET: inside the session -> page.
+    assert Orchestrator._overlaps_paging_hours(
+        ts(2026, 7, 14, 10, 0), ts(2026, 7, 14, 10, 30))
+    # Gap spanning overnight INTO the open (05:00 -> 09:40) -> page.
+    assert Orchestrator._overlaps_paging_hours(
+        ts(2026, 7, 14, 5, 0), ts(2026, 7, 14, 9, 40))
+    # Multi-day gap whose endpoints are both closed (Mon 20:00 -> Wed 06:00)
+    # still covered Tuesday's session -> page.
+    assert Orchestrator._overlaps_paging_hours(
+        ts(2026, 7, 13, 20, 0), ts(2026, 7, 15, 6, 0))
+    # Sat 10:00 -> Sun 10:00: weekend -> no page.
+    assert not Orchestrator._overlaps_paging_hours(
+        ts(2026, 7, 18, 10, 0), ts(2026, 7, 19, 10, 0))
 
 
 def test_normal_tick_is_silent():
@@ -247,3 +323,33 @@ def test_setup_logging_pins_noisy_third_party_loggers(monkeypatch):
         assert logging.getLogger("httpx").level == logging.WARNING
     finally:
         root.handlers[:] = saved
+
+
+# -- in-cycle liveness stamps (busy is not hung) -------------------------------- #
+
+def test_stamp_liveness_refreshes_heartbeat_gate(monkeypatch):
+    # A decision cycle blocks the main loop for minutes; progress stamps must
+    # keep the gate open so the external monitor only sees silence on a REAL
+    # hang (2026-07-14: every hourly cycle withheld the ping for ~3-5 min).
+    pings = []
+    monkeypatch.setattr(orch_mod, "ping_heartbeat", lambda url: pings.append(url))
+    o = _orch(heartbeat_url="http://hb.example/ping")
+    o._last_main_tick = time.monotonic() - 10_000   # mid-cycle, stale
+    o._maybe_heartbeat()
+    assert pings == []                               # gate correctly closed
+    o._stamp_liveness()                              # forward progress
+    o._maybe_heartbeat()
+    assert pings == ["http://hb.example/ping"]       # gate reopened
+
+
+def test_gather_reports_progress_per_provider():
+    # The aggregator drives the longest cycle stretch; it must tick the
+    # liveness callback after EVERY provider so no healthy path goes silent.
+    from investment_strategy.signals.aggregator import SignalAggregator
+    agg = SignalAggregator.__new__(SignalAggregator)
+    provider = SimpleNamespace(safe_fetch=lambda syms: [])
+    agg.market_wide = [provider]
+    agg.per_symbol = [provider, provider]
+    ticks = []
+    agg.gather(["AAPL"], on_progress=lambda: ticks.append(1))
+    assert len(ticks) == 3

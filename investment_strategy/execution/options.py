@@ -18,6 +18,7 @@ from alpaca.trading.enums import OrderSide, PositionIntent
 from alpaca.trading.requests import OptionLegRequest
 
 from ..config import Config
+from .alpaca_client import bound_client
 from ..models import Action, OptionLeg, Position, TradeProposal
 
 log = logging.getLogger("options")
@@ -78,9 +79,9 @@ def build_closing_legs(positions: list[Position]) -> tuple[list[OptionLegRequest
 
 class OptionsHelper:
     def __init__(self, cfg: Config):
-        self.data = OptionHistoricalDataClient(
+        self.data = bound_client(OptionHistoricalDataClient(
             cfg.alpaca_api_key, cfg.alpaca_secret_key
-        )
+        ))
         self._cfg = cfg
         self._trading = None  # lazy — only liquidity checks need the trading API
 
@@ -88,10 +89,10 @@ class OptionsHelper:
     def trading(self):
         if self._trading is None:
             from alpaca.trading.client import TradingClient
-            self._trading = TradingClient(
+            self._trading = bound_client(TradingClient(
                 self._cfg.alpaca_api_key, self._cfg.alpaca_secret_key,
                 paper=not self._cfg.is_live,
-            )
+            ))
         return self._trading
 
     def build_legs(self, proposal: TradeProposal) -> list[OptionLegRequest]:

@@ -14,7 +14,8 @@ import logging
 import os
 import threading
 import time
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
+from zoneinfo import ZoneInfo
 
 from requests.exceptions import ConnectionError as RequestsConnectionError
 from requests.exceptions import Timeout as RequestsTimeout
@@ -251,22 +252,68 @@ class Orchestrator:
         self._last_wall_tick = now_wall
         threshold = self.cfg.monitor_interval_s * 3 + 60
         if gap > threshold:
-            log.critical(
-                "DARK GAP: no loop tick for %.0f min (sleep/suspend?). Positions "
-                "were unwatched; reconciling before trading resumes.", gap / 60.0,
-            )
-            self.alerter.critical(
-                "dark_gap",
-                f"Bot was dark for {gap / 60.0:.0f} min",
-                "The process missed loop ticks (host slept, was suspended, or the "
-                "clock jumped). Position monitoring resumed; the next decision "
-                "cycle reconciles pending orders first. Check the host.",
-            )
+            # Page only when the gap touched market hours: overnight/weekend
+            # laptop sleep left nothing unwatched (prices weren't moving), and
+            # 2-4am CRITICAL emails for a sleeping laptop are pure noise
+            # (2026-07-14: 10 closed-market dark gaps, 2 pager emails).
+            if self._overlaps_paging_hours(now_wall - gap, now_wall):
+                log.critical(
+                    "DARK GAP: no loop tick for %.0f min (sleep/suspend?). Positions "
+                    "were unwatched; reconciling before trading resumes.", gap / 60.0,
+                )
+                self.alerter.critical(
+                    "dark_gap",
+                    f"Bot was dark for {gap / 60.0:.0f} min",
+                    "The process missed loop ticks (host slept, was suspended, or the "
+                    "clock jumped). Position monitoring resumed; the next decision "
+                    "cycle reconciles pending orders first. Check the host.",
+                )
+            else:
+                log.warning(
+                    "DARK GAP (market closed): no loop tick for %.0f min "
+                    "(sleep/suspend?) — positions could not move; not paging.",
+                    gap / 60.0,
+                )
+
+    @staticmethod
+    def _overlaps_paging_hours(start_ts: float, end_ts: float) -> bool:
+        """True when any part of wall-clock [start_ts, end_ts] falls inside the
+        weekday 09:25-16:05 ET paging window (the same window ops/deadman.py
+        uses). Checked at both endpoints plus each session open inside the
+        span, so a multi-day gap can't thread between samples. Pure clock math
+        — no network — because this runs on the watchdog thread."""
+        et = ZoneInfo("America/New_York")
+
+        def in_window(dt_: datetime) -> bool:
+            if dt_.weekday() >= 5:
+                return False
+            minute = dt_.hour * 60 + dt_.minute
+            return (9 * 60 + 25) <= minute <= (16 * 60 + 5)
+
+        start = datetime.fromtimestamp(start_ts, et)
+        end = datetime.fromtimestamp(end_ts, et)
+        if in_window(start) or in_window(end):
+            return True
+        day = start.date()
+        while day <= end.date():
+            session_open = datetime(day.year, day.month, day.day, 9, 30, tzinfo=et)
+            if start <= session_open <= end and in_window(session_open):
+                return True
+            day += timedelta(days=1)
+        return False
 
     def _maybe_heartbeat(self) -> None:
         """Ping the external dead-man monitor — only while the MAIN loop is also
         fresh. Called from the watchdog thread, so a dead/hung decision loop OR a
-        dead watchdog both silence the ping and the external monitor pages."""
+        dead watchdog both silence the ping and the external monitor pages.
+
+        Freshness is kept by _stamp_liveness at progress points THROUGH the
+        decision cycle (a healthy cycle never goes >150s between stamps), so
+        withheld here means genuinely stuck, not merely busy. Known exception:
+        the LLM call is one opaque SDK call whose timeout+retry worst case
+        (~185s) can outlast the gate — accepted, because the resulting outward
+        silence ends within ~65s and only a real hang reaches the external
+        monitor's period+grace."""
         if not self.cfg.heartbeat_url:
             return
         main_age = time.monotonic() - self._last_main_tick
@@ -277,6 +324,13 @@ class Orchestrator:
             )
             return
         ping_heartbeat(self.cfg.heartbeat_url)
+
+    def _stamp_liveness(self) -> None:
+        """Forward-progress stamp for the heartbeat gate. Call from the MAIN
+        thread only, right after a unit of cycle work completes — never from
+        the watchdog thread and never from an except path, so a wedged network
+        read stops the stamps and the external monitor still pages."""
+        self._last_main_tick = time.monotonic()
 
     def _tick(self) -> None:
         """One monitor-cadence pass of the decision-loop body (extracted from
@@ -410,6 +464,7 @@ class Orchestrator:
         if not self.broker.is_market_open():
             log.info("Market closed; skipping decision cycle.")
             self._maybe_run_postmortem()
+            self._stamp_liveness()  # the postmortem's LLM call can run ~2 min
             # Arm the at-the-bell wake-up (see _decision_due; _tick clears it
             # only after the first SUCCESSFUL open-market cycle consumes it).
             self._next_open_utc = self.broker.next_market_open()
@@ -417,6 +472,7 @@ class Orchestrator:
 
         self._reconcile_fills()
         self._backfill_exchange_exits()
+        self._stamp_liveness()
         # Fresh Quiver data this cycle, but pulled once and shared by the signal
         # and screener layers (both read the same cached live feeds).
         self.quiver.new_cycle()
@@ -467,8 +523,12 @@ class Orchestrator:
             base.discard(self.cfg.core_etf)
         discovered = self.screeners.scan(exclude=base) if self.cfg.screener.enabled else []
         symbols = sorted(base | {c.symbol for c in discovered})
+        self._stamp_liveness()
 
-        bundles = self.signals.gather(symbols)
+        # Signal gathering is the cycle's longest stretch (3+ min across ~10
+        # providers); per-provider progress stamps keep the heartbeat gate
+        # from mistaking busy for hung.
+        bundles = self.signals.gather(symbols, on_progress=self._stamp_liveness)
         self._inject_discovery(bundles, discovered)
 
         # Persist this cycle's scores and build the freshness/trend annotations
@@ -521,11 +581,13 @@ class Orchestrator:
         except Exception as e:
             log.warning("Could not render today block: %s", e)
 
+        self._stamp_liveness()
         proposals = self.engine.decide(
             bundles, account, bench_line, external, lessons,
             today=today_block, buy_excluded=buy_excluded,
             signal_notes=signal_notes,
         )
+        self._stamp_liveness()
         proposals = self._filter_to_slate(proposals, bundles, account)
         # Hard backstop: Claude may still propose an excluded BUY; drop it.
         dropped = set()
@@ -542,18 +604,30 @@ class Orchestrator:
                     prop.rationale[:120] if prop.rationale else "",
                 )
         budget_caps = self._cycle_budget_caps(proposals, account)
+        undeployed = 0.0
         if not proposals:
             log.info("No actionable proposals this cycle.")
         else:
             for proposal in proposals:
+                self._stamp_liveness()  # order placement progresses per name
                 kinds = signal_kinds.get(proposal.symbol, [])
                 if proposal.instrument is Instrument.OPTION:
                     self._handle_option(proposal, account, kinds)
                 else:
-                    self._handle_equity(
+                    undeployed += self._handle_equity(
                         proposal, account, kinds,
                         cycle_budget_cap=budget_caps.get(proposal.symbol),
                     )
+        if undeployed >= 1.0:
+            # Whole-share bracket flooring drops each buy's sub-share remainder
+            # (deliberate — the exchange-resident bracket wins over precision);
+            # total it here so the drag is visible instead of silent cash.
+            log.info(
+                "Cycle budget not fully deployed: $%.2f dropped by whole-share "
+                "flooring across this cycle's buys (stays cash; core sweep / "
+                "next cycle can redeploy).", undeployed,
+            )
+        self._stamp_liveness()
         # Core-satellite fill (Todo 1.6): deploy whatever cash the single-name book
         # left idle into the broad core ETF, so we're not structurally short the
         # benchmark. Runs EVEN when there were no proposals — that's exactly the
@@ -563,8 +637,10 @@ class Orchestrator:
         # (growing) position — the core previously had NO exchange-side stop.
         self._ensure_core_stop(account)
         # Persist this cycle's freshly-submitted order ids so the next boot (even
-        # after a crash between cycles) reconciles their fills (1B.9).
-        self.state.set_pending_orders(self._pending_oids)
+        # after a crash between cycles) reconciles their fills (1B.9). MERGE, not
+        # overwrite: the watchdog queues its exit orders into state DURING the
+        # minutes-long cycle, and a plain overwrite silently dropped them.
+        self.state.merge_pending_orders(self._pending_oids)
 
     def _refresh_dashboard(self) -> None:
         """Regenerate the live dashboard HTML — and the public track-record page
@@ -685,14 +761,29 @@ class Orchestrator:
         NEW buys via the kill-switch file until a human deletes the file to
         acknowledge. Sells and the watchdog are never gated — closing out of a
         mis-booked position is exactly what we still want to work."""
-        pending, self._pending_oids = self._pending_oids, []
-        # Persist the cleared list immediately: these are about to be checked, so a
-        # crash mid-reconcile must not re-examine (or re-strand) them next boot.
-        self.state.set_pending_orders(self._pending_oids)
+        # Check the union of this process's list and the persisted one: the
+        # watchdog queues its exit orders straight into state (add_pending_order)
+        # from its own thread, so state can hold oids this list has never seen.
+        # drain_pending_orders clears the persisted list atomically — these are
+        # about to be checked, so a crash mid-reconcile must not re-examine (or
+        # re-strand) them next boot.
+        drained = self.state.drain_pending_orders()
+        seen_oids: set[str] = set()
+        pending: list[tuple[str, str]] = []
+        for oid, symbol in list(self._pending_oids) + drained:
+            if oid not in seen_oids:  # boot loads state into _pending_oids; dedupe
+                seen_oids.add(oid)
+                pending.append((oid, symbol))
+        self._pending_oids = []
         mismatches: list[str] = []
         for oid, symbol in pending:
             status, filled, qty = self.broker.order_fill(oid)
             if status in ("filled", "unknown"):
+                continue
+            if status == "replaced":
+                # A watchdog exit superseded by a later re-replace: its ledger
+                # record was already corrected at replace time (the replacement
+                # order carries the exit, and is itself in this list).
                 continue
             if status in ("rejected", "canceled", "expired"):
                 log.error(
@@ -719,7 +810,9 @@ class Orchestrator:
         if self._pending_oids:
             # Re-queued live partials must survive a crash before the cycle's
             # end-of-run persist, or their final fill never gets corrected.
-            self.state.set_pending_orders(self._pending_oids)
+            # MERGE (not overwrite): the watchdog may have queued an exit into
+            # state while the fill checks above were running.
+            self.state.merge_pending_orders(self._pending_oids)
         if mismatches and self.cfg.reconcile_halt_enabled:
             self._halt_new_buys(
                 "reconcile mismatch: " + "; ".join(mismatches),
@@ -1349,7 +1442,10 @@ class Orchestrator:
     def _handle_equity(
         self, proposal: TradeProposal, account, signal_kinds: list[str] | None = None,
         cycle_budget_cap: float | None = None,
-    ) -> None:
+    ) -> float:
+        """Evaluate + execute one equity proposal. Returns the $ the whole-share
+        bracket flooring dropped from an approved buy (0 for everything else)
+        so the cycle can total the undeployed drag."""
         price = self.broker.latest_price(proposal.symbol)
         vol = self.broker.annualized_vol(proposal.symbol)
         is_buy = proposal.action.value == "buy"
@@ -1373,23 +1469,36 @@ class Orchestrator:
             cycle_budget_cap=cycle_budget_cap,
             corr_data_missing=corr_missing,
         )
-        log.info(
-            "%s %s -> %s: %s | %s",
-            proposal.action.value.upper(), proposal.symbol,
-            decision.verdict.value, decision.reason, proposal.rationale[:100],
-        )
+        if proposal.action.value == "hold":
+            # A HOLD is the model saying "no action" — the risk layer returns
+            # REJECTED so nothing executes, but logging it as "REJECT hold"
+            # read like an error for a no-op. One quiet line instead.
+            log.info("HOLD %s (no action) | %s",
+                     proposal.symbol, proposal.rationale[:100])
+        else:
+            log.info(
+                "%s %s -> %s: %s | %s",
+                proposal.action.value.upper(), proposal.symbol,
+                decision.verdict.value, decision.reason, proposal.rationale[:100],
+            )
         # Journal every verdict so rejects have a durable record (not just a log
         # line), and the 'Today so far' block can surface them to Claude next cycle.
         instr = proposal.instrument.value if hasattr(proposal.instrument, "value") else str(proposal.instrument)
         verdict_str = decision.verdict.value
-        self._journal_decision(
-            proposal.symbol, proposal.action.value, instr,
-            proposal.conviction, proposal.target_weight_pct, verdict_str,
-            decision.approved_notional if decision.verdict != RiskVerdict.REJECTED else 0.0,
-            decision.reason, proposal.rationale[:120] if proposal.rationale else "",
-        )
         if decision.verdict == RiskVerdict.REJECTED:
-            return
+            self._journal_decision(
+                proposal.symbol, proposal.action.value, instr,
+                proposal.conviction, proposal.target_weight_pct, verdict_str,
+                0.0,
+                decision.reason, proposal.rationale[:120] if proposal.rationale else "",
+            )
+            return 0.0
+        dropped_notional = 0.0
+        # Journaled dollars: sells keep the approved figure; buys are journaled
+        # AFTER submit with the ACTUAL submitted notional — the whole-share
+        # bracket path floors the sized qty, and journaling the intent made the
+        # postmortem/'Today so far' see $2,001 deployed when $1,154 was.
+        executed_notional = decision.approved_notional
         # Hold the trade lock across broker mutations so the watchdog thread can't
         # interleave an emergency close on the same symbol mid-operation.
         with self._trade_lock:
@@ -1417,6 +1526,8 @@ class Orchestrator:
                     self._apply_pending_close(account, proposal.symbol)
             else:  # buy (approved or resized)
                 sub = self.broker.submit_from_decision(decision)
+                executed_notional = sub.notional if sub.order_id else 0.0
+                dropped_notional = sub.dropped_notional if sub.order_id else 0.0
                 if sub.order_id:
                     # Record the SUBMITTED qty/notional, not the decision's: the
                     # whole-share bracket path floors the sized qty (2.5 sh -> 2),
@@ -1450,6 +1561,13 @@ class Orchestrator:
                         self.state.register_exits(
                             proposal.symbol, decision.stop_loss_pct, decision.take_profit_pct,
                         )
+        self._journal_decision(
+            proposal.symbol, proposal.action.value, instr,
+            proposal.conviction, proposal.target_weight_pct, verdict_str,
+            executed_notional,
+            decision.reason, proposal.rationale[:120] if proposal.rationale else "",
+        )
+        return dropped_notional
 
     # -- options path (defined-risk, gated) -------------------------------- #
     def _handle_option(

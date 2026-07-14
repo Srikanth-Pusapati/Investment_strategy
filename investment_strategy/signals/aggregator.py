@@ -4,6 +4,7 @@ market-wide (macro) signals attached as shared context.
 from __future__ import annotations
 
 import logging
+from typing import Callable
 
 from ..config import Config
 from ..models import SignalBundle
@@ -43,11 +44,20 @@ class SignalAggregator:
         ]
         self.market_wide: list[SignalProvider] = [MacroProvider(cfg)]
 
-    def gather(self, symbols: list[str]) -> list[SignalBundle]:
+    def gather(
+        self, symbols: list[str], on_progress: Callable[[], None] | None = None,
+    ) -> list[SignalBundle]:
+        """`on_progress` (optional) is called after EACH provider completes —
+        the orchestrator passes its heartbeat liveness stamp so a multi-minute
+        gather doesn't read as a hung main loop, while a provider whose HTTP
+        read genuinely wedges stops the stamps and the external monitor still
+        pages. Only forward progress may call it."""
         # Market context fetched once and shared across all bundles.
         context = []
         for p in self.market_wide:
             context.extend(p.safe_fetch(symbols))
+            if on_progress:
+                on_progress()
 
         # Per-symbol signals, indexed by symbol.
         by_symbol: dict[str, list] = {s: [] for s in symbols}
@@ -55,6 +65,8 @@ class SignalAggregator:
             for sig in p.safe_fetch(symbols):
                 if sig.symbol in by_symbol:
                     by_symbol[sig.symbol].append(sig)
+            if on_progress:
+                on_progress()
 
         bundles = [
             SignalBundle(symbol=s, signals=sigs, market_context=context)

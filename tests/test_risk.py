@@ -994,14 +994,33 @@ def test_option_rejected_when_halt_latched():
     assert "halt latch" in d.reason.lower()
 
 
-def test_option_rejected_at_max_open_positions():
+def test_option_not_blocked_by_full_equity_book():
+    # 2026-07-13/14: all 8 option proposals died at "max open positions" — the
+    # prompt steers Claude to defined-risk options exactly when equity buys are
+    # capped, so the global slot cap made OPTIONS_ENABLED structurally dead.
+    # Option concurrency is bounded by its OWN gates (max_option_positions
+    # underlyings + the premium cap), not the equity slot cap.
     rm = _rm(_limits(options_enabled=True, max_open_positions=1))
     p = _opt(OptionStrategy.LONG_CALL,
              [OptionLeg(expiry=_opt_exp(30), strike=200, right="call", side=Action.BUY)])
     d = rm.evaluate_option(p, _account(positions=[_pos()]),
                            est_premium_per_contract=2.0)
-    assert d.verdict is RiskVerdict.REJECTED
-    assert "max open positions" in d.reason.lower()
+    assert "max open positions" not in d.reason.lower()
+    assert d.verdict is not RiskVerdict.REJECTED
+
+
+def test_equity_slot_cap_counts_only_equity_rows():
+    # An option row must not eat an equity slot: with the cap at 2, one equity
+    # position + one OCC contract row still leaves room for a new equity name.
+    rm = _rm(_limits(max_open_positions=2))
+    opt_row = Position(
+        symbol="AAPL260117C00200000", qty=1.0, avg_entry_price=2.0,
+        current_price=2.0, market_value=200.0, unrealized_pl=0.0,
+        unrealized_pl_pct=0.0, asset_class="us_option",
+    )
+    d = rm.evaluate(_buy("MSFT"), _account(positions=[_pos(), opt_row]),
+                    price=100.0, volatility=0.2)
+    assert "max open positions" not in d.reason.lower()
 
 
 def test_option_dte_too_short_rejected():

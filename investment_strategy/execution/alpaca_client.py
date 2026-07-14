@@ -11,6 +11,7 @@ Key Alpaca constraints handled here:
 """
 from __future__ import annotations
 
+import functools
 import logging
 import statistics
 import time
@@ -69,9 +70,31 @@ class BuySubmission(NamedTuple):
     fractional: bool
     qty: float        # shares submitted (approx for notional orders: $/price)
     notional: float   # dollars submitted (approx for whole-share: qty*price)
+    dropped_notional: float = 0.0  # $ the whole-share flooring left undeployed
 
 
 _NO_BUY = BuySubmission(None, False, 0.0, 0.0)
+
+# alpaca-py's RESTClient exposes NO timeout knob and issues every request
+# through a bare requests.Session with no timeout argument — so a wedged read
+# blocks forever ("Read timed out. (read timeout=None)", seen 2026-07-14 on
+# the news feed; a hang here stalls the whole decision cycle, and via the
+# trade lock can starve the watchdog thread). Bind (connect, read) bounds at
+# the Session level; a fired timeout surfaces as requests.Timeout, which is
+# already in _TRANSIENT_NET and absorbed as a transient tick-skip.
+HTTP_TIMEOUT: tuple[int, int] = (5, 15)
+
+
+def bound_client(client: _T, timeout: tuple[int, int] = HTTP_TIMEOUT) -> _T:
+    """Inject a finite timeout into an alpaca-py client's private Session.
+    Every SDK request funnels through _session.request without a timeout
+    kwarg, so a functools.partial can't collide (and if a future SDK passes
+    one, call-time kwargs override the partial's). Private-attr poke by
+    necessity — a unit test asserts it survives SDK upgrades."""
+    client._session.request = functools.partial(
+        client._session.request, timeout=timeout
+    )
+    return client
 
 # Transient, self-healing network faults. A "connection reset by peer" (errno 54)
 # mid-read surfaces as requests' ConnectionError wrapping urllib3's ProtocolError;
@@ -108,12 +131,12 @@ class AlpacaClient:
     def __init__(self, cfg: Config):
         self.cfg = cfg
         paper = not cfg.is_live
-        self.trading = TradingClient(
+        self.trading = bound_client(TradingClient(
             cfg.alpaca_api_key, cfg.alpaca_secret_key, paper=paper
-        )
-        self.data = StockHistoricalDataClient(
+        ))
+        self.data = bound_client(StockHistoricalDataClient(
             cfg.alpaca_api_key, cfg.alpaca_secret_key
-        )
+        ))
         log.info("Alpaca client ready (mode=%s).", cfg.mode.value)
 
     # -- read --------------------------------------------------------------- #
@@ -367,6 +390,18 @@ class AlpacaClient:
 
         whole = int(decision.approved_qty)
         if whole >= 1:
+            dropped_qty = decision.approved_qty - whole
+            dropped_usd = round(dropped_qty * price, 2)
+            if dropped_usd >= 0.01:
+                # Deliberate trade-off (see docstring): the exchange-resident
+                # bracket wins over sizing precision — but never silently.
+                log.warning(
+                    "%s: floored %.6g sh -> %d for the exchange bracket; $%.2f "
+                    "of the $%.2f allocation NOT deployed (stays cash; core "
+                    "sweep / next cycle can redeploy).", symbol,
+                    decision.approved_qty, whole, dropped_usd,
+                    decision.approved_notional,
+                )
             order = OrderRequest(
                 symbol=symbol, side=Action.BUY, order_type=OrderType.MARKET,
                 # GTC so the protective stop/take-profit legs REST at the exchange
@@ -381,6 +416,7 @@ class AlpacaClient:
             )
             return BuySubmission(
                 self.submit(order), False, float(whole), round(whole * price, 2),
+                dropped_notional=dropped_usd,
             )
 
         # Sub-share: fractional dollar-notional order, no exchange bracket.
@@ -574,7 +610,9 @@ class AlpacaClient:
         {"accepted", "pending_new", "pending_cancel", "pending_replace"}
     )
 
-    def clear_orders_for_exit(self, symbol: str, ref_price: float) -> list[tuple[str, float]]:
+    def clear_orders_for_exit(
+        self, symbol: str, ref_price: float,
+    ) -> list[tuple[str, float, str, float]]:
         """Make every open order for `symbol` either BE the exit or go away,
         ahead of a liquidation whose shares they reserve.
 
@@ -593,14 +631,17 @@ class AlpacaClient:
         cancel, except orders already pending_cancel where re-sending only
         errors.
 
-        Returns (new_order_id, unfilled_qty) per replaced sell so the caller
-        can ledger those orders as the exit they now are."""
+        Returns (new_order_id, unfilled_qty, old_order_id, old_filled_qty) per
+        replaced sell so the caller can ledger those orders as the exit they
+        now are — and, when the SAME exit gets re-replaced on a later tick
+        (price fell, the old marketable limit went stale), void the SELL it
+        already ledgered for old_order_id instead of double-counting."""
         limit = (
             round(ref_price * (1 - self.EXIT_LIMIT_BUFFER_PCT / 100.0), 2)
             if ref_price > 0 else 0.0
         )
         trigger = round(ref_price * (1 + self.EXIT_LIMIT_BUFFER_PCT / 100.0), 2)
-        replaced: list[tuple[str, float]] = []
+        replaced: list[tuple[str, float, str, float]] = []
         for o in self.trading.get_orders():
             if o.symbol != symbol:
                 continue
@@ -630,8 +671,9 @@ class AlpacaClient:
                     req, new_px = ReplaceOrderRequest(limit_price=limit), limit
                 try:
                     new = self.trading.replace_order_by_id(o.id, req)
-                    left = float(o.qty or 0) - float(getattr(o, "filled_qty", 0) or 0)
-                    replaced.append((str(new.id), left))
+                    old_filled = float(getattr(o, "filled_qty", 0) or 0)
+                    left = float(o.qty or 0) - old_filled
+                    replaced.append((str(new.id), left, str(o.id), old_filled))
                     log.warning(
                         "Exit via resting sell %s (%s): replaced %s -> %.2f "
                         "(marketable; new order %s).", o.id, symbol,

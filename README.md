@@ -136,11 +136,14 @@ it by accident.
   while the laptop is up; `HEARTBEAT_URL` covers the laptop itself dying.
   It is NOT the dashboard and NOT the control panel (`localhost:8787`) — a
   self-ping can't page you when the machine is off. Setup: create a free
-  check at [healthchecks.io](https://healthchecks.io) (period 10 min, grace
-  10 min), paste its ping URL (`https://hc-ping.com/<uuid>`) into
-  `HEARTBEAT_URL` in `.env`, restart the bot. The bot pings it every healthy
-  watchdog tick; when pings stop (bot dead, laptop asleep, power lost),
-  healthchecks.io emails you. Empty = disabled, and the bot warns at startup.
+  check at [healthchecks.io](https://healthchecks.io) — period 5 min, grace
+  5 min is a good balance (the bot pings every 30s and, since 2026-07-14,
+  keeps pinging THROUGH the multi-minute decision cycle via in-cycle liveness
+  stamps, so sustained silence means real trouble; a genuine hang pages in
+  ~10 min). Paste the check's ping URL (`https://hc-ping.com/<uuid>`) into
+  `HEARTBEAT_URL` in `.env`, restart the bot. When pings stop (bot dead,
+  laptop asleep, power lost), healthchecks.io emails you. Empty = disabled,
+  and the bot warns at startup.
 
 ---
 

@@ -123,9 +123,11 @@ def _check_options(cfg):
         return True, "Options OFF (optional) — set OPTIONS_ENABLED=on for defined-risk options."
     try:
         from alpaca.trading.client import TradingClient
-        raw = TradingClient(
+
+        from .execution.alpaca_client import bound_client
+        raw = bound_client(TradingClient(
             cfg.alpaca_api_key, cfg.alpaca_secret_key, paper=not cfg.is_live,
-        ).get_account()
+        )).get_account()
         level = int(getattr(raw, "options_trading_level", 0) or 0)
         if level < 2:
             return False, (
@@ -135,9 +137,9 @@ def _check_options(cfg):
         from alpaca.data.historical.option import OptionHistoricalDataClient
         from alpaca.data.requests import OptionChainRequest
         from datetime import date, timedelta
-        chain = OptionHistoricalDataClient(
+        chain = bound_client(OptionHistoricalDataClient(
             cfg.alpaca_api_key, cfg.alpaca_secret_key,
-        ).get_option_chain(OptionChainRequest(
+        )).get_option_chain(OptionChainRequest(
             underlying_symbol="SPY",
             expiration_date_gte=date.today() + timedelta(days=7),
             expiration_date_lte=date.today() + timedelta(days=35),

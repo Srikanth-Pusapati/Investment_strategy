@@ -51,7 +51,8 @@ PHASE B — CORE-SATELLITE FILL  (was Todo-2 1.6; DONE 2026-07-01)
 --------------------------------------------------------------------------------
 [DONE 2026-07-01] 1.6 Core-ETF allocation mode. After each decision cycle,
         orchestrator._apply_core_fill sweeps idle cash into a broad CORE_ETF (env,
-        default QQQ) until the book is TARGET_INVESTED_PCT invested (default 90) —
+        default QQQ) until the book is TARGET_INVESTED_PCT invested (code
+        default 0 = off; .env sets 90) —
         so we're never a structural short vs the benchmark. Runs EVEN when there
         were no proposals (the cash-drag case it exists for). The ETF is EXEMPT
         from the single-name/sector caps (it IS the diversified core) but still
@@ -94,7 +95,9 @@ PHASE C — FIX DISCOVERY BREADTH  (found 2026-07-01; largely DONE 2026-07-02)
         Tests: test_robinhood_feed.py (5). NOTE: this is momentum/crowd discovery, NOT
         options-flow or insider data — Robinhood is a broker, not a flow/insider vendor.
 [ ] C.3 (LOW) Enable the coded-but-inert `wallstreetbets` screener once its plan
-        gating clears (already in the registry).
+        gating clears (already in the registry). RE-TESTED 2026-07-14: live
+        call still returns HTTP 403 "upgrade your subscription plan" on the
+        Hobbyist tier — stays parked until a plan upgrade is worth it.
 [DONE 2026-07-10] C.4 Options-chain positioning SIGNAL (partial options_flow
         replacement) — shipped as signals/options_chain.py (OptionsChainProvider):
         per-name ATM IV, put-call IV skew, and OI lean for candidates already
@@ -143,10 +146,13 @@ PHASE L — LEGAL / TAX  (absorbs old G.6; single-user posture is CLEAR today)
         IA/broker-dealer registration depending on jurisdiction. Hard gate before
         any G.* build. Single-user (own money, own keys, paper->live) needs NO
         registration — current posture is fine.
-[ ] L.2 (MED, before LIVE money) Wash-sale/tax mechanics of a high-churn bot:
-        short-term gains = ordinary income; the rebuy-after-stop pattern triggers
-        wash-sale basis adjustments the ledger doesn't track. Add a wash-sale flag
-        to the ledger, or minimally document "broker 1099-B is source of truth".
+[DONE 2026-07-14] L.2 (MED, before LIVE money) Wash-sale/tax mechanics of a
+        high-churn bot. The ledger wash-sale FLAG shipped with GA-2.5 (lots.py,
+        ±30d FIFO-lot flag, "wash-sale?" in the track record); the written
+        operator note is docs/tax-wash-sale-note.md (short-term = ordinary
+        income; 24h re-entry cooldown does NOT avoid the 30-DAY wash window;
+        flag is a heads-up only — broker 1099-B is the source of truth;
+        December cross-year deferral; options wash stock losses too).
 [x] L.3 (LOW, mostly OK) Data-source ToS: RH agentic MCP = official API OK; EDGAR
         SEC_USER_AGENT set OK; Quiver = paid license OK; yfinance is ToS-gray ->
         already being routed away via C.5/E.2.
@@ -343,10 +349,10 @@ ON; re-open the frozen-window question if/when a formal record window starts.)
     for the first real SUBSCRIBE/HOLD verdicts, and R.3's periodic `--sweep` /
     `--sweep-stops` re-tune on COMPLETE exit data (human applies knob changes).
  3. C.3  Enable the coded-but-inert wallstreetbets screener once its plan
-    gating clears — the last dormant discovery leg.
- 4. L.2  Wash-sale/tax note — before real money (the ledger wash-sale FLAG
-    shipped with GA-2.5; remaining: the written "1099-B is source of truth"
-    note + any doc updates).
+    gating clears — the last dormant discovery leg. (Re-tested 2026-07-14:
+    still 403 on the Hobbyist tier.)
+ 4. [DONE 2026-07-14] L.2 Wash-sale/tax note — docs/tax-wash-sale-note.md
+    (flag shipped with GA-2.5; 1099-B is source of truth).
  5. X.6  Leverage (gross 100 -> ~150 on margin) ONLY after #2 proves the
     config on live paper round-trips.
  6. G.*  Multi-user — AFTER the L.1 legal/regulatory gate (both parked ~1yr

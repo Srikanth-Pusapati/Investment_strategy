@@ -318,8 +318,11 @@ def aggregate_round_trips(
     for g in groups.values():
         g["oversold"] = g["sold_qty"] > g["bought_qty"] + 1e-6
         open_qty = max(0.0, g["bought_qty"] - g["sold_qty"])
-        # Tolerate float dust from fractional fills.
-        if open_qty * max(prices.get(g["symbol"], 0.0), 1.0) < 0.01:
+        # Tolerate float dust from fractional fills. $0.05 absolute: broker
+        # rounding on sub-share sells leaves ~1e-4 sh slivers (ORCL 2026-07-14:
+        # 0.000085 sh ≈ $0.011) that the old $0.01 bar counted as still-open,
+        # freezing the round trip forever.
+        if open_qty * max(prices.get(g["symbol"], 0.0), 1.0) < 0.05:
             open_qty = 0.0
         g["open_qty"] = open_qty
         avg_cost = (g["bought_usd"] / g["bought_qty"]) if g["bought_qty"] > 0 else 0.0

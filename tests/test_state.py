@@ -250,3 +250,37 @@ def _run_all():
 
 if __name__ == "__main__":
     sys.exit(1 if _run_all() else 0)
+
+
+def test_pending_order_add_drain_merge_and_restart():
+    path = _tmp()
+    s = PortfolioState(path=path)
+    # add is idempotent per order id and appends from any thread
+    s.add_pending_order("wd-1", "NU")
+    s.add_pending_order("wd-1", "NU")
+    s.set_pending_orders([("o-1", "LLY")])
+    s.add_pending_order("wd-2", "NU")
+    # merge unions without duplicating what's already there
+    s.merge_pending_orders([("o-1", "LLY"), ("o-2", "CVX")])
+    assert s.get_pending_orders() == [("o-1", "LLY"), ("wd-2", "NU"), ("o-2", "CVX")]
+    # survives a restart
+    s2 = PortfolioState(path=path)
+    assert s2.get_pending_orders() == [("o-1", "LLY"), ("wd-2", "NU"), ("o-2", "CVX")]
+    # drain atomically takes-and-clears
+    assert s2.drain_pending_orders() == [("o-1", "LLY"), ("wd-2", "NU"), ("o-2", "CVX")]
+    assert s2.get_pending_orders() == []
+    assert PortfolioState(path=path).get_pending_orders() == []
+
+
+def test_ledgered_exit_oids_tracked_and_forgotten():
+    path = _tmp()
+    s = PortfolioState(path=path)
+    s.note_exit_ledgered("NU", "new-1")
+    assert s.exit_was_ledgered("NU", "new-1")
+    assert not s.exit_was_ledgered("NU", "other")
+    assert not s.exit_was_ledgered("LLY", "new-1")
+    # survives a restart
+    assert PortfolioState(path=path).exit_was_ledgered("NU", "new-1")
+    # position gone -> tracking dropped with the rest of the symbol state
+    s.forget_symbol("NU")
+    assert not s.exit_was_ledgered("NU", "new-1")
