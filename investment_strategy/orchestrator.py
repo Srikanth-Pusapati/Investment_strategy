@@ -141,7 +141,12 @@ class Orchestrator:
         self.journal = DecisionJournal()
         # Persisted daily equity snapshots so the account P&L curve survives restarts.
         self.equity_history = EquityHistory()
-        self._last_decision_at = 0.0
+        # -inf so the FIRST decision tick is unconditionally due. 0.0 looked
+        # equivalent but wasn't: time.monotonic() is seconds since BOOT, so on
+        # a freshly rebooted machine (2026-07-14: bot up 6 min after boot) the
+        # bot silently idled until MACHINE uptime exceeded the decision
+        # interval — a whole quiet hour, even mid-session.
+        self._last_decision_at = float("-inf")
         # Next session open (UTC), stashed by closed-market ticks so the loop
         # can fire a decision AT the bell instead of at the next hourly tick
         # (2026-07-13: a tick 17s before the open slept through the first hour).

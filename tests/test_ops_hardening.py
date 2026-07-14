@@ -353,3 +353,20 @@ def test_gather_reports_progress_per_provider():
     ticks = []
     agg.gather(["AAPL"], on_progress=lambda: ticks.append(1))
     assert len(ticks) == 3
+
+
+# -- first decision tick after a machine reboot --------------------------------- #
+
+def test_first_decision_due_even_on_fresh_boot(monkeypatch):
+    # time.monotonic() counts from MACHINE boot. With _last_decision_at = 0.0
+    # a bot started minutes after a reboot wasn't "due" until machine uptime
+    # exceeded the whole decision interval (2026-07-14: a silent first hour).
+    # The -inf sentinel makes the first tick unconditionally due.
+    o = Orchestrator.__new__(Orchestrator)
+    o.cfg = SimpleNamespace(decision_interval_s=3600)
+    o._next_open_utc = None
+    monkeypatch.setattr(orch_mod.time, "monotonic", lambda: 300.0)  # 5 min up
+    o._last_decision_at = 0.0                 # the old init value: NOT due
+    assert o._decision_due() is False         # documents the reboot bug
+    o._last_decision_at = float("-inf")       # the fixed init value: due
+    assert o._decision_due() is True
