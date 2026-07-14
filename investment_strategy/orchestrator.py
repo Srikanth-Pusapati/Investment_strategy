@@ -330,6 +330,22 @@ class Orchestrator:
                 "trade-capable token could place orders if misused. Use a "
                 "read-scoped token."
             )
+        hb = (self.cfg.heartbeat_url or "").strip()
+        if not hb:
+            log.warning(
+                "HEARTBEAT_URL is empty — laptop-dead paging is DISABLED. The "
+                "deadman launchd job only covers 'bot died while the laptop is "
+                "up'; for the other half, create a free healthchecks.io check "
+                "and put its ping URL (https://hc-ping.com/<uuid>) in "
+                "HEARTBEAT_URL."
+            )
+        elif any(h in hb for h in ("localhost", "127.0.0.1", "0.0.0.0")):
+            log.warning(
+                "HEARTBEAT_URL points at THIS machine (%s) — a self-ping can't "
+                "page when the laptop dies. It must be an EXTERNAL monitor's "
+                "ping URL (healthchecks.io: https://hc-ping.com/<uuid>), not "
+                "the dashboard or the control panel.", hb,
+            )
         # Tiny-float sanity: if the per-name budget after the position cap can't
         # clear the min order, the bot can never fill MAX_OPEN_POSITIONS slots and
         # will sit in cash. Surface it once at startup rather than silently.

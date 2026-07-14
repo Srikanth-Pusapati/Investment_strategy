@@ -22,14 +22,17 @@ import html
 import logging
 import webbrowser
 from collections import defaultdict
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
+from zoneinfo import ZoneInfo
 
 from .ledger import TradeLedger, TradeRecord
 from .status import AccountStatus
 
 log = logging.getLogger("dashboard")
+
+_ET = ZoneInfo("America/New_York")
 
 # Palette — calm, readable, prints fine.
 _BG = "#0f1419"
@@ -80,19 +83,52 @@ def _live_enrichment(
 class _Row:
     """A trade plus any live-derived numbers, ready to render."""
 
-    def __init__(self, rec: TradeRecord, price_now: Optional[float]):
+    def __init__(self, rec: TradeRecord, price_now: Optional[float],
+                 position_closed: bool = False):
         self.rec = rec
         self.price_now = price_now
+        # `position_closed`: the symbol's whole position is gone, so a live
+        # unrealized number on the BUY row would be phantom P/L on shares no
+        # longer held — the outcome lives on the matching SELL row instead.
+        self.position_closed = position_closed
         self.current_value: Optional[float] = None
         self.unreal_pl: Optional[float] = None
         self.unreal_pct: Optional[float] = None
+        # Sell economics: what the position cost going in (basis), what the
+        # sale returned (proceeds), and the realized result.
+        self.proceeds: Optional[float] = None
+        self.basis: Optional[float] = None
+        self.realized_pl: Optional[float] = None
+        self.realized_pct: Optional[float] = None
         if (
             rec.action == "buy" and rec.instrument == "equity"
+            and not position_closed
             and price_now and rec.entry_price > 0 and rec.qty > 0
         ):
             self.current_value = price_now * rec.qty
             self.unreal_pl = self.current_value - rec.entry_price * rec.qty
             self.unreal_pct = (price_now / rec.entry_price - 1.0) * 100.0
+        elif rec.action == "sell":
+            self.realized_pl = rec.realized_pl
+            self.realized_pct = rec.realized_pl_pct
+            # Equity only: an option's exit_price is per-share premium while
+            # qty is contracts, so price*qty would be 100x off. Option rows
+            # still show recorded realized $ — just no derived proceeds/basis.
+            if rec.exit_price and rec.qty > 0 and rec.instrument == "equity":
+                self.proceeds = rec.exit_price * rec.qty
+            if self.proceeds is not None:
+                # Basis (what went in for the sold shares): prefer exact $,
+                # else reconstruct from the recorded %.
+                if self.realized_pl is not None:
+                    self.basis = self.proceeds - self.realized_pl
+                elif self.realized_pct is not None and self.realized_pct > -100.0:
+                    self.basis = self.proceeds / (1.0 + self.realized_pct / 100.0)
+                    self.realized_pl = self.proceeds - self.basis
+            if self.realized_pl is not None and self.basis and self.basis > 0:
+                # Keep % and $ describing the same slice: a partially-covered
+                # exchange backfill records a per-share % beside a
+                # covered-slice $ — recompute % from the numbers shown.
+                self.realized_pct = self.realized_pl / self.basis * 100.0
 
 
 # --------------------------------------------------------------------------- #
@@ -184,11 +220,24 @@ def _card(label: str, value: str, sub: str = "", tone: str = "") -> str:
 
 
 def _fmt_dt(dt: datetime) -> str:
-    return dt.strftime("%Y-%m-%d %H:%M")
+    """Ledger timestamps are UTC; render in ET so times read as market time
+    (the raw UTC previously showed a 10:33 ET fill as '14:33')."""
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    return dt.astimezone(_ET).strftime("%Y-%m-%d %H:%M")
 
 
-def _exit_cell(r: TradeRecord) -> str:
-    """The 'assumed sell' analogue: bracket take-profit / stop-loss levels."""
+def _exit_cell(row: _Row) -> str:
+    """Buys: the 'assumed sell' bracket levels. Sells: what actually happened —
+    the exit fill and the total proceeds coming back."""
+    r = row.rec
+    if r.action == "sell":
+        if not r.exit_price:
+            return "<span class='mute'>—</span>"
+        reason = f" · {html.escape(r.exit_reason)}" if r.exit_reason else ""
+        proceeds = (f"<br><span class='up'>${row.proceeds:,.0f} back</span>"
+                    if row.proceeds is not None else "")
+        return (f"<span>Sold @ ${r.exit_price:,.2f}{reason}</span>{proceeds}")
     if r.action != "buy":
         return "<span class='mute'>—</span>"
     tp = (f"TP {r.take_profit_pct:.0f}%"
@@ -199,58 +248,262 @@ def _exit_cell(r: TradeRecord) -> str:
             f"<span class='down'>{sl}</span>")
 
 
-def _pl_cell(row: _Row) -> str:
-    if row.unreal_pct is None:
+def _fmt_pl(pl: Optional[float], pct: Optional[float],
+            label: str = "") -> str:
+    """±%/±$ pair with up/down coloring; '—' when unknown."""
+    if pl is None and pct is None:
         return "<span class='mute'>—</span>"
-    cls = "up" if row.unreal_pl >= 0 else "down"
-    sign = "+" if row.unreal_pl >= 0 else ""
-    return (f"<span class='{cls}'>{sign}{row.unreal_pct:,.1f}%<br>"
-            f"{sign}${row.unreal_pl:,.0f}</span>")
+    ref = pl if pl is not None else pct
+    cls = "up" if ref >= 0 else "down"
+    sign = "+" if ref >= 0 else ""
+    pct_s = f"{sign}{pct:,.1f}%" if pct is not None else ""
+    pl_s = f"{sign}${pl:,.0f}" if pl is not None else ""
+    lbl = f"<br><span class='mute'>{label}</span>" if label else ""
+    joiner = "<br>" if pct_s and pl_s else ""
+    return f"<span class='{cls}'>{pct_s}{joiner}{pl_s}</span>{lbl}"
+
+
+def _pl_cell(row: _Row) -> str:
+    if row.rec.action == "sell":
+        return _fmt_pl(row.realized_pl, row.realized_pct, label="realized")
+    if row.position_closed:
+        return "<span class='mute'>closed — see sell row</span>"
+    return _fmt_pl(row.unreal_pl, row.unreal_pct)
+
+
+# --------------------------------------------------------------------------- #
+# Per-ticker round trips
+# --------------------------------------------------------------------------- #
+def aggregate_round_trips(
+    records: list[TradeRecord], prices: dict[str, float],
+) -> list[dict]:
+    """Group the ledger by (symbol, instrument) into round-trip economics:
+    money in (buys), money out (sell proceeds), realized P/L on the closed
+    part, live value + unrealized P/L on whatever is still open, and the net.
+    Pure function over ledger records — unit-testable without a broker."""
+    groups: dict[tuple[str, str], dict] = {}
+    for r in sorted(records, key=lambda x: x.ts):
+        g = groups.setdefault((r.symbol, r.instrument), {
+            "symbol": r.symbol, "instrument": r.instrument,
+            "bought_qty": 0.0, "bought_usd": 0.0,
+            "sold_qty": 0.0, "proceeds_usd": 0.0,
+            "realized_pl": None, "last_ts": r.ts,
+        })
+        g["last_ts"] = max(g["last_ts"], r.ts)
+        if r.action == "buy":
+            g["bought_qty"] += r.qty
+            g["bought_usd"] += r.cost_usd
+        elif r.action == "sell":
+            if r.qty > 0:
+                sell_qty = r.qty
+            elif r.realized_pl is not None or r.realized_pl_pct is not None:
+                # Legacy full-close shape (pre-GA-2.5, mirrored from lots.py):
+                # qty 0/unknown with realized data means "sold everything held".
+                sell_qty = max(0.0, g["bought_qty"] - g["sold_qty"])
+            else:
+                sell_qty = 0.0
+            g["sold_qty"] += sell_qty
+            realized = r.realized_pl
+            # Equity only — see _Row: option exit_price is per-share premium.
+            if r.exit_price and sell_qty > 0 and r.instrument == "equity":
+                proceeds = r.exit_price * sell_qty
+                g["proceeds_usd"] += proceeds
+                if realized is None and (
+                    r.realized_pl_pct is not None and r.realized_pl_pct > -100.0
+                ):
+                    realized = proceeds - proceeds / (1.0 + r.realized_pl_pct / 100.0)
+            if realized is not None:
+                g["realized_pl"] = (g["realized_pl"] or 0.0) + realized
+    out = []
+    for g in groups.values():
+        g["oversold"] = g["sold_qty"] > g["bought_qty"] + 1e-6
+        open_qty = max(0.0, g["bought_qty"] - g["sold_qty"])
+        # Tolerate float dust from fractional fills.
+        if open_qty * max(prices.get(g["symbol"], 0.0), 1.0) < 0.01:
+            open_qty = 0.0
+        g["open_qty"] = open_qty
+        avg_cost = (g["bought_usd"] / g["bought_qty"]) if g["bought_qty"] > 0 else 0.0
+        # Open basis = dollars in minus the basis the sells consumed
+        # (proceeds - realized). Lifetime average cost misprices the remainder
+        # whenever a closed lot traded at a different price (re-entry after a
+        # full close, multi-lot FIFO backfills) — it fabricated unrealized P/L.
+        consumed = (
+            g["proceeds_usd"] - g["realized_pl"]
+            if (g["realized_pl"] is not None and g["proceeds_usd"] > 0)
+            else None
+        )
+        if open_qty <= 0:
+            g["open_basis"] = 0.0
+        elif consumed is not None and 0.0 <= consumed <= g["bought_usd"]:
+            g["open_basis"] = g["bought_usd"] - consumed
+        else:
+            g["open_basis"] = avg_cost * open_qty
+        px = prices.get(g["symbol"]) if g["instrument"] == "equity" else None
+        g["open_value"] = px * open_qty if (px and open_qty > 0) else None
+        g["unreal_pl"] = (
+            g["open_value"] - g["open_basis"] if g["open_value"] is not None else None
+        )
+        parts = [v for v in (g["realized_pl"], g["unreal_pl"]) if v is not None]
+        g["net_pl"] = sum(parts) if parts else None
+        out.append(g)
+    out.sort(key=lambda g: g["last_ts"], reverse=True)
+    return out
+
+
+_TABLE_HEAD = (
+    "<tr><th>Executed (ET)</th><th>Symbol</th><th>Side</th><th>Type</th>"
+    "<th class='num'>Volume</th><th class='num'>Entry</th>"
+    "<th class='num'>Went in ($)</th><th>Planned / actual exit</th>"
+    "<th class='num'>Profit % assumed</th><th>P/L</th>"
+    "<th>Conviction</th><th>Reason behind the trade</th></tr>"
+)
+
+
+def _row_html(row: _Row) -> str:
+    r = row.rec
+    side_cls = "buy-pill" if r.action == "buy" else "sell-pill"
+    signals = ""
+    if r.key_signals:
+        chips = "".join(
+            f"<span class='chip'>{html.escape(s)}</span>" for s in r.key_signals
+        )
+        signals = f"<div class='chips'>{chips}</div>"
+    conv = (f"<div class='conv'><div class='conv-bar' "
+            f"style='width:{r.conviction * 100:.0f}%'></div></div>"
+            f"<span class='mute'>{r.conviction:.2f}</span>") if r.conviction else \
+        "<span class='mute'>—</span>"
+    strat = f" <span class='mute'>({r.option_strategy})</span>" if r.option_strategy else ""
+    # Sells carry no entry/cost of their own in the ledger — surface the basis
+    # of the shares sold ("went in for") so the row reads in → out → result.
+    if r.action == "sell" and row.basis is not None and r.qty > 0:
+        entry_cell = f"${row.basis / r.qty:,.2f}"
+        cost_cell = f"${row.basis:,.0f} <span class='mute'>in</span>"
+    else:
+        entry_cell = f"${r.entry_price:,.2f}" if r.entry_price else "—"
+        cost_cell = f"${r.cost_usd:,.0f}"
+    return (
+        "<tr>"
+        f"<td class='nowrap'>{_fmt_dt(r.ts)}</td>"
+        f"<td class='sym'>{html.escape(r.symbol)}</td>"
+        f"<td><span class='{side_cls}'>{r.action.upper()}</span></td>"
+        f"<td>{html.escape(r.instrument)}{strat}</td>"
+        f"<td class='num'>{r.qty:,.4g}</td>"
+        f"<td class='num'>{entry_cell}</td>"
+        f"<td class='num'>{cost_cell}</td>"
+        f"<td>{_exit_cell(row)}</td>"
+        f"<td class='num up'>{('%.0f%%' % r.take_profit_pct) if r.action == 'buy' and r.take_profit_pct else '—'}</td>"
+        f"<td class='num'>{_pl_cell(row)}</td>"
+        f"<td>{conv}</td>"
+        f"<td class='reason'>{html.escape(r.rationale) or '<span class=\"mute\">—</span>'}{signals}</td>"
+        "</tr>"
+    )
 
 
 def _table(rows: list[_Row]) -> str:
     if not rows:
         return ("<p class='empty'>No trades recorded yet. The ledger fills as the "
                 "bot executes orders.</p>")
-    head = (
-        "<tr><th>Executed</th><th>Symbol</th><th>Side</th><th>Type</th>"
-        "<th class='num'>Volume</th><th class='num'>Entry</th>"
-        "<th class='num'>Cost invested</th><th>Planned exit (TP / SL)</th>"
-        "<th class='num'>Profit % assumed</th><th>Live P/L</th>"
-        "<th>Conviction</th><th>Reason behind the purchase</th></tr>"
-    )
-    body = []
-    for row in sorted(rows, key=lambda x: x.rec.ts, reverse=True):
-        r = row.rec
-        side_cls = "buy-pill" if r.action == "buy" else "sell-pill"
-        signals = ""
-        if r.key_signals:
-            chips = "".join(
-                f"<span class='chip'>{html.escape(s)}</span>" for s in r.key_signals
-            )
-            signals = f"<div class='chips'>{chips}</div>"
-        conv = (f"<div class='conv'><div class='conv-bar' "
-                f"style='width:{r.conviction * 100:.0f}%'></div></div>"
-                f"<span class='mute'>{r.conviction:.2f}</span>") if r.conviction else \
-            "<span class='mute'>—</span>"
-        strat = f" <span class='mute'>({r.option_strategy})</span>" if r.option_strategy else ""
-        body.append(
-            "<tr>"
-            f"<td class='nowrap'>{_fmt_dt(r.ts)}</td>"
-            f"<td class='sym'>{html.escape(r.symbol)}</td>"
-            f"<td><span class='{side_cls}'>{r.action.upper()}</span></td>"
-            f"<td>{html.escape(r.instrument)}{strat}</td>"
-            f"<td class='num'>{r.qty:,.4g}</td>"
-            f"<td class='num'>{('$%.2f' % r.entry_price) if r.entry_price else '—'}</td>"
-            f"<td class='num'>${r.cost_usd:,.0f}</td>"
-            f"<td>{_exit_cell(r)}</td>"
-            f"<td class='num up'>{('%.0f%%' % r.take_profit_pct) if r.action == 'buy' and r.take_profit_pct else '—'}</td>"
-            f"<td class='num'>{_pl_cell(row)}</td>"
-            f"<td>{conv}</td>"
-            f"<td class='reason'>{html.escape(r.rationale) or '<span class=\"mute\">—</span>'}{signals}</td>"
-            "</tr>"
+    body = [
+        _row_html(row) for row in sorted(rows, key=lambda x: x.rec.ts, reverse=True)
+    ]
+    return f"<table><thead>{_TABLE_HEAD}</thead><tbody>{''.join(body)}</tbody></table>"
+
+
+def fifo_consumed_buys(records: list[TradeRecord]) -> set[int]:
+    """id()s of BUY records whose shares were fully sold, matching sells to
+    buys FIFO within each (symbol, instrument) group. A consumed buy's "live"
+    unrealized P/L would be phantom — the outcome already realized on sells —
+    including the re-entry case where the GROUP holds shares again but this
+    particular lot is long gone."""
+    out: set[int] = set()
+    open_lots: dict[tuple[str, str], list[list]] = defaultdict(list)
+    for r in sorted(records, key=lambda x: x.ts):
+        key = (r.symbol, r.instrument)
+        if r.action == "buy" and r.qty > 0:
+            open_lots[key].append([r.qty, r])
+        elif r.action == "sell":
+            lots = open_lots[key]
+            if r.qty > 0:
+                remaining = r.qty
+            elif r.realized_pl is not None or r.realized_pl_pct is not None:
+                remaining = sum(q for q, _ in lots)  # legacy full close
+            else:
+                continue
+            while remaining > 1e-9 and lots:
+                take = min(lots[0][0], remaining)
+                lots[0][0] -= take
+                remaining -= take
+                if lots[0][0] <= 1e-9:
+                    out.add(id(lots[0][1]))
+                    lots.pop(0)
+    return out
+
+
+def _rt_stat(label: str, value: str) -> str:
+    return (f"<div class='rt-stat'><div class='rt-lbl'>{html.escape(label)}</div>"
+            f"<div class='rt-val'>{value}</div></div>")
+
+
+def _round_trips_html(trips: list[dict], rows: list[_Row]) -> str:
+    """One expandable block per (symbol, instrument): the rollup line answers
+    'how much in, how much out, what's the total P/L for this ticker'; expanding
+    shows that ticker's buys and sells together, newest first."""
+    if not trips:
+        return "<p class='empty'>No trades recorded yet.</p>"
+    by_group: dict[tuple[str, str], list[_Row]] = defaultdict(list)
+    for row in rows:
+        by_group[(row.rec.symbol, row.rec.instrument)].append(row)
+    blocks = []
+    for g in trips:
+        grp_rows = sorted(
+            by_group.get((g["symbol"], g["instrument"]), []),
+            key=lambda x: x.rec.ts, reverse=True,
         )
-    return f"<table><thead>{head}</thead><tbody>{''.join(body)}</tbody></table>"
+        inner = (f"<div class='tablewrap'><table><thead>{_TABLE_HEAD}</thead>"
+                 f"<tbody>{''.join(_row_html(r) for r in grp_rows)}</tbody>"
+                 "</table></div>")
+        if g["open_qty"] > 0:
+            open_val = (f"{g['open_qty']:,.4g} open"
+                        + (f" · ${g['open_value']:,.0f}" if g["open_value"] is not None else "")
+                        + (f" · {_fmt_pl(g['unreal_pl'], None)}"
+                           if g["unreal_pl"] is not None else ""))
+        elif g.get("oversold"):
+            # More sold than the ledger ever bought (e.g. positions surviving a
+            # reset.py wipe) — say so instead of hiding it behind "flat".
+            open_val = (f"<span class='down'>oversold — {g['sold_qty']:,.4g} "
+                        f"sold vs {g['bought_qty']:,.4g} recorded</span>")
+        else:
+            open_val = "<span class='mute'>flat</span>" if g["sold_qty"] else \
+                "<span class='mute'>—</span>"
+        if not g["sold_qty"]:
+            out_cell = "<span class='mute'>—</span>"
+        elif g["proceeds_usd"] > 0:
+            out_cell = (f"${g['proceeds_usd']:,.0f} <span class='mute'>· "
+                        f"{g['sold_qty']:,.4g}</span>")
+        else:
+            # Sold, but no exit price on record (option closes) — unknown
+            # proceeds, not zero.
+            out_cell = (f"<span class='mute'>$? · {g['sold_qty']:,.4g}</span>")
+        stats = [
+            _rt_stat("In (buys)",
+                     f"${g['bought_usd']:,.0f} <span class='mute'>· "
+                     f"{g['bought_qty']:,.4g}</span>"),
+            _rt_stat("Out (sells)", out_cell),
+            _rt_stat("Realized", _fmt_pl(g["realized_pl"], None)),
+            _rt_stat("Still open", open_val),
+            _rt_stat("Net P/L", _fmt_pl(g["net_pl"], None)),
+        ]
+        opt = (" <span class='mute'>(option)</span>"
+               if g["instrument"] == "option" else "")
+        blocks.append(
+            "<details class='rt'><summary>"
+            f"<div class='rt-stat'><div class='rt-lbl'>Ticker</div>"
+            f"<div class='rt-val sym'>{html.escape(g['symbol'])}{opt}</div></div>"
+            + "".join(stats) +
+            "<span class='rt-hint'>trades ▾</span>"
+            f"</summary>{inner}</details>"
+        )
+    return "".join(blocks)
 
 
 def _account_panel(status: Optional[AccountStatus]) -> str:
@@ -286,7 +539,20 @@ def build_html(
     records: list[TradeRecord], prices: dict[str, float],
     account: Optional[AccountStatus] = None,
 ) -> str:
-    rows = [_Row(r, prices.get(r.symbol)) for r in records]
+    trips = aggregate_round_trips(records, prices)
+    closed_groups = {
+        (g["symbol"], g["instrument"]) for g in trips
+        if g["sold_qty"] > 0 and g["open_qty"] <= 0
+    }
+    # Per-BUY FIFO consumption (not per-group): after a re-entry the group
+    # holds shares again, but the original buy's shares are gone and its
+    # "unrealized" P/L would be phantom.
+    consumed_buys = fifo_consumed_buys(records)
+    rows = [
+        _Row(r, prices.get(r.symbol),
+             position_closed=(r.action == "buy" and id(r) in consumed_buys))
+        for r in records
+    ]
     buys = [r for r in records if r.action == "buy"]
 
     total_invested = sum(r.cost_usd for r in buys)
@@ -297,6 +563,10 @@ def build_html(
     total_unreal = sum(r.unreal_pl for r in live_rows) if live_rows else None
     cur_basis = sum(r.rec.entry_price * r.rec.qty for r in live_rows) or 1.0
     unreal_pct = (total_unreal / cur_basis * 100.0) if total_unreal is not None else None
+
+    realized_parts = [g["realized_pl"] for g in trips if g["realized_pl"] is not None]
+    total_realized = sum(realized_parts) if realized_parts else None
+    n_closed = len(closed_groups)
 
     # charts
     per_symbol = defaultdict(float)
@@ -320,6 +590,14 @@ def build_html(
               f"${(total_invested / n_buys):,.0f}" if n_buys else "—",
               "per opening order"),
     ]
+    if total_realized is not None:
+        tone = "up" if total_realized >= 0 else "down"
+        sign = "+" if total_realized >= 0 else ""
+        cards.append(_card(
+            "Realized P/L", f"{sign}${total_realized:,.0f}",
+            f"{n_sells} sells · {n_closed} closed round trips",
+            tone=tone,
+        ))
     if total_unreal is not None:
         tone = "up" if total_unreal >= 0 else "down"
         sign = "+" if total_unreal >= 0 else ""
@@ -332,12 +610,13 @@ def build_html(
         cards.append(_card("Unrealized P/L", "—",
                            "set Alpaca keys for live P/L"))
 
-    generated = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    generated = datetime.now(_ET).strftime("%Y-%m-%d %H:%M:%S ET")
     return _PAGE.format(
         account_panel=_account_panel(account),
         cards="".join(cards),
         bar=bar,
         area=area,
+        round_trips=_round_trips_html(trips, rows),
         table=_table(rows),
         generated=generated,
         css=_CSS,
@@ -389,6 +668,18 @@ tbody tr:hover{background:rgba(255,255,255,.025)}
 .conv{height:6px;width:60px;background:%(grid)s;border-radius:4px;overflow:hidden;
   display:inline-block;vertical-align:middle;margin-right:6px}
 .conv-bar{height:100%%;background:%(amber)s}
+details.rt{background:%(card)s;border:1px solid %(grid)s;border-radius:12px;
+  margin-bottom:10px;overflow:hidden}
+details.rt summary{display:flex;flex-wrap:wrap;align-items:center;gap:8px 28px;
+  padding:14px 18px;cursor:pointer;list-style:none}
+details.rt summary::-webkit-details-marker{display:none}
+details.rt summary:hover{background:rgba(255,255,255,.025)}
+details.rt .tablewrap{border:0;border-top:1px solid %(grid)s;border-radius:0}
+.rt-stat{min-width:110px}
+.rt-lbl{color:%(mute)s;font-size:10px;text-transform:uppercase;letter-spacing:.04em}
+.rt-val{font-size:14px;font-weight:600;margin-top:2px;
+  font-variant-numeric:tabular-nums}
+.rt-hint{color:%(mute)s;font-size:11px;margin-left:auto}
 footer{color:%(mute)s;font-size:12px;margin-top:24px;text-align:center}
 """ % {
     "bg": _BG, "card": _CARD, "ink": _INK, "mute": _MUTE, "grid": _GRID,
@@ -411,8 +702,10 @@ exit, and why. Exits are price-triggered brackets (TP/SL), not calendar dates.</
   <div class="panel"><h2>Capital deployed per symbol</h2>{bar}</div>
   <div class="panel"><h2>Cumulative invested over time</h2>{area}</div>
 </div>
-<div class="panel" style="padding:0">
-  <h2 style="padding:18px 18px 0">All trades</h2>
+<h2 class="section">By ticker — round trips (money in → money out → P/L; expand for the trades)</h2>
+{round_trips}
+<div class="panel" style="padding:0;margin-top:28px">
+  <h2 style="padding:18px 18px 0">All trades (newest first)</h2>
   <div class="tablewrap">{table}</div>
 </div>
 <footer>Generated {generated} · source: state/trades.jsonl</footer>
