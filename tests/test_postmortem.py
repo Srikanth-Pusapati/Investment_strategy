@@ -204,6 +204,31 @@ def test_run_postmortem_truncates_lessons_to_three_and_writes_curated():
     assert schema is _POSTMORTEM_SCHEMA
 
 
+def test_run_postmortem_reads_the_labeled_et_day_not_previous():
+    """Regression (2026-07-13 skip): `day` parsed as UTC midnight lands on the
+    PREVIOUS ET date inside journal._trading_day(), so the labeled day's journal
+    looked empty and the nightly post-mortem silently skipped a 15-trade day.
+    Uses a REAL DecisionJournal — _FakeJournal.today() ignores its argument and
+    would mask exactly this bug."""
+    import json
+    from unittest.mock import MagicMock
+    from investment_strategy.journal import DecisionJournal
+    base = _tmpdir()
+    day = "2026-07-13"
+    (base / f"{day}.jsonl").write_text(json.dumps({
+        "ts": "2026-07-13T14:00:00+00:00", "symbol": "AAPL", "action": "buy",
+        "instrument": "equity", "conviction": 0.8, "target_weight_pct": 5.0,
+        "verdict": "approved", "approved_notional": 500.0, "reason": "r",
+        "rationale_head": "rh",
+    }) + "\n", encoding="utf-8")
+    journal = DecisionJournal(base_dir=base)
+    with patch.dict(sys.modules, {"anthropic": MagicMock()}), \
+         patch("builtins.print"):  # dry-run prints the prompt; keep output clean
+        result = pm_mod.run_postmortem(None, _FakeLedger(), journal,
+                                       day=day, dry_run=True)
+    assert result is not None, "post-mortem skipped the labeled day's records"
+
+
 def _run_all():
     fns = [v for k, v in sorted(globals().items()) if k.startswith("test_") and callable(v)]
     failed = 0

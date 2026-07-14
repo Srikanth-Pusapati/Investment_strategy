@@ -225,6 +225,19 @@ class AlpacaClient:
         clock = _retry_read(self.trading.get_clock, what="get_clock")
         return bool(clock.is_open)
 
+    def next_market_open(self) -> Optional[datetime]:
+        """UTC datetime of the next session open, or None when the clock read
+        fails (callers treat None as 'no open-time wake-up armed')."""
+        try:
+            clock = _retry_read(self.trading.get_clock, what="get_clock")
+            nxt = clock.next_open
+            if nxt is not None and nxt.tzinfo is None:
+                nxt = nxt.replace(tzinfo=timezone.utc)
+            return nxt
+        except Exception as e:
+            log.warning("next_market_open failed: %s", e)
+            return None
+
     def portfolio_basis(self) -> Optional[tuple[float, float]]:
         """(base_value, net_cashflows) since account inception, for true
         total-return math: total_return = equity - base_value - net_cashflows

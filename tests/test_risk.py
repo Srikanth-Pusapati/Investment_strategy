@@ -324,6 +324,16 @@ def test_max_open_positions_halt():
     assert "max open positions" in d.reason.lower()
 
 
+def test_max_open_positions_exempts_topup_of_held_name():
+    # A top-up reuses the held symbol's position row, so the slot cap must not
+    # apply (2026-07-13: a full 15/15 book rejected every buy, including
+    # top-ups the cooldown guard had explicitly promised for later).
+    rm = _rm(_limits(max_open_positions=2))
+    acct = _account(positions=[_pos("AAPL"), _pos("MSFT")])
+    d = rm.evaluate(_buy("AAPL"), acct, price=100.0, volatility=0.25)
+    assert "max open positions" not in d.reason.lower()
+
+
 # --------------------------------------------------------------------------- #
 # Earnings-blackout guard
 # --------------------------------------------------------------------------- #

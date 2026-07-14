@@ -8,6 +8,9 @@ from __future__ import annotations
 
 import json
 import logging
+import math
+from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo
 
 import anthropic
 
@@ -69,20 +72,13 @@ class DecisionEngine:
                 # silently drops the whole cycle). We detect truncation below too.
                 max_tokens=16000,
                 thinking={"type": "adaptive"},
-                # Cache the static system prompt so it isn't re-billed every cycle.
-                # 1h TTL (not the 5m default) so it can survive the gap between
-                # decision cycles (see DECISION_INTERVAL_SECONDS). Note: on Opus
-                # the minimum cacheable prefix is 4096 tokens; until SYSTEM_PROMPT
-                # (plus any future shared context) crosses that, this is a no-op and
-                # cache_creation_input_tokens stays 0. The output_config schema is
-                # cached automatically for 24h by structured outputs.
-                system=[
-                    {
-                        "type": "text",
-                        "text": SYSTEM_PROMPT,
-                        "cache_control": {"type": "ephemeral", "ttl": "1h"},
-                    }
-                ],
+                # No prompt caching: the decision cadence (>= 60 min start-to-
+                # start) outlives even the 1h cache TTL, so every cycle paid the
+                # cache-write premium and never read it back (Jul 13 ledger:
+                # cache_write 3,839 tokens on all 6 calls, 0 cache reads). The
+                # output_config schema is still cached automatically for 24h by
+                # structured outputs.
+                system=SYSTEM_PROMPT,
                 output_config={
                     "effort": self.cfg.decision_effort,
                     "format": {"type": "json_schema", "schema": PROPOSALS_SCHEMA},
@@ -120,6 +116,24 @@ class DecisionEngine:
         # Our own derived data (track-record, today-so-far, exclusions) sits
         # OUTSIDE <market_data> — it's trusted guidance, not third-party text.
         lines: list[str] = []
+        # The model has no clock; without an anchor it dates things from its
+        # training data — the 2026-07-13 session proposed option legs expiring
+        # 2025-08-15, a year in the past, all dead on arrival at the DTE gate.
+        now_et = datetime.now(ZoneInfo("America/New_York")).date()
+        lines.append(f"Today's date: {now_et.isoformat()} (US/Eastern).")
+        r = getattr(self.cfg, "risk", None)
+        if r is not None and getattr(r, "options_enabled", False):
+            # ceil/floor so the stated window is exactly the DTE gate's
+            # acceptance set even for fractional configured bounds.
+            lo_days = math.ceil(r.min_option_dte)
+            hi_days = math.floor(r.max_option_dte)
+            lines.append(
+                f"Option legs must expire {lo_days}-{hi_days} days out: only "
+                f"expiries from {(now_et + timedelta(days=lo_days)).isoformat()} "
+                f"to {(now_et + timedelta(days=hi_days)).isoformat()} are "
+                "accepted."
+            )
+        lines.append("")
         if lessons:
             lines += [lessons, ""]
         if today:

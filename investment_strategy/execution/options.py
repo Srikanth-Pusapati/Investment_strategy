@@ -152,10 +152,15 @@ class OptionsHelper:
             try:
                 q = self.data.get_option_latest_quote(
                     OptionLatestQuoteRequest(symbol_or_symbols=sym)
-                )[sym]
-                bid, ask = float(q.bid_price or 0), float(q.ask_price or 0)
-                if bid > 0 and ask > bid:
-                    spread = (ask - bid) / ((ask + bid) / 2) * 100.0
+                ).get(sym)
+                # The feed simply omits contracts it has no NBBO for (illiquid,
+                # unlisted strike, past-dated expiry) — spread stays None and
+                # _legs_liquid fails open; the est_premium<=0 gate is what
+                # refuses the quote-less leg (_mid_price logs the one line).
+                if q is not None:
+                    bid, ask = float(q.bid_price or 0), float(q.ask_price or 0)
+                    if bid > 0 and ask > bid:
+                        spread = (ask - bid) / ((ask + bid) / 2) * 100.0
             except Exception as e:
                 log.warning("spread lookup failed for %s: %s", sym, e)
             out.append({"symbol": sym, "oi": oi, "rel_spread_pct": spread})
@@ -166,7 +171,13 @@ class OptionsHelper:
         try:
             q = self.data.get_option_latest_quote(
                 OptionLatestQuoteRequest(symbol_or_symbols=sym)
-            )[sym]
+            ).get(sym)
+            if q is None:
+                # No NBBO on the feed (illiquid, unlisted strike, past-dated
+                # expiry) — not an API failure. 0.0 makes the risk gate refuse
+                # the leg (est_premium<=0), which is the designed backstop.
+                log.warning("no quote available for %s — contract unknown to feed", sym)
+                return 0.0
             bid, ask = float(q.bid_price or 0), float(q.ask_price or 0)
             if bid > 0 and ask > 0:
                 return (bid + ask) / 2
