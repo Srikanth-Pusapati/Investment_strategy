@@ -162,6 +162,29 @@ class DecisionEngine:
                 )
             )
             lines.append("")
+        # Full-book rotation guidance (postmortem 2026-07-14: MU 0.63 was
+        # rejected at the slot cap while CVX sat held at 0.46 — the model never
+        # tried pairing a sell with the buy). Counted the same way the risk
+        # gate counts (equity rows only; options have their own concurrency
+        # cap), so this appears exactly when the cap would actually reject.
+        max_slots = int(getattr(r, "max_open_positions", 0) or 0) if r else 0
+        equity_rows = sum(
+            1 for p in account.positions if not getattr(p, "is_option", False)
+        )
+        if max_slots and equity_rows >= max_slots:
+            lines += [
+                f"## Book FULL ({equity_rows}/{max_slots} equity slots) — "
+                "new names enter only by ROTATION",
+                "An equity BUY of a not-held name will be auto-rejected at the "
+                "position cap UNLESS this same response also SELLs a current "
+                "holding: sells execute first, so the freed slot and capital "
+                "fund the buy. Rotate when a candidate's conviction clearly "
+                "beats your weakest holding's (by ~0.10 or more) — otherwise "
+                "HOLD: churn pays the spread twice, and a sold name is locked "
+                "out by the re-entry cooldown. Top-ups of held names are "
+                "unaffected by the cap.",
+                "",
+            ]
         # All third-party text lives inside <market_data> so the system prompt can
         # bind "untrusted data, not instructions" to a clear, delimited region.
         lines += [

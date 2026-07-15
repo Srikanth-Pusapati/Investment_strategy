@@ -608,21 +608,7 @@ class Orchestrator:
                     0.0, buy_excluded.get(prop.symbol, "excluded from slate"),
                     prop.rationale[:120] if prop.rationale else "",
                 )
-        budget_caps = self._cycle_budget_caps(proposals, account)
-        undeployed = 0.0
-        if not proposals:
-            log.info("No actionable proposals this cycle.")
-        else:
-            for proposal in proposals:
-                self._stamp_liveness()  # order placement progresses per name
-                kinds = signal_kinds.get(proposal.symbol, [])
-                if proposal.instrument is Instrument.OPTION:
-                    self._handle_option(proposal, account, kinds)
-                else:
-                    undeployed += self._handle_equity(
-                        proposal, account, kinds,
-                        cycle_budget_cap=budget_caps.get(proposal.symbol),
-                    )
+        undeployed = self._execute_proposals(proposals, account, signal_kinds)
         if undeployed >= 1.0:
             # Whole-share bracket flooring drops each buy's sub-share remainder
             # (deliberate — the exchange-resident bracket wins over precision);
@@ -931,8 +917,10 @@ class Orchestrator:
         applies — this only stops the FIRST buy from consuming the whole cycle's
         cash and starving every later idea to "Budget $0.00" (the 2026-07-06 log:
         10 LLY top-ups in one day while TSM/TDG/BIIB/T were rejected every
-        cycle). Single-buy cycles get no share cap. Capital freed by sells this
-        cycle isn't re-split; the core-ETF fill sweeps whatever is left."""
+        cycle). Single-buy cycles get no share cap. Decision sells run BEFORE
+        this split (_execute_proposals), so capital they free is part of the
+        deployable pool — that's what funds a full-book rotation buy; whatever
+        the buys leave unused is swept by the core-ETF fill."""
         buys = [
             p for p in proposals
             if p.action is Action.BUY and p.instrument is not Instrument.OPTION
@@ -961,6 +949,49 @@ class Orchestrator:
                 ", ".join(f"{s} ${c:,.0f}" for s, c in caps.items()),
             )
         return caps
+
+    # -- proposal execution: equity sells first (rotation support) ---------- #
+    def _execute_proposals(self, proposals, account, signal_kinds) -> float:
+        """Execute the cycle's proposals, equity SELLs first. Returns the $
+        dropped by whole-share flooring across the cycle's buys.
+
+        Sells-first is what makes ROTATION work on a full book (postmortem
+        2026-07-14: MU at 0.63 conviction died at the slot cap while CVX sat
+        held at 0.46): each decision sell folds back into the snapshot
+        (_apply_pending_close), so a paired SELL-weak + BUY-strong response
+        frees the slot and the capital before any buy is evaluated — whatever
+        order the model listed them in. The budget split runs AFTER the sells
+        for the same reason: on a full book, the rotation buy's deployable
+        cash IS the freed capital."""
+        if not proposals:
+            log.info("No actionable proposals this cycle.")
+            return 0.0
+        sells = [
+            p for p in proposals
+            if p.instrument is not Instrument.OPTION and p.action.value == "sell"
+        ]
+        rest = [
+            p for p in proposals
+            if p.instrument is Instrument.OPTION or p.action.value != "sell"
+        ]
+        for proposal in sells:
+            self._stamp_liveness()  # order placement progresses per name
+            self._handle_equity(
+                proposal, account, signal_kinds.get(proposal.symbol, []),
+            )
+        budget_caps = self._cycle_budget_caps(rest, account)
+        undeployed = 0.0
+        for proposal in rest:
+            self._stamp_liveness()
+            kinds = signal_kinds.get(proposal.symbol, [])
+            if proposal.instrument is Instrument.OPTION:
+                self._handle_option(proposal, account, kinds)
+            else:
+                undeployed += self._handle_equity(
+                    proposal, account, kinds,
+                    cycle_budget_cap=budget_caps.get(proposal.symbol),
+                )
+        return undeployed
 
     # -- prompt-time buy-headroom / slate filtering (A2) --------------------- #
     def _buy_headroom_usd(self, symbol: str, account) -> tuple[float, str]:

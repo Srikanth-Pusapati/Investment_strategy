@@ -687,6 +687,89 @@ def test_cycle_budget_respects_cash_buffer():
 
 
 # --------------------------------------------------------------------------- #
+# Sells-first proposal execution (rotation on a full book)
+# --------------------------------------------------------------------------- #
+def _rotation_orch():
+    """Orchestrator with _handle_equity stubbed to record call order and fold
+    sells back into the snapshot the way the real sell path does."""
+    o = _orch(min_cash_buffer_pct=0.0)
+    o._stamp_liveness = lambda: None
+    o._calls = []
+
+    def handle_equity(proposal, account, kinds, cycle_budget_cap=None):
+        o._calls.append((proposal.action.value, proposal.symbol, cycle_budget_cap))
+        if proposal.action.value == "sell":
+            Orchestrator._apply_pending_close(account, proposal.symbol)
+        return 0.0
+
+    def handle_option(proposal, account, kinds):
+        o._calls.append(("option", proposal.symbol, None))
+
+    o._handle_equity = handle_equity
+    o._handle_option = handle_option
+    return o
+
+
+def test_execute_proposals_runs_equity_sells_first():
+    # Rotation (postmortem 2026-07-14): the SELL must free the slot/capital
+    # before any BUY is evaluated, even when the model lists the buy first.
+    o = _rotation_orch()
+    acct = _acct(cash=0.0, positions=[_pos("CVX", 500.0)])
+    props = [
+        _buy_prop("MU", 0.63),
+        _buy_prop("CVX", 0.46, action=Action.SELL),
+    ]
+    o._execute_proposals(props, acct, {})
+    assert [c[:2] for c in o._calls] == [("sell", "CVX"), ("buy", "MU")]
+    assert acct.position_for("CVX") is None   # slot freed before the buy ran
+    assert acct.cash == 500.0                 # capital freed before the buy ran
+
+
+def test_execute_proposals_budget_split_sees_freed_capital():
+    # The fair-share budget split must run AFTER the sells: on a full book the
+    # rotation buys' deployable cash IS the sell's freed capital.
+    o = _rotation_orch()
+    seen = {}
+    real_caps = o._cycle_budget_caps
+
+    def caps_spy(props, account):
+        seen["cash"] = account.cash
+        return real_caps(props, account)
+
+    o._cycle_budget_caps = caps_spy
+    acct = _acct(cash=0.0, positions=[_pos("CVX", 500.0)])
+    props = [
+        _buy_prop("MU", 0.6),
+        _buy_prop("TSM", 0.4),
+        _buy_prop("CVX", 0.46, action=Action.SELL),
+    ]
+    o._execute_proposals(props, acct, {})
+    assert seen["cash"] == 500.0
+    # And the split itself reached the buys (both capped, sell uncapped).
+    buys = [c for c in o._calls if c[0] == "buy"]
+    assert all(cap is not None and cap > 0 for _, _, cap in buys)
+
+
+def test_execute_proposals_keeps_options_and_holds_in_second_phase():
+    o = _rotation_orch()
+    acct = _acct(cash=100.0, positions=[_pos("CVX", 500.0)])
+    opt = TradeProposal(
+        symbol="NVDA", action=Action.BUY, conviction=0.7,
+        target_weight_pct=10.0, rationale="test", instrument=Instrument.OPTION,
+    )
+    props = [
+        opt,
+        _buy_prop("AVAV", 0.5, action=Action.HOLD),
+        _buy_prop("CVX", 0.46, action=Action.SELL),
+    ]
+    o._execute_proposals(props, acct, {})
+    # Sell first; option and hold keep their relative order in phase two.
+    assert [c[:2] for c in o._calls] == [
+        ("sell", "CVX"), ("option", "NVDA"), ("hold", "AVAV"),
+    ]
+
+
+# --------------------------------------------------------------------------- #
 # Daily dated log names (backward-analysis archive)
 # --------------------------------------------------------------------------- #
 from investment_strategy.__main__ import dated_log_name  # noqa: E402

@@ -334,6 +334,23 @@ def test_max_open_positions_exempts_topup_of_held_name():
     assert "max open positions" not in d.reason.lower()
 
 
+def test_rotation_sell_frees_slot_for_new_buy_same_cycle():
+    # Full-book rotation (postmortem 2026-07-14: MU 0.63 died at the slot cap
+    # while CVX sat held at 0.46): once the orchestrator folds a decision SELL
+    # back into the snapshot, the very same buy must clear the slot cap.
+    from investment_strategy.orchestrator import Orchestrator
+
+    rm = _rm(_limits(max_open_positions=2))
+    acct = _account(positions=[_pos("CVX"), _pos("AAPL")])
+    d = rm.evaluate(_buy("MU"), acct, price=100.0, volatility=0.25)
+    assert d.verdict is RiskVerdict.REJECTED
+    assert "max open positions" in d.reason.lower()
+
+    Orchestrator._apply_pending_close(acct, "CVX")   # the paired rotation sell
+    d2 = rm.evaluate(_buy("MU"), acct, price=100.0, volatility=0.25)
+    assert "max open positions" not in d2.reason.lower()
+
+
 # --------------------------------------------------------------------------- #
 # Earnings-blackout guard
 # --------------------------------------------------------------------------- #
