@@ -93,3 +93,23 @@ def test_rotation_block_survives_missing_risk_config():
     acct = _acct([_pos("CVX")])
     text = eng._render([_bundle("MU")], acct, "", [])
     assert "Book FULL" not in text
+
+
+def test_held_note_renders_entry_conviction_and_age():
+    # The incumbent baseline a rotation must beat (postmortem 2026-07-14: the
+    # CVX 0.46 vs MU 0.63 gap was visible only in our journal, never to the
+    # model).
+    eng = _engine(max_open_positions=5)
+    acct = _acct([_pos("CVX")])
+    text = eng._render(
+        [_bundle("CVX")], acct, "", [],
+        held_notes={"CVX": "entry conviction 0.46, held 1.2d"},
+    )
+    assert "(HELD: 1 sh, +0.0%, entry conviction 0.46, held 1.2d)" in text
+
+
+def test_held_tag_unchanged_without_note():
+    eng = _engine(max_open_positions=5)
+    acct = _acct([_pos("CVX")])
+    text = eng._render([_bundle("CVX")], acct, "", [])
+    assert "(HELD: 1 sh, +0.0%)" in text
