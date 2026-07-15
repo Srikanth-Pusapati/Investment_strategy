@@ -590,7 +590,7 @@ class Orchestrator:
         proposals = self.engine.decide(
             bundles, account, bench_line, external, lessons,
             today=today_block, buy_excluded=buy_excluded,
-            signal_notes=signal_notes,
+            signal_notes=signal_notes, held_notes=self._held_notes(account),
         )
         self._stamp_liveness()
         proposals = self._filter_to_slate(proposals, bundles, account)
@@ -949,6 +949,31 @@ class Orchestrator:
                 ", ".join(f"{s} ${c:,.0f}" for s, c in caps.items()),
             )
         return caps
+
+    # -- held-position context for the prompt (rotation baseline) ----------- #
+    def _held_notes(self, account) -> dict[str, str]:
+        """Entry conviction + hold age per held equity name, from our own state
+        clocks (trusted derived data, not market text). This is the incumbent
+        baseline a rotation candidate must beat — without it the model compares
+        a fresh candidate's conviction against nothing (postmortem 2026-07-14:
+        the CVX 0.46 vs MU 0.63 gap was visible only in our journal). Best-
+        effort: a name traded before conviction tracking simply has no note."""
+        notes: dict[str, str] = {}
+        for p in account.positions:
+            if p.is_option:
+                continue
+            if self.cfg.core_etf and p.symbol == self.cfg.core_etf:
+                continue  # passive core: never on the slate, never rotated
+            bits: list[str] = []
+            conv = self.state.last_buy_conviction(p.symbol)
+            if conv is not None:
+                bits.append(f"entry conviction {conv:.2f}")
+            age = self.state.entry_age_days(p.symbol)
+            if age is not None:
+                bits.append(f"held {age:.1f}d")
+            if bits:
+                notes[p.symbol] = ", ".join(bits)
+        return notes
 
     # -- proposal execution: equity sells first (rotation support) ---------- #
     def _execute_proposals(self, proposals, account, signal_kinds) -> float:

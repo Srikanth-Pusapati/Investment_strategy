@@ -45,6 +45,7 @@ class DecisionEngine:
         lessons: str = "", today: str = "",
         buy_excluded: dict[str, str] | None = None,
         signal_notes: dict[str, dict[str, str]] | None = None,
+        held_notes: dict[str, str] | None = None,
     ) -> list[TradeProposal]:
         """Ask Claude for proposals across all candidate symbols at once.
 
@@ -55,6 +56,9 @@ class DecisionEngine:
         `signal_notes` (symbol -> kind -> note) carries OUR deterministic
         freshness/trend annotations (E.1+R.4) — trusted, computed from persisted
         history, never from third-party text.
+        `held_notes` (symbol -> note) carries each holding's entry conviction
+        and hold age from our own ledger clocks — the incumbent baseline a
+        rotation candidate must beat.
         """
         if not bundles:
             return []
@@ -63,6 +67,7 @@ class DecisionEngine:
             bundles, account, benchmark_line, external or [], lessons,
             today=today, buy_excluded=buy_excluded or {},
             signal_notes=signal_notes or {},
+            held_notes=held_notes or {},
         )
         try:
             resp = self.client.messages.create(
@@ -112,6 +117,7 @@ class DecisionEngine:
         benchmark_line: str, external: list[ExternalHolding], lessons: str = "",
         today: str = "", buy_excluded: dict[str, str] | None = None,
         signal_notes: dict[str, dict[str, str]] | None = None,
+        held_notes: dict[str, str] | None = None,
     ) -> str:
         # Our own derived data (track-record, today-so-far, exclusions) sits
         # OUTSIDE <market_data> — it's trusted guidance, not third-party text.
@@ -179,10 +185,13 @@ class DecisionEngine:
                 "position cap UNLESS this same response also SELLs a current "
                 "holding: sells execute first, so the freed slot and capital "
                 "fund the buy. Rotate when a candidate's conviction clearly "
-                "beats your weakest holding's (by ~0.10 or more) — otherwise "
-                "HOLD: churn pays the spread twice, and a sold name is locked "
-                "out by the re-entry cooldown. Top-ups of held names are "
-                "unaffected by the cap.",
+                "beats your weakest holding's (by ~0.10 or more) — each HELD "
+                "line shows the incumbent's entry conviction and hold age. "
+                "Prefer displacing stale, low-conviction holds; do NOT flip a "
+                "name entered within the last day on no new information. "
+                "Otherwise HOLD: churn pays the spread twice, and a sold name "
+                "is locked out by the re-entry cooldown. Top-ups of held "
+                "names are unaffected by the cap.",
                 "",
             ]
         # All third-party text lives inside <market_data> so the system prompt can
@@ -219,7 +228,14 @@ class DecisionEngine:
                     f" — AT CAP: do NOT propose equity BUY "
                     f"({buy_excluded[b.symbol]})" if at_cap else ""
                 )
-                tag = f" (HELD: {pos.qty:g} sh, {pos.unrealized_pl_pct:+.1f}%{cap_note})"
+                # Our ledger's entry conviction + hold age (trusted, not market
+                # text) — the incumbent baseline a rotation must clearly beat.
+                held_note = (held_notes or {}).get(b.symbol, "")
+                held_note = f", {held_note}" if held_note else ""
+                tag = (
+                    f" (HELD: {pos.qty:g} sh, "
+                    f"{pos.unrealized_pl_pct:+.1f}%{held_note}{cap_note})"
+                )
             elif any(s.kind is SignalKind.DISCOVERY for s in b.signals):
                 tag = " (NEW — surfaced by scanner)"
             else:

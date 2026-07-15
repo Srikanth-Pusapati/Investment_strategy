@@ -770,6 +770,32 @@ def test_execute_proposals_keeps_options_and_holds_in_second_phase():
 
 
 # --------------------------------------------------------------------------- #
+# Held-position notes for the prompt (rotation baseline)
+# --------------------------------------------------------------------------- #
+def test_held_notes_built_from_state_clocks():
+    o = _orch(core_etf="QQQ")
+    o.state.register_buy("CVX", conviction=0.46)
+    o.state.register_entry("CVX")
+    acct = _acct(positions=[_pos("CVX", 100.0), _pos("QQQ", 500.0)])
+    notes = o._held_notes(acct)
+    assert "entry conviction 0.46" in notes["CVX"]
+    assert "held 0.0d" in notes["CVX"]
+    assert "QQQ" not in notes           # passive core: never slated, never rotated
+
+
+def test_held_notes_skip_options_and_unclocked_names():
+    o = _orch()
+    opt = Position(
+        symbol="AAPL260821C00200000", qty=1.0, avg_entry_price=2.0,
+        current_price=2.0, market_value=200.0, unrealized_pl=0.0,
+        unrealized_pl_pct=0.0, asset_class="us_option",
+    )
+    acct = _acct(positions=[opt, _pos("MSFT", 100.0)])
+    # Option rows are skipped; MSFT predates conviction tracking -> no note.
+    assert o._held_notes(acct) == {}
+
+
+# --------------------------------------------------------------------------- #
 # Daily dated log names (backward-analysis archive)
 # --------------------------------------------------------------------------- #
 from investment_strategy.__main__ import dated_log_name  # noqa: E402
