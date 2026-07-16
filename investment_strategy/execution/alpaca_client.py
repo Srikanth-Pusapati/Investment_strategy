@@ -537,6 +537,20 @@ class AlpacaClient:
         log.info("REDUCE %s qty=%g (order %s)", symbol, qty, order.id)
         return str(order.id)
 
+    def open_position(self, symbol: str) -> Optional[Position]:
+        """Fresh single-position read straight from the broker. Close paths
+        branch on qty_available, and the cycle-start snapshot can be minutes
+        old by the time a decision sell executes (LLM round-trip) — brackets
+        placed or replaced in between change what's reserved. None => flat
+        (or unreadable this instant; callers treat both as nothing-to-close
+        and let the next cycle re-decide)."""
+        try:
+            return self._to_position(self.trading.get_open_position(symbol))
+        except Exception as e:
+            if "position does not exist" not in str(e).lower():
+                log.warning("open_position(%s) failed: %s", symbol, e)
+            return None
+
     # -- closing (never gated) --------------------------------------------- #
     def close_position(self, symbol: str) -> Optional[str]:
         try:

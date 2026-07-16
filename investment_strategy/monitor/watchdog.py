@@ -214,6 +214,16 @@ class Watchdog:
         self._last_wait_log[symbol] = now
         log.warning(msg, *args)
 
+    def close_now(self, pos: Position, reason: str) -> tuple[str, str | None]:
+        """Public entry for decision-loop closes (orchestrator SELL / thesis
+        decay): the same escalation ladder as watchdog exits — exit-via-replace
+        when shares are reserved by live sell legs, never cancel-then-resell
+        (the async pending-cancel wedge that stranded SPCX 2026-07-16: cancel
+        issued, close refused 40310000, position left naked). Partial exits
+        are ledgered in here with `reason`; the caller records only a "full"
+        close and must NOT ledger anything on "failed"."""
+        return self._close_hard(pos, reason)
+
     # -- best-effort hard close (1B.5) -------------------------------------- #
     def _close_hard(self, pos: Position, reason: str) -> tuple[str, str | None]:
         """Close `pos` as hard as the broker allows, escalating through every
