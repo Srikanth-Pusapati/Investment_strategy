@@ -1,0 +1,1063 @@
+2026-07-15 00:56:04,486 INFO orchestrator | Market closed; skipping decision cycle.
+2026-07-15 00:56:04,567 INFO alpaca | Alpaca client ready (mode=paper).
+2026-07-15 00:56:09,220 INFO dashboard | Wrote dashboard with 27 trades -> dashboard.html
+2026-07-15 01:56:20,847 INFO orchestrator | Market closed; skipping decision cycle.
+2026-07-15 01:56:21,085 INFO alpaca | Alpaca client ready (mode=paper).
+2026-07-15 01:56:22,801 INFO dashboard | Wrote dashboard with 27 trades -> dashboard.html
+2026-07-15 02:56:38,008 INFO orchestrator | Market closed; skipping decision cycle.
+2026-07-15 02:56:38,244 INFO alpaca | Alpaca client ready (mode=paper).
+2026-07-15 02:56:40,051 INFO dashboard | Wrote dashboard with 27 trades -> dashboard.html
+2026-07-15 03:29:07,929 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 03:29:08,306 WARNING alpaca | Exit via resting sell ad42d824-198f-48d6-bf2f-78b78308f27b (BIIB): replaced limit -> 188.07 (marketable; new order 757e705e-f68c-4fbb-8761-32eeca130d0b).
+2026-07-15 03:29:08,320 INFO ledger | Ledger: SELL BIIB qty=11 $2096
+2026-07-15 03:29:08,327 WARNING watchdog | Partial close BIIB (trail): sold 0 available share(s), made 1 resting sell(s) marketable; 11 reserved by open orders — will retry the full close next tick.
+2026-07-15 03:29:39,058 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 03:29:39,209 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 03:30:09,945 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 03:30:10,100 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 03:30:40,728 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 03:30:40,965 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 03:31:11,678 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 03:31:11,911 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 03:31:42,595 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 03:31:42,832 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 03:32:13,532 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 03:32:13,770 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 03:32:44,440 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 03:32:44,651 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 03:33:15,335 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 03:33:15,580 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 03:33:46,302 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 03:33:46,519 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 03:34:17,253 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 03:34:17,494 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 03:34:48,186 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 03:34:48,425 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 03:35:19,128 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 03:35:19,367 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 03:35:50,021 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 03:35:50,252 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 03:36:20,984 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 03:36:21,228 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 03:36:51,903 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 03:36:52,115 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 03:37:22,828 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 03:37:23,050 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 03:37:53,767 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 03:37:53,979 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 03:38:24,684 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 03:38:24,918 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 03:38:55,605 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 03:38:55,852 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 03:39:26,558 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 03:39:26,784 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 03:39:57,745 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 03:39:57,892 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 03:40:28,708 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 03:40:28,867 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 03:40:59,631 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 03:40:59,786 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 03:41:30,603 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 03:41:30,768 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 03:42:01,538 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 03:42:01,684 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 03:42:32,470 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 03:42:32,628 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 03:43:03,374 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 03:43:03,526 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 03:43:34,338 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 03:43:34,487 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 03:44:05,275 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 03:44:05,425 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 03:44:36,206 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 03:44:36,362 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 03:45:07,053 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 03:45:07,237 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 03:45:38,071 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 03:45:38,224 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 03:46:08,972 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 03:46:09,216 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 03:46:39,965 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 03:46:40,126 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 03:47:10,868 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 03:47:11,036 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 03:47:41,833 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 03:47:41,987 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 03:48:12,771 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 03:48:12,931 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 03:48:43,630 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 03:48:43,789 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 03:49:14,561 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 03:49:14,709 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 03:49:45,495 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 03:49:45,650 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 03:50:16,463 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 03:50:16,611 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 03:50:47,389 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 03:50:47,580 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 03:51:18,449 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 03:51:18,607 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 03:51:49,403 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 03:51:49,554 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 03:52:20,231 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 03:52:20,387 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 03:52:51,128 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 03:52:51,280 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 03:53:22,018 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 03:53:22,168 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 03:53:52,957 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 03:53:53,116 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 03:54:23,846 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 03:54:24,001 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 03:54:54,824 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 03:54:54,984 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 03:55:25,764 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 03:55:25,919 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 03:55:56,685 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 03:55:56,834 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 03:56:27,667 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 03:56:27,853 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 03:56:55,194 INFO orchestrator | Market closed; skipping decision cycle.
+2026-07-15 03:56:55,486 INFO alpaca | Alpaca client ready (mode=paper).
+2026-07-15 03:56:57,182 INFO dashboard | Wrote dashboard with 28 trades -> dashboard.html
+2026-07-15 03:56:58,612 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 03:56:58,769 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 03:57:29,554 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 03:57:29,700 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 03:58:00,460 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 03:58:00,619 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 03:58:31,352 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 03:58:31,523 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 03:59:02,292 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 03:59:02,452 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 03:59:33,214 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 03:59:33,373 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 04:00:04,153 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 04:00:04,321 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 04:00:35,085 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 04:00:35,232 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 04:01:06,024 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 04:01:06,176 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 04:01:36,951 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 04:01:37,130 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 04:02:07,894 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 04:02:08,049 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 04:02:38,637 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 04:02:38,870 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 04:03:09,552 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 04:03:09,801 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 04:03:40,448 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 04:03:40,689 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 04:04:11,375 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 04:04:11,617 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 04:04:42,336 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 04:04:42,554 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 04:05:13,185 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 04:05:13,345 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 04:05:44,079 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 04:05:44,236 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 04:06:14,931 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 04:06:15,090 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 04:06:45,787 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 04:06:45,936 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 04:07:16,725 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 04:07:16,886 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 04:07:47,655 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 04:07:47,809 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 04:08:18,596 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 04:08:18,765 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 04:08:49,523 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 04:08:49,679 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 04:09:20,473 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 04:09:20,626 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 04:09:51,389 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 04:09:51,541 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 04:10:22,325 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 04:10:22,480 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 04:10:53,251 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 04:10:53,401 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 04:11:24,101 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 04:11:24,255 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 04:11:54,880 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 04:11:55,119 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 04:12:25,807 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 04:12:26,055 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 04:13:01,460 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 04:13:01,702 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 04:13:32,380 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 04:13:32,597 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 04:14:03,290 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 04:14:03,534 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 04:14:34,200 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 04:14:34,414 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 04:15:05,194 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 04:15:05,438 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 04:15:36,125 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 04:15:36,370 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 04:16:07,300 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 04:16:07,455 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 04:16:38,308 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 04:16:38,490 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 04:17:09,225 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 04:17:09,376 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 04:17:40,162 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 04:17:40,315 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 04:18:11,063 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 04:18:11,225 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 04:18:42,012 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 04:18:42,160 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 04:19:12,898 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 04:19:13,048 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 04:19:43,788 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 04:19:43,944 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 04:20:14,724 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 04:20:14,873 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 04:20:45,663 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 04:20:45,816 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 04:21:16,589 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 04:21:16,763 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 04:21:47,521 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 04:21:47,676 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 04:22:18,457 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 04:22:18,612 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 04:22:49,389 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 04:22:49,546 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 04:23:20,361 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 04:23:20,518 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 04:23:51,252 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 04:23:51,415 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 04:24:22,214 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 04:24:22,380 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 04:24:53,161 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 04:24:53,313 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 04:25:24,089 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 04:25:24,243 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 04:25:55,046 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 04:25:55,205 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 04:26:25,916 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 04:26:26,067 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 04:26:56,889 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 04:26:57,044 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 04:27:27,841 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 04:27:28,001 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 04:27:58,748 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 04:27:58,899 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 04:28:29,652 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 04:28:29,809 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 04:29:00,584 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 04:29:00,734 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 04:29:31,513 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 04:29:31,695 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 04:30:02,450 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 04:30:02,737 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 04:30:33,469 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 04:30:33,632 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 04:31:04,375 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 04:31:04,529 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 04:31:35,013 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 04:31:35,257 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 04:32:06,089 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 04:32:06,241 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 04:32:37,017 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 04:32:37,179 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 04:33:07,949 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 04:33:08,104 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 04:33:38,878 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 04:33:39,030 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 04:34:09,817 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 04:34:09,973 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 04:34:40,778 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 04:34:40,924 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 04:35:11,679 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 04:35:11,835 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 04:35:42,600 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 04:35:42,750 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 04:36:13,546 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 04:36:13,706 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 04:36:44,513 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 04:36:44,670 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 04:37:15,405 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 04:37:15,548 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 04:37:46,377 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 04:37:46,529 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 04:38:17,313 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 04:38:17,467 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 04:38:48,244 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 04:38:48,397 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 04:39:19,139 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 04:39:19,290 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 04:39:50,103 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 04:39:50,257 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 04:40:21,065 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 04:40:21,239 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 04:40:51,989 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 04:40:52,206 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 04:41:22,938 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 04:41:23,115 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 04:41:53,849 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 04:41:53,997 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 04:42:24,770 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 04:42:24,926 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 04:42:55,659 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 04:42:55,813 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 04:43:26,632 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 04:43:26,838 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 04:43:57,595 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 04:43:57,742 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 04:44:28,498 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 04:44:28,658 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 04:44:59,383 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 04:44:59,534 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 04:45:30,274 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 04:45:30,430 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 04:46:01,297 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 04:46:01,458 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 04:46:32,184 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 04:46:32,339 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 04:47:03,162 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 04:47:03,324 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 04:47:34,089 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 04:47:34,243 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 04:48:04,828 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 04:48:05,079 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 04:48:35,913 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 04:48:36,064 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 04:49:06,842 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 04:49:07,004 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 04:49:37,824 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 04:49:37,984 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 04:50:08,711 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 04:50:08,866 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 04:50:39,681 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 04:50:39,827 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 04:51:10,617 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 04:51:10,811 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 04:51:41,594 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 04:51:41,749 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 04:52:12,521 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 04:52:12,677 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 04:52:43,438 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 04:52:43,595 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 04:53:14,362 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 04:53:14,526 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 04:53:45,274 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 04:53:45,433 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 04:54:16,171 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 04:54:16,324 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 04:54:47,137 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 04:54:47,286 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 04:55:18,076 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 04:55:18,235 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 04:55:48,800 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 04:55:49,012 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 04:56:19,658 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 04:56:19,898 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 04:56:50,614 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 04:56:50,826 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 04:57:12,614 INFO orchestrator | Market closed; skipping decision cycle.
+2026-07-15 04:57:12,914 INFO alpaca | Alpaca client ready (mode=paper).
+2026-07-15 04:57:14,627 INFO dashboard | Wrote dashboard with 28 trades -> dashboard.html
+2026-07-15 04:57:21,520 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 04:57:21,751 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 04:57:52,477 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 04:57:52,712 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 04:58:23,444 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 04:58:23,662 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 04:58:54,360 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 04:58:54,588 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 04:59:25,311 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 04:59:25,526 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 04:59:56,223 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 04:59:56,457 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 05:00:31,892 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 05:00:32,110 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 05:01:02,814 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 05:01:03,088 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 05:01:33,760 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 05:01:34,003 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 05:02:04,703 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 05:02:04,947 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 05:02:35,606 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 05:02:35,839 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 05:03:06,561 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 05:03:06,765 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 05:03:37,355 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 05:03:37,508 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 05:04:08,186 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 05:04:08,331 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 05:04:39,063 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 05:04:39,208 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 05:05:10,016 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 05:05:10,169 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 05:05:40,940 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 05:05:41,105 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 05:06:11,878 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 05:06:12,031 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 05:06:42,801 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 05:06:42,961 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 05:07:13,660 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 05:07:13,815 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 05:07:44,682 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 05:07:44,838 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 05:08:15,620 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 05:08:15,773 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 05:08:46,502 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 05:08:46,662 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 05:09:17,388 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 05:09:17,547 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 05:09:48,437 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 05:09:48,594 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 05:10:19,353 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 05:10:19,504 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 05:10:50,264 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 05:10:50,407 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 05:11:21,204 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 05:11:21,359 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 05:11:52,098 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 05:11:52,246 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 05:12:23,069 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 05:12:23,221 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 05:12:53,958 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 05:12:54,112 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 05:13:24,897 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 05:13:25,097 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 05:13:55,874 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 05:13:56,028 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 05:14:26,765 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 05:14:26,940 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 05:14:57,646 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 05:14:57,807 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 05:15:28,685 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 05:15:28,840 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 05:15:59,606 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 05:15:59,754 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 05:16:30,569 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 05:16:30,727 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 05:17:01,488 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 05:17:01,646 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 05:17:32,394 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 05:17:32,576 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 05:18:03,287 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 05:18:03,448 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 05:18:34,220 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 05:18:34,388 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 05:19:05,153 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 05:19:05,308 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 05:19:36,114 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 05:19:36,268 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 05:20:07,054 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 05:20:07,201 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 05:20:37,948 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 05:20:38,097 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 05:21:08,878 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 05:21:09,030 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 05:21:39,808 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 05:21:39,964 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 05:22:10,753 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 05:22:10,902 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 05:22:41,675 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 05:22:41,825 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 05:23:12,616 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 05:23:12,771 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 05:23:43,610 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 05:23:43,767 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 05:24:14,591 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 05:24:14,760 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 05:24:45,601 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 05:24:45,749 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 05:25:16,618 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 05:25:16,778 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 05:25:47,524 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 05:25:47,671 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 05:26:18,356 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 05:26:18,510 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 05:26:49,326 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 05:26:49,470 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 05:27:20,178 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 05:27:20,337 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 05:27:51,019 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 05:27:51,161 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 05:28:21,833 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 05:28:22,049 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 05:28:52,635 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 05:28:52,783 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 05:29:23,668 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 05:29:23,905 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 05:29:54,572 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 05:29:54,802 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 05:30:25,475 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 05:30:25,795 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 05:30:56,473 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 05:30:56,832 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 05:31:27,642 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 05:31:27,799 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 05:31:58,530 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 05:31:58,679 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 05:32:29,464 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 05:32:29,629 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 05:33:00,445 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 05:33:00,646 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 05:33:31,376 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 05:33:31,567 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 05:34:02,307 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 05:34:02,493 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 05:34:33,237 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 05:34:33,396 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 05:35:04,171 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 05:35:04,329 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 05:35:35,060 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 05:35:35,213 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 05:36:05,997 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 05:36:06,147 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 05:36:36,930 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 05:36:37,085 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 05:37:07,906 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 05:37:08,076 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 05:37:38,832 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 05:37:38,992 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 05:38:09,770 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 05:38:09,941 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 05:38:40,610 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 05:38:40,757 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 05:39:11,596 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 05:39:11,758 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 05:39:42,570 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 05:39:42,730 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 05:40:13,465 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 05:40:13,626 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 05:40:44,436 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 05:40:44,592 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 05:41:15,329 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 05:41:15,496 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 05:41:46,299 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 05:41:46,453 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 05:42:17,199 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 05:42:17,357 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 05:42:48,171 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 05:42:48,322 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 05:43:19,051 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 05:43:19,202 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 05:43:49,991 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 05:43:50,145 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 05:44:20,964 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 05:44:21,131 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 05:44:51,808 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 05:44:51,960 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 05:45:22,827 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 05:45:22,978 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 05:45:53,723 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 05:45:53,875 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 05:46:24,658 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 05:46:24,818 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 05:46:55,628 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 05:46:55,785 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 05:47:26,561 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 05:47:26,724 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 05:47:57,304 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 05:47:57,549 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 05:48:28,225 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 05:48:28,434 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 05:48:59,087 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 05:48:59,319 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 05:49:30,030 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 05:49:30,263 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 05:50:00,981 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 05:50:01,242 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 05:50:31,907 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 05:50:32,117 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 05:51:02,847 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 05:51:03,050 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 05:51:33,766 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 05:51:33,986 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 05:52:04,700 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 05:52:04,917 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 05:52:35,639 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 05:52:35,853 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 05:53:06,598 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 05:53:06,897 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 05:53:37,719 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 05:53:37,872 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 05:54:08,697 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 05:54:08,892 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 05:54:39,625 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 05:54:39,774 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 05:55:10,560 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 05:55:10,717 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 05:55:41,556 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 05:55:41,723 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 05:56:12,543 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 05:56:12,699 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 05:56:43,387 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 05:56:43,545 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 05:57:14,474 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 05:57:14,725 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 05:57:30,491 INFO orchestrator | Market closed; skipping decision cycle.
+2026-07-15 05:57:30,551 INFO alpaca | Alpaca client ready (mode=paper).
+2026-07-15 05:57:32,236 INFO dashboard | Wrote dashboard with 28 trades -> dashboard.html
+2026-07-15 05:57:45,452 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 05:57:45,658 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 05:58:16,422 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 05:58:16,641 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 05:58:47,356 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 05:58:47,572 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 05:59:18,301 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 05:59:18,548 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 05:59:49,220 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 05:59:49,439 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 06:00:20,136 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 06:00:20,370 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 06:00:51,098 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 06:00:51,312 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 06:01:22,098 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 06:01:22,330 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 06:01:53,164 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 06:01:53,318 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 06:02:24,055 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 06:02:24,208 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 06:02:55,030 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 06:02:55,191 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 06:03:25,969 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 06:03:26,119 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 06:03:56,903 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 06:03:57,062 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 06:04:27,651 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 06:04:27,889 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 06:04:58,594 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 06:04:58,821 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 06:05:29,424 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 06:05:29,652 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 06:06:00,425 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 06:06:00,630 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 06:06:31,369 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 06:06:31,619 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 06:07:02,291 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 06:07:02,542 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 06:57:48,215 INFO orchestrator | Market closed; skipping decision cycle.
+2026-07-15 06:57:48,285 INFO alpaca | Alpaca client ready (mode=paper).
+2026-07-15 06:57:50,069 INFO dashboard | Wrote dashboard with 28 trades -> dashboard.html
+2026-07-15 07:58:05,694 INFO orchestrator | Market closed; skipping decision cycle.
+2026-07-15 07:58:05,904 INFO alpaca | Alpaca client ready (mode=paper).
+2026-07-15 07:58:07,598 INFO dashboard | Wrote dashboard with 28 trades -> dashboard.html
+2026-07-15 08:25:14,827 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now 0.2%. Closing.
+2026-07-15 08:25:15,220 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 08:25:46,013 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now 0.2%. Closing.
+2026-07-15 08:25:46,166 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 08:26:16,949 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now 0.2%. Closing.
+2026-07-15 08:26:17,105 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 08:26:47,842 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now 0.2%. Closing.
+2026-07-15 08:26:47,994 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 08:27:18,777 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now 0.2%. Closing.
+2026-07-15 08:27:18,967 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 08:27:49,694 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now 0.2%. Closing.
+2026-07-15 08:27:49,887 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 08:28:20,493 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now 0.2%. Closing.
+2026-07-15 08:28:20,721 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 08:28:51,407 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now 0.2%. Closing.
+2026-07-15 08:28:51,613 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 08:29:22,277 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now 0.2%. Closing.
+2026-07-15 08:29:22,570 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 08:29:53,424 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now 0.2%. Closing.
+2026-07-15 08:29:53,571 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 08:30:15,979 WARNING orchestrator | Order 757e705e-f68c-4fbb-8761-32eeca130d0b (BIIB) still new a full cycle later.
+2026-07-15 08:30:17,519 INFO orchestrator | Market regime: SPY above 200dma (755 vs 692), VIX 16 -> risk-on, size x1.00.
+2026-07-15 08:30:18,286 INFO quiver | Quiver live/congresstrading -> 1000 row(s).
+2026-07-15 08:30:20,723 INFO screener | EDGAR Form-4 feed -> 62 filing(s) (scanning up to 100).
+2026-07-15 08:30:24,365 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.3%. Closing.
+2026-07-15 08:30:24,541 WARNING alpaca | Exit via resting sell 757e705e-f68c-4fbb-8761-32eeca130d0b (BIIB): replaced limit -> 187.18 (marketable; new order 281081b2-963d-46e5-b1ef-03337dc3f1bd).
+2026-07-15 08:30:24,547 INFO ledger | Ledger: CORRECT BIIB qty=0 $0
+2026-07-15 08:30:24,549 INFO watchdog | Superseded exit 757e705e-f68c-4fbb-8761-32eeca130d0b (BIIB): prior SELL record corrected to 0/11 filled; the replacement order carries the exit.
+2026-07-15 08:30:24,553 INFO ledger | Ledger: SELL BIIB qty=11 $2092
+2026-07-15 08:30:24,557 WARNING watchdog | Partial close BIIB (trail): sold 0 available share(s), made 1 resting sell(s) marketable; 11 reserved by open orders — will retry the full close next tick.
+2026-07-15 08:30:45,025 INFO screener | Options-flow most-actives pool -> 40 name(s).
+2026-07-15 08:30:55,298 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.6%. Closing.
+2026-07-15 08:30:55,447 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 08:31:04,403 INFO screener | Robinhood 'Daily movers' -> 20 name(s).
+2026-07-15 08:31:05,646 INFO screener | Robinhood '100 most popular' -> 100 name(s).
+2026-07-15 08:31:06,567 INFO screener | Robinhood scans: none saved (define scans in the RH app to use this leg).
+2026-07-15 08:31:06,569 INFO screener | Discovered 18 candidate(s) from 5 source(s) (264 merged, 255 above min_score, capped to 18).
+2026-07-15 08:31:06,570 INFO screener |   candidate IBM [congress+robinhood] score=+1.10 — Congress: 3 buy / 1 sell filings in last 60d (disclosures lag up to ~45d). | Robinhood Daily Movers (today's biggest movers — momentum) | Robinhood 100 Most Popular (retail crowd positioning)
+2026-07-15 08:31:06,572 INFO screener |   candidate TSCO [congress] score=-1.00 — Congress: 0 buy / 5 sell filings in last 60d (disclosures lag up to ~45d).
+2026-07-15 08:31:06,573 INFO screener |   candidate WAB [congress] score=-1.00 — Congress: 0 buy / 4 sell filings in last 60d (disclosures lag up to ~45d).
+2026-07-15 08:31:06,574 INFO screener |   candidate LCDL [options_flow] score=+0.96 — Options flow: 911 call / 20 put vol (bullish call imbalance +0.96) on a most-active name.
+2026-07-15 08:31:06,576 INFO screener |   candidate LYV [congress] score=-0.75 — Congress: 0 buy / 3 sell filings in last 60d (disclosures lag up to ~45d).
+2026-07-15 08:31:06,577 INFO screener |   candidate ENTG [congress] score=+0.75 — Congress: 3 buy / 0 sell filings in last 60d (disclosures lag up to ~45d).
+2026-07-15 08:31:06,578 INFO screener |   candidate WRB [congress] score=-0.75 — Congress: 0 buy / 3 sell filings in last 60d (disclosures lag up to ~45d).
+2026-07-15 08:31:06,579 INFO screener |   candidate BAC [options_flow+robinhood] score=+0.74 — Options flow: 118,828 call / 51,831 put vol (bullish call imbalance +0.39) on a most-active name. | Robinhood 100 Most Popular (retail crowd positioning)
+2026-07-15 08:31:06,580 INFO screener |   candidate BITO [options_flow] score=+0.74 — Options flow: 5,716 call / 854 put vol (bullish call imbalance +0.74) on a most-active name.
+2026-07-15 08:31:06,581 INFO screener |   candidate NVD [options_flow] score=-0.70 — Options flow: 71 call / 399 put vol (bearish put imbalance -0.70) on a most-active name.
+2026-07-15 08:31:06,582 INFO screener |   candidate OPEN [options_flow] score=+0.66 — Options flow: 31,367 call / 6,432 put vol (bullish call imbalance +0.66) on a most-active name.
+2026-07-15 08:31:06,583 INFO screener |   candidate TSLA [congress+robinhood] score=+0.60 — Congress: 1 buy / 0 sell filings in last 60d (disclosures lag up to ~45d). | Robinhood 100 Most Popular (retail crowd positioning)
+2026-07-15 08:31:06,585 INFO screener |   candidate JNJ [congress+robinhood] score=+0.60 — Congress: 1 buy / 0 sell filings in last 60d (disclosures lag up to ~45d). | Robinhood 100 Most Popular (retail crowd positioning)
+2026-07-15 08:31:06,586 INFO screener |   candidate UBER [congress+robinhood] score=+0.60 — Congress: 1 buy / 0 sell filings in last 60d (disclosures lag up to ~45d). | Robinhood 100 Most Popular (retail crowd positioning)
+2026-07-15 08:31:06,587 INFO screener |   candidate AMD [congress+robinhood] score=+0.60 — Congress: 1 buy / 0 sell filings in last 60d (disclosures lag up to ~45d). | Robinhood 100 Most Popular (retail crowd positioning)
+2026-07-15 08:31:06,588 INFO screener |   candidate MU [congress+robinhood] score=+0.60 — Congress: 2 buy / 1 sell filings in last 60d (disclosures lag up to ~45d). | Robinhood 100 Most Popular (retail crowd positioning)
+2026-07-15 08:31:06,589 INFO screener |   candidate MARA [options_flow] score=+0.60 — Options flow: 69,747 call / 17,458 put vol (bullish call imbalance +0.60) on a most-active name.
+2026-07-15 08:31:06,590 INFO screener |   candidate SKHY [robinhood] score=+0.60 — Robinhood Daily Movers (today's biggest movers — momentum)
+2026-07-15 08:31:26,258 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -0.6%. Closing.
+2026-07-15 08:31:26,478 WARNING watchdog | Close BIIB (trail): 11 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-15 08:31:32,489 WARNING signals | Finnhub news-sentiment is premium-gated on this key (HTTP 403) — using the VADER fallback for this run.
+2026-07-15 08:31:34,909 INFO quiver | Quiver live/offexchange -> 5496 row(s).
+2026-07-15 08:31:35,384 INFO quiver | Quiver live/govcontractsall -> 20000 row(s).
+2026-07-15 08:31:57,195 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -1.4%. Closing.
+2026-07-15 08:31:57,340 WARNING alpaca | Exit via resting sell 281081b2-963d-46e5-b1ef-03337dc3f1bd (BIIB): replaced limit -> 185.24 (marketable; new order 74bdcae5-f0b0-45f1-93b7-26f247c15a6f).
+2026-07-15 08:31:57,347 INFO ledger | Ledger: CORRECT BIIB qty=0 $0
+2026-07-15 08:31:57,349 INFO watchdog | Superseded exit 281081b2-963d-46e5-b1ef-03337dc3f1bd (BIIB): prior SELL record corrected to 0/11 filled; the replacement order carries the exit.
+2026-07-15 08:31:57,356 INFO ledger | Ledger: SELL BIIB qty=11 $2069
+2026-07-15 08:31:57,360 WARNING watchdog | Partial close BIIB (trail): sold 0 available share(s), made 1 resting sell(s) marketable; 11 reserved by open orders — will retry the full close next tick.
+2026-07-15 08:32:28,086 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -1.5%. Closing.
+2026-07-15 08:32:28,236 WARNING alpaca | Exit via resting sell 74bdcae5-f0b0-45f1-93b7-26f247c15a6f (BIIB): replaced limit -> 183.72 (marketable; new order f03a0f3e-9e04-413a-9fcf-bf470bac4622).
+2026-07-15 08:32:28,243 INFO ledger | Ledger: CORRECT BIIB qty=0 $0
+2026-07-15 08:32:28,245 INFO watchdog | Superseded exit 74bdcae5-f0b0-45f1-93b7-26f247c15a6f (BIIB): prior SELL record corrected to 0/11 filled; the replacement order carries the exit.
+2026-07-15 08:32:28,251 INFO ledger | Ledger: SELL BIIB qty=11 $2068
+2026-07-15 08:32:28,254 WARNING watchdog | Partial close BIIB (trail): sold 0 available share(s), made 1 resting sell(s) marketable; 11 reserved by open orders — will retry the full close next tick.
+2026-07-15 08:32:59,019 INFO watchdog | Trailing stop hit on BIIB: peak 3.3% -> now -2.1%. Closing.
+2026-07-15 08:32:59,180 WARNING alpaca | Exit via resting sell f03a0f3e-9e04-413a-9fcf-bf470bac4622 (BIIB): replaced limit -> 183.27 (marketable; new order a8767682-88f3-46ec-b08b-42bae288d7d7).
+2026-07-15 08:32:59,187 INFO ledger | Ledger: CORRECT BIIB qty=10 $0
+2026-07-15 08:32:59,189 INFO watchdog | Superseded exit f03a0f3e-9e04-413a-9fcf-bf470bac4622 (BIIB): prior SELL record corrected to 10/11 filled; the replacement order carries the exit.
+2026-07-15 08:32:59,194 INFO ledger | Ledger: SELL BIIB qty=1 $187
+2026-07-15 08:32:59,198 WARNING watchdog | Partial close BIIB (trail): sold 0 available share(s), made 1 resting sell(s) marketable; 1 reserved by open orders — will retry the full close next tick.
+2026-07-15 08:32:59,201 INFO watchdog | Trailing stop hit on NOK: peak 3.3% -> now -0.2%. Closing.
+2026-07-15 08:32:59,350 WARNING alpaca | Exit via resting sell ab7014d3-26e5-4a08-bdfd-910b4679d528 (NOK): replaced limit -> 11.45 (marketable; new order 8a5a4ae0-085c-40ee-8f91-554464607389).
+2026-07-15 08:32:59,357 INFO ledger | Ledger: SELL NOK qty=256 $2993
+2026-07-15 08:32:59,361 WARNING watchdog | Partial close NOK (trail): sold 0 available share(s), made 1 resting sell(s) marketable; 256 reserved by open orders — will retry the full close next tick.
+2026-07-15 08:34:34,034 INFO signals | options_chain: reading 25 of 32 symbols this cycle (cap).
+2026-07-15 08:34:41,592 INFO signals | Gathered signals for 32/32 symbols (+3 market signals).
+2026-07-15 08:34:43,668 INFO robinhood | Imported 1 Robinhood holding(s) for context (read-only).
+2026-07-15 08:34:43,678 INFO orchestrator | Buy-excluded from slate this cycle: AMD (exited 23.9h ago (cooldown 24h)), JNJ (exited 19.7h ago (cooldown 24h))
+2026-07-15 08:35:23,931 INFO usage | decision call: 23554 in / 2974 out (cache r=0 w=0) ~$0.1921 [claude-opus-4-8]
+2026-07-15 08:35:23,936 INFO decision | Claude returned 7 proposal(s).
+2026-07-15 08:35:24,053 INFO orchestrator | SELL UNH -> approved: Closing existing position. | Weakest holding (entry conv 0.40, -2.6%). Fundamentals negative (-0.09, thin 4.8% margin), MACD bear
+2026-07-15 08:35:24,279 INFO alpaca | CLOSE UNH (order a3b9623c-c0cd-44eb-a001-f577ffc90acb)
+2026-07-15 08:35:24,286 INFO ledger | Ledger: SELL UNH qty=18 $7538
+2026-07-15 08:35:24,418 INFO orchestrator | HOLD PLTR (no action) | Strong fundamentals (rev +84.7%, 38.6% margin), MACD bull, $301M federal contracts, bullish call flo
+2026-07-15 08:35:24,708 INFO orchestrator | HOLD SOFI (no action) | MACD bull, rev +42.5%, bullish options chain (+0.43) and call flow +0.56, up +1.9%. Insider selling 
+2026-07-15 08:35:24,899 INFO orchestrator | HOLD NOK (no action) | Bullish options chain +0.77 (improving), call flow +0.64, buy-side off-exchange (DPI 0.24), up +2.5%
+2026-07-15 08:35:25,002 INFO orchestrator | HOLD CVX (no action) | Uptrend with improving technical (+0.59), bullish call flow +0.62, buy-side DPI 0.23. Heavy insider 
+2026-07-15 08:35:25,111 INFO orchestrator | HOLD LLY (no action) | Best-in-class fundamentals (rev +55.5%, 50% margin), uptrend. Bearish chain/put lean and insider sel
+2026-07-15 08:35:25,232 INFO orchestrator | HOLD CDW (no action) | Insider open-market buying (22,830 sh, +1.00), MS upgrade, MACD bull, bullish chain +0.42, govcontra
+2026-07-15 08:35:25,560 INFO alpaca | BUY market QQQ qty=None notional=514.7 lim=None (order 2fa17378-3bcf-4578-8979-704cb2ba16a6)
+2026-07-15 08:35:25,564 INFO orchestrator | Core fill: bought $515 of QQQ (invested 89% -> ~90%, target 90%).
+2026-07-15 08:35:25,566 INFO ledger | Ledger: BUY QQQ qty=0.711624 $515
+2026-07-15 08:35:25,850 INFO alpaca | SELL stop QQQ qty=38.0 notional=None lim=None (order 81526b2f-a865-419c-b071-bbdaf42c14c0)
+2026-07-15 08:35:25,854 INFO orchestrator | Core stop: GTC stop resting for 38 QQQ @ 609.98 (15% under basis 717.62).
+2026-07-15 08:35:25,865 INFO alpaca | Alpaca client ready (mode=paper).
+2026-07-15 08:35:27,638 INFO dashboard | Wrote dashboard with 32 trades -> dashboard.html
+2026-07-15 09:30:42,896 INFO orchestrator | Market regime: SPY above 200dma (755 vs 692), VIX 16 -> risk-on, size x1.00.
+2026-07-15 09:30:43,433 INFO quiver | Quiver live/congresstrading -> 1000 row(s).
+2026-07-15 09:30:43,642 INFO screener | EDGAR Form-4 feed -> 66 filing(s) (scanning up to 100).
+2026-07-15 09:31:05,803 INFO screener | Options-flow most-actives pool -> 40 name(s).
+2026-07-15 09:31:29,358 INFO screener | Robinhood 'Daily movers' -> 20 name(s).
+2026-07-15 09:31:30,467 INFO screener | Robinhood '100 most popular' -> 100 name(s).
+2026-07-15 09:31:31,336 INFO screener | Robinhood scans: none saved (define scans in the RH app to use this leg).
+2026-07-15 09:31:31,338 INFO screener | Discovered 18 candidate(s) from 5 source(s) (264 merged, 255 above min_score, capped to 18).
+2026-07-15 09:31:31,339 INFO screener |   candidate ELVA [options_flow+robinhood] score=+1.55 — Options flow: 5,587 call / 143 put vol (bullish call imbalance +0.95) on a most-active name. | Robinhood Daily Movers (today's biggest movers — momentum)
+2026-07-15 09:31:31,341 INFO screener |   candidate AMC [options_flow+robinhood] score=+1.23 — Options flow: 28,523 call / 1,890 put vol (bullish call imbalance +0.88) on a most-active name. | Robinhood 100 Most Popular (retail crowd positioning)
+2026-07-15 09:31:31,342 INFO screener |   candidate PYPL [options_flow+robinhood] score=+1.16 — Options flow: 99,202 call / 28,051 put vol (bullish call imbalance +0.56) on a most-active name. | Robinhood Daily Movers (today's biggest movers — momentum) | Robinhood 100 Most Popular (retail crowd positioning)
+2026-07-15 09:31:31,344 INFO screener |   candidate NOK [options_flow+robinhood] score=+1.06 — Options flow: 43,634 call / 7,482 put vol (bullish call imbalance +0.71) on a most-active name. | Robinhood 100 Most Popular (retail crowd positioning)
+2026-07-15 09:31:31,345 INFO screener |   candidate TSCO [congress] score=-1.00 — Congress: 0 buy / 5 sell filings in last 60d (disclosures lag up to ~45d).
+2026-07-15 09:31:31,346 INFO screener |   candidate WAB [congress] score=-1.00 — Congress: 0 buy / 4 sell filings in last 60d (disclosures lag up to ~45d).
+2026-07-15 09:31:31,347 INFO screener |   candidate BITO [options_flow] score=+0.88 — Options flow: 725 call / 45 put vol (bullish call imbalance +0.88) on a most-active name.
+2026-07-15 09:31:31,349 INFO screener |   candidate OPEN [options_flow] score=+0.86 — Options flow: 27,429 call / 2,078 put vol (bullish call imbalance +0.86) on a most-active name.
+2026-07-15 09:31:31,350 INFO screener |   candidate IBM [congress+robinhood] score=+0.85 — Congress: 3 buy / 1 sell filings in last 60d (disclosures lag up to ~45d). | Robinhood 100 Most Popular (retail crowd positioning)
+2026-07-15 09:31:31,351 INFO screener |   candidate SQQQ [options_flow] score=+0.81 — Options flow: 10,935 call / 1,184 put vol (bullish call imbalance +0.81) on a most-active name.
+2026-07-15 09:31:31,352 INFO screener |   candidate SNDQ [options_flow] score=+0.78 — Options flow: 2,254 call / 277 put vol (bullish call imbalance +0.78) on a most-active name.
+2026-07-15 09:31:31,353 INFO screener |   candidate LYV [congress] score=-0.75 — Congress: 0 buy / 3 sell filings in last 60d (disclosures lag up to ~45d).
+2026-07-15 09:31:31,354 INFO screener |   candidate ENTG [congress] score=+0.75 — Congress: 3 buy / 0 sell filings in last 60d (disclosures lag up to ~45d).
+2026-07-15 09:31:31,355 INFO screener |   candidate WRB [congress] score=-0.75 — Congress: 0 buy / 3 sell filings in last 60d (disclosures lag up to ~45d).
+2026-07-15 09:31:31,356 INFO screener |   candidate BMNR [options_flow] score=+0.74 — Options flow: 43,214 call / 6,458 put vol (bullish call imbalance +0.74) on a most-active name.
+2026-07-15 09:31:31,357 INFO screener |   candidate CLSK [options_flow] score=+0.72 — Options flow: 18,723 call / 3,073 put vol (bullish call imbalance +0.72) on a most-active name.
+2026-07-15 09:31:31,358 INFO screener |   candidate TSLA [congress+robinhood] score=+0.60 — Congress: 1 buy / 0 sell filings in last 60d (disclosures lag up to ~45d). | Robinhood 100 Most Popular (retail crowd positioning)
+2026-07-15 09:31:31,359 INFO screener |   candidate JNJ [congress+robinhood] score=+0.60 — Congress: 1 buy / 0 sell filings in last 60d (disclosures lag up to ~45d). | Robinhood 100 Most Popular (retail crowd positioning)
+2026-07-15 09:31:51,435 INFO quiver | Quiver live/offexchange -> 5496 row(s).
+2026-07-15 09:31:52,150 INFO quiver | Quiver live/govcontractsall -> 20000 row(s).
+2026-07-15 09:33:03,778 INFO signals | options_chain: reading 25 of 29 symbols this cycle (cap).
+2026-07-15 09:33:12,509 INFO signals | Gathered signals for 29/29 symbols (+3 market signals).
+2026-07-15 09:33:14,775 INFO robinhood | Imported 1 Robinhood holding(s) for context (read-only).
+2026-07-15 09:33:14,780 INFO orchestrator | Buy-excluded from slate this cycle: JNJ (exited 20.7h ago (cooldown 24h)), NOK (exited 1.0h ago (cooldown 24h))
+2026-07-15 09:33:57,727 INFO usage | decision call: 21746 in / 2323 out (cache r=0 w=0) ~$0.1668 [claude-opus-4-8]
+2026-07-15 09:33:57,732 INFO decision | Claude returned 5 proposal(s).
+2026-07-15 09:33:57,916 INFO orchestrator | SELL CVX -> approved: Closing existing position. | Heavy insider open-market selling (575k shares sold, 0 bought, w=0.91) is a strong timely bearish te
+2026-07-15 09:33:58,074 INFO alpaca | CLOSE CVX (order f86f7d45-d936-4c24-bfbb-f7d091fbcc34)
+2026-07-15 09:33:58,082 INFO ledger | Ledger: SELL CVX qty=9 $1617
+2026-07-15 09:33:59,752 INFO earnings | Robinhood earnings calendar: 0 name(s) reporting within 31d.
+2026-07-15 09:34:04,078 INFO risk | REJECT buy PLTR: Top-up conviction 0.62 shows no new edge over prior entry 0.60 (needs +0.05) — 'adding to a winner' is not a signal.
+2026-07-15 09:34:04,085 INFO orchestrator | BUY PLTR -> rejected: Top-up conviction 0.62 shows no new edge over prior entry 0.60 (needs +0.05) — 'adding to a winner' is not a signal. | Best-in-slate fundamentals: rev growth +84.7%, 38.6% margin, low D/E 2, plus $301M in federal contra
+2026-07-15 09:34:04,258 INFO orchestrator | HOLD LLY (no action) | Elite fundamentals (margin 50%, rev +55.5%) and uptrend support the thesis, but insider open-market 
+2026-07-15 09:34:04,396 INFO orchestrator | HOLD T (no action) | Solid fundamentals (EBITDA $44B, 35% margin), congressional and insider net buying support the thesi
+2026-07-15 09:34:04,552 INFO orchestrator | HOLD CDW (no action) | Insider open-market buying (22.8k) and bullish options positioning (put/call OI 0.03) plus a Morgan 
+2026-07-15 09:34:04,830 INFO alpaca | BUY market QQQ qty=None notional=6674.77 lim=None (order 11dda64c-0896-4c4f-96b2-9b02d03b63f0)
+2026-07-15 09:34:04,835 INFO orchestrator | Core fill: bought $6675 of QQQ (invested 83% -> ~90%, target 90%).
+2026-07-15 09:34:04,839 INFO ledger | Ledger: BUY QQQ qty=9.2966 $6675
+2026-07-15 09:34:07,199 INFO alpaca | SELL stop QQQ qty=47.0 notional=None lim=None (order 29ed35a4-30ea-48ca-a885-012f2d606e51)
+2026-07-15 09:34:07,203 INFO orchestrator | Core stop: GTC stop resting for 47 QQQ @ 610.07 (15% under basis 717.72).
+2026-07-15 09:34:07,212 INFO alpaca | Alpaca client ready (mode=paper).
+2026-07-15 09:34:09,104 INFO dashboard | Wrote dashboard with 34 trades -> dashboard.html
+2026-07-15 10:30:46,865 INFO ledger | Ledger: SELL CDW qty=55 $7334
+2026-07-15 10:30:46,884 INFO orchestrator | Backfilled exchange exit: CDW 55 sh @ 133.34 (stop -> bracket_stop, -7.3%).
+2026-07-15 10:30:47,561 INFO orchestrator | Market regime: SPY above 200dma (753 vs 693), VIX 16 -> risk-on, size x1.00.
+2026-07-15 10:30:48,421 INFO quiver | Quiver live/congresstrading -> 1000 row(s).
+2026-07-15 10:30:48,882 INFO screener | EDGAR Form-4 feed -> 63 filing(s) (scanning up to 100).
+2026-07-15 10:31:14,291 INFO screener | Options-flow most-actives pool -> 40 name(s).
+2026-07-15 10:31:32,157 INFO screener | Robinhood 'Daily movers' -> 20 name(s).
+2026-07-15 10:31:33,278 INFO screener | Robinhood '100 most popular' -> 100 name(s).
+2026-07-15 10:31:34,025 INFO screener | Robinhood scans: none saved (define scans in the RH app to use this leg).
+2026-07-15 10:31:34,027 INFO screener | Discovered 18 candidate(s) from 5 source(s) (262 merged, 253 above min_score, capped to 18).
+2026-07-15 10:31:34,029 INFO screener |   candidate ELVA [options_flow+robinhood] score=+1.52 — Options flow: 6,686 call / 275 put vol (bullish call imbalance +0.92) on a most-active name. | Robinhood Daily Movers (today's biggest movers — momentum)
+2026-07-15 10:31:34,030 INFO screener |   candidate PYPL [options_flow+robinhood] score=+1.07 — Options flow: 135,022 call / 49,067 put vol (bullish call imbalance +0.47) on a most-active name. | Robinhood Daily Movers (today's biggest movers — momentum) | Robinhood 100 Most Popular (retail crowd positioning)
+2026-07-15 10:31:34,032 INFO screener |   candidate AMC [options_flow+robinhood] score=+1.02 — Options flow: 44,162 call / 8,833 put vol (bullish call imbalance +0.67) on a most-active name. | Robinhood 100 Most Popular (retail crowd positioning)
+2026-07-15 10:31:34,034 INFO screener |   candidate TSCO [congress] score=-1.00 — Congress: 0 buy / 5 sell filings in last 60d (disclosures lag up to ~45d).
+2026-07-15 10:31:34,035 INFO screener |   candidate WAB [congress] score=-1.00 — Congress: 0 buy / 4 sell filings in last 60d (disclosures lag up to ~45d).
+2026-07-15 10:31:34,036 INFO screener |   candidate NOK [options_flow+robinhood] score=+0.98 — Options flow: 79,453 call / 17,904 put vol (bullish call imbalance +0.63) on a most-active name. | Robinhood 100 Most Popular (retail crowd positioning)
+2026-07-15 10:31:34,038 INFO screener |   candidate LCID [options_flow+robinhood] score=+0.92 — Options flow: 38,366 call / 19,890 put vol (bullish call imbalance +0.32) on a most-active name. | Robinhood Daily Movers (today's biggest movers — momentum) | Robinhood 100 Most Popular (retail crowd positioning)
+2026-07-15 10:31:34,039 INFO screener |   candidate IBM [congress+robinhood] score=+0.85 — Congress: 3 buy / 1 sell filings in last 60d (disclosures lag up to ~45d). | Robinhood 100 Most Popular (retail crowd positioning)
+2026-07-15 10:31:34,041 INFO screener |   candidate SNDQ [options_flow] score=+0.82 — Options flow: 5,663 call / 572 put vol (bullish call imbalance +0.82) on a most-active name.
+2026-07-15 10:31:34,042 INFO screener |   candidate PATH [options_flow] score=+0.82 — Options flow: 12,520 call / 1,260 put vol (bullish call imbalance +0.82) on a most-active name.
+2026-07-15 10:31:34,043 INFO screener |   candidate LYV [congress] score=-0.75 — Congress: 0 buy / 3 sell filings in last 60d (disclosures lag up to ~45d).
+2026-07-15 10:31:34,044 INFO screener |   candidate ENTG [congress] score=+0.75 — Congress: 3 buy / 0 sell filings in last 60d (disclosures lag up to ~45d).
+2026-07-15 10:31:34,045 INFO screener |   candidate WRB [congress] score=-0.75 — Congress: 0 buy / 3 sell filings in last 60d (disclosures lag up to ~45d).
+2026-07-15 10:31:34,046 INFO screener |   candidate OPEN [options_flow] score=+0.71 — Options flow: 46,138 call / 7,745 put vol (bullish call imbalance +0.71) on a most-active name.
+2026-07-15 10:31:34,047 INFO screener |   candidate BITO [options_flow] score=+0.65 — Options flow: 1,155 call / 242 put vol (bullish call imbalance +0.65) on a most-active name.
+2026-07-15 10:31:34,048 INFO screener |   candidate SOXS [options_flow] score=+0.63 — Options flow: 17,953 call / 4,117 put vol (bullish call imbalance +0.63) on a most-active name.
+2026-07-15 10:31:34,049 INFO screener |   candidate CVX [congress+robinhood] score=+0.60 — Congress: 1 buy / 0 sell filings in last 60d (disclosures lag up to ~45d). | Robinhood 100 Most Popular (retail crowd positioning)
+2026-07-15 10:31:34,050 INFO screener |   candidate TSLA [congress+robinhood] score=+0.60 — Congress: 1 buy / 0 sell filings in last 60d (disclosures lag up to ~45d). | Robinhood 100 Most Popular (retail crowd positioning)
+2026-07-15 10:31:54,693 INFO quiver | Quiver live/offexchange -> 5496 row(s).
+2026-07-15 10:31:57,622 INFO quiver | Quiver live/govcontractsall -> 20000 row(s).
+2026-07-15 10:32:24,335 INFO signals | options_chain: reading 25 of 27 symbols this cycle (cap).
+2026-07-15 10:32:32,153 INFO signals | Gathered signals for 27/27 symbols (+3 market signals).
+2026-07-15 10:32:34,335 INFO robinhood | Imported 1 Robinhood holding(s) for context (read-only).
+2026-07-15 10:32:34,339 INFO orchestrator | Buy-excluded from slate this cycle: CVX (exited 1.0h ago (cooldown 24h)), NOK (exited 2.0h ago (cooldown 24h))
+2026-07-15 10:33:12,666 INFO usage | decision call: 20537 in / 3058 out (cache r=0 w=0) ~$0.1791 [claude-opus-4-8]
+2026-07-15 10:33:12,673 INFO decision | Claude returned 7 proposal(s).
+2026-07-15 10:33:15,386 INFO earnings | Robinhood earnings calendar: 0 name(s) reporting within 31d.
+2026-07-15 10:33:21,153 INFO risk | REJECT buy AMC: Price $2.06 below min $5.00 (liquidity guard).
+2026-07-15 10:33:21,156 INFO orchestrator | BUY AMC -> rejected: Price $2.06 below min $5.00 (liquidity guard). | Corroborated thesis: heavy insider open-market buying 250k sh/0 sold (Form 4, w=0.91) plus strong bu
+2026-07-15 10:33:21,276 INFO orchestrator | HOLD PLTR (no action) | Best fundamental+momentum combo held: rev growth +84.7%, margin 38.6%, MACD bull, $301M in federal c
+2026-07-15 10:33:21,957 INFO orchestrator | HOLD LPLA (no action) | Working position (+3.6%), improving technical (MACD bull, RSI 69), congressional and insider net buy
+2026-07-15 10:33:22,535 INFO orchestrator | HOLD T (no action) | Solid cash-flow fundamentals (EBITDA $44B, margin 35%), congress buys and insider net buying (138k/0
+2026-07-15 10:33:22,647 INFO orchestrator | HOLD SOFI (no action) | Rev growth +42.5%, bullish options-chain positioning (put/call OI 0.28) and call flow +0.45 offset f
+2026-07-15 10:33:22,774 INFO orchestrator | HOLD BRK.B (no action) | Fortress fundamentals (EBITDA $118B, low D/E 18, positive sentiment) but technicals decaying (MACD b
+2026-07-15 10:33:22,890 INFO orchestrator | HOLD LLY (no action) | Elite fundamentals (rev +55.5%, margin 50%) but MACD bear, heavy insider selling (18k sold) and bear
+2026-07-15 10:33:23,155 INFO alpaca | BUY market QQQ qty=None notional=7366.06 lim=None (order ebf6b21c-1401-47d4-861e-9dbf1a9406ab)
+2026-07-15 10:33:23,159 INFO orchestrator | Core fill: bought $7366 of QQQ (invested 83% -> ~90%, target 90%).
+2026-07-15 10:33:23,164 INFO ledger | Ledger: BUY QQQ qty=10.28 $7366
+2026-07-15 10:33:25,513 INFO alpaca | SELL stop QQQ qty=57.0 notional=None lim=None (order 737138d2-3128-494a-a203-3421fd06a84a)
+2026-07-15 10:33:25,517 INFO orchestrator | Core stop: GTC stop resting for 57 QQQ @ 610.10 (15% under basis 717.77).
+2026-07-15 10:33:25,525 INFO alpaca | Alpaca client ready (mode=paper).
+2026-07-15 10:33:27,257 INFO dashboard | Wrote dashboard with 36 trades -> dashboard.html
+2026-07-15 11:31:11,864 INFO orchestrator | Market regime: SPY above 200dma (751 vs 693), VIX 16 -> risk-on, size x1.00.
+2026-07-15 11:31:12,478 INFO quiver | Quiver live/congresstrading -> 1000 row(s).
+2026-07-15 11:31:12,978 INFO screener | EDGAR Form-4 feed -> 59 filing(s) (scanning up to 100).
+2026-07-15 11:31:36,934 INFO screener | Options-flow most-actives pool -> 40 name(s).
+2026-07-15 11:31:57,407 INFO screener | Robinhood 'Daily movers' -> 20 name(s).
+2026-07-15 11:31:58,685 INFO screener | Robinhood '100 most popular' -> 100 name(s).
+2026-07-15 11:31:59,502 INFO screener | Robinhood scans: none saved (define scans in the RH app to use this leg).
+2026-07-15 11:31:59,503 INFO screener | Discovered 18 candidate(s) from 5 source(s) (266 merged, 257 above min_score, capped to 18).
+2026-07-15 11:31:59,505 INFO screener |   candidate TSCO [congress] score=-1.00 — Congress: 0 buy / 5 sell filings in last 60d (disclosures lag up to ~45d).
+2026-07-15 11:31:59,506 INFO screener |   candidate WAB [congress] score=-1.00 — Congress: 0 buy / 4 sell filings in last 60d (disclosures lag up to ~45d).
+2026-07-15 11:31:59,507 INFO screener |   candidate NOK [options_flow+robinhood] score=+0.94 — Options flow: 92,019 call / 23,600 put vol (bullish call imbalance +0.59) on a most-active name. | Robinhood 100 Most Popular (retail crowd positioning)
+2026-07-15 11:31:59,508 INFO screener |   candidate SNDQ [options_flow] score=+0.87 — Options flow: 9,649 call / 683 put vol (bullish call imbalance +0.87) on a most-active name.
+2026-07-15 11:31:59,510 INFO screener |   candidate IBM [congress+robinhood] score=+0.85 — Congress: 3 buy / 1 sell filings in last 60d (disclosures lag up to ~45d). | Robinhood 100 Most Popular (retail crowd positioning)
+2026-07-15 11:31:59,511 INFO screener |   candidate PATH [options_flow] score=+0.82 — Options flow: 14,573 call / 1,418 put vol (bullish call imbalance +0.82) on a most-active name.
+2026-07-15 11:31:59,512 INFO screener |   candidate PYPL [options_flow+robinhood] score=+0.80 — Options flow: 150,606 call / 57,396 put vol (bullish call imbalance +0.45) on a most-active name. | Robinhood 100 Most Popular (retail crowd positioning)
+2026-07-15 11:31:59,513 INFO screener |   candidate LYV [congress] score=-0.75 — Congress: 0 buy / 3 sell filings in last 60d (disclosures lag up to ~45d).
+2026-07-15 11:31:59,514 INFO screener |   candidate ENTG [congress] score=+0.75 — Congress: 3 buy / 0 sell filings in last 60d (disclosures lag up to ~45d).
+2026-07-15 11:31:59,515 INFO screener |   candidate WRB [congress] score=-0.75 — Congress: 0 buy / 3 sell filings in last 60d (disclosures lag up to ~45d).
+2026-07-15 11:31:59,516 INFO screener |   candidate OPEN [options_flow] score=+0.72 — Options flow: 53,529 call / 8,622 put vol (bullish call imbalance +0.72) on a most-active name.
+2026-07-15 11:31:59,517 INFO screener |   candidate BITO [options_flow] score=+0.72 — Options flow: 2,530 call / 417 put vol (bullish call imbalance +0.72) on a most-active name.
+2026-07-15 11:31:59,518 INFO screener |   candidate SOXS [options_flow] score=+0.69 — Options flow: 28,408 call / 5,212 put vol (bullish call imbalance +0.69) on a most-active name.
+2026-07-15 11:31:59,519 INFO screener |   candidate RDGL [insider] score=+0.67 — Insider: 2 open-market buy filing(s), 260,000 sh (SEC Form 4, last filings feed).
+2026-07-15 11:31:59,520 INFO screener |   candidate CVX [congress+robinhood] score=+0.60 — Congress: 1 buy / 0 sell filings in last 60d (disclosures lag up to ~45d). | Robinhood 100 Most Popular (retail crowd positioning)
+2026-07-15 11:31:59,521 INFO screener |   candidate TSLA [congress+robinhood] score=+0.60 — Congress: 1 buy / 0 sell filings in last 60d (disclosures lag up to ~45d). | Robinhood 100 Most Popular (retail crowd positioning)
+2026-07-15 11:31:59,522 INFO screener |   candidate JNJ [congress+robinhood] score=+0.60 — Congress: 1 buy / 0 sell filings in last 60d (disclosures lag up to ~45d). | Robinhood 100 Most Popular (retail crowd positioning)
+2026-07-15 11:31:59,523 INFO screener |   candidate UBER [congress+robinhood] score=+0.60 — Congress: 1 buy / 0 sell filings in last 60d (disclosures lag up to ~45d). | Robinhood 100 Most Popular (retail crowd positioning)
+2026-07-15 11:32:22,905 INFO quiver | Quiver live/offexchange -> 5496 row(s).
+2026-07-15 11:32:23,782 INFO quiver | Quiver live/govcontractsall -> 20000 row(s).
+2026-07-15 11:32:43,053 INFO signals | options_chain: reading 25 of 27 symbols this cycle (cap).
+2026-07-15 11:32:49,133 INFO signals | Gathered signals for 27/27 symbols (+3 market signals).
+2026-07-15 11:32:51,423 INFO robinhood | Imported 1 Robinhood holding(s) for context (read-only).
+2026-07-15 11:32:51,429 INFO orchestrator | Buy-excluded from slate this cycle: CVX (exited 2.0h ago (cooldown 24h)), JNJ (exited 22.7h ago (cooldown 24h)), NOK (exited 3.0h ago (cooldown 24h))
+2026-07-15 11:33:29,553 INFO usage | decision call: 20415 in / 2838 out (cache r=0 w=0) ~$0.1730 [claude-opus-4-8]
+2026-07-15 11:33:29,561 INFO decision | Claude returned 5 proposal(s).
+2026-07-15 11:33:29,563 INFO orchestrator | Cycle budget $7,921 split across 2 buy(s): UBER $4,185, PATH $3,737.
+2026-07-15 11:33:31,244 INFO earnings | Robinhood earnings calendar: 0 name(s) reporting within 31d.
+2026-07-15 11:33:35,569 INFO orchestrator | BUY UBER -> resized: Sized to 56.8521 sh ($4,185) within caps. Reduced from request. | Solid fundamentals (EBITDA $7B, rev +14.5%), sharply improving technicals (trend +0.22/d) and MACD t
+2026-07-15 11:33:35,621 WARNING alpaca | UBER: floored 56.8521 sh -> 56 for the exchange bracket; $62.73 of the $4184.89 allocation NOT deployed (stays cash; core sweep / next cycle can redeploy).
+2026-07-15 11:33:35,811 INFO alpaca | BUY market UBER qty=56.0 notional=None lim=None (order 966f6098-2297-471e-9af4-edcfca03b43f)
+2026-07-15 11:33:35,819 INFO ledger | Ledger: BUY UBER qty=56 $4122
+2026-07-15 11:33:36,622 INFO orchestrator | BUY PATH -> approved: Sized to 288.788 sh ($3,442) within caps. | Strong bullish call imbalance (+0.82) and bullish chain positioning (+0.45, p/c OI 0.58), MACD bull 
+2026-07-15 11:33:36,673 WARNING alpaca | PATH: floored 288.788 sh -> 288 for the exchange bracket; $9.39 of the $3442.35 allocation NOT deployed (stays cash; core sweep / next cycle can redeploy).
+2026-07-15 11:33:36,728 INFO alpaca | BUY market PATH qty=288.0 notional=None lim=None (order 9fdf204a-49b8-4469-8806-30eec934a6c4)
+2026-07-15 11:33:36,731 INFO ledger | Ledger: BUY PATH qty=288 $3433
+2026-07-15 11:33:36,851 INFO orchestrator | HOLD PLTR (no action) | Best corroborated holding: fundamentals +0.80 (rev +84.7%), improving technicals (+0.16/d, MACD bull
+2026-07-15 11:33:37,056 INFO orchestrator | HOLD BRK.B (no action) | Stable defensive fundamentals (EBITDA $118B, margin 31%, low D/E 18), positive news sentiment. Techn
+2026-07-15 11:33:37,165 INFO orchestrator | HOLD SOFI (no action) | Down 3.5% but thesis intact: rev +42.5%, bullish options chain (+0.52) and flow (+0.44). Technicals 
+2026-07-15 11:33:37,170 INFO orchestrator | Cycle budget not fully deployed: $72.12 dropped by whole-share flooring across this cycle's buys (stays cash; core sweep / next cycle can redeploy).
+2026-07-15 11:33:37,237 INFO alpaca | Alpaca client ready (mode=paper).
+2026-07-15 11:33:39,129 INFO dashboard | Wrote dashboard with 38 trades -> dashboard.html
+2026-07-15 12:31:25,301 INFO orchestrator | Market regime: SPY above 200dma (753 vs 693), VIX 16 -> risk-on, size x1.00.
+2026-07-15 12:31:25,990 INFO quiver | Quiver live/congresstrading -> 1000 row(s).
+2026-07-15 12:31:29,409 INFO screener | EDGAR Form-4 feed -> 59 filing(s) (scanning up to 100).
+2026-07-15 12:31:54,208 INFO screener | Options-flow most-actives pool -> 40 name(s).
+2026-07-15 12:32:11,547 INFO screener | Robinhood 'Daily movers' -> 20 name(s).
+2026-07-15 12:32:12,625 INFO screener | Robinhood '100 most popular' -> 100 name(s).
+2026-07-15 12:32:13,468 INFO screener | Robinhood scans: none saved (define scans in the RH app to use this leg).
+2026-07-15 12:32:13,470 INFO screener | Discovered 18 candidate(s) from 5 source(s) (261 merged, 252 above min_score, capped to 18).
+2026-07-15 12:32:13,471 INFO screener |   candidate PYPL [options_flow+robinhood] score=+1.05 — Options flow: 159,503 call / 61,117 put vol (bullish call imbalance +0.45) on a most-active name. | Robinhood Daily Movers (today's biggest movers — momentum) | Robinhood 100 Most Popular (retail crowd positioning)
+2026-07-15 12:32:13,472 INFO screener |   candidate TSCO [congress] score=-1.00 — Congress: 0 buy / 5 sell filings in last 60d (disclosures lag up to ~45d).
+2026-07-15 12:32:13,474 INFO screener |   candidate WAB [congress] score=-1.00 — Congress: 0 buy / 4 sell filings in last 60d (disclosures lag up to ~45d).
+2026-07-15 12:32:13,475 INFO screener |   candidate NOK [options_flow+robinhood] score=+0.91 — Options flow: 108,548 call / 30,684 put vol (bullish call imbalance +0.56) on a most-active name. | Robinhood 100 Most Popular (retail crowd positioning)
+2026-07-15 12:32:13,476 INFO screener |   candidate SNDQ [options_flow] score=+0.85 — Options flow: 10,811 call / 869 put vol (bullish call imbalance +0.85) on a most-active name.
+2026-07-15 12:32:13,477 INFO screener |   candidate IBM [congress+robinhood] score=+0.85 — Congress: 3 buy / 1 sell filings in last 60d (disclosures lag up to ~45d). | Robinhood 100 Most Popular (retail crowd positioning)
+2026-07-15 12:32:13,478 INFO screener |   candidate LYV [congress] score=-0.75 — Congress: 0 buy / 3 sell filings in last 60d (disclosures lag up to ~45d).
+2026-07-15 12:32:13,479 INFO screener |   candidate ENTG [congress] score=+0.75 — Congress: 3 buy / 0 sell filings in last 60d (disclosures lag up to ~45d).
+2026-07-15 12:32:13,480 INFO screener |   candidate WRB [congress] score=-0.75 — Congress: 0 buy / 3 sell filings in last 60d (disclosures lag up to ~45d).
+2026-07-15 12:32:13,481 INFO screener |   candidate F [options_flow+robinhood] score=+0.72 — Options flow: 30,708 call / 14,171 put vol (bullish call imbalance +0.37) on a most-active name. | Robinhood 100 Most Popular (retail crowd positioning)
+2026-07-15 12:32:13,482 INFO screener |   candidate OPEN [options_flow] score=+0.71 — Options flow: 58,665 call / 9,855 put vol (bullish call imbalance +0.71) on a most-active name.
+2026-07-15 12:32:13,483 INFO screener |   candidate SOXS [options_flow] score=+0.67 — Options flow: 32,463 call / 6,444 put vol (bullish call imbalance +0.67) on a most-active name.
+2026-07-15 12:32:13,484 INFO screener |   candidate CVX [congress+robinhood] score=+0.60 — Congress: 1 buy / 0 sell filings in last 60d (disclosures lag up to ~45d). | Robinhood 100 Most Popular (retail crowd positioning)
+2026-07-15 12:32:13,485 INFO screener |   candidate TSLA [congress+robinhood] score=+0.60 — Congress: 1 buy / 0 sell filings in last 60d (disclosures lag up to ~45d). | Robinhood 100 Most Popular (retail crowd positioning)
+2026-07-15 12:32:13,486 INFO screener |   candidate JNJ [congress+robinhood] score=+0.60 — Congress: 1 buy / 0 sell filings in last 60d (disclosures lag up to ~45d). | Robinhood 100 Most Popular (retail crowd positioning)
+2026-07-15 12:32:13,487 INFO screener |   candidate AMD [congress+robinhood] score=+0.60 — Congress: 1 buy / 0 sell filings in last 60d (disclosures lag up to ~45d). | Robinhood 100 Most Popular (retail crowd positioning)
+2026-07-15 12:32:13,488 INFO screener |   candidate MU [congress+robinhood] score=+0.60 — Congress: 2 buy / 1 sell filings in last 60d (disclosures lag up to ~45d). | Robinhood 100 Most Popular (retail crowd positioning)
+2026-07-15 12:32:13,489 INFO screener |   candidate CMAKY [robinhood] score=+0.60 — Robinhood Daily Movers (today's biggest movers — momentum)
+2026-07-15 12:32:33,149 INFO quiver | Quiver live/offexchange -> 5496 row(s).
+2026-07-15 12:32:33,698 INFO quiver | Quiver live/govcontractsall -> 20000 row(s).
+2026-07-15 12:33:02,048 INFO signals | options_chain: reading 25 of 29 symbols this cycle (cap).
+2026-07-15 12:33:09,059 INFO signals | Gathered signals for 29/29 symbols (+3 market signals).
+2026-07-15 12:33:11,110 INFO robinhood | Imported 1 Robinhood holding(s) for context (read-only).
+2026-07-15 12:33:11,115 INFO orchestrator | Buy-excluded from slate this cycle: CVX (exited 3.0h ago (cooldown 24h)), JNJ (exited 23.7h ago (cooldown 24h)), NOK (exited 4.0h ago (cooldown 24h)), PATH (topped up 1.0h ago (next ok in 4h)), UBER (topped up 1.0h ago (next ok in 4h))
+2026-07-15 12:33:37,617 INFO usage | decision call: 22492 in / 1862 out (cache r=0 w=0) ~$0.1590 [claude-opus-4-8]
+2026-07-15 12:33:37,624 INFO decision | Claude returned 2 proposal(s).
+2026-07-15 12:33:37,809 INFO orchestrator | SELL HUBB -> approved: Closing existing position. | Rotating out weakest holding to free a slot/capital. HUBB is down -2.0%, MACD bear, RSI 44, off-exch
+2026-07-15 12:33:38,089 INFO alpaca | CLOSE HUBB (order 8a8ca0ef-b04d-46e9-bdf0-cd98014a87f2)
+2026-07-15 12:33:38,099 INFO ledger | Ledger: SELL HUBB qty=16 $7649
+2026-07-15 12:33:39,952 INFO earnings | Robinhood earnings calendar: 0 name(s) reporting within 31d.
+2026-07-15 12:33:45,272 INFO orchestrator | BUY F -> approved: Sized to 277.16 sh ($3,945) within caps. | Best fresh corroborated setup: technical improving (+0.24/d), uptrend px>50>200, MACD bull, RSI 53; 
+2026-07-15 12:33:45,321 WARNING alpaca | F: floored 277.16 sh -> 277 for the exchange bracket; $2.27 of the $3945.37 allocation NOT deployed (stays cash; core sweep / next cycle can redeploy).
+2026-07-15 12:33:45,376 INFO alpaca | BUY market F qty=277.0 notional=None lim=None (order d720991c-1acd-49c3-9bb6-9cc20306c9a0)
+2026-07-15 12:33:45,381 INFO ledger | Ledger: BUY F qty=277 $3943
+2026-07-15 12:33:45,387 INFO orchestrator | Cycle budget not fully deployed: $2.27 dropped by whole-share flooring across this cycle's buys (stays cash; core sweep / next cycle can redeploy).
+2026-07-15 12:33:45,449 INFO alpaca | Alpaca client ready (mode=paper).
+2026-07-15 12:33:47,230 INFO dashboard | Wrote dashboard with 40 trades -> dashboard.html
+2026-07-15 13:31:33,528 INFO orchestrator | Market regime: SPY above 200dma (755 vs 693), VIX 16 -> risk-on, size x1.00.
+2026-07-15 13:31:34,284 INFO quiver | Quiver live/congresstrading -> 1000 row(s).
+2026-07-15 13:31:34,710 INFO screener | EDGAR Form-4 feed -> 61 filing(s) (scanning up to 100).
+2026-07-15 13:31:59,677 INFO screener | Options-flow most-actives pool -> 40 name(s).
+2026-07-15 13:32:17,402 INFO screener | Robinhood 'Daily movers' -> 20 name(s).
+2026-07-15 13:32:18,594 INFO screener | Robinhood '100 most popular' -> 100 name(s).
+2026-07-15 13:32:19,489 INFO screener | Robinhood scans: none saved (define scans in the RH app to use this leg).
+2026-07-15 13:32:19,491 INFO screener | Discovered 18 candidate(s) from 5 source(s) (263 merged, 254 above min_score, capped to 18).
+2026-07-15 13:32:19,492 INFO screener |   candidate PYPL [options_flow+robinhood] score=+1.03 — Options flow: 171,146 call / 67,398 put vol (bullish call imbalance +0.43) on a most-active name. | Robinhood Daily Movers (today's biggest movers — momentum) | Robinhood 100 Most Popular (retail crowd positioning)
+2026-07-15 13:32:19,494 INFO screener |   candidate TSCO [congress] score=-1.00 — Congress: 0 buy / 5 sell filings in last 60d (disclosures lag up to ~45d).
+2026-07-15 13:32:19,495 INFO screener |   candidate HUBB [congress] score=+1.00 — Congress: 8 buy / 0 sell filings in last 60d (disclosures lag up to ~45d).
+2026-07-15 13:32:19,496 INFO screener |   candidate WAB [congress] score=-1.00 — Congress: 0 buy / 4 sell filings in last 60d (disclosures lag up to ~45d).
+2026-07-15 13:32:19,497 INFO screener |   candidate NOK [options_flow+robinhood] score=+0.93 — Options flow: 124,904 call / 33,360 put vol (bullish call imbalance +0.58) on a most-active name. | Robinhood 100 Most Popular (retail crowd positioning)
+2026-07-15 13:32:19,499 INFO screener |   candidate SNDQ [options_flow] score=+0.85 — Options flow: 12,865 call / 1,038 put vol (bullish call imbalance +0.85) on a most-active name.
+2026-07-15 13:32:19,500 INFO screener |   candidate IBM [congress+robinhood] score=+0.85 — Congress: 3 buy / 1 sell filings in last 60d (disclosures lag up to ~45d). | Robinhood 100 Most Popular (retail crowd positioning)
+2026-07-15 13:32:19,501 INFO screener |   candidate LYV [congress] score=-0.75 — Congress: 0 buy / 3 sell filings in last 60d (disclosures lag up to ~45d).
+2026-07-15 13:32:19,502 INFO screener |   candidate ENTG [congress] score=+0.75 — Congress: 3 buy / 0 sell filings in last 60d (disclosures lag up to ~45d).
+2026-07-15 13:32:19,503 INFO screener |   candidate WRB [congress] score=-0.75 — Congress: 0 buy / 3 sell filings in last 60d (disclosures lag up to ~45d).
+2026-07-15 13:32:19,504 INFO screener |   candidate JOBY [options_flow] score=+0.73 — Options flow: 7,588 call / 1,198 put vol (bullish call imbalance +0.73) on a most-active name.
+2026-07-15 13:32:19,505 INFO screener |   candidate OPEN [options_flow] score=+0.72 — Options flow: 61,647 call / 10,184 put vol (bullish call imbalance +0.72) on a most-active name.
+2026-07-15 13:32:19,506 INFO screener |   candidate SOXS [options_flow] score=+0.66 — Options flow: 34,880 call / 7,148 put vol (bullish call imbalance +0.66) on a most-active name.
+2026-07-15 13:32:19,506 INFO screener |   candidate CVX [congress+robinhood] score=+0.60 — Congress: 1 buy / 0 sell filings in last 60d (disclosures lag up to ~45d). | Robinhood 100 Most Popular (retail crowd positioning)
+2026-07-15 13:32:19,508 INFO screener |   candidate TSLA [congress+robinhood] score=+0.60 — Congress: 1 buy / 0 sell filings in last 60d (disclosures lag up to ~45d). | Robinhood 100 Most Popular (retail crowd positioning)
+2026-07-15 13:32:19,509 INFO screener |   candidate JNJ [congress+robinhood] score=+0.60 — Congress: 1 buy / 0 sell filings in last 60d (disclosures lag up to ~45d). | Robinhood 100 Most Popular (retail crowd positioning)
+2026-07-15 13:32:19,510 INFO screener |   candidate AMD [congress+robinhood] score=+0.60 — Congress: 1 buy / 0 sell filings in last 60d (disclosures lag up to ~45d). | Robinhood 100 Most Popular (retail crowd positioning)
+2026-07-15 13:32:19,511 INFO screener |   candidate MU [congress+robinhood] score=+0.60 — Congress: 2 buy / 1 sell filings in last 60d (disclosures lag up to ~45d). | Robinhood 100 Most Popular (retail crowd positioning)
+2026-07-15 13:32:39,306 INFO quiver | Quiver live/offexchange -> 5496 row(s).
+2026-07-15 13:32:39,885 INFO quiver | Quiver live/govcontractsall -> 20000 row(s).
+2026-07-15 13:33:09,843 INFO signals | options_chain: reading 25 of 29 symbols this cycle (cap).
+2026-07-15 13:33:18,742 INFO signals | Gathered signals for 29/29 symbols (+3 market signals).
+2026-07-15 13:33:20,939 INFO robinhood | Imported 1 Robinhood holding(s) for context (read-only).
+2026-07-15 13:33:20,944 INFO orchestrator | Buy-excluded from slate this cycle: CVX (exited 4.0h ago (cooldown 24h)), F (topped up 1.0h ago (next ok in 4h)), HUBB (exited 1.0h ago (cooldown 24h)), NOK (exited 5.0h ago (cooldown 24h)), PATH (topped up 2.0h ago (next ok in 4h)) …+1 more
+2026-07-15 13:34:04,875 INFO usage | decision call: 23189 in / 2645 out (cache r=0 w=0) ~$0.1821 [claude-opus-4-8]
+2026-07-15 13:34:04,886 INFO decision | Claude returned 3 proposal(s).
+2026-07-15 13:34:05,041 INFO orchestrator | SELL BEP -> approved: Closing existing position. | Weakest holding (entry conv 0.44). Fundamentals show negative rev growth (-4.2%) and heavy leverage 
+2026-07-15 13:34:05,305 INFO alpaca | CLOSE BEP (order a57be3fa-a3b8-4bd6-ac71-bbcce2ff9eb9)
+2026-07-15 13:34:05,315 INFO ledger | Ledger: SELL BEP qty=62 $2021
+2026-07-15 13:34:05,784 INFO orchestrator | HOLD PLTR (no action) | Strong fundamentals (rev +84.7%, 38.6% margin, low D/E), improving technicals (MACD bull, RSI 55 imp
+2026-07-15 13:34:05,898 INFO orchestrator | HOLD LPLA (no action) | Working position (+1.9%), MACD bull with improving technicals, congress and insider net buying, stro
+2026-07-15 13:34:05,969 INFO alpaca | Alpaca client ready (mode=paper).
+2026-07-15 13:34:07,695 INFO dashboard | Wrote dashboard with 41 trades -> dashboard.html
+2026-07-15 14:31:47,189 INFO orchestrator | Market regime: SPY above 200dma (754 vs 693), VIX 16 -> risk-on, size x1.00.
+2026-07-15 14:31:48,312 INFO quiver | Quiver live/congresstrading -> 1000 row(s).
+2026-07-15 14:31:48,701 INFO screener | EDGAR Form-4 feed -> 59 filing(s) (scanning up to 100).
+2026-07-15 14:32:13,554 INFO screener | Options-flow most-actives pool -> 40 name(s).
+2026-07-15 14:32:32,986 INFO screener | Robinhood 'Daily movers' -> 20 name(s).
+2026-07-15 14:32:34,049 INFO screener | Robinhood '100 most popular' -> 100 name(s).
+2026-07-15 14:32:34,708 INFO screener | Robinhood scans: none saved (define scans in the RH app to use this leg).
+2026-07-15 14:32:34,710 INFO screener | Discovered 18 candidate(s) from 5 source(s) (266 merged, 257 above min_score, capped to 18).
+2026-07-15 14:32:34,711 INFO screener |   candidate PYPL [options_flow+robinhood] score=+1.04 — Options flow: 185,148 call / 71,464 put vol (bullish call imbalance +0.44) on a most-active name. | Robinhood Daily Movers (today's biggest movers — momentum) | Robinhood 100 Most Popular (retail crowd positioning)
+2026-07-15 14:32:34,714 INFO screener |   candidate TSCO [congress] score=-1.00 — Congress: 0 buy / 5 sell filings in last 60d (disclosures lag up to ~45d).
+2026-07-15 14:32:34,715 INFO screener |   candidate BEP [congress] score=+1.00 — Congress: 7 buy / 0 sell filings in last 60d (disclosures lag up to ~45d).
+2026-07-15 14:32:34,716 INFO screener |   candidate HUBB [congress] score=+1.00 — Congress: 8 buy / 0 sell filings in last 60d (disclosures lag up to ~45d).
+2026-07-15 14:32:34,717 INFO screener |   candidate WAB [congress] score=-1.00 — Congress: 0 buy / 4 sell filings in last 60d (disclosures lag up to ~45d).
+2026-07-15 14:32:34,718 INFO screener |   candidate NOK [options_flow+robinhood] score=+0.93 — Options flow: 131,774 call / 35,086 put vol (bullish call imbalance +0.58) on a most-active name. | Robinhood 100 Most Popular (retail crowd positioning)
+2026-07-15 14:32:34,719 INFO screener |   candidate SNDQ [options_flow] score=+0.87 — Options flow: 15,060 call / 1,083 put vol (bullish call imbalance +0.87) on a most-active name.
+2026-07-15 14:32:34,721 INFO screener |   candidate IBM [congress+robinhood] score=+0.85 — Congress: 3 buy / 1 sell filings in last 60d (disclosures lag up to ~45d). | Robinhood 100 Most Popular (retail crowd positioning)
+2026-07-15 14:32:34,722 INFO screener |   candidate LYV [congress] score=-0.75 — Congress: 0 buy / 3 sell filings in last 60d (disclosures lag up to ~45d).
+2026-07-15 14:32:34,723 INFO screener |   candidate ENTG [congress] score=+0.75 — Congress: 3 buy / 0 sell filings in last 60d (disclosures lag up to ~45d).
+2026-07-15 14:32:34,724 INFO screener |   candidate WRB [congress] score=-0.75 — Congress: 0 buy / 3 sell filings in last 60d (disclosures lag up to ~45d).
+2026-07-15 14:32:34,725 INFO screener |   candidate JOBY [options_flow] score=+0.72 — Options flow: 8,328 call / 1,350 put vol (bullish call imbalance +0.72) on a most-active name.
+2026-07-15 14:32:34,726 INFO screener |   candidate OPEN [options_flow] score=+0.72 — Options flow: 65,577 call / 10,734 put vol (bullish call imbalance +0.72) on a most-active name.
+2026-07-15 14:32:34,727 INFO screener |   candidate CVX [congress+robinhood] score=+0.60 — Congress: 1 buy / 0 sell filings in last 60d (disclosures lag up to ~45d). | Robinhood 100 Most Popular (retail crowd positioning)
+2026-07-15 14:32:34,728 INFO screener |   candidate TSLA [congress+robinhood] score=+0.60 — Congress: 1 buy / 0 sell filings in last 60d (disclosures lag up to ~45d). | Robinhood 100 Most Popular (retail crowd positioning)
+2026-07-15 14:32:34,729 INFO screener |   candidate JNJ [congress+robinhood] score=+0.60 — Congress: 1 buy / 0 sell filings in last 60d (disclosures lag up to ~45d). | Robinhood 100 Most Popular (retail crowd positioning)
+2026-07-15 14:32:34,730 INFO screener |   candidate AMD [congress+robinhood] score=+0.60 — Congress: 1 buy / 0 sell filings in last 60d (disclosures lag up to ~45d). | Robinhood 100 Most Popular (retail crowd positioning)
+2026-07-15 14:32:34,731 INFO screener |   candidate MU [congress+robinhood] score=+0.60 — Congress: 2 buy / 1 sell filings in last 60d (disclosures lag up to ~45d). | Robinhood 100 Most Popular (retail crowd positioning)
+2026-07-15 14:32:50,063 WARNING signals | macro.fetch failed: HTTPSConnectionPool(host='api.stlouisfed.org', port=443): Read timed out. (read timeout=15)
+2026-07-15 14:33:07,728 INFO quiver | Quiver live/offexchange -> 5496 row(s).
+2026-07-15 14:33:08,225 INFO quiver | Quiver live/govcontractsall -> 20000 row(s).
+2026-07-15 14:34:58,890 INFO signals | options_chain: reading 25 of 28 symbols this cycle (cap).
+2026-07-15 14:35:10,643 INFO signals | Gathered signals for 28/28 symbols (+0 market signals).
+2026-07-15 14:35:12,768 INFO robinhood | Imported 1 Robinhood holding(s) for context (read-only).
+2026-07-15 14:35:12,776 INFO orchestrator | Buy-excluded from slate this cycle: BEP (exited 1.0h ago (cooldown 24h)), CVX (exited 5.0h ago (cooldown 24h)), F (topped up 2.0h ago (next ok in 4h)), HUBB (exited 2.0h ago (cooldown 24h)), NOK (exited 6.0h ago (cooldown 24h)) …+2 more
+2026-07-15 14:35:45,617 INFO usage | decision call: 22608 in / 2297 out (cache r=0 w=0) ~$0.1705 [claude-opus-4-8]
+2026-07-15 14:35:45,625 INFO decision | Claude returned 1 proposal(s).
+2026-07-15 14:35:47,384 INFO earnings | Robinhood earnings calendar: 0 name(s) reporting within 31d.
+2026-07-15 14:35:53,383 INFO orchestrator | BUY MU -> approved: Sized to 5.45875 sh ($4,934) within caps. | Best-in-class fundamentals among new names: rev growth +345.7%, 75.6% margin, EBITDA $68.2B, low D/E
+2026-07-15 14:35:53,524 WARNING alpaca | MU: floored 5.45875 sh -> 5 for the exchange bracket; $414.88 of the $4934.33 allocation NOT deployed (stays cash; core sweep / next cycle can redeploy).
+2026-07-15 14:35:53,587 INFO alpaca | BUY market MU qty=5.0 notional=None lim=None (order 52697e55-5ba9-4109-97ea-9fb61ae342be)
+2026-07-15 14:35:53,595 INFO ledger | Ledger: BUY MU qty=5 $4522
+2026-07-15 14:35:53,603 INFO orchestrator | Cycle budget not fully deployed: $414.88 dropped by whole-share flooring across this cycle's buys (stays cash; core sweep / next cycle can redeploy).
+2026-07-15 14:35:53,663 INFO alpaca | Alpaca client ready (mode=paper).
+2026-07-15 14:35:55,475 INFO dashboard | Wrote dashboard with 42 trades -> dashboard.html
+2026-07-15 15:32:02,354 INFO orchestrator | Market closed; skipping decision cycle.
+2026-07-15 15:32:02,385 INFO orchestrator | Running nightly post-mortem for 2026-07-15 …
+2026-07-15 15:32:14,223 INFO usage | postmortem call: 2501 in / 452 out (cache r=0 w=0) ~$0.0238 [claude-opus-4-8]
+2026-07-15 15:32:14,231 INFO postmortem | Post-mortem written to state/lessons/2026-07-15.md
+2026-07-15 15:32:14,257 INFO postmortem | Post-mortem lessons: When one ticker (esp. broad ETF like QQQ) exceeds ~40% of daily buy dollars, cap further tranches and diversify.
+2026-07-15 15:32:14,264 INFO orchestrator | API spend today: $1.25 across 8 calls (157,042 in / 18,449 out tokens).
+2026-07-15 15:32:14,316 INFO alpaca | Alpaca client ready (mode=paper).
+2026-07-15 15:32:16,425 INFO dashboard | Wrote dashboard with 42 trades -> dashboard.html
+2026-07-15 16:32:27,662 INFO orchestrator | Market closed; skipping decision cycle.
+2026-07-15 16:32:27,794 INFO alpaca | Alpaca client ready (mode=paper).
+2026-07-15 16:32:29,769 INFO dashboard | Wrote dashboard with 42 trades -> dashboard.html
+2026-07-15 17:32:45,900 INFO orchestrator | Market closed; skipping decision cycle.
+2026-07-15 17:32:45,979 INFO alpaca | Alpaca client ready (mode=paper).
+2026-07-15 17:32:47,999 INFO dashboard | Wrote dashboard with 42 trades -> dashboard.html
+2026-07-15 18:33:02,478 INFO orchestrator | Market closed; skipping decision cycle.
+2026-07-15 18:33:02,547 INFO alpaca | Alpaca client ready (mode=paper).
+2026-07-15 18:33:04,495 INFO dashboard | Wrote dashboard with 42 trades -> dashboard.html
+2026-07-15 19:33:20,504 INFO orchestrator | Market closed; skipping decision cycle.
+2026-07-15 19:33:20,572 INFO alpaca | Alpaca client ready (mode=paper).
+2026-07-15 19:33:22,628 INFO dashboard | Wrote dashboard with 42 trades -> dashboard.html
+2026-07-15 20:33:38,173 INFO orchestrator | Market closed; skipping decision cycle.
+2026-07-15 20:33:38,249 INFO alpaca | Alpaca client ready (mode=paper).
+2026-07-15 20:33:40,194 INFO dashboard | Wrote dashboard with 42 trades -> dashboard.html
+2026-07-15 21:26:20,428 WARNING orchestrator | DARK GAP (market closed): no loop tick for 7 min (sleep/suspend?) — positions could not move; not paging.
+2026-07-15 21:27:18,537 WARNING alpaca | get_account: transient network error (ReadTimeout); retry 1/2.
+2026-07-15 21:27:19,197 WARNING alpaca | get_account: transient network error (ConnectionError); retry 2/2.
+2026-07-15 21:27:20,351 WARNING orchestrator | Watchdog tick skipped on a transient network error (ConnectionError); retrying next tick.
+2026-07-15 22:01:14,437 WARNING orchestrator | DARK GAP (market closed): no loop tick for 34 min (sleep/suspend?) — positions could not move; not paging.
+2026-07-15 22:01:14,463 WARNING alpaca | get_account: transient network error (ConnectionError); retry 1/2.
+2026-07-15 22:01:15,117 WARNING alpaca | get_account: transient network error (ConnectionError); retry 2/2.
+2026-07-15 22:01:16,274 WARNING orchestrator | Watchdog tick skipped on a transient network error (ConnectionError); retrying next tick.
+2026-07-15 23:18:53,267 WARNING orchestrator | DARK GAP (market closed): no loop tick for 78 min (sleep/suspend?) — positions could not move; not paging.
+2026-07-15 23:18:53,290 WARNING alpaca | get_account: transient network error (ConnectionError); retry 1/2.
+2026-07-15 23:18:53,940 WARNING alpaca | get_account: transient network error (ConnectionError); retry 2/2.
+2026-07-15 23:18:55,045 WARNING orchestrator | Watchdog tick skipped on a transient network error (ConnectionError); retrying next tick.
+2026-07-15 23:19:25,140 WARNING alpaca | get_account: transient network error (ConnectionError); retry 1/2.
+2026-07-15 23:19:25,803 WARNING alpaca | get_account: transient network error (ConnectionError); retry 2/2.
+2026-07-15 23:19:26,951 WARNING orchestrator | Watchdog tick skipped on a transient network error (ConnectionError); retrying next tick.

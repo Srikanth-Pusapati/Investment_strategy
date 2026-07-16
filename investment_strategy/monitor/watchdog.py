@@ -61,6 +61,12 @@ class Watchdog:
         #: give back this much of peak gain before trailing-stopping out
         #: (TRAIL_GIVEBACK_PCT; the backtest engine mirrors the same knob).
         self.trail_giveback_pct = getattr(cfg.risk, "trail_giveback_pct", 3.0)
+        #: last time we logged the "protected, waiting to fill" no-op per
+        #: symbol — an illiquid pre/post-market exit can sit unfilled for
+        #: hours, and at a 30s tick that line repeats hundreds of times a day
+        #: for a single ticker (BIIB, 2026-07-15: 318x) without saying
+        #: anything new. Throttled below, not silenced (see _log_waiting_throttled).
+        self._last_wait_log: dict[str, datetime] = {}
 
     def _alert(self, key: str, subject: str, body: str) -> None:
         """Page a human, if an alerter is wired. The event is already logged at
@@ -195,6 +201,19 @@ class Watchdog:
                     f"may need manual intervention.",
                 )
 
+    #: minimum gap between repeated "still waiting to fill" log lines for the
+    #: same symbol — the underlying retry cadence (the watchdog tick) is far
+    #: shorter and would otherwise spam identical WARNINGs for hours.
+    WAIT_LOG_THROTTLE_S = 300
+
+    def _log_waiting_throttled(self, symbol: str, msg: str, *args) -> None:
+        now = datetime.now(timezone.utc)
+        last = self._last_wait_log.get(symbol)
+        if last is not None and (now - last).total_seconds() < self.WAIT_LOG_THROTTLE_S:
+            return
+        self._last_wait_log[symbol] = now
+        log.warning(msg, *args)
+
     # -- best-effort hard close (1B.5) -------------------------------------- #
     def _close_hard(self, pos: Position, reason: str) -> tuple[str, str | None]:
         """Close `pos` as hard as the broker allows, escalating through every
@@ -259,7 +278,8 @@ class Watchdog:
             # close: page only when no working sell exit is resting (e.g. legs
             # wedged in pending_cancel, or none at all — the FRHC-class stall).
             if self.broker.has_working_exit(pos.symbol, ref):
-                log.warning(
+                self._log_waiting_throttled(
+                    pos.symbol,
                     "Close %s (%s): %.6g reserved share(s) already covered by a "
                     "resting marketable exit from a prior tick — protected, "
                     "waiting to fill. Will retry the full close next tick.",
