@@ -104,6 +104,11 @@ class _FakeBroker:
         self.closed.append(symbol)
         return f"oid-{symbol}"
 
+    def open_position(self, symbol):
+        # Fresh re-read unavailable in tests: decay path falls back to the
+        # cycle-snapshot row; decision-sell tests script their own broker.
+        return None
+
     def latest_price(self, symbol):
         return 100.0
 
@@ -141,11 +146,28 @@ class _FakeLedger:
 
 
 class _FakeWatchdog:
-    def __init__(self):
+    """Fakes close_now with the real contract: ("full", oid) routed through the
+    fake broker so tests can keep asserting on broker.closed. Script `outcomes`
+    (a list popped per call) to exercise the partial/failed branches."""
+
+    def __init__(self, broker=None):
         self.forgotten = []
+        self.closed_now = []    # (symbol, reason)
+        self.outcomes = []      # scripted (outcome, oid) tuples, FIFO
+        self.broker = broker
 
     def forget(self, symbol):
         self.forgotten.append(symbol)
+
+    def close_now(self, pos, reason):
+        self.closed_now.append((pos.symbol, reason))
+        if self.outcomes:
+            return self.outcomes.pop(0)
+        oid = (
+            self.broker.close_position(pos.symbol)
+            if self.broker else f"oid-{pos.symbol}"
+        )
+        return ("full", oid)
 
 
 def _state_tmp():
@@ -182,7 +204,7 @@ def _orch(trim_enabled=True, trim_pct=25.0, state=None,
     o.risk = SimpleNamespace(kill_switch=kill_switch)
     o.broker = _FakeBroker()
     o.ledger = _FakeLedger()
-    o.watchdog = _FakeWatchdog()
+    o.watchdog = _FakeWatchdog(o.broker)
     o.state = state or _state_tmp()
     o._trade_lock = threading.Lock()
     o._pending_oids = []
@@ -353,6 +375,38 @@ def test_thesis_decay_exits_when_no_bundle_at_all():
     acct = _acct(positions=[_pos("AAPL", 300.0)])
     exited = o._apply_thesis_decay_exits([], acct)  # signals went stale entirely
     assert exited == {"AAPL"}
+
+
+def test_thesis_decay_failed_close_ledgers_nothing_and_keeps_position():
+    """SPCX regression (2026-07-16): a close refused by the broker must NOT
+    write a phantom SELL record, must NOT drop watchdog tracking, and must
+    keep the position in the cycle snapshot for a later retry."""
+    state = _state_tmp()
+    _held(state, "AAPL", days_ago=10)
+    o = _orch(thesis_decay_enabled=True, state=state)
+    o.watchdog.outcomes = [("failed", None)]
+    acct = _acct(positions=[_pos("AAPL", 300.0)])
+    exited = o._apply_thesis_decay_exits([_bundle("AAPL", -0.5)], acct)
+    assert exited == set()                          # not treated as exited
+    assert o.ledger.records == []                   # no phantom SELL
+    assert o.watchdog.forgotten == []               # still tracked
+    assert acct.position_for("AAPL") is not None    # snapshot keeps it
+
+
+def test_thesis_decay_partial_close_keeps_tracking_but_frees_capital():
+    """A partial close (legs replaced into marketable exits) is ledgered
+    inside close_now — the orchestrator must not double-record, must keep
+    watchdog tracking until the fills land, and frees the cycle capital."""
+    state = _state_tmp()
+    _held(state, "AAPL", days_ago=10)
+    o = _orch(thesis_decay_enabled=True, state=state)
+    o.watchdog.outcomes = [("partial", None)]
+    acct = _acct(positions=[_pos("AAPL", 300.0)])
+    exited = o._apply_thesis_decay_exits([_bundle("AAPL", -0.5)], acct)
+    assert exited == {"AAPL"}                       # dropped from the slate
+    assert o.ledger.records == []                   # close_now already ledgered
+    assert o.watchdog.forgotten == []               # tracked to completion
+    assert acct.position_for("AAPL") is None        # capital freed downstream
 
 
 def test_thesis_decay_noop_when_disabled():

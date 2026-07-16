@@ -1327,19 +1327,32 @@ class Orchestrator:
                 pos.unrealized_pl_pct,
             )
             with self._trade_lock:
-                self.broker.cancel_open_orders_for(pos.symbol)
-                oid = self.broker.close_position(pos.symbol)
-                self.watchdog.forget(pos.symbol)
-                self.ledger.record(TradeRecord.for_sell(
-                    pos.symbol, "thesis decay: entry signals no longer corroborated",
-                    oid, qty=pos.qty, realized_pl_pct=pos.unrealized_pl_pct,
-                    realized_pl=pos.unrealized_pl, exit_reason="thesis_decay",
-                    exit_price=pos.current_price or None,
-                ))
-                if oid:
+                # Fresh read (qty_available drives the close ladder); fall back
+                # to the snapshot row if the re-read is transiently unreadable.
+                live = self.broker.open_position(pos.symbol) or pos
+                outcome, oid = self.watchdog.close_now(live, "thesis_decay")
+                if outcome == "full":
+                    self.watchdog.forget(pos.symbol)
+                    self.ledger.record(TradeRecord.for_sell(
+                        pos.symbol,
+                        "thesis decay: entry signals no longer corroborated",
+                        oid, qty=live.qty, realized_pl_pct=live.unrealized_pl_pct,
+                        realized_pl=live.unrealized_pl, exit_reason="thesis_decay",
+                        exit_price=live.current_price or None,
+                    ))
                     self._pending_oids.append((oid, pos.symbol))
                     # Start the re-entry cooldown clock (churn guard).
                     self.state.register_exit(pos.symbol)
+                elif outcome == "partial":
+                    # Live legs replaced into marketable exits and ledgered
+                    # inside close_now; watchdog keeps tracking to completion.
+                    self.state.register_exit(pos.symbol)
+                else:
+                    log.error(
+                        "Thesis-decay close FAILED for %s — stays held (and in "
+                        "the slate) until a later cycle exits it.", pos.symbol,
+                    )
+                    continue
                 # Keep this cycle's snapshot honest (frees capital/slot downstream).
                 self._apply_pending_close(account, pos.symbol)
             exited.add(pos.symbol)
@@ -1564,27 +1577,55 @@ class Orchestrator:
         # interleave an emergency close on the same symbol mid-operation.
         with self._trade_lock:
             if proposal.action.value == "sell":
-                self.broker.cancel_open_orders_for(proposal.symbol)
-                held = account.position_for(proposal.symbol)
-                oid = self.broker.close_position(proposal.symbol)
-                self.watchdog.forget(proposal.symbol)
-                # The held position's unrealized P&L at close IS the realized
-                # outcome — record it so this round-trip is attributable.
-                self.ledger.record(TradeRecord.for_sell(
-                    proposal.symbol, proposal.rationale, oid,
-                    qty=held.qty if held else 0.0, key_signals=proposal.key_signals,
-                    realized_pl_pct=held.unrealized_pl_pct if held else None,
-                    realized_pl=held.unrealized_pl if held else None,
-                    exit_reason="decision",
-                    exit_price=held.current_price if held else None,
-                ))
-                if oid:
-                    self._pending_oids.append((oid, proposal.symbol))
-                    # Start the re-entry cooldown clock (churn guard).
-                    self.state.register_exit(proposal.symbol)
-                    # Reflect the close in this cycle's snapshot so later proposals
-                    # see the freed capital / slot (see _apply_pending_buy).
-                    self._apply_pending_close(account, proposal.symbol)
+                # Fresh read: the close ladder branches on qty_available, and
+                # the cycle-start snapshot is minutes old after the LLM call.
+                held = self.broker.open_position(proposal.symbol)
+                if held is None or held.qty <= 0:
+                    log.warning(
+                        "SELL %s: no open position at the broker — nothing to "
+                        "close (already exited?).", proposal.symbol,
+                    )
+                    executed_notional = 0.0
+                else:
+                    outcome, oid = self.watchdog.close_now(held, "decision")
+                    if outcome == "full":
+                        self.watchdog.forget(proposal.symbol)
+                        # The held position's unrealized P&L at close IS the
+                        # realized outcome — record it so this round-trip is
+                        # attributable.
+                        self.ledger.record(TradeRecord.for_sell(
+                            proposal.symbol, proposal.rationale, oid,
+                            qty=held.qty, key_signals=proposal.key_signals,
+                            realized_pl_pct=held.unrealized_pl_pct,
+                            realized_pl=held.unrealized_pl,
+                            exit_reason="decision",
+                            exit_price=held.current_price or None,
+                        ))
+                        self._pending_oids.append((oid, proposal.symbol))
+                        # Start the re-entry cooldown clock (churn guard).
+                        self.state.register_exit(proposal.symbol)
+                        # Reflect the close in this cycle's snapshot so later
+                        # proposals see the freed capital / slot.
+                        self._apply_pending_close(account, proposal.symbol)
+                    elif outcome == "partial":
+                        # Exit in motion: live sell legs were replaced into
+                        # marketable limits (ledgered inside close_now with
+                        # their order ids, so reconcile can true them up).
+                        # Keep watchdog tracking until the fills land; free
+                        # the capital in this cycle's snapshot — marketable
+                        # exits fill within ticks.
+                        self.state.register_exit(proposal.symbol)
+                        self._apply_pending_close(account, proposal.symbol)
+                    else:
+                        # Nothing was ledgered and nothing must be: a phantom
+                        # SELL with no order id is invisible to reconcile and
+                        # poisons attribution forever (SPCX 2026-07-16).
+                        log.error(
+                            "SELL %s approved but the close FAILED — position "
+                            "stays held and tracked; next cycle re-decides.",
+                            proposal.symbol,
+                        )
+                        executed_notional = 0.0
             else:  # buy (approved or resized)
                 sub = self.broker.submit_from_decision(decision)
                 executed_notional = sub.notional if sub.order_id else 0.0

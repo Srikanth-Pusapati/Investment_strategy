@@ -38,6 +38,15 @@ _UNSET = object()  # "not resolved yet" sentinel (distinct from a resolved None)
 
 
 class RobinhoodReader:
+    #: Latched True the first time a call dies on an OAuth failure that cannot
+    #: be fixed headlessly (expired/revoked refresh token -> the SDK falls back
+    #: to a full browser authorization, which interactive=False refuses).
+    #: CLASS-level on purpose: the orchestrator, both screener feeds, and the
+    #: earnings module each hold their own reader, and without a shared latch a
+    #: dead token dumped a full OAuth traceback per call, per module, per cycle
+    #: (~8 tracebacks/hour, 2026-07-16) while saying the same thing: re-auth.
+    _auth_dead = False
+
     def __init__(self, cfg: Config):
         self.cfg = cfg
         self._account_number: Any = _UNSET  # cached agentic account number
@@ -48,6 +57,7 @@ class RobinhoodReader:
 
         return (
             self.cfg.robinhood_enabled
+            and not RobinhoodReader._auth_dead
             and bool(self.cfg.robinhood_mcp_url)
             # Either the OAuth handshake has been completed (preferred: auto-refresh)
             # or a legacy pre-obtained Bearer token is pasted in the env.
@@ -156,8 +166,43 @@ class RobinhoodReader:
         try:
             return asyncio.run(self._call_tool(tool, arguments or {}))
         except Exception as e:
+            if self._latch_if_auth_dead(e):
+                return None
             log.warning("Robinhood MCP call %s failed: %s", tool, e)
             return None
+
+    @classmethod
+    def _latch_if_auth_dead(cls, exc: BaseException) -> bool:
+        """True (and latch the class-wide kill) when `exc` is an OAuth failure
+        the bot cannot fix without a human: the refresh token is dead and a
+        browser handshake is required. The MCP TaskGroup wraps the real error
+        in nested ExceptionGroups, so walk them. Every later call this process
+        no-ops via `enabled` instead of re-failing."""
+        try:
+            from mcp.client.auth.exceptions import OAuthFlowError, OAuthTokenError
+            auth_errors: tuple = (OAuthFlowError, OAuthTokenError)
+        except ImportError:  # SDK layout changed — fall back to name matching
+            auth_errors = ()
+
+        def _is_auth(e: BaseException) -> bool:
+            if isinstance(e, BaseExceptionGroup):
+                return any(_is_auth(sub) for sub in e.exceptions)
+            if auth_errors:
+                return isinstance(e, auth_errors)
+            return "oauth" in type(e).__name__.lower()
+
+        if not _is_auth(exc):
+            return False
+        if not cls._auth_dead:
+            cls._auth_dead = True
+            log.error(
+                "Robinhood OAuth token is dead (refresh failed; a browser "
+                "handshake is needed). Disabling ALL Robinhood context reads "
+                "for this run — the bot trades fine without them. To restore: "
+                "run `python -m investment_strategy.portfolio.robinhood_auth "
+                "login`, then restart the bot.",
+            )
+        return True
 
     async def _call_tool(self, tool: str, arguments: dict) -> Any:
         from mcp import ClientSession
