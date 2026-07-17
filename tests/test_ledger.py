@@ -93,6 +93,16 @@ def test_last_correction_wins():
     assert eff[0].qty == 6.0                   # the later, final number
 
 
+def test_composite_score_round_trips_and_defaults_none():
+    from investment_strategy.ledger import TradeRecord as TR
+    rec = TR(symbol="AAPL", action="buy", composite_score=0.42)
+    back = TR.model_validate_json(rec.model_dump_json())
+    assert back.composite_score == 0.42
+    # Old ledger rows (no field) keep loading — backward compatible.
+    old = TR.model_validate_json('{"symbol": "AAPL", "action": "buy"}')
+    assert old.composite_score is None
+
+
 def _run_all():
     fns = [v for k, v in sorted(globals().items()) if k.startswith("test_") and callable(v)]
     failed = 0

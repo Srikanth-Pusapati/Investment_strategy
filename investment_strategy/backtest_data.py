@@ -86,6 +86,30 @@ def annualized_vol_at(
     return sd * (_TRADING_DAYS ** 0.5)
 
 
+def tech_at(closes: list[float], day: int) -> dict | None:
+    """Technical context at bar `day` for the anti-chasing gate, computed from
+    the same close series the replay runs on. ATR degrades to the close-to-
+    close true range (no H/L bars offline) — a slightly tighter yardstick, so
+    the gate fires a touch EARLIER in replay than live; document, don't hide.
+    None when history is too short (the gate then fails open, exactly as live)."""
+    from .signals.technical import TechnicalProvider
+
+    window = [c for c in closes[max(0, day - 260): day + 1] if c > 0]
+    if len(window) < 35:
+        return None
+    rsi = TechnicalProvider._rsi(window, 14)
+    sma20 = TechnicalProvider._sma(window, 20)
+    atr = TechnicalProvider._atr([], [], window, 14)
+    price = window[-1]
+    ext_pct = ((price / sma20 - 1.0) * 100.0) if sma20 else None
+    ext_atr = ((price - sma20) / atr) if (sma20 and atr) else None
+    return {
+        "rsi14": round(rsi, 1),
+        "ext_pct_sma20": round(ext_pct, 2) if ext_pct is not None else None,
+        "ext_atr": round(ext_atr, 2) if ext_atr is not None else None,
+    }
+
+
 def entries_from_ledger(
     ledger_path: str | Path, dates: list[str],
     prices: dict[str, list[float]] | None = None,
@@ -126,6 +150,7 @@ def entries_from_ledger(
             stop_loss_pct=rec.get("stop_loss_pct"),
             take_profit_pct=rec.get("take_profit_pct"),
             volatility=vol,
+            tech=tech_at(prices[sym], day) if prices is not None else None,
         ))
     return entries
 
@@ -202,6 +227,7 @@ def breakout_entries(
                     day=day, symbol=sym,
                     conviction=0.6, target_weight_pct=10.0,
                     volatility=annualized_vol_at(closes, day),
+                    tech=tech_at(closes, day),
                 ))
                 last_fire = day
     entries.sort(key=lambda e: e.day)

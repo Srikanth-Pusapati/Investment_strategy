@@ -62,6 +62,10 @@ class SignalBundle(BaseModel):
     symbol: str
     signals: list[Signal] = Field(default_factory=list)
     market_context: list[Signal] = Field(default_factory=list)  # macro etc.
+    # Deterministic weighted signal index (signals/composite.py): per-kind mean
+    # score x freshness-lag weight x realized track-record weight. None until
+    # computed (or when the bundle has no scored signals).
+    composite_score: Optional[float] = None
 
 
 class Candidate(BaseModel):

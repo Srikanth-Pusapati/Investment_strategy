@@ -107,6 +107,19 @@ def tail_log(n: int = 120, log_file: Path | None = None) -> str:
         return f"(no log: {e})"
 
 
+def robinhood_health() -> str:
+    """Latch state written by RobinhoodReader (separate process — a file is the
+    only shared surface): 'ok' | 'AUTH DEAD since <ts>' | 'n/a' (never latched)."""
+    try:
+        h = json.loads((ROOT / "state" / "robinhood_health.json").read_text())
+    except (OSError, ValueError):
+        return "n/a"
+    if h.get("auth_dead"):
+        since = str(h.get("since") or "")[:16].replace("T", " ")
+        return f"AUTH DEAD since {since}" if since else "AUTH DEAD"
+    return "ok"
+
+
 def status() -> dict:
     pid = bot_pid()
     age = log_age_minutes()
@@ -118,6 +131,7 @@ def status() -> dict:
         "kill_switch": KILL_FILE.exists(),
         "log_age_min": None if age is None else round(age, 1),
         "market_hours": market_hours(now),
+        "robinhood": robinhood_health(),
     }
 
 
@@ -165,6 +179,7 @@ async function refresh(){
    +c('LOG AGE', s.log_age_min===null?'—':s.log_age_min+' min',
       s.log_age_min!==null&&s.log_age_min<40?'ok':'warn')
    +c('MARKET HOURS', s.market_hours?'OPEN window':'closed', s.market_hours?'ok':'')
+   +c('ROBINHOOD', s.robinhood, s.robinhood==='ok'?'ok':(s.robinhood==='n/a'?'':'bad'))
    +c('TIME', s.time_et,'');
 }
 async function act(a, confirmMsg){

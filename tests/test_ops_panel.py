@@ -96,10 +96,28 @@ def test_status_shape():
     s = panel.status()   # read-only against the real repo — safe
     assert set(s) == {
         "time_et", "bot_pid", "bot_alive", "kill_switch",
-        "log_age_min", "market_hours",
+        "log_age_min", "market_hours", "robinhood",
     }
     assert isinstance(s["bot_alive"], bool)
     assert isinstance(s["kill_switch"], bool)
+    assert isinstance(s["robinhood"], str)
+
+
+def test_robinhood_health_states(monkeypatch, tmp_path):
+    monkeypatch.setattr(panel, "ROOT", tmp_path)
+    assert panel.robinhood_health() == "n/a"  # no health file yet
+    state = tmp_path / "state"
+    state.mkdir()
+    hf = state / "robinhood_health.json"
+    hf.write_text('{"auth_dead": false, "since": null, "detail": "ok"}')
+    assert panel.robinhood_health() == "ok"
+    hf.write_text(
+        '{"auth_dead": true, "since": "2026-07-16T14:00:00+00:00",'
+        ' "detail": "relogin required"}'
+    )
+    assert panel.robinhood_health().startswith("AUTH DEAD since 2026-07-16")
+    hf.write_text("not json")
+    assert panel.robinhood_health() == "n/a"
 
 
 def test_tail_log(tmp_path):

@@ -107,6 +107,8 @@ class RiskManager:
         max_held_corr: float | None = None, corr_symbol: str = "",
         cycle_budget_cap: float | None = None,
         corr_data_missing: bool = False,
+        tech: dict | None = None,
+        composite_score: float | None = None,
     ) -> RiskDecision:
         """`price` is the current market price for proposal.symbol. `volatility`
         is the symbol's annualized realized vol (fraction, e.g. 0.45) used for
@@ -126,7 +128,11 @@ class RiskManager:
         one cycle (None = no share cap), so the first buy can't starve the rest
         to "Budget $0.00". `corr_data_missing` is True when we HOLD satellites
         but couldn't compute correlations against them (data outage) — a blind
-        guard sizes down instead of failing open."""
+        guard sizes down instead of failing open. `tech` is the symbol's
+        technical-signal data dict (rsi14 / ext_atr / ext_pct_sma20) for the
+        anti-chasing overextension gate; `composite_score` is our deterministic
+        weighted signal index for the opt-in composite floor. Both fail open
+        when None."""
         if proposal.action is Action.HOLD:
             # Same REJECTED verdict (nothing downstream may execute a HOLD),
             # but without _reject's "REJECT hold X" log line — a no-op HOLD is
@@ -141,6 +147,7 @@ class RiskManager:
             proposal, account, price, volatility, pending_buy_notional,
             days_to_earnings, sector, sector_exposure_usd, regime_multiplier,
             max_held_corr, corr_symbol, cycle_budget_cap, corr_data_missing,
+            tech, composite_score,
         )
 
     # -- survival-first sizing: vol-targeted, fractional-Kelly -------------- #
@@ -209,6 +216,8 @@ class RiskManager:
         max_held_corr: float | None = None, corr_symbol: str = "",
         cycle_budget_cap: float | None = None,
         corr_data_missing: bool = False,
+        tech: dict | None = None,
+        composite_score: float | None = None,
     ) -> RiskDecision:
         halted, why = self.trading_halted(account)
         if halted:
@@ -240,6 +249,74 @@ class RiskManager:
                 f"Conviction {proposal.conviction:.2f} below floor "
                 f"{self.limits.min_conviction:.2f} — no real edge; skip.",
             )
+
+        # Composite floor (opt-in): the deterministic weighted signal index
+        # must corroborate the LLM's conviction. Fails open on None — the
+        # composite is best-effort context, not a required feed.
+        if (
+            self.limits.composite_gate_enabled
+            and composite_score is not None
+            and composite_score < self.limits.min_composite_score
+        ):
+            return self._reject(
+                proposal,
+                f"Composite {composite_score:+.2f} below floor "
+                f"{self.limits.min_composite_score:+.2f} — the weighted signals "
+                "don't corroborate the conviction.",
+            )
+
+        # Anti-chasing overextension gate (week of 2026-07-13: 68% of realized
+        # losses were momentum entries near local tops — CDW/SOFI/PATH — that
+        # ran straight to their stops). Two triggers:
+        #   (a) hot AND extended: RSI >= overext_rsi AND price >= overext_atr_mult
+        #       ATRs above the 20d SMA (% fallback when ATR is unavailable);
+        #   (b) EXTREME extension alone: >= overext_extreme_atr_mult ATRs over
+        #       the 20d SMA fires regardless of RSI — the actual Jul-13 losers
+        #       entered at RSI 61-64 (under any sane RSI floor) but 3.4-4.0 ATRs
+        #       extended; the RSI leg must not muzzle a screaming extension leg.
+        # Block it, or halve the size (haircut mode) so a wrong top costs half.
+        # Fails open on missing technicals — a yfinance outage must not freeze
+        # all buying.
+        overext_note = ""
+        overext_mult = 1.0
+        if self.limits.overextension_gate_enabled and tech:
+            rsi = tech.get("rsi14")
+            ext_atr = tech.get("ext_atr")
+            ext_pct = tech.get("ext_pct_sma20")
+            extended = (
+                (ext_atr is not None and ext_atr >= self.limits.overext_atr_mult)
+                or (
+                    ext_atr is None
+                    and ext_pct is not None
+                    and ext_pct >= self.limits.overext_pct
+                )
+            )
+            hot_and_extended = (
+                rsi is not None and rsi >= self.limits.overext_rsi and extended
+            )
+            extreme = (
+                self.limits.overext_extreme_atr_mult > 0
+                and ext_atr is not None
+                and ext_atr >= self.limits.overext_extreme_atr_mult
+            )
+            if hot_and_extended or extreme:
+                how_far = (
+                    f"{ext_atr:.1f}xATR" if ext_atr is not None
+                    else f"{ext_pct:.1f}%"
+                )
+                why = (
+                    f"{how_far} above the 20d SMA (extreme extension)"
+                    if extreme and not hot_and_extended
+                    else f"RSI {rsi:.0f} and {how_far} above the 20d SMA"
+                )
+                if self.limits.overextension_mode == "block":
+                    return self._reject(
+                        proposal,
+                        f"Overextended: {why} — chasing a local top; wait "
+                        "for a pullback or base.",
+                    )
+                overext_mult = max(0.0, min(1.0, self.limits.overext_haircut))
+                overext_note = f" Overextension haircut x{overext_mult:g} ({why})."
 
         # Churn guards (2026-07-06 log: LLY bought 10x in one day, every 30-min
         # cycle, while all other buys starved). (a) Top-up spacing: a name bought
@@ -380,6 +457,10 @@ class RiskManager:
             proposal.target_weight_pct, sized_pct, self.limits.max_position_pct
         )
         target_notional = equity * (weight_pct / 100.0)
+
+        # 1a) Anti-chasing haircut (computed above): halve what an extended
+        #     entry may deploy, BEFORE the additive caps below shave it further.
+        target_notional *= overext_mult
 
         # 1b) Market-regime scaling — shrink size in a risk-off backdrop (SPY below
         #     its 200dma / elevated VIX). 1.0 in a calm uptrend; clamped to [0,1]
@@ -544,6 +625,7 @@ class RiskManager:
             reason=(
                 f"Sized to {qty:g} sh (${approved_notional:,.0f}) within caps."
                 + (" Reduced from request." if resized else "")
+                + overext_note
             ),
         )
 

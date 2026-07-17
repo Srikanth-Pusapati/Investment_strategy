@@ -199,6 +199,10 @@ def _orch(trim_enabled=True, trim_pct=25.0, state=None,
             min_order_pct=0.05,
             whole_shares_only=whole_shares_only,
             max_cycle_symbol_share_pct=100.0,  # 100 = off
+            # New guards default OFF here — they have their own suites
+            # (test_rotation_guard.py); these tests pin the pre-existing paths.
+            composite_budget_blend=False,
+            rotation_loss_guard_enabled=False,
         ),
     )
     o.risk = SimpleNamespace(kill_switch=kill_switch)
@@ -750,7 +754,8 @@ def _rotation_orch():
     o._stamp_liveness = lambda: None
     o._calls = []
 
-    def handle_equity(proposal, account, kinds, cycle_budget_cap=None):
+    def handle_equity(proposal, account, kinds, cycle_budget_cap=None,
+                      tech=None, composite=None):
         o._calls.append((proposal.action.value, proposal.symbol, cycle_budget_cap))
         if proposal.action.value == "sell":
             Orchestrator._apply_pending_close(account, proposal.symbol)
@@ -786,9 +791,9 @@ def test_execute_proposals_budget_split_sees_freed_capital():
     seen = {}
     real_caps = o._cycle_budget_caps
 
-    def caps_spy(props, account):
+    def caps_spy(props, account, composites=None):
         seen["cash"] = account.cash
-        return real_caps(props, account)
+        return real_caps(props, account, composites)
 
     o._cycle_budget_caps = caps_spy
     acct = _acct(cash=0.0, positions=[_pos("CVX", 500.0)])

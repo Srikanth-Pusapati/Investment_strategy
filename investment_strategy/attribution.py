@@ -40,6 +40,10 @@ class RoundTrip:
     exit_reason: str = ""
     n_lots: int = 1               # how many open lots contributed (proxy for top-up depth)
     same_day_repeat: bool = False  # True when ≥2 lots opened on the same calendar date
+    # Mean entry conviction of the open lots (None when no lot recorded one —
+    # core fills and pre-tracking records write conviction 0.0, treated as
+    # unknown). Feeds the conviction-calibration block.
+    conviction: float | None = None
 
 
 @dataclass
@@ -67,25 +71,31 @@ def round_trips(records: list[TradeRecord]) -> list[RoundTrip]:
     remainder open, so it reduces the open lots FIFO rather than flattening them.
     """
     ordered = sorted(records, key=lambda r: r.ts)
-    # Per symbol, a list of open lots as [remaining_qty, entry_signals, ts_date].
+    # Per symbol, a list of open lots as
+    # [remaining_qty, entry_signals, ts_date, conviction-or-None].
     open_by_symbol: dict[str, list[list]] = {}
     trips: list[RoundTrip] = []
     for r in ordered:
         if r.action == "buy":
             ts_date = str(r.ts)[:10] if r.ts else ""
+            # 0.0 means "not recorded" (core fills, pre-tracking rows), not
+            # "zero conviction" — store None so calibration skips it.
+            conv = r.conviction if (r.conviction or 0.0) > 0 else None
             open_by_symbol.setdefault(r.symbol, []).append(
-                [float(r.qty or 0.0), list(r.entry_signals), ts_date]
+                [float(r.qty or 0.0), list(r.entry_signals), ts_date, conv]
             )
         elif r.action == "sell":
             lots = open_by_symbol.get(r.symbol, [])
             if r.realized_pl_pct is not None:
-                signals = sorted({k for _, sigs, _d in lots for k in sigs})
-                dates = [d for _, _, d in lots if d]
+                signals = sorted({k for _, sigs, _d, _c in lots for k in sigs})
+                dates = [d for _, _, d, _c in lots if d]
                 same_day = len(dates) >= 2 and len(set(dates)) == 1
+                convs = [c for _, _, _, c in lots if c is not None]
                 trips.append(RoundTrip(
                     symbol=r.symbol, pl_pct=r.realized_pl_pct,
                     signals=signals, exit_reason=r.exit_reason,
                     n_lots=len(lots), same_day_repeat=same_day,
+                    conviction=sum(convs) / len(convs) if convs else None,
                 ))
             # A partial exit (with a known qty) trims the open lots and keeps the
             # remainder; anything else — or an unknown qty — fully closes.
@@ -128,8 +138,9 @@ def concentration_lessons(trips: list[RoundTrip], min_trips: int = 3) -> list[st
 
 
 def _reduce_fifo(lots: list[list], qty: float) -> None:
-    """Consume `qty` shares from the front of `lots` (each [remaining_qty, signals, date]),
-    dropping fully-consumed lots. Mutates `lots` in place."""
+    """Consume `qty` shares from the front of `lots` (each
+    [remaining_qty, signals, date, conviction]), dropping fully-consumed lots.
+    Mutates `lots` in place."""
     remaining = qty
     while remaining > 1e-9 and lots:
         lot = lots[0]
@@ -139,6 +150,47 @@ def _reduce_fifo(lots: list[list], qty: float) -> None:
         else:
             lot[0] -= remaining
             remaining = 0.0
+
+
+def conviction_calibration(trips: list[RoundTrip], min_trips: int = 3) -> list[str]:
+    """Win rate + avg realized P&L by entry-conviction bucket — the mirror the
+    LLM needs when its confidence stops predicting outcomes (week of
+    2026-07-13: the 0.6+ picks were the biggest losers while the 0.4 picks
+    won). Buckets under `min_trips` closed trips are suppressed; an explicit
+    inversion flag is prepended when the top bucket underperforms the bottom
+    one (both populated)."""
+    buckets = [
+        ("0.2-0.4", 0.2, 0.4),
+        ("0.4-0.6", 0.4, 0.6),
+        ("0.6+", 0.6, 1.01),
+    ]
+    stats: list[tuple[str, int, float, float]] = []  # (label, n, win%, avg)
+    for label, lo, hi in buckets:
+        pls = [
+            t.pl_pct for t in trips
+            if t.conviction is not None and lo <= t.conviction < hi
+        ]
+        if len(pls) < min_trips:
+            continue
+        win = sum(1 for p in pls if p > 0) / len(pls) * 100
+        avg = sum(pls) / len(pls)
+        stats.append((label, len(pls), win, avg))
+    if not stats:
+        return []
+    lines = [
+        f"- conviction {label}: {n} trades, {win:.0f}% win, {avg:+.1f}% avg"
+        for label, n, win, avg in stats
+    ]
+    lows = next((s for s in stats if s[0] == "0.2-0.4"), None)
+    highs = next((s for s in stats if s[0] == "0.6+"), None)
+    if lows and highs and highs[3] < lows[3]:
+        lines.insert(0, (
+            "CONVICTION INVERTED: your highest-conviction entries "
+            f"({highs[3]:+.1f}% avg) are LOSING to your lowest "
+            f"({lows[3]:+.1f}% avg) — your confidence is currently "
+            "miscalibrated; demand stronger corroboration before sizing up."
+        ))
+    return lines
 
 
 def attribute(trips: list[RoundTrip]) -> dict[str, SourceStats]:
@@ -197,4 +249,8 @@ def render_lessons(
     conc = concentration_lessons(recent)
     if conc:
         lines.extend(conc)
+    calib = conviction_calibration(recent)
+    if calib:
+        lines.append("Conviction calibration (win rate by YOUR stated conviction):")
+        lines.extend(calib)
     return "\n".join(lines)

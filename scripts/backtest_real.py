@@ -196,6 +196,60 @@ def _sweep_stops(cfg, prices, entries, benchmark, lookback: int) -> int:
     return 0
 
 
+# --sweep-chase grid: the anti-chasing overextension gate (off vs haircut vs
+# block) x RSI leg x ATR-extension leg, on breakout entries — which by
+# construction ARE chases (every entry is a fresh N-day high), so this is the
+# harshest audience the gate gets: it must earn its keep against pure momentum.
+_CHASE_MODE = ("haircut", "block")
+_CHASE_RSI = (60.0, 65.0, 70.0)
+_CHASE_ATR = (1.5, 2.0, 2.5)
+
+
+def _sweep_chase(cfg, prices, entries, benchmark, lookback: int) -> int:
+    """Anti-chasing evidence pass: same breakout stream, live sizing/exits, the
+    overextension gate varied. Backtest ATR is a close-to-close proxy (no H/L
+    bars offline) — slightly tighter than live Wilder ATR, so the gate fires a
+    touch earlier here. Run at 20 AND 55-day lookbacks before believing a row."""
+    r = cfg.risk
+    configs: list[tuple[str, object]] = [
+        ("gate OFF", replace(r, overextension_gate_enabled=False)),
+    ]
+    for mode in _CHASE_MODE:
+        for rsi in _CHASE_RSI:
+            for atr in _CHASE_ATR:
+                configs.append((
+                    f"{mode} rsi>={rsi:g} ext>={atr:g}atr",
+                    replace(r, overextension_gate_enabled=True,
+                            overextension_mode=mode, overext_rsi=rsi,
+                            overext_atr_mult=atr),
+                ))
+    print(f"Chase-gate sweep: {len(entries)} breakout entries ({lookback}-day "
+          f"highs — every one a momentum chase by construction) x "
+          f"{len(configs)} gate configs\n")
+    rows = []
+    for label, limits in configs:
+        res = _run(limits, prices, list(entries), benchmark)
+        rows.append((label, res))
+    rows.sort(key=lambda x: x[1].total_return_pct, reverse=True)
+    print(f"{'gate config':>24} | {'return':>8} {'excess':>8} {'maxDD':>6} "
+          f"{'sharpe':>6} {'PF':>5} {'trades':>6} {'stops':>5}")
+    for label, res in rows:
+        excess = (f"{res.excess_return_pct:+8.1f}%"
+                  if res.excess_return_pct is not None else "     n/a")
+        pf = f"{res.profit_factor:5.2f}" if res.profit_factor != float("inf") else "  inf"
+        closed = [t for t in res.trades if t.reason != "end"]
+        stops = sum(1 for t in closed if t.reason == "stop")
+        print(f"{label:>24} | {res.total_return_pct:+7.1f}% {excess} "
+              f"{res.max_drawdown_pct:5.1f}% {res.sharpe:6.2f} {pf} "
+              f"{len(closed):6d} {stops:5d}")
+    if rows and rows[0][1].benchmark_return_pct is not None:
+        print(f"\nBenchmark: {rows[0][1].benchmark_return_pct:+.1f}% over the window.")
+    print(f"Live .env today: gate={'on' if r.overextension_gate_enabled else 'off'} "
+          f"mode={r.overextension_mode} rsi>={r.overext_rsi:g} "
+          f"ext>={r.overext_atr_mult:g}atr haircut={r.overext_haircut:g}")
+    return 0
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--days", type=int, default=365, help="trading-day window")
@@ -203,6 +257,8 @@ def main() -> int:
     ap.add_argument("--sweep", action="store_true", help="knob grid on breakout entries")
     ap.add_argument("--sweep-stops", action="store_true",
                     help="R.1 evidence: fixed stop/take vs vol-scaled stops")
+    ap.add_argument("--sweep-chase", action="store_true",
+                    help="anti-chasing evidence: overextension gate off/haircut/block grid")
     ap.add_argument("--stress", action="store_true",
                     help="D.3 crash-path brake test (guards must engage)")
     ap.add_argument("--lookback", type=int, default=20, help="breakout high lookback")
@@ -210,7 +266,7 @@ def main() -> int:
     args = ap.parse_args()
 
     logging.basicConfig(level="INFO", format="%(message)s")
-    if args.sweep or args.sweep_stops:
+    if args.sweep or args.sweep_stops or args.sweep_chase:
         # Sweeps run thousands of entries through the risk gate; per-entry
         # REJECT lines (conviction floor, halts, liquidity...) drown the result
         # table. The counts that matter are already in each run's summary().
@@ -249,6 +305,12 @@ def main() -> int:
             dates, prices, lookback=args.lookback, benchmark=bench_sym,
         )
         return _sweep_stops(cfg, prices, entries, benchmark, args.lookback)
+
+    if args.sweep_chase:
+        entries = breakout_entries(
+            dates, prices, lookback=args.lookback, benchmark=bench_sym,
+        )
+        return _sweep_chase(cfg, prices, entries, benchmark, args.lookback)
 
     if not args.sweep:
         entries = entries_from_ledger(args.ledger, dates, prices)

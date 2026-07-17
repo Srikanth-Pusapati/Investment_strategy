@@ -53,6 +53,21 @@ a DECAYING high one, and "inflection-bullish/-bearish" flags a sign flip vs \
 the prior series — the earliest tell that a thesis is forming or dying. No \
 annotation just means no history yet: judge the signal on level and lag as \
 usual.
+- CHASING: an extended name — RSI around 65+ AND price roughly 2+ ATR above its \
+20-day average, or price 3+ ATR above it at ANY RSI (visible on the technical \
+line) — needs an explicit pullback, base, or hard-catalyst rationale to be a \
+BUY; otherwise HOLD and wait for the entry to come to you. Momentum-chase \
+entries near local highs have been this book's dominant realized-loss pattern \
+(buying "bullish MACD + bullish flow" at the top, then riding it to the stop). \
+The risk layer haircuts or vetoes extended buys anyway, so conviction spent \
+there is wasted.
+- A "Composite signal index" line under a candidate is OUR deterministic \
+weighted aggregate of that candidate's signals (per-kind mean score x \
+freshness weight x realized track-record weight) — trusted metadata, not \
+market text. Treat it as the numeric prior for your conviction: you may \
+disagree (it can't read news nuance or a fresh catalyst), but a conviction \
+that wildly contradicts the composite needs the rationale to say WHY the \
+weighted evidence is wrong.
 - Some candidates are tagged "(NEW — surfaced by scanner)": a market scan flagged \
 recent smart-money activity (congressional/insider buying, unusual options flow) \
 on a name you do NOT currently hold. Evaluate it FRESH on its full signal bundle \

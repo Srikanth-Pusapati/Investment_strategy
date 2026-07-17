@@ -59,6 +59,11 @@ class EntrySignal:
     stop_loss_pct: float | None = None      # None -> RiskManager default
     take_profit_pct: float | None = None
     volatility: float | None = None         # annualized; None -> risk assumes high vol
+    # Technical context at entry (rsi14 / ext_atr / ext_pct_sma20) for the
+    # anti-chasing overextension gate — computed from the SAME close series the
+    # replay runs on (backtest_data.tech_at; ATR is a close-to-close proxy).
+    # None fails open, exactly as live.
+    tech: dict | None = None
 
 
 @dataclass
@@ -278,6 +283,7 @@ class BacktestEngine:
                 account = self._snapshot(cash, open_pos, day, equity, prev_equity)
                 decision = self.risk.evaluate(
                     self._proposal(sig), account, price, sig.volatility,
+                    tech=sig.tech,
                 )
                 if decision.verdict == RiskVerdict.REJECTED or decision.approved_qty <= 0:
                     kind = self._halt_block_kind(decision.reason)

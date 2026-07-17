@@ -113,3 +113,36 @@ def test_held_tag_unchanged_without_note():
     acct = _acct([_pos("CVX")])
     text = eng._render([_bundle("CVX")], acct, "", [])
     assert "(HELD: 1 sh, +0.0%)" in text
+
+
+def test_data_health_note_renders_in_account_block():
+    # RH dead-auth used to silently DROP the external-holdings line; the model
+    # couldn't tell an outage from "RH holds nothing". The note must render.
+    eng = _engine(max_open_positions=5)
+    acct = _acct([])
+    note = "Robinhood data unavailable (OAuth expired): external holdings missing."
+    text = eng._render([_bundle("CVX")], acct, "", [], data_health=[note])
+    assert f"DATA HEALTH: {note}" in text
+    # And absent when not passed — no phantom outage banner.
+    clean = eng._render([_bundle("CVX")], acct, "", [])
+    assert "DATA HEALTH" not in clean
+
+
+def test_composite_anchor_renders_under_candidate_header():
+    eng = _engine(max_open_positions=5)
+    acct = _acct([])
+    text = eng._render(
+        [_bundle("CVX")], acct, "", [], composites={"CVX": 0.42},
+    )
+    lines = text.splitlines()
+    idx = lines.index("### CVX")
+    assert lines[idx + 1].startswith("Composite signal index: +0.42")
+    # No composite for the symbol -> no anchor line.
+    clean = eng._render([_bundle("CVX")], acct, "", [], composites={})
+    assert "Composite signal index" not in clean
+
+
+def test_system_prompt_carries_new_rules():
+    from investment_strategy.decision.prompts import SYSTEM_PROMPT
+    assert "CHASING" in SYSTEM_PROMPT
+    assert "Composite signal index" in SYSTEM_PROMPT

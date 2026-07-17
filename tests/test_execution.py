@@ -662,3 +662,29 @@ def test_bound_client_injects_session_timeout():
     )
     client = bound_client(TradingClient("key", "secret", paper=True))
     assert client._session.request.keywords["timeout"] == HTTP_TIMEOUT
+
+
+def test_still_marketable_limit_is_left_alone_on_falling_tape():
+    # PLTR 2026-07-15: a trail exit was re-REPLACED every ~30s tick because the
+    # "already marketable" test compared against the BUFFERED price (ref-2%),
+    # so any dip re-priced a limit that could already fill on the next print —
+    # each replacement minted a new order id (4 realized lots in 93s) and reset
+    # the paper-sim queue. Marketable now means at/below the LAST TRADE.
+    c = AlpacaClient.__new__(AlpacaClient)
+    c.trading = _FakeExitTrading([
+        # Priced between ref (50.0) and the 2% buffer (49.0): fills on the next
+        # print -> it IS the exit; must NOT be replaced again.
+        _open_order("mid", limit_price="49.5"),
+    ])
+    assert c.clear_orders_for_exit("FRHC", ref_price=50.0) == []
+    assert c.trading.replaced == []
+    assert c.trading.canceled == []
+
+
+def test_has_working_exit_counts_limit_between_buffer_and_last_trade():
+    # Mirror of the clear_orders_for_exit change (the docstring demands the two
+    # marketability tests stay in sync): a leg left alone as "already the exit"
+    # must also read as protection, or the watchdog pages a false CRITICAL.
+    c = AlpacaClient.__new__(AlpacaClient)
+    c.trading = _FakeExitTrading([_open_order("mid", limit_price="49.5", qty="9")])
+    assert c.has_working_exit("FRHC", ref_price=50.0) is True

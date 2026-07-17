@@ -27,6 +27,10 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import os
+import time
+from datetime import datetime, timezone
+from pathlib import Path
 from typing import Any
 
 from ..config import Config
@@ -45,7 +49,16 @@ class RobinhoodReader:
     #: earnings module each hold their own reader, and without a shared latch a
     #: dead token dumped a full OAuth traceback per call, per module, per cycle
     #: (~8 tracebacks/hour, 2026-07-16) while saying the same thing: re-auth.
+    #: The latch self-heals: it remembers the token file's (mtime, size) at
+    #: latch time, and `enabled` clears it once the file changes (the user
+    #: re-ran `robinhood_auth login`) — no restart needed. A failed relogin
+    #: re-latches after exactly one failed call with the NEW signature, so a
+    #: still-dead token can't cause an unlatch/relatch spin.
     _auth_dead = False
+    _auth_dead_since: float | None = None  # time.time() at latch (page dedupe key)
+    _auth_dead_token_sig: tuple[float, int] | None = None  # token file (mtime, size)
+    _last_recovery_check: float = 0.0  # monotonic; throttles the stat() probe
+    _RECOVERY_CHECK_INTERVAL_S = 60.0
 
     def __init__(self, cfg: Config):
         self.cfg = cfg
@@ -55,6 +68,8 @@ class RobinhoodReader:
     def enabled(self) -> bool:
         from .robinhood_auth import has_tokens
 
+        if RobinhoodReader._auth_dead:
+            self._maybe_recover()
         return (
             self.cfg.robinhood_enabled
             and not RobinhoodReader._auth_dead
@@ -63,6 +78,94 @@ class RobinhoodReader:
             # or a legacy pre-obtained Bearer token is pasted in the env.
             and (has_tokens(self.cfg) or bool(self.cfg.robinhood_mcp_token))
         )
+
+    @classmethod
+    def auth_dead(cls) -> bool:
+        return cls._auth_dead
+
+    @classmethod
+    def auth_dead_since(cls) -> float | None:
+        return cls._auth_dead_since if cls._auth_dead else None
+
+    @staticmethod
+    def _token_file_sig(path: str) -> tuple[float, int] | None:
+        """(mtime, size) of the persisted OAuth token file, None if unreadable.
+        FileTokenStorage writes atomically (tmp + rename), so ANY relogin or
+        SDK refresh changes at least the mtime."""
+        try:
+            st = os.stat(path)
+            return (st.st_mtime, st.st_size)
+        except OSError:
+            return None
+
+    def _maybe_recover(self) -> None:
+        """Clear the dead-auth latch once the token file has changed since it
+        was latched — the user re-ran the login handshake. Throttled to one
+        stat() per minute. Deliberately NO network probe: if the new token is
+        also dead, the very next real call re-latches (with the new signature),
+        which is exactly one extra failure instead of a probe per minute."""
+        now = time.monotonic()
+        if now - RobinhoodReader._last_recovery_check < self._RECOVERY_CHECK_INTERVAL_S:
+            return
+        RobinhoodReader._last_recovery_check = now
+        sig = self._token_file_sig(self.cfg.robinhood_oauth_file)
+        if sig is None or sig == RobinhoodReader._auth_dead_token_sig:
+            return
+        RobinhoodReader._auth_dead = False
+        RobinhoodReader._auth_dead_since = None
+        RobinhoodReader._auth_dead_token_sig = None
+        log.warning(
+            "Robinhood OAuth token file changed since the dead-auth latch — "
+            "re-enabling context reads; the next call verifies (and re-latches "
+            "if the new token is also dead).",
+        )
+        self._write_health(dead=False, detail="token refreshed; reads re-enabled")
+
+    def _health_path(self) -> Path:
+        """Anchored to the canonical state dir (STATE_FILE's directory), NOT
+        the token file: a user pointing ROBINHOOD_OAUTH_FILE outside the repo
+        must not strand the health file where the control panel (which reads
+        <repo>/state/) can't see it."""
+        return Path(self.cfg.state_file).with_name("robinhood_health.json")
+
+    def reconcile_health(self) -> None:
+        """Startup reconciliation: the latch is in-memory, so a restart clears
+        it — but a health file written by the PREVIOUS process still says
+        AUTH DEAD, and nothing else would ever rewrite it (the panel would
+        show a phantom outage indefinitely). Called once at orchestrator
+        init; best-effort."""
+        try:
+            path = self._health_path()
+            if not path.exists():
+                return
+            stale = json.loads(path.read_text()).get("auth_dead")
+            if stale and not RobinhoodReader._auth_dead:
+                self._write_health(
+                    dead=False,
+                    detail="reset at startup (restart clears the in-memory latch)",
+                )
+        except Exception as e:
+            log.debug("robinhood health reconcile failed: %s", e)
+
+    def _write_health(self, dead: bool, detail: str) -> None:
+        """Best-effort machine-readable latch state for the (separate-process)
+        control panel."""
+        try:
+            path = self._health_path()
+            since = RobinhoodReader._auth_dead_since
+            payload = {
+                "auth_dead": dead,
+                "since": (
+                    datetime.fromtimestamp(since, tz=timezone.utc).isoformat()
+                    if dead and since else None
+                ),
+                "detail": detail,
+            }
+            tmp = path.with_suffix(".json.tmp")
+            tmp.write_text(json.dumps(payload))
+            tmp.replace(path)
+        except Exception as e:  # health is observability only — never break reads
+            log.debug("robinhood_health.json write failed: %s", e)
 
     def holdings(self) -> list[ExternalHolding]:
         """Sync entry point for the orchestrator. Returns [] if disabled/failed."""
@@ -171,13 +274,13 @@ class RobinhoodReader:
             log.warning("Robinhood MCP call %s failed: %s", tool, e)
             return None
 
-    @classmethod
-    def _latch_if_auth_dead(cls, exc: BaseException) -> bool:
+    def _latch_if_auth_dead(self, exc: BaseException) -> bool:
         """True (and latch the class-wide kill) when `exc` is an OAuth failure
         the bot cannot fix without a human: the refresh token is dead and a
         browser handshake is required. The MCP TaskGroup wraps the real error
         in nested ExceptionGroups, so walk them. Every later call this process
-        no-ops via `enabled` instead of re-failing."""
+        no-ops via `enabled` instead of re-failing — until the token file
+        changes on disk (relogin), which auto-clears the latch (_maybe_recover)."""
         try:
             from mcp.client.auth.exceptions import OAuthFlowError, OAuthTokenError
             auth_errors: tuple = (OAuthFlowError, OAuthTokenError)
@@ -193,14 +296,22 @@ class RobinhoodReader:
 
         if not _is_auth(exc):
             return False
-        if not cls._auth_dead:
-            cls._auth_dead = True
+        if not RobinhoodReader._auth_dead:
+            RobinhoodReader._auth_dead = True
+            RobinhoodReader._auth_dead_since = time.time()
+            RobinhoodReader._auth_dead_token_sig = self._token_file_sig(
+                self.cfg.robinhood_oauth_file
+            )
             log.error(
                 "Robinhood OAuth token is dead (refresh failed; a browser "
                 "handshake is needed). Disabling ALL Robinhood context reads "
-                "for this run — the bot trades fine without them. To restore: "
-                "run `python -m investment_strategy.portfolio.robinhood_auth "
-                "login`, then restart the bot.",
+                "— the bot trades fine without them. To restore: run "
+                "`python -m investment_strategy.portfolio.robinhood_auth "
+                "login` on the host; reads auto-resume within ~1 minute of "
+                "the new token landing (no restart needed).",
+            )
+            self._write_health(
+                dead=True, detail="OAuth refresh token dead; relogin required"
             )
         return True
 
