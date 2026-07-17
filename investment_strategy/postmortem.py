@@ -28,16 +28,23 @@ _CURATED_FILE = _LESSONS_DIR / "curated.md"
 POSTMORTEM_PROMPT = """\
 You are reviewing ONE trading day of your own automated decisions. \
 The input below shows every equity buy decision (approved, resized, or rejected), \
-slate exclusions, and the final ledger for executed trades.
+slate exclusions, the final ledger for executed trades, and the day's CLOSED \
+positions with their realized P&L, exit reason, and original entry thesis.
 
 Your task:
-1. Identify the 1–3 most important operating lessons for TOMORROW — concrete, \
+1. FIRST: find the largest realized LOSERS and diagnose WHY each ENTRY failed — \
+   chased an extended move near a local high? entry thesis contradicted by the \
+   exit (e.g. "bullish momentum" stopped out in 2 days)? conviction \
+   miscalibrated (high conviction, bad outcome)? Dollar-loss patterns OUTRANK \
+   ops observations: a lesson about what keeps losing money beats a lesson \
+   about process noise.
+2. Identify the 1–3 most important operating lessons for TOMORROW — concrete, \
    actionable, one-line imperatives (≤140 chars each).
-2. Focus on: same-symbol concentration (did one name dominate?), \
+3. Secondary checks: same-symbol concentration (did one name dominate?), \
    rejected-proposal waste (good ideas turned away for budget?), \
    churn (did the same name get re-proposed many times?), \
    missed diversification, or any guard that should have been tighter/looser.
-3. IGNORE normal volatility or small losses — only flag systemic patterns \
+4. IGNORE normal volatility and small losses — only flag repeatable patterns \
    worth changing.
 
 Return JSON: {"summary_md": "<concise markdown summary, ≤300 words>", \
@@ -134,27 +141,66 @@ def run_postmortem(
 
     # Build input text from journal records
     buy_lines = []
+    guard_lines = []
     for r in recs:
         if r.action == "buy":
             buy_lines.append(
                 f"  {r.ts[11:16]} {r.verdict.upper():15} {r.symbol:8} "
                 f"conv={r.conviction:.2f} ${r.approved_notional:,.0f} | {r.reason[:80]}"
             )
+        elif r.action == "sell":
+            # Guard-vetoed sells (e.g. rotation_guard) — the postmortem must
+            # weigh 'the guard pinned a loser that kept falling' against 'the
+            # guard saved a bottom-tick sale', or the guard's real-world cost
+            # is invisible to the exact loop built to catch it.
+            guard_lines.append(
+                f"  {r.ts[11:16]} {r.verdict.upper():15} {r.symbol:8} "
+                f"conv={r.conviction:.2f} | {r.reason[:100]}"
+            )
     ledger_lines = []
+    sell_lines = []
     try:
-        for t in ledger.effective():
+        records = ledger.effective()
+        # Entry-rationale head per symbol (latest buy wins) so a closed trade
+        # shows its thesis next to its outcome — the thesis-vs-exit mismatch is
+        # the pattern task 1 exists to catch.
+        entry_rationale: dict[str, str] = {}
+        for t in records:
+            if t.action == "buy" and getattr(t, "rationale", ""):
+                entry_rationale[t.symbol] = t.rationale[:90]
+        for t in records:
             if hasattr(t, "ts") and str(t.ts)[:10] == day and t.action == "buy":
                 ledger_lines.append(
                     f"  {str(t.ts)[11:16]} BUY {t.symbol:8} "
                     f"${t.cost_usd if hasattr(t, 'cost_usd') and t.cost_usd else 0:,.0f}"
                 )
+        day_sells = [
+            t for t in records
+            if hasattr(t, "ts") and str(t.ts)[:10] == day
+            and t.action == "sell" and t.realized_pl is not None
+        ]
+        # Worst first — task 1 leads with the largest realized losers.
+        day_sells.sort(key=lambda t: t.realized_pl)
+        for t in day_sells[:15]:
+            why = entry_rationale.get(t.symbol, "")
+            sell_lines.append(
+                f"  {str(t.ts)[11:16]} CLOSE {t.symbol:8} "
+                f"{t.realized_pl:+,.0f} USD ({(t.realized_pl_pct or 0):+.1f}%) "
+                f"exit={t.exit_reason or '?'}"
+                + (f" | entry thesis: {why}" if why else "")
+            )
     except Exception:
         pass
 
     user_text = POSTMORTEM_PROMPT + f"Date: {day}\n\nDecisions:\n"
     user_text += "\n".join(buy_lines[:100]) or "  (none)"
+    if guard_lines:
+        user_text += "\n\nSell decisions blocked/vetoed by guards:\n"
+        user_text += "\n".join(guard_lines[:20])
     user_text += "\n\nExecuted trades:\n"
     user_text += "\n".join(ledger_lines[:50]) or "  (none)"
+    user_text += "\n\nClosed positions (realized P&L, worst first):\n"
+    user_text += "\n".join(sell_lines) or "  (none)"
 
     if dry_run:
         print(user_text)

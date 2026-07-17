@@ -46,6 +46,8 @@ class DecisionEngine:
         buy_excluded: dict[str, str] | None = None,
         signal_notes: dict[str, dict[str, str]] | None = None,
         held_notes: dict[str, str] | None = None,
+        data_health: list[str] | None = None,
+        composites: dict[str, float] | None = None,
     ) -> list[TradeProposal]:
         """Ask Claude for proposals across all candidate symbols at once.
 
@@ -59,6 +61,11 @@ class DecisionEngine:
         `held_notes` (symbol -> note) carries each holding's entry conviction
         and hold age from our own ledger clocks — the incumbent baseline a
         rotation candidate must beat.
+        `data_health` lists OUR notes about degraded data feeds this cycle, so
+        a missing signal reads as an outage instead of a neutral fact.
+        `composites` (symbol -> score) is OUR deterministic weighted signal
+        index (score x freshness-lag x realized track record) — a numeric
+        prior the model's conviction should not wildly contradict unstated.
         """
         if not bundles:
             return []
@@ -68,6 +75,8 @@ class DecisionEngine:
             today=today, buy_excluded=buy_excluded or {},
             signal_notes=signal_notes or {},
             held_notes=held_notes or {},
+            data_health=data_health or [],
+            composites=composites or {},
         )
         try:
             resp = self.client.messages.create(
@@ -118,6 +127,8 @@ class DecisionEngine:
         today: str = "", buy_excluded: dict[str, str] | None = None,
         signal_notes: dict[str, dict[str, str]] | None = None,
         held_notes: dict[str, str] | None = None,
+        data_health: list[str] | None = None,
+        composites: dict[str, float] | None = None,
     ) -> str:
         # Our own derived data (track-record, today-so-far, exclusions) sits
         # OUTSIDE <market_data> — it's trusted guidance, not third-party text.
@@ -210,6 +221,10 @@ class DecisionEngine:
                 f"{h.symbol} (${h.market_value:,.0f})" for h in external
             )
             lines.append(f"External holdings (e.g. Robinhood, read-only): {held}")
+        # Degraded-feed notes (our own trusted text) rendered where the missing
+        # data would otherwise sit, so its absence isn't read as a neutral fact.
+        for note in data_health or []:
+            lines.append(f"DATA HEALTH: {note}")
         lines.append("")
         # Macro / market-wide context is shared across all symbols.
         if bundles and bundles[0].market_context:
@@ -241,6 +256,14 @@ class DecisionEngine:
             else:
                 tag = ""
             lines.append(f"### {b.symbol}{tag}")
+            comp = (composites or {}).get(b.symbol)
+            if comp is not None:
+                # Our deterministic weighted index (trusted): per-kind mean
+                # score x freshness-lag weight x realized track-record weight.
+                lines.append(
+                    f"Composite signal index: {comp:+.2f} (deterministic: "
+                    "score x freshness x realized track record)"
+                )
             sym_notes = (signal_notes or {}).get(b.symbol, {})
             for s in b.signals:
                 score = f" score={s.score:+.2f}" if s.score is not None else ""

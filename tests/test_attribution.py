@@ -155,6 +155,69 @@ def test_render_includes_source_lines():
     assert out.index("technical:") < out.index("congress:")
 
 
+def test_round_trip_carries_mean_entry_conviction():
+    from investment_strategy.attribution import round_trips as rt
+    recs = [
+        TradeRecord(symbol="A", action="buy", qty=1.0, conviction=0.4,
+                    entry_signals=["technical"], ts=_T0),
+        TradeRecord(symbol="A", action="buy", qty=1.0, conviction=0.6,
+                    entry_signals=["technical"], ts=_T0 + timedelta(hours=1)),
+        _sell("A", 5.0, 2),
+    ]
+    trips = rt(recs)
+    assert len(trips) == 1
+    assert abs(trips[0].conviction - 0.5) < 1e-9
+
+
+def test_round_trip_conviction_none_when_unrecorded():
+    # conviction 0.0 means "not recorded" (core fills, pre-tracking rows).
+    recs = [_buy("A", ["technical"], 0), _sell("A", 5.0, 1)]
+    assert round_trips(recs)[0].conviction is None
+
+
+def test_conviction_calibration_buckets_and_min_trips():
+    from investment_strategy.attribution import RoundTrip, conviction_calibration
+    trips = (
+        [RoundTrip("X", +3.0, [], conviction=0.3) for _ in range(3)]
+        + [RoundTrip("Y", -5.0, [], conviction=0.7) for _ in range(3)]
+        + [RoundTrip("Z", +9.0, [], conviction=0.5)]          # n=1 -> suppressed
+        + [RoundTrip("W", +9.0, [], conviction=None)]         # unknown -> ignored
+    )
+    lines = conviction_calibration(trips, min_trips=3)
+    joined = "\n".join(lines)
+    assert "conviction 0.2-0.4: 3 trades, 100% win, +3.0% avg" in joined
+    assert "conviction 0.6+: 3 trades, 0% win, -5.0% avg" in joined
+    assert "0.4-0.6" not in joined
+    # High-conviction losing to low-conviction -> the inversion flag leads.
+    assert lines[0].startswith("CONVICTION INVERTED")
+
+
+def test_conviction_calibration_no_inversion_when_high_wins():
+    from investment_strategy.attribution import RoundTrip, conviction_calibration
+    trips = (
+        [RoundTrip("X", -2.0, [], conviction=0.3) for _ in range(3)]
+        + [RoundTrip("Y", +6.0, [], conviction=0.8) for _ in range(3)]
+    )
+    lines = conviction_calibration(trips, min_trips=3)
+    assert lines and not lines[0].startswith("CONVICTION INVERTED")
+
+
+def test_render_lessons_includes_calibration_block():
+    from investment_strategy.ledger import TradeLedger
+    led = TradeLedger.__new__(TradeLedger)
+    recs = []
+    for i, (conv, pl) in enumerate([(0.7, -5.0)] * 3 + [(0.3, 3.0)] * 3):
+        sym = f"S{i}"
+        recs.append(TradeRecord(symbol=sym, action="buy", qty=1.0,
+                                conviction=conv, entry_signals=["technical"],
+                                ts=_T0 + timedelta(hours=2 * i)))
+        recs.append(_sell(sym, pl, 2 * i + 1))
+    led.effective = lambda: recs  # type: ignore[method-assign]
+    out = render_lessons(led)
+    assert "Conviction calibration" in out
+    assert "CONVICTION INVERTED" in out
+
+
 def _run_all():
     fns = [v for k, v in sorted(globals().items()) if k.startswith("test_") and callable(v)]
     failed = 0

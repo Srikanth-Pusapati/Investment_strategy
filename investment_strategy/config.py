@@ -184,6 +184,38 @@ class RiskLimits:
     # of skipping the guard (multipliers stack — blinder = smaller). 1.0
     # restores the old fail-open behavior.
     missing_data_mult: float = 1.0
+    # --- anti-chasing overextension gate (week of 2026-07-13: 68% of realized
+    # losses were momentum entries near local tops — CDW/SOFI/PATH — bought on
+    # high RSI + bullish flow and run straight to their stops). Fires when RSI
+    # AND price extension over the 20d SMA are BOTH elevated; fails open on
+    # missing technicals. ---
+    overextension_gate_enabled: bool = True
+    overextension_mode: str = "haircut"  # "haircut" (downsize) | "block" (reject)
+    overext_rsi: float = 65.0            # RSI14 leg of the hot-AND-extended trigger
+    overext_atr_mult: float = 2.0        # extension leg: price >= this many ATRs over SMA20
+    overext_pct: float = 8.0             # fallback extension leg (%) when ATR unavailable
+    overext_haircut: float = 0.5         # size multiplier in haircut mode
+    # Extreme extension fires ALONE, regardless of RSI: the actual Jul-13
+    # losers entered at RSI 61-64 but 3.4-4.0 ATRs over the 20d SMA — an RSI
+    # floor must not muzzle a screaming extension. 0 = off.
+    overext_extreme_atr_mult: float = 3.0
+    # --- deterministic weighted composite index (signals/composite.py) ---
+    composite_enabled: bool = True       # compute + render the per-candidate index
+    composite_budget_blend: bool = True  # blend into the cycle budget split weights
+    composite_gate_enabled: bool = False # opt-in deterministic buy floor (backtest first)
+    min_composite_score: float = 0.0     # floor value when the gate is on
+    composite_perf_min_trips: int = 3    # closed trips before a source's perf weight != 1.0
+    # --- rotation loss guard (Jul-13 week: UNH -$204 / HUBB -$158 realized
+    # purely to free a slot). Enforces the +0.10 edge the prompt only asks
+    # for, ONLY on cap-forced sells that lock in a real loss. ---
+    rotation_loss_guard_enabled: bool = True
+    rotation_guard_min_loss_pct: float = 4.0    # only sells losing more than this are guarded
+    rotation_min_conviction_edge: float = 0.10  # incoming must beat incumbent entry by this
+    rotation_require_composite_edge: bool = False  # also demand a composite edge (opt-in)
+    # A SELL whose OWN conviction is at/above this is a risk-off exit, never a
+    # slot-freeing rotation — exempt it so a co-occurring unrelated buy can't
+    # get a thesis-broken exit vetoed ("never block a legitimate exit"). 0=off.
+    rotation_guard_exempt_sell_conviction: float = 0.65
 
 
 @dataclass(frozen=True)
@@ -474,6 +506,28 @@ def load_config() -> Config:
             max_cycle_symbol_share_pct=_f("MAX_CYCLE_SYMBOL_SHARE_PCT", 60.0),
             topup_min_conviction_delta=_f("TOPUP_MIN_CONVICTION_DELTA", 0.05),
             missing_data_mult=_f("MISSING_DATA_MULT", 1.0),
+            # Anti-chasing overextension gate (see the RiskLimits field notes).
+            overextension_gate_enabled=_flag("OVEREXTENSION_GATE_ENABLED", "on"),
+            overextension_mode=os.getenv("OVEREXTENSION_MODE", "haircut").strip().lower(),
+            overext_rsi=_f("OVEREXT_RSI", 65.0),
+            overext_atr_mult=_f("OVEREXT_ATR_MULT", 2.0),
+            overext_pct=_f("OVEREXT_PCT", 8.0),
+            overext_haircut=_f("OVEREXT_HAIRCUT", 0.5),
+            overext_extreme_atr_mult=_f("OVEREXT_EXTREME_ATR_MULT", 3.0),
+            # Deterministic weighted composite index (signals/composite.py).
+            composite_enabled=_flag("COMPOSITE_ENABLED", "on"),
+            composite_budget_blend=_flag("COMPOSITE_BUDGET_BLEND", "on"),
+            composite_gate_enabled=_flag("COMPOSITE_GATE_ENABLED", "off"),
+            min_composite_score=_f("MIN_COMPOSITE_SCORE", 0.0),
+            composite_perf_min_trips=_i("COMPOSITE_PERF_MIN_TRIPS", 3),
+            # Rotation loss guard (see the RiskLimits field notes).
+            rotation_loss_guard_enabled=_flag("ROTATION_LOSS_GUARD_ENABLED", "on"),
+            rotation_guard_min_loss_pct=_f("ROTATION_GUARD_MIN_LOSS_PCT", 4.0),
+            rotation_min_conviction_edge=_f("ROTATION_MIN_CONVICTION_EDGE", 0.10),
+            rotation_require_composite_edge=_flag("ROTATION_REQUIRE_COMPOSITE_EDGE", "off"),
+            rotation_guard_exempt_sell_conviction=_f(
+                "ROTATION_GUARD_EXEMPT_SELL_CONVICTION", 0.65
+            ),
         ),
         screener=ScreenerConfig(
             enabled=_flag("SCREENER_ENABLED", "on"),

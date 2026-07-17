@@ -144,8 +144,14 @@ class DecisionJournal:
         excluded: dict[str, str] = {}  # symbol -> reason (last seen)
         rejected_count: dict[str, int] = defaultdict(int)
         rejected_reason: dict[str, str] = {}
+        guard_vetoed: dict[str, str] = {}  # sell vetoes (rotation_guard etc.)
 
         for r in recs:
+            if r.action == "sell" and r.verdict == "rotation_guard":
+                # Surface guard vetoes so the model doesn't re-propose the
+                # SAME rotation every cycle for the rest of the day.
+                guard_vetoed[r.symbol] = r.reason
+                continue
             if r.action != "buy":
                 continue
             if r.verdict in ("approved", "resized"):
@@ -193,6 +199,18 @@ class DecisionJournal:
                 for sym, n in list(rejected_count.items())[:4]
             ]
             lines.append("Rejected today: " + ", ".join(rej_parts))
+
+        if guard_vetoed:
+            veto_parts = [
+                f"{sym} ({reason[:70]})"
+                for sym, reason in list(guard_vetoed.items())[:4]
+            ]
+            lines.append(
+                "Rotation sells VETOED today (loss-locking without a clear "
+                "incoming edge): " + ", ".join(veto_parts)
+                + ". Do not re-propose the same rotation without a stronger "
+                "incoming candidate."
+            )
 
         if excluded:
             lines.append(

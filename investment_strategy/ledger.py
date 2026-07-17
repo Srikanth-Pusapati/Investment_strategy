@@ -73,6 +73,10 @@ class TradeRecord(BaseModel):
                                       # | bracket_stop | bracket_take | external (F.1 backfill)
     option_strategy: Optional[str] = None
     order_id: Optional[str] = None
+    # Deterministic weighted signal index at entry (buys; signals/composite.py).
+    # None on sells and on records predating the composite — lets future
+    # calibration score the composite against realized outcomes.
+    composite_score: Optional[float] = None
 
     # -- builders ---------------------------------------------------------- #
     @classmethod
@@ -81,6 +85,7 @@ class TradeRecord(BaseModel):
         order_id: Optional[str], entry_signals: Optional[list[str]] = None,
         submitted_qty: Optional[float] = None,
         submitted_cost: Optional[float] = None,
+        composite_score: Optional[float] = None,
     ) -> "TradeRecord":
         """`submitted_qty`/`submitted_cost` are what actually went to the broker
         when it differs from the decision (whole-share flooring drops the
@@ -107,6 +112,7 @@ class TradeRecord(BaseModel):
             entry_signals=entry_signals or [],
             verdict=decision.verdict.value, risk_note=decision.reason,
             order_id=order_id,
+            composite_score=composite_score,
         )
 
     @classmethod

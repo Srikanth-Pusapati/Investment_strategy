@@ -679,7 +679,13 @@ class AlpacaClient:
                 kind = str(getattr(otype, "value", otype)).lower()
                 cur_limit = float(getattr(o, "limit_price", None) or 0)
                 cur_stop = float(getattr(o, "stop_price", None) or 0)
-                limit_marketable = 0 < cur_limit <= limit
+                # Marketable = priced to fill on the next print (at/below the
+                # last trade). Comparing against the BUFFERED price instead
+                # re-replaced a still-marketable limit every ~30s tick on a
+                # falling tape (PLTR 2026-07-15: 4 exit lots in 93s, each
+                # replacement resetting the paper-sim queue and delaying the
+                # fill). Fresh replacements below still price 2% through.
+                limit_marketable = 0 < cur_limit <= ref_price
                 stop_firing = cur_stop >= ref_price
                 if "stop" in kind:
                     if stop_firing and ("limit" not in kind or limit_marketable):
@@ -736,7 +742,6 @@ class AlpacaClient:
         Best-effort: False on error, so the caller errs toward paging."""
         if ref_price <= 0:
             return False
-        limit = round(ref_price * (1 - self.EXIT_LIMIT_BUFFER_PCT / 100.0), 2)
         try:
             for o in self.trading.get_orders():
                 if o.symbol != symbol:
@@ -751,7 +756,11 @@ class AlpacaClient:
                 cur_stop = float(getattr(o, "stop_price", None) or 0)
                 if kind == "market":
                     return True  # a live market sell is already the exit
-                marketable_limit = 0 < cur_limit <= limit
+                # Same marketability test as clear_orders_for_exit (see the
+                # comment there): at/below the LAST TRADE, not the buffered
+                # price, or a leg that method just left in place reads as
+                # unprotected here.
+                marketable_limit = 0 < cur_limit <= ref_price
                 if "stop" in kind:
                     if cur_stop >= ref_price and ("limit" not in kind or marketable_limit):
                         return True  # trigger fires on the next print

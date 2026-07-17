@@ -33,13 +33,23 @@ class TechnicalProvider(SignalProvider):
             closes = [float(c) for c in hist["Close"].dropna().tolist()] if not hist.empty else []
             if len(closes) < 35:  # need enough for MACD(26)+signal(9)
                 continue
+            # High/Low ride along (same fetch) for the ATR; a feed without them
+            # degrades to the close-to-close true range inside _atr.
+            highs = [float(h) for h in hist["High"].dropna().tolist()] if "High" in hist else []
+            lows = [float(l) for l in hist["Low"].dropna().tolist()] if "Low" in hist else []
 
             rsi = self._rsi(closes, 14)
             macd, macd_signal = self._macd(closes)
             hist_val = macd - macd_signal
             price = closes[-1]
+            sma20 = self._sma(closes, 20)
             sma50 = self._sma(closes, 50)
             sma200 = self._sma(closes, 200)
+            atr = self._atr(highs, lows, closes, 14)
+            # Overextension inputs for the risk layer's anti-chasing gate: how
+            # far price sits above its 20d mean, in % and in ATR multiples.
+            ext_pct = ((price / sma20 - 1.0) * 100.0) if sma20 else None
+            ext_atr = ((price - sma20) / atr) if (sma20 and atr) else None
 
             score = self._score(rsi, hist_val, price, sma50, sma200)
             summary = self._summary(rsi, macd, macd_signal, price, sma50, sma200)
@@ -56,8 +66,12 @@ class TechnicalProvider(SignalProvider):
                     "macd_signal": round(macd_signal, 3),
                     "macd_hist": round(hist_val, 3),
                     "price": round(price, 2),
+                    "sma20": round(sma20, 2) if sma20 else None,
                     "sma50": round(sma50, 2) if sma50 else None,
                     "sma200": round(sma200, 2) if sma200 else None,
+                    "atr14": round(atr, 3) if atr else None,
+                    "ext_pct_sma20": round(ext_pct, 2) if ext_pct is not None else None,
+                    "ext_atr": round(ext_atr, 2) if ext_atr is not None else None,
                 },
             ))
         return signals
@@ -107,6 +121,31 @@ class TechnicalProvider(SignalProvider):
         if len(closes) < period:
             return None
         return sum(closes[-period:]) / period
+
+    @staticmethod
+    def _atr(highs: list[float], lows: list[float], closes: list[float],
+             period: int = 14) -> float | None:
+        """Wilder ATR. Falls back to close-to-close true range when the feed
+        lacks aligned High/Low columns (still a usable volatility yardstick)."""
+        n = len(closes)
+        if n < period + 1:
+            return None
+        aligned = len(highs) == n and len(lows) == n
+        trs: list[float] = []
+        for i in range(1, n):
+            if aligned:
+                tr = max(
+                    highs[i] - lows[i],
+                    abs(highs[i] - closes[i - 1]),
+                    abs(lows[i] - closes[i - 1]),
+                )
+            else:
+                tr = abs(closes[i] - closes[i - 1])
+            trs.append(tr)
+        atr = sum(trs[:period]) / period
+        for tr in trs[period:]:
+            atr = (atr * (period - 1) + tr) / period
+        return atr if atr > 0 else None
 
     # -- scoring / summary -------------------------------------------------- #
     @staticmethod

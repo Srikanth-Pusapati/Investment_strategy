@@ -76,6 +76,30 @@ def test_score_bounded():
     assert -1.0 <= s <= 1.0
 
 
+def test_atr_wilder_with_highs_lows():
+    from investment_strategy.signals.technical import TechnicalProvider as TP
+    closes = [10.0, 11.0, 10.5, 11.5, 12.0]
+    highs = [10.5, 11.5, 11.0, 12.0, 12.5]
+    lows = [9.5, 10.0, 10.0, 10.5, 11.5]
+    atr = TP._atr(highs, lows, closes, period=3)
+    # TRs (i=1..4): max(1.5,1.5,0) =1.5; max(1,0,1)=1.0; max(1.5,1.5,0)=1.5;
+    # max(1,1,0.5)=1.0. Seed mean(1.5,1.0,1.5)=4/3; Wilder: (4/3*2+1.0)/3.
+    assert abs(atr - (4.0 / 3.0 * 2 + 1.0) / 3.0) < 1e-9
+
+
+def test_atr_falls_back_to_close_to_close():
+    from investment_strategy.signals.technical import TechnicalProvider as TP
+    closes = [10.0, 11.0, 10.5, 11.5, 12.0]
+    atr = TP._atr([], [], closes, period=3)
+    # C2C TRs: 1.0, 0.5, 1.0, 0.5 -> seed mean(1.0,0.5,1.0)=2.5/3; then Wilder.
+    assert abs(atr - ((2.5 / 3.0) * 2 + 0.5) / 3.0) < 1e-9
+
+
+def test_atr_none_when_insufficient_history():
+    from investment_strategy.signals.technical import TechnicalProvider as TP
+    assert TP._atr([], [], [10.0, 10.5], period=14) is None
+
+
 def _run_all():
     fns = [v for k, v in sorted(globals().items()) if k.startswith("test_") and callable(v)]
     failed = 0

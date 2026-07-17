@@ -53,6 +53,7 @@ from .reset import maybe_reset_on_account_change
 from .screener import ScreenerAggregator
 from .sectors import SectorMap
 from .signals import SignalAggregator, SignalHistory
+from .signals.composite import composite_score, perf_weights
 from .signals.quiver_client import QuiverClient
 from .state import PortfolioState
 from .status import EquityHistory, compute_status
@@ -90,6 +91,9 @@ class Orchestrator:
         self.signal_history = SignalHistory()
         self.screeners = ScreenerAggregator(cfg, self.quiver)
         self.robinhood = RobinhoodReader(cfg)
+        # A restart clears the in-memory dead-auth latch; clear a stale
+        # AUTH DEAD health file too, or the panel shows a phantom outage.
+        self.robinhood.reconcile_health()
         # Per-cycle-cached next-earnings lookup feeding the risk earnings-blackout
         # guard (one lookup per symbol per cycle; advisory, fails open). With the
         # RH MCP on, ONE market-wide calendar call per cycle replaces the flaky
@@ -115,6 +119,9 @@ class Orchestrator:
         # Out-of-band paging for watchdog CRITICALs (failed close = naked position;
         # latched halt). Log-only unless ALERTS_ENABLED + a sink is configured.
         self.alerter = Alerter(cfg.alerts)
+        # Last RH dead-auth latch timestamp we paged for: one page per latch
+        # EVENT (not per cycle), and a fresh latch after recovery pages again.
+        self._rh_paged_for: float = 0.0
         # The watchdog records its own exits (stops/take-profits/flattens) to the
         # ledger so signal attribution sees every close, not just decision sells.
         self.watchdog = Watchdog(
@@ -555,9 +562,39 @@ class Orchestrator:
         if decayed:
             bundles = [b for b in bundles if b.symbol not in decayed]
 
+        # Deterministic weighted signal index ("composite"): per-kind mean
+        # score x freshness-lag weight x realized track-record weight. Rendered
+        # as a per-candidate anchor in the prompt, blended into the cycle
+        # budget split, and (opt-in) a risk floor. Best-effort — the composite
+        # is context, never a required feed.
+        composites: dict[str, float] = {}
+        if self.cfg.risk.composite_enabled:
+            try:
+                pw = perf_weights(
+                    self.ledger, self.cfg.risk.composite_perf_min_trips
+                )
+                for b in bundles:
+                    b.composite_score = composite_score(b, pw)
+                composites = {
+                    b.symbol: b.composite_score
+                    for b in bundles if b.composite_score is not None
+                }
+            except Exception as e:
+                log.warning("Composite index unavailable this cycle: %s", e)
+
+        # Technical context (RSI / extension over the 20d SMA) per symbol for
+        # the risk layer's anti-chasing gate. Missing entries fail open there.
+        tech_ctx: dict[str, dict] = {
+            b.symbol: s.data
+            for b in bundles
+            for s in b.signals
+            if s.kind is SignalKind.TECHNICAL and s.data
+        }
+
         bench_stats = self.benchmark.compute()
         bench_line = self.benchmark.context_line(bench_stats)
         external = self.robinhood.holdings()
+        data_health = self._check_robinhood_health()
         # Reflection loop: our realized P&L per entry signal, fed back so Claude can
         # weight by what has actually paid off. Best-effort; never blocks a cycle.
         lessons = self._lessons()
@@ -591,6 +628,7 @@ class Orchestrator:
             bundles, account, bench_line, external, lessons,
             today=today_block, buy_excluded=buy_excluded,
             signal_notes=signal_notes, held_notes=self._held_notes(account),
+            data_health=data_health, composites=composites,
         )
         self._stamp_liveness()
         proposals = self._filter_to_slate(proposals, bundles, account)
@@ -608,7 +646,10 @@ class Orchestrator:
                     0.0, buy_excluded.get(prop.symbol, "excluded from slate"),
                     prop.rationale[:120] if prop.rationale else "",
                 )
-        undeployed = self._execute_proposals(proposals, account, signal_kinds)
+        undeployed = self._execute_proposals(
+            proposals, account, signal_kinds, tech_ctx=tech_ctx,
+            composites=composites,
+        )
         if undeployed >= 1.0:
             # Whole-share bracket flooring drops each buy's sub-share remainder
             # (deliberate — the exchange-resident bracket wins over precision);
@@ -632,6 +673,33 @@ class Orchestrator:
         # overwrite: the watchdog queues its exit orders into state DURING the
         # minutes-long cycle, and a plain overwrite silently dropped them.
         self.state.merge_pending_orders(self._pending_oids)
+
+    def _check_robinhood_health(self) -> list[str]:
+        """Page ONCE per RH dead-auth latch event and return the DATA HEALTH
+        notes for the decision prompt — so Claude can tell "RH says nothing"
+        apart from "RH is dead" instead of the signals silently vanishing."""
+        if not self.cfg.robinhood_enabled:
+            return []
+        since = RobinhoodReader.auth_dead_since()
+        if since is None:
+            return []
+        if since != self._rh_paged_for:
+            self._rh_paged_for = since
+            self.alerter.critical(
+                "robinhood_auth",
+                "Robinhood OAuth dead — context reads disabled",
+                "The RH refresh token is dead; external holdings, the RH "
+                "movers/scan screeners and the RH earnings calendar (yfinance "
+                "fallback active) are offline. Trading continues on Alpaca. "
+                "Fix: run `python -m investment_strategy.portfolio."
+                "robinhood_auth login` on the host — reads auto-resume within "
+                "~1 minute of the new token landing (no restart needed).",
+            )
+        return [
+            "Robinhood data unavailable (OAuth expired): external holdings, RH "
+            "movers/scans and the RH earnings calendar are missing this cycle "
+            "— their absence is an outage, not a neutral signal."
+        ]
 
     def _refresh_dashboard(self) -> None:
         """Regenerate the live dashboard HTML — and the public track-record page
@@ -910,7 +978,9 @@ class Orchestrator:
             log.warning("Exchange-exit backfill failed: %s", e)
 
     # -- per-cycle budget fair-share (2026-07-06 all-LLY fix) ---------------- #
-    def _cycle_budget_caps(self, proposals, account) -> dict[str, float]:
+    def _cycle_budget_caps(
+        self, proposals, account, composites: dict[str, float] | None = None,
+    ) -> dict[str, float]:
         """Split the cycle's deployable cash across ALL equity-buy proposals,
         weighted by conviction, and return {symbol: $cap}. Proposals are executed
         in the order Claude returns them, and every hard cap in RiskManager still
@@ -920,7 +990,12 @@ class Orchestrator:
         cycle). Single-buy cycles get no share cap. Decision sells run BEFORE
         this split (_execute_proposals), so capital they free is part of the
         deployable pool — that's what funds a full-book rotation buy; whatever
-        the buys leave unused is swept by the core-ETF fill."""
+        the buys leave unused is swept by the core-ETF fill.
+
+        With COMPOSITE_BUDGET_BLEND on, each weight is conviction x the
+        deterministic composite index (floored at 0.1 so a thin composite
+        shrinks a share rather than zeroing it) — corroborated ideas get more
+        of the cycle's cash than the LLM's say-so alone."""
         buys = [
             p for p in proposals
             if p.action is Action.BUY and p.instrument is not Instrument.OPTION
@@ -933,6 +1008,12 @@ class Orchestrator:
         # Floor each weight so a zero-conviction proposal can't zero-divide and a
         # tiny one still gets a sliver (the risk gate handles the rest).
         weights = {p.symbol: max(p.conviction, 0.05) for p in buys}
+        if r.composite_budget_blend and composites:
+            weights = {
+                sym: w * max(composites[sym], 0.1)
+                if sym in composites else w
+                for sym, w in weights.items()
+            }
         total = sum(weights.values())
         caps = {sym: deployable * w / total for sym, w in weights.items()}
         # Per-symbol share cap: even with many candidates, one name can't sweep
@@ -965,7 +1046,10 @@ class Orchestrator:
             if self.cfg.core_etf and p.symbol == self.cfg.core_etf:
                 continue  # passive core: never on the slate, never rotated
             bits: list[str] = []
-            conv = self.state.last_buy_conviction(p.symbol)
+            # Same durable baseline the rotation guard enforces (state clock
+            # with ledger fallback) — the prompt must show the bar the guard
+            # will actually hold a rotation to.
+            conv = self._entry_conviction(p.symbol)
             if conv is not None:
                 bits.append(f"entry conviction {conv:.2f}")
             age = self.state.entry_age_days(p.symbol)
@@ -975,8 +1059,127 @@ class Orchestrator:
                 notes[p.symbol] = ", ".join(bits)
         return notes
 
+    # -- rotation loss guard (week of 2026-07-13: UNH -$204 / HUBB -$158
+    #    realized purely to free a slot) ------------------------------------ #
+    def _entry_conviction(self, symbol: str) -> float | None:
+        """The conviction of `symbol`'s most recent BUY. Tries the state clock
+        first (fast), then falls back to the ledger: the state store rides the
+        7-day churn-guard retention (state._CLOCK_RETENTION_DAYS), so a
+        never-topped-up name held past a week — exactly the stale incumbent a
+        rotation targets — has NO state entry, while the ledger keeps every
+        buy's conviction forever. 0.0 in the ledger means 'not recorded'
+        (core fills, pre-tracking rows), not zero conviction."""
+        conv = self.state.last_buy_conviction(symbol)
+        if conv is not None:
+            return conv
+        try:
+            for rec in reversed(self.ledger.effective()):
+                if (
+                    rec.action == "buy" and rec.symbol == symbol
+                    and (rec.conviction or 0.0) > 0
+                ):
+                    return rec.conviction
+        except Exception as e:
+            log.debug("Ledger entry-conviction lookup failed for %s: %s", symbol, e)
+        return None
+
+    def _apply_rotation_guard(self, proposals, account, composites):
+        """Enforce the rotation edge the prompt only ASKS for: on a full book,
+        a SELL that locks in a real loss to free a slot must be displaced by a
+        clearly stronger incoming name. Detection is deterministic (never the
+        LLM's rationale text): the equity book is at the slot cap AND the same
+        response BUYs a not-held equity name — the buy that would consume the
+        freed slot. Watchdog stops/trails/flattens never pass through decision
+        proposals, and a standalone risk-off sell has no paired new-name buy,
+        so neither can be blocked here. Two further escape hatches keep this
+        from ever pinning a position the model urgently wants out of: a SELL
+        whose OWN conviction is at/above rotation_guard_exempt_sell_conviction
+        is treated as a risk-off exit (never vetoed — 'never block a
+        legitimate exit' outranks anti-churn), and a missing entry-conviction
+        baseline fails open. Vetoed positions still keep their exchange
+        bracket + watchdog stops — the veto holds, it never strands. Returns
+        the (possibly filtered) list; vetoed sells are journaled so 'Today so
+        far' and the postmortem see them."""
+        r = self.cfg.risk
+        if not r.rotation_loss_guard_enabled or not proposals:
+            return proposals
+        equity_rows = sum(
+            1 for p in account.positions if not getattr(p, "is_option", False)
+        )
+        if equity_rows < r.max_open_positions:
+            return proposals  # slots free — sells aren't cap-forced
+        held_syms = {
+            p.symbol for p in account.positions
+            if not getattr(p, "is_option", False)
+        }
+        incoming = [
+            p for p in proposals
+            if p.action is Action.BUY and p.instrument is not Instrument.OPTION
+            and p.symbol not in held_syms
+        ]
+        if not incoming:
+            return proposals  # no new name wants the slot — not a rotation
+        best_in_conv = max(p.conviction for p in incoming)
+        best_in_comp = max(
+            (composites.get(p.symbol) for p in incoming
+             if composites.get(p.symbol) is not None),
+            default=None,
+        )
+        kept = []
+        for p in proposals:
+            if not (
+                p.action is Action.SELL
+                and p.instrument is not Instrument.OPTION
+            ):
+                kept.append(p)
+                continue
+            pos = account.position_for(p.symbol)
+            if pos is None or pos.unrealized_pl_pct > -r.rotation_guard_min_loss_pct:
+                kept.append(p)  # not a loss-locking sell
+                continue
+            exempt = r.rotation_guard_exempt_sell_conviction
+            if exempt > 0 and p.conviction >= exempt:
+                # The model strongly wants OUT (thesis broken / risk-off) — a
+                # co-occurring unrelated buy must not reclassify this exit as
+                # a lukewarm slot-freeing rotation.
+                kept.append(p)
+                continue
+            entry_conv = self._entry_conviction(p.symbol)
+            if entry_conv is None:
+                kept.append(p)  # no baseline anywhere — fail open
+                continue
+            conv_ok = best_in_conv >= entry_conv + r.rotation_min_conviction_edge
+            comp_ok = True
+            if r.rotation_require_composite_edge:
+                inc_comp = composites.get(p.symbol)
+                if best_in_comp is not None and inc_comp is not None:
+                    comp_ok = best_in_comp > inc_comp
+            if conv_ok and comp_ok:
+                kept.append(p)
+                continue
+            reason = (
+                f"Rotation guard: selling {p.symbol} at "
+                f"{pos.unrealized_pl_pct:+.1f}% locks in a real loss, and the "
+                f"best incoming buy (conviction {best_in_conv:.2f}) doesn't "
+                f"clear the incumbent's entry {entry_conv:.2f} by "
+                f"+{r.rotation_min_conviction_edge:g}"
+                + ("" if comp_ok else " (composite edge missing)")
+                + " — holding instead."
+            )
+            log.warning("%s", reason)
+            self._journal_decision(
+                p.symbol, "sell", "equity", p.conviction, p.target_weight_pct,
+                "rotation_guard", 0.0, reason,
+                p.rationale[:120] if p.rationale else "",
+            )
+        return kept
+
     # -- proposal execution: equity sells first (rotation support) ---------- #
-    def _execute_proposals(self, proposals, account, signal_kinds) -> float:
+    def _execute_proposals(
+        self, proposals, account, signal_kinds,
+        tech_ctx: dict[str, dict] | None = None,
+        composites: dict[str, float] | None = None,
+    ) -> float:
         """Execute the cycle's proposals, equity SELLs first. Returns the $
         dropped by whole-share flooring across the cycle's buys.
 
@@ -991,6 +1194,9 @@ class Orchestrator:
         if not proposals:
             log.info("No actionable proposals this cycle.")
             return 0.0
+        tech_ctx = tech_ctx or {}
+        composites = composites or {}
+        proposals = self._apply_rotation_guard(proposals, account, composites)
         sells = [
             p for p in proposals
             if p.instrument is not Instrument.OPTION and p.action.value == "sell"
@@ -1004,7 +1210,7 @@ class Orchestrator:
             self._handle_equity(
                 proposal, account, signal_kinds.get(proposal.symbol, []),
             )
-        budget_caps = self._cycle_budget_caps(rest, account)
+        budget_caps = self._cycle_budget_caps(rest, account, composites)
         undeployed = 0.0
         for proposal in rest:
             self._stamp_liveness()
@@ -1015,6 +1221,8 @@ class Orchestrator:
                 undeployed += self._handle_equity(
                     proposal, account, kinds,
                     cycle_budget_cap=budget_caps.get(proposal.symbol),
+                    tech=tech_ctx.get(proposal.symbol),
+                    composite=composites.get(proposal.symbol),
                 )
         return undeployed
 
@@ -1516,10 +1724,14 @@ class Orchestrator:
     def _handle_equity(
         self, proposal: TradeProposal, account, signal_kinds: list[str] | None = None,
         cycle_budget_cap: float | None = None,
+        tech: dict | None = None,
+        composite: float | None = None,
     ) -> float:
         """Evaluate + execute one equity proposal. Returns the $ the whole-share
         bracket flooring dropped from an approved buy (0 for everything else)
-        so the cycle can total the undeployed drag."""
+        so the cycle can total the undeployed drag. `tech` (RSI/extension) and
+        `composite` feed the risk layer's anti-chasing gate and composite
+        floor; both fail open when None."""
         price = self.broker.latest_price(proposal.symbol)
         vol = self.broker.annualized_vol(proposal.symbol)
         is_buy = proposal.action.value == "buy"
@@ -1542,6 +1754,7 @@ class Orchestrator:
             max_held_corr=max_corr, corr_symbol=corr_sym,
             cycle_budget_cap=cycle_budget_cap,
             corr_data_missing=corr_missing,
+            tech=tech, composite_score=composite,
         )
         if proposal.action.value == "hold":
             # A HOLD is the model saying "no action" — the risk layer returns
@@ -1638,7 +1851,8 @@ class Orchestrator:
                     self.ledger.record(TradeRecord.from_equity(
                         decision, price, sub.order_id,
                         entry_signals=signal_kinds or [],
-                        submitted_qty=sub.qty, submitted_cost=sub.notional))
+                        submitted_qty=sub.qty, submitted_cost=sub.notional,
+                        composite_score=composite))
                     self._pending_oids.append((sub.order_id, proposal.symbol))
                     # Start (or preserve) the hold clock for the deterministic
                     # time-stop (1B.4). register_entry only stamps a first entry.
