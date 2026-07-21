@@ -1120,30 +1120,32 @@ class Orchestrator:
         return None
 
     def _apply_rotation_guard(self, proposals, account, composites):
-        """Enforce the rotation edge the prompt only ASKS for: on a full book,
-        a SELL that locks in a real loss to free a slot must be displaced by a
+        """Enforce the rotation edge the prompt only ASKS for: a SELL that locks
+        in a real loss to free capital for a new name must be displaced by a
         clearly stronger incoming name. Detection is deterministic (never the
-        LLM's rationale text): the equity book is at the slot cap AND the same
-        response BUYs a not-held equity name — the buy that would consume the
-        freed slot. Watchdog stops/trails/flattens never pass through decision
-        proposals, and a standalone risk-off sell has no paired new-name buy,
-        so neither can be blocked here. Two further escape hatches keep this
-        from ever pinning a position the model urgently wants out of: a SELL
-        whose OWN conviction is at/above rotation_guard_exempt_sell_conviction
-        is treated as a risk-off exit (never vetoed — 'never block a
-        legitimate exit' outranks anti-churn), and a missing entry-conviction
-        baseline fails open. Vetoed positions still keep their exchange
-        bracket + watchdog stops — the veto holds, it never strands. Returns
-        the (possibly filtered) list; vetoed sells are journaled so 'Today so
-        far' and the postmortem see them."""
+        LLM's rationale text): the same response BUYs a not-held equity name (the
+        buy the freed capital would fund) AND sells a held loser. This fires
+        whenever that PAIR appears — NOT only at the slot cap: the original
+        `positions < MAX_OPEN` bypass meant the guard never once ran (Jul 17: 13
+        of 15 slots, so the SPCX -9.9% / MU -9.7% loss-rotations it was built to
+        veto sailed straight through). A loss-locking sell frees CAPITAL for the
+        rotation buy regardless of how many slots are open. Watchdog
+        stops/trails/flattens never pass through decision proposals, and a
+        standalone risk-off sell has no paired new-name buy, so neither can be
+        blocked here. Escape hatches keep this from ever pinning a position the
+        model urgently wants out of: buys are halted (kill switch) => nothing to
+        fund, so pass everything; a SELL whose OWN conviction is at/above
+        rotation_guard_exempt_sell_conviction is a risk-off exit (never vetoed —
+        'never block a legitimate exit' outranks anti-churn); and a missing
+        entry-conviction baseline fails open. Vetoed positions still keep their
+        exchange bracket + watchdog stops — the veto holds, it never strands.
+        Every guarded loss-sell leaves an auditable ruling (log + journal),
+        pass or veto."""
         r = self.cfg.risk
         if not r.rotation_loss_guard_enabled or not proposals:
             return proposals
-        equity_rows = sum(
-            1 for p in account.positions if not getattr(p, "is_option", False)
-        )
-        if equity_rows < r.max_open_positions:
-            return proposals  # slots free — sells aren't cap-forced
+        if self.risk.kill_switch:
+            return proposals  # buys are halted — a paired sell funds no rotation
         held_syms = {
             p.symbol for p in account.positions
             if not getattr(p, "is_option", False)
@@ -1154,7 +1156,7 @@ class Orchestrator:
             and p.symbol not in held_syms
         ]
         if not incoming:
-            return proposals  # no new name wants the slot — not a rotation
+            return proposals  # no new name to fund — not a rotation
         best_in_conv = max(p.conviction for p in incoming)
         best_in_comp = max(
             (composites.get(p.symbol) for p in incoming
@@ -1177,11 +1179,20 @@ class Orchestrator:
             if exempt > 0 and p.conviction >= exempt:
                 # The model strongly wants OUT (thesis broken / risk-off) — a
                 # co-occurring unrelated buy must not reclassify this exit as
-                # a lukewarm slot-freeing rotation.
+                # a lukewarm capital-freeing rotation.
+                log.info(
+                    "Rotation guard: PASS %s at %+.1f%% — own sell conviction "
+                    "%.2f >= exempt %.2f (risk-off exit, not vetoed).",
+                    p.symbol, pos.unrealized_pl_pct, p.conviction, exempt,
+                )
                 kept.append(p)
                 continue
             entry_conv = self._entry_conviction(p.symbol)
             if entry_conv is None:
+                log.info(
+                    "Rotation guard: PASS %s at %+.1f%% — no entry-conviction "
+                    "baseline; failing open.", p.symbol, pos.unrealized_pl_pct,
+                )
                 kept.append(p)  # no baseline anywhere — fail open
                 continue
             conv_ok = best_in_conv >= entry_conv + r.rotation_min_conviction_edge
@@ -1191,6 +1202,13 @@ class Orchestrator:
                 if best_in_comp is not None and inc_comp is not None:
                     comp_ok = best_in_comp > inc_comp
             if conv_ok and comp_ok:
+                log.info(
+                    "Rotation guard: PASS %s at %+.1f%% — incoming conviction "
+                    "%.2f clears entry %.2f by +%g%s; rotation allowed.",
+                    p.symbol, pos.unrealized_pl_pct, best_in_conv, entry_conv,
+                    r.rotation_min_conviction_edge,
+                    "" if comp_ok else " (composite edge waived)",
+                )
                 kept.append(p)
                 continue
             reason = (
@@ -1245,6 +1263,7 @@ class Orchestrator:
             self._stamp_liveness()  # order placement progresses per name
             self._handle_equity(
                 proposal, account, signal_kinds.get(proposal.symbol, []),
+                composite=composites.get(proposal.symbol),
             )
         budget_caps = self._cycle_budget_caps(rest, account, composites)
         undeployed = 0.0
@@ -1849,6 +1868,7 @@ class Orchestrator:
                             realized_pl=held.unrealized_pl,
                             exit_reason="decision",
                             exit_price=held.current_price or None,
+                            composite_score=composite,
                         ))
                         self._pending_oids.append((oid, proposal.symbol))
                         # Start the re-entry cooldown clock (churn guard).

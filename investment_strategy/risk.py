@@ -309,7 +309,15 @@ class RiskManager:
                     if extreme and not hot_and_extended
                     else f"RSI {rsi:.0f} and {how_far} above the 20d SMA"
                 )
-                if self.limits.overextension_mode == "block":
+                # The EXTREME leg has its own mode: a >=Nx-ATR screaming
+                # extension is a different risk than a mild hot-and-extended
+                # entry, and defaults to a hard block (the shared "haircut" mode
+                # only halved it — CVX still bought $2,799 at 3.2xATR Jul 17).
+                mode = (
+                    self.limits.overext_extreme_mode if extreme
+                    else self.limits.overextension_mode
+                )
+                if mode == "block":
                     return self._reject(
                         proposal,
                         f"Overextended: {why} — chasing a local top; wait "

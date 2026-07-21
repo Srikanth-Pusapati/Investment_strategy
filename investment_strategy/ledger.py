@@ -160,17 +160,21 @@ class TradeRecord(BaseModel):
         realized_pl_pct: Optional[float] = None, realized_pl: Optional[float] = None,
         exit_reason: str = "decision", instrument: str = "equity",
         ts: Optional[datetime] = None, exit_price: Optional[float] = None,
+        composite_score: Optional[float] = None,
     ) -> "TradeRecord":
         """`ts` overrides the record time — the exchange-exit backfill (F.1)
         stamps the order's actual FILL time so attribution's chronological
         round-trip pairing sees the exit where it really happened, not when the
         backfill noticed it. `exit_price` is the sell's fill/quote price —
-        record it whenever known so FIFO lot P&L (GA-2.5) has a real basis."""
+        record it whenever known so FIFO lot P&L (GA-2.5) has a real basis.
+        `composite_score` is the name's weighted composite at exit — recorded so
+        sell rows aren't blind to it (buys already carry it)."""
         kwargs: dict = dict(
             symbol=symbol, action="sell", instrument=instrument, qty=qty,
             rationale=rationale, key_signals=key_signals or [], order_id=order_id,
             realized_pl_pct=realized_pl_pct, realized_pl=realized_pl,
             exit_reason=exit_reason, exit_price=exit_price,
+            composite_score=composite_score,
         )
         if ts is not None:
             kwargs["ts"] = ts

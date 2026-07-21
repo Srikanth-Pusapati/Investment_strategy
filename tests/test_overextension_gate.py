@@ -59,14 +59,26 @@ def test_gate_needs_both_legs_below_extreme():
         assert "haircut" not in d.reason.lower()
 
 
-def test_extreme_extension_fires_regardless_of_rsi():
+def test_extreme_extension_blocks_by_default_regardless_of_rsi():
     # The actual Jul-13 losers: CDW RSI 63.9 @ 3.41 ATR, PATH RSI 60.9 @ 3.68
     # ATR — under the RSI floor, but screaming extension. The extreme leg
-    # must catch exactly these.
-    base = _decide()
+    # must catch exactly these, and now HARD-BLOCKS by default (the shared
+    # haircut mode only halved size — CVX still bought $2,799 at 3.2xATR).
     cdw_like = _decide(tech={"rsi14": 63.9, "ext_atr": 3.41, "ext_pct_sma20": 7.5})
-    assert abs(cdw_like.approved_notional - base.approved_notional / 2) < 1e-6
+    assert cdw_like.verdict is RiskVerdict.REJECTED
     assert "extreme extension" in cdw_like.reason
+
+
+def test_extreme_extension_haircut_mode_still_downsizes():
+    # OVEREXT_EXTREME_MODE=haircut restores the old shared behavior: halve, not
+    # reject. A mild (non-extreme) hot-and-extended entry is unaffected by this
+    # knob and still follows overextension_mode.
+    base = _decide()
+    cut = _decide(tech={"rsi14": 63.9, "ext_atr": 3.41, "ext_pct_sma20": 7.5},
+                  overext_extreme_mode="haircut")
+    assert cut.verdict in (RiskVerdict.APPROVED, RiskVerdict.RESIZED)
+    assert abs(cut.approved_notional - base.approved_notional / 2) < 1e-6
+    assert "extreme extension" in cut.reason
 
 
 def test_extreme_leg_disabled_at_zero():

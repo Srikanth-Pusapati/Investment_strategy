@@ -207,6 +207,12 @@ class RiskLimits:
     # losers entered at RSI 61-64 but 3.4-4.0 ATRs over the 20d SMA — an RSI
     # floor must not muzzle a screaming extension. 0 = off.
     overext_extreme_atr_mult: float = 3.0
+    # How the EXTREME leg acts, independent of overextension_mode. In the shared
+    # "haircut" mode the extreme trigger only halved size — CVX still bought
+    # $2,799 at 3.2xATR on Jul 17, exactly the >=3xATR trade class this leg
+    # exists to STOP. A screaming extension is a different risk than a mild one,
+    # so it hard-rejects by default. "haircut" restores the old shared behavior.
+    overext_extreme_mode: str = "block"  # "block" (reject) | "haircut" (downsize)
     # --- deterministic weighted composite index (signals/composite.py) ---
     composite_enabled: bool = True       # compute + render the per-candidate index
     composite_budget_blend: bool = True  # blend into the cycle budget split weights
@@ -523,6 +529,8 @@ def load_config() -> Config:
             overext_pct=_f("OVEREXT_PCT", 8.0),
             overext_haircut=_f("OVEREXT_HAIRCUT", 0.5),
             overext_extreme_atr_mult=_f("OVEREXT_EXTREME_ATR_MULT", 3.0),
+            overext_extreme_mode=os.getenv(
+                "OVEREXT_EXTREME_MODE", "block").strip().lower(),
             # Deterministic weighted composite index (signals/composite.py).
             composite_enabled=_flag("COMPOSITE_ENABLED", "on"),
             composite_budget_blend=_flag("COMPOSITE_BUDGET_BLEND", "on"),
