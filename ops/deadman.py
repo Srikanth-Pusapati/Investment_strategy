@@ -41,6 +41,11 @@ ET = ZoneInfo("America/New_York")
 # every hour). Derive it from the bot's own .env cadence + grace.
 STALE_GRACE_MINUTES = 15.0
 PAGE_COOLDOWN_S = 1800.0
+# The bot writes state/last_tick.stamp on every MAIN-loop tick (~30s) and
+# through each decision cycle, so a wedged decision thread goes stale here in
+# minutes even while the 24/7 watchdog keeps logs/bot.log warm. Tighter than the
+# log-mtime threshold; only consulted when the stamp file exists.
+TICK_STAMP_STALE_MINUTES = 5.0
 
 
 def stale_log_minutes() -> float:
@@ -100,6 +105,21 @@ def log_age_minutes(log_file: Path = ROOT / "logs" / "bot.log",
     return (now - mtime).total_seconds() / 60.0
 
 
+def tick_stamp_age_minutes(
+    stamp_file: Path = ROOT / "state" / "last_tick.stamp",
+    now: dt.datetime | None = None,
+) -> float | None:
+    """Minutes since the bot's MAIN loop last wrote its tick stamp, or None if
+    the stamp file is missing/unreadable (older bot, or never started — the
+    caller falls back to the log-mtime check rather than false-paging)."""
+    try:
+        written = float(stamp_file.read_text().strip())
+    except (OSError, ValueError):
+        return None
+    now = now or dt.datetime.now(dt.timezone.utc)
+    return (now.timestamp() - written) / 60.0
+
+
 def diagnose(now: dt.datetime | None = None) -> str | None:
     """None when healthy; otherwise a one-line description of what's wrong."""
     pid = bot_pid()
@@ -108,6 +128,17 @@ def diagnose(now: dt.datetime | None = None) -> str | None:
             f"Bot process is NOT RUNNING (lock pid {pid or 'missing'}). "
             f"Restart: cd {ROOT} && nohup .venv/bin/python -m investment_strategy "
             ">> logs/stdout.log 2>&1 &"
+        )
+    # Main-loop tick stamp first: it detects a WEDGED decision thread that the
+    # 24/7 watchdog would otherwise mask by keeping the log warm. Only trusted
+    # when present; a missing stamp falls through to the log-mtime check.
+    tick_age = tick_stamp_age_minutes(now=now)
+    if tick_age is not None and tick_age > TICK_STAMP_STALE_MINUTES:
+        return (
+            f"Bot pid {pid} is alive but its main-loop tick stamp is "
+            f"{tick_age:.0f} min old (> {TICK_STAMP_STALE_MINUTES:.0f} min) — the "
+            f"decision loop is WEDGED (the watchdog may still be logging). It "
+            f"holds the instance lock, so kill it (kill -TERM {pid}) and restart."
         )
     age = log_age_minutes(now=now)
     stale_after = stale_log_minutes()
@@ -141,6 +172,9 @@ def should_page(stamp: Path = ROOT / "state" / "deadman.page-stamp") -> bool:
 def main() -> int:
     now = dt.datetime.now(ET)
     if not market_hours(now):
+        # Print a visible heartbeat so an off-hours run is distinguishable from
+        # a launchd job that never fired (the old silent return looked the same).
+        print(f"[{now:%Y-%m-%d %H:%M:%S ET}] skip (market closed)", flush=True)
         return 0
     problem = diagnose()
     stamp = f"[{now:%Y-%m-%d %H:%M:%S ET}]"

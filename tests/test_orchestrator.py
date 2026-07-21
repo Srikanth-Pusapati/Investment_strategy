@@ -179,11 +179,12 @@ def _orch(trim_enabled=True, trim_pct=25.0, state=None,
           thesis_decay_enabled=False, thesis_decay_min_age_days=3.0,
           thesis_min_score=0.1, core_etf="", target_invested_pct=0.0,
           min_cash_buffer_pct=2.0, max_gross_exposure_pct=100.0,
-          kill_switch=False, whole_shares_only=False, core_stop_pct=15.0):
+          kill_switch=False, whole_shares_only=False, core_stop_pct=15.0,
+          core_max_pct=0.0):
     o = Orchestrator.__new__(Orchestrator)
     o.cfg = SimpleNamespace(
         core_etf=core_etf, target_invested_pct=target_invested_pct,
-        core_stop_pct=core_stop_pct,
+        core_stop_pct=core_stop_pct, core_max_pct=core_max_pct,
         # These reconcile tests assert the LOG output; the enforcing halt
         # behavior has its own suite in test_ops_hardening.py.
         reconcile_halt_enabled=False,
@@ -212,6 +213,7 @@ def _orch(trim_enabled=True, trim_pct=25.0, state=None,
     o.state = state or _state_tmp()
     o._trade_lock = threading.Lock()
     o._pending_oids = []
+    o._oid_retries = {}
     return o
 
 
@@ -459,6 +461,23 @@ def test_core_fill_noop_when_already_at_target():
     assert o.broker.core_buys == []
 
 
+def test_core_fill_capped_by_core_max_pct():
+    # Target wants the core near 90% of a $1000 book, but CORE_MAX_PCT=30 caps
+    # the QQQ position at $300; it already holds $250, so only $50 more is bought.
+    o = _orch(core_etf="QQQ", target_invested_pct=90.0, min_cash_buffer_pct=2.0,
+              core_max_pct=30.0)
+    acct = _acct(cash=750.0, positions=[_pos("QQQ", 250.0)])
+    o._apply_core_fill(acct)
+    assert o.broker.core_buys == [("QQQ", 50.0)]
+
+
+def test_core_fill_skips_when_core_at_ceiling():
+    o = _orch(core_etf="QQQ", target_invested_pct=90.0, core_max_pct=30.0)
+    acct = _acct(cash=700.0, positions=[_pos("QQQ", 300.0)])  # already at 30%
+    o._apply_core_fill(acct)
+    assert o.broker.core_buys == []
+
+
 def test_core_fill_noop_when_disabled():
     o = _orch(core_etf="", target_invested_pct=90.0)
     acct = _acct(cash=1_000.0)
@@ -564,9 +583,16 @@ def test_reconcile_partial_fill_logs_warning():
     )
 
 
-def test_reconcile_still_pending_logs_warning():
-    _, recs = _reconcile("new", 0.0, 3.0)
-    assert any("full cycle later" in r.getMessage() for r in recs)
+def test_reconcile_still_pending_requeues_with_warning():
+    # A still-"new" order long after submission is re-queued (bounded), NOT
+    # dropped — dropping it was the exact path an oid was lost through.
+    o, recs = _reconcile("new", 0.0, 3.0)
+    assert any(
+        r.levelno == logging.WARNING and "unresolved, re-queued" in r.getMessage()
+        for r in recs
+    )
+    assert ("oid-1", "AAPL") in o._pending_oids
+    assert o._oid_retries.get("oid-1") == 1
 
 
 # --------------------------------------------------------------------------- #
@@ -970,13 +996,32 @@ from unittest.mock import patch  # noqa: E402
 def test_decision_due_fires_at_stashed_next_open_and_not_before():
     o = Orchestrator.__new__(Orchestrator)
     o.cfg = SimpleNamespace(decision_interval_s=3600)
-    o._last_decision_at = time.monotonic()   # hourly grid not due
+    o._last_decision_at = time.time()        # wall-clock: hourly grid not due
     o._next_open_utc = None
     assert not o._decision_due()
     o._next_open_utc = datetime.now(timezone.utc) + timedelta(seconds=30)
     assert not o._decision_due()
     o._next_open_utc = datetime.now(timezone.utc) - timedelta(seconds=1)
     assert o._decision_due()
+
+
+def test_within_close_fence_only_near_the_bell():
+    o = Orchestrator.__new__(Orchestrator)
+    o.cfg = SimpleNamespace(close_fence_minutes=5.0)
+    now = datetime.now(timezone.utc)
+    # 3 min to close -> fenced; 30 min -> not; already closed (negative) -> not;
+    # unknown close time -> fail open (not fenced).
+    o.broker = SimpleNamespace(next_market_close=lambda: now + timedelta(minutes=3))
+    assert o._within_close_fence() is True
+    o.broker = SimpleNamespace(next_market_close=lambda: now + timedelta(minutes=30))
+    assert o._within_close_fence() is False
+    o.broker = SimpleNamespace(next_market_close=lambda: now - timedelta(minutes=1))
+    assert o._within_close_fence() is False
+    o.broker = SimpleNamespace(next_market_close=lambda: None)
+    assert o._within_close_fence() is False
+    o.cfg = SimpleNamespace(close_fence_minutes=0.0)   # disabled
+    o.broker = SimpleNamespace(next_market_close=lambda: now + timedelta(minutes=1))
+    assert o._within_close_fence() is False
 
 
 def test_closed_tick_arms_the_bell_wakeup():
@@ -994,11 +1039,14 @@ def test_bell_stash_survives_failed_cycle_and_clears_on_success():
     # An exception AT the open must keep the stash armed (30s retry at the
     # bell); only a successful cycle consumes it; a FUTURE stash survives.
     o = Orchestrator.__new__(Orchestrator)
-    o.cfg = SimpleNamespace(decision_interval_s=3600)
+    o.cfg = SimpleNamespace(decision_interval_s=3600, monitor_interval_s=30)
     o._last_main_tick = 0.0
+    o._last_main_wall = time.time()     # recent -> no post-wake settle path
     o._last_decision_at = 0.0            # hourly due -> _tick runs the cycle
     o._refresh_runtime_controls = lambda: None
     o._refresh_dashboard = lambda: None
+    o._cycle_market_open = True
+    o._dashboard_open_last = True
     bell = datetime.now(timezone.utc) - timedelta(seconds=1)  # consumed stash
     o._next_open_utc = bell
 

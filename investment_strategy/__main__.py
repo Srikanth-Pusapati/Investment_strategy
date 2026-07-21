@@ -20,6 +20,28 @@ from .config import load_config
 from .orchestrator import Orchestrator
 
 
+class _TruncateFilter(logging.Filter):
+    """Cap any single log record at `limit` chars. yfinance logs a full HTML
+    error page verbatim on an upstream 5xx (`HTTP Error 502: <!DOCTYPE html>…`);
+    a handful of those dumps buried a whole trading day's real warnings (Jul 20:
+    5 dumps = 59% of bot.log). We keep the signal (the status line) and drop the
+    page. Applied as a filter so it truncates BEFORE either handler formats."""
+
+    def __init__(self, limit: int = 300) -> None:
+        super().__init__()
+        self.limit = limit
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        try:
+            msg = record.getMessage()
+        except Exception:
+            return True
+        if len(msg) > self.limit:
+            record.msg = msg[: self.limit] + f"… [+{len(msg) - self.limit} chars truncated]"
+            record.args = ()
+        return True
+
+
 def dated_log_name(default_name: str) -> str:
     """TimedRotatingFileHandler namer: turn the default rotated name
     (`logs/bot.log.2026-07-06`) into a per-day, repo-friendly label
@@ -71,6 +93,9 @@ def _setup_logging() -> None:
     # Neither logger carries signal below WARNING.
     logging.getLogger("mcp.client.streamable_http").setLevel(logging.WARNING)
     logging.getLogger("httpx").setLevel(logging.WARNING)
+    # yfinance echoes the upstream HTML error page on a 5xx; truncate it so one
+    # provider hiccup can't bury the day's real warnings.
+    logging.getLogger("yfinance").addFilter(_TruncateFilter())
 
 
 def _prevent_sleep() -> None:

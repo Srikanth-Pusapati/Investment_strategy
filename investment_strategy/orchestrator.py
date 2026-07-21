@@ -12,6 +12,8 @@ from __future__ import annotations
 
 import logging
 import os
+import subprocess
+import sys
 import threading
 import time
 from datetime import datetime, timedelta, timezone
@@ -118,7 +120,10 @@ class Orchestrator:
         self.ledger = TradeLedger()
         # Out-of-band paging for watchdog CRITICALs (failed close = naked position;
         # latched halt). Log-only unless ALERTS_ENABLED + a sink is configured.
-        self.alerter = Alerter(cfg.alerts)
+        # async_send: this is a long-lived process, so blocking SMTP/webhook I/O
+        # moves off the watchdog thread (a post-wake DNS stall must not wedge the
+        # safety loop); run() flushes on shutdown so no page is lost.
+        self.alerter = Alerter(cfg.alerts, async_send=True)
         # Last RH dead-auth latch timestamp we paged for: one page per latch
         # EVENT (not per cycle), and a fresh latch after recovery pages again.
         self._rh_paged_for: float = 0.0
@@ -127,6 +132,7 @@ class Orchestrator:
         self.watchdog = Watchdog(
             cfg, self.broker, state=self.state, ledger=self.ledger,
             alerter=self.alerter,
+            on_exchange_exit=self._backfill_exchange_exits_locked,
         )
         self.benchmark = BenchmarkTracker(cfg, self.broker, symbol=cfg.benchmark_symbol)
         self.options = OptionsHelper(cfg) if cfg.risk.options_enabled else None
@@ -148,21 +154,36 @@ class Orchestrator:
         self.journal = DecisionJournal()
         # Persisted daily equity snapshots so the account P&L curve survives restarts.
         self.equity_history = EquityHistory()
-        # -inf so the FIRST decision tick is unconditionally due. 0.0 looked
-        # equivalent but wasn't: time.monotonic() is seconds since BOOT, so on
-        # a freshly rebooted machine (2026-07-14: bot up 6 min after boot) the
-        # bot silently idled until MACHINE uptime exceeded the decision
-        # interval — a whole quiet hour, even mid-session.
+        # WALL-CLOCK stamp (time.time()) of the last decision cycle's START.
+        # -inf => the FIRST tick is unconditionally due. This used to be
+        # time.monotonic(), which on macOS freezes during sleep/suspend: a
+        # laptop that slept an hour advanced monotonic by only the awake time,
+        # so the cadence stalled and cycles were MISSED for the whole slept span
+        # (Jul 18: 02:05 -> 12:34 starvation). Wall-clock keeps ticking through
+        # sleep, so the next cycle is due the moment the host wakes. Hang
+        # detection (_last_main_tick) stays monotonic — that's the correct clock
+        # for 'is the loop wedged', which sleep is not.
         self._last_decision_at = float("-inf")
         # Next session open (UTC), stashed by closed-market ticks so the loop
         # can fire a decision AT the bell instead of at the next hourly tick
         # (2026-07-13: a tick 17s before the open slept through the first hour).
         self._next_open_utc: datetime | None = None
+        # Whether the last cycle found the market open. Gates the dashboard
+        # refresh: rebuilding the HTML every hour overnight burns an AlpacaClient
+        # + full price sweep for byte-identical output. True initially so the
+        # first tick always paints; a final refresh still fires on the
+        # open->closed transition to capture the settled end-of-day picture.
+        self._cycle_market_open = True
+        self._dashboard_open_last = True
         # Serializes broker order mutations so the watchdog's emergency closes and
         # the decision cycle's order placement can't interleave (e.g. double-close).
         # It guards only the quick submit/close calls — never the slow LLM call —
         # so the safety thread is delayed at most by an order-submission window.
         self._trade_lock = threading.Lock()
+        # Serializes the exchange-exit backfill's ledger read-modify-append: it
+        # now runs from BOTH the decision cycle and the watchdog thread (on a
+        # vanished position), and the two must not interleave a double-append.
+        self._backfill_lock = threading.Lock()
         self._stop = threading.Event()
         # Order ids submitted last cycle, reconciled against actual fills at the
         # start of the next one (by then ~a decision interval has passed, so async
@@ -175,6 +196,14 @@ class Orchestrator:
                 "Loaded %d pending order(s) from state to reconcile.",
                 len(self._pending_oids),
             )  # (order_id, symbol)
+        # How many reconcile passes each oid has come back UNRESOLVED (broker read
+        # failed = "unknown", or still "new"/"accepted"). In-memory: a restart
+        # re-reconciles from the persisted pending list. Bounds the re-queue so a
+        # permanently unreadable oid isn't chased forever, but isn't DROPPED on a
+        # single blip either (the old code lumped "unknown" with "filled" and
+        # dropped it after one look — a rejected order caught by a network blip
+        # left its phantom ledger intent uncorrected forever).
+        self._oid_retries: dict[str, int] = {}
         # Liveness stamps (goGA GA-2.1/2.2). _last_main_tick gates the heartbeat:
         # the watchdog thread only pings the external dead-man URL while the main
         # loop is ALSO fresh, so either thread dying silences the ping and the
@@ -182,10 +211,24 @@ class Orchestrator:
         # clock jumps) that monotonic timers can't see.
         self._last_main_tick = time.monotonic()
         self._last_wall_tick = time.time()
+        # Wall-clock stamp of the last MAIN-loop tick (distinct from the
+        # watchdog's _last_wall_tick): a big jump here means the host just
+        # resumed from sleep, so the decision loop settles the network before
+        # its first post-wake cycle (see _tick / _await_network_settle).
+        self._last_main_wall = time.time()
         # In-memory halt latch: backs the kill-switch FILE when the file write
         # itself failed (disk full/read-only). Cleared only by restart — if we
         # couldn't write the ack file, there's nothing a human can delete to ack.
         self._forced_halt = False
+        # Last time we paged about running on battery during market hours (0 =
+        # never). Throttled: clamshell/battery sleep is a standing condition, not
+        # a one-shot event, so one page per BATTERY_WARN_COOLDOWN_S is enough.
+        self._last_battery_warn = 0.0
+        # Consecutive watchdog ticks that failed on a transient network error.
+        # A one-off skip is normal; a RUN of them during market hours means the
+        # safety loop is effectively blind and must page (Jul 17: 9 in a row,
+        # zero alerts). Reset on any clean tick.
+        self._watchdog_skips = 0
 
     # -- main loop ---------------------------------------------------------- #
     def run(self) -> None:
@@ -230,6 +273,11 @@ class Orchestrator:
         finally:
             self._stop.set()
             wd_thread.join(timeout=self.cfg.monitor_interval_s + 5)
+            # Drain any in-flight page before exiting (async alert worker).
+            try:
+                self.alerter.flush()
+            except Exception:  # noqa: BLE001 — shutdown best-effort
+                pass
 
     def _watchdog_loop(self) -> None:
         """Independent safety loop: closing positions is never gated, so this runs
@@ -237,17 +285,100 @@ class Orchestrator:
         while not self._stop.is_set():
             try:
                 self._note_loop_tick()
+                self._maybe_warn_on_battery()
                 with self._trade_lock:
                     self.watchdog.check_once()
                 self._maybe_heartbeat()
+                self._watchdog_skips = 0   # a clean tick clears the run
             except _TRANSIENT_NET as e:
+                self._watchdog_skips += 1
                 log.warning(
                     "Watchdog tick skipped on a transient network error (%s); "
-                    "retrying next tick.", e.__class__.__name__,
+                    "retrying next tick (%d in a row).",
+                    e.__class__.__name__, self._watchdog_skips,
                 )
+                self._maybe_page_on_skip_run()
             except Exception:
                 log.exception("Watchdog tick failed; continuing.")
             self._stop.wait(self.cfg.monitor_interval_s)
+
+    #: consecutive watchdog skips (network) before we page the safety loop is blind.
+    WATCHDOG_SKIP_ESCALATE = 5
+
+    def _maybe_page_on_skip_run(self) -> None:
+        """Page when the watchdog has skipped WATCHDOG_SKIP_ESCALATE ticks in a
+        row on network errors during market hours — the safety loop can't see the
+        book. Throttled by the alerter's dark_gap-style key; only fires in-hours
+        (an overnight outage strands nothing). Best-effort."""
+        if self._watchdog_skips < self.WATCHDOG_SKIP_ESCALATE:
+            return
+        now = time.time()
+        if not self._overlaps_paging_hours(now, now):
+            return
+        secs = self._watchdog_skips * self.cfg.monitor_interval_s
+        log.critical(
+            "Watchdog BLIND: %d consecutive ticks failed (~%.0fs) — positions "
+            "unwatched during market hours.", self._watchdog_skips, secs,
+        )
+        self.alerter.critical(
+            "watchdog_blind",
+            f"Watchdog blind for {self._watchdog_skips} ticks (~{secs:.0f}s)",
+            "The safety loop has failed to read the account for several ticks in "
+            "a row (network). Stops/floor/flatten can't fire while it's blind. "
+            "Check the host's connectivity.",
+            severity=float(self._watchdog_skips),
+        )
+
+    #: page at most once per this window about running on battery in-hours.
+    BATTERY_WARN_COOLDOWN_S = 1800.0
+
+    def _maybe_warn_on_battery(self) -> None:
+        """Proactively page when the host is on BATTERY during market hours.
+        `caffeinate` can't prevent clamshell/battery sleep (Jul 20: pmset
+        'Clamshell Sleep … Using Batt 39%' mapped 1:1 to the dark gaps), so the
+        only in-code mitigation is to warn BEFORE the bot goes dark — the
+        durable fix is AC power or the always-on host in ops/. macOS-only,
+        throttled, best-effort; never raises."""
+        if sys.platform != "darwin":
+            return
+        now = time.time()
+        if now - self._last_battery_warn < self.BATTERY_WARN_COOLDOWN_S:
+            return
+        if not self._overlaps_paging_hours(now, now):
+            return  # off-hours: sleeping on battery is fine, don't cry wolf
+        if self._on_battery() is not True:
+            return
+        self._last_battery_warn = now
+        log.critical(
+            "On BATTERY during market hours — clamshell/battery sleep will blind "
+            "the bot (caffeinate cannot prevent it). Plug in AC or move to the "
+            "always-on host (ops/)."
+        )
+        self.alerter.critical(
+            "on_battery",
+            "Bot on battery during market hours",
+            "The host is running on battery while the market is open. macOS will "
+            "sleep on lid-close/idle even with caffeinate held, and the bot goes "
+            "dark with positions unwatched between watchdog ticks. Plug in AC "
+            "power, or move to the always-on host (ops/Dockerfile).",
+        )
+
+    @staticmethod
+    def _on_battery() -> bool | None:
+        """True on battery, False on AC, None if undetermined (pmset missing /
+        parse fail). macOS `pmset -g batt` prints 'Now drawing from Battery
+        Power' or 'AC Power'."""
+        try:
+            out = subprocess.run(
+                ["pmset", "-g", "batt"], capture_output=True, text=True, timeout=3,
+            ).stdout
+        except Exception:  # noqa: BLE001 — advisory probe, never raises
+            return None
+        if "AC Power" in out:
+            return False
+        if "Battery Power" in out:
+            return True
+        return None
 
     def _note_loop_tick(self) -> None:
         """Detect dark gaps. A wall-clock jump much larger than the tick interval
@@ -279,6 +410,7 @@ class Orchestrator:
                     "The process missed loop ticks (host slept, was suspended, or the "
                     "clock jumped). Position monitoring resumed; the next decision "
                     "cycle reconciles pending orders first. Check the host.",
+                    severity=gap / 60.0,   # minutes — a bigger gap out-pages a smaller
                 )
             else:
                 log.warning(
@@ -343,6 +475,25 @@ class Orchestrator:
         the watchdog thread and never from an except path, so a wedged network
         read stops the stamps and the external monitor still pages."""
         self._last_main_tick = time.monotonic()
+        self._write_tick_stamp()
+
+    def _write_tick_stamp(self) -> None:
+        """Write a wall-clock freshness stamp for the LOCAL deadman (state/
+        last_tick.stamp). The deadman used to key only on logs/bot.log mtime,
+        which the 24/7 watchdog keeps warm even when the MAIN loop is wedged —
+        so a stuck decision thread stayed invisible below the ~75-min log-stale
+        threshold. This stamp moves only from main-thread forward progress, so a
+        wedge goes stale in minutes. Throttled + best-effort."""
+        now = time.monotonic()
+        if now - getattr(self, "_last_stamp_write", 0.0) < 10.0:
+            return
+        self._last_stamp_write = now
+        try:
+            from pathlib import Path
+            stamp = Path(self.cfg.state_file).parent / "last_tick.stamp"
+            stamp.write_text(f"{time.time():.0f}\n", encoding="utf-8")
+        except Exception as e:  # noqa: BLE001 — liveness stamp must never raise
+            log.debug("tick-stamp write failed: %s", e)
 
     def _tick(self) -> None:
         """One monitor-cadence pass of the decision-loop body (extracted from
@@ -352,12 +503,28 @@ class Orchestrator:
         # minutes inside a decision cycle (LLM + signal fetches), and busy is
         # not dark — the watchdog keeps watching positions the whole time.
         self._last_main_tick = time.monotonic()
+        self._write_tick_stamp()   # local deadman freshness (idle ticks too)
+        now_wall = time.time()
+        wake_gap = now_wall - self._last_main_wall
+        self._last_main_wall = now_wall
         self._refresh_runtime_controls()
         if not self._decision_due():
             return
-        cycle_start = time.monotonic()
+        # Post-wake settle: a wall-clock jump far larger than the tick interval
+        # means the host just resumed from sleep. Give the network a moment to
+        # reconnect before the cycle's reconcile/reads, so their retry budget
+        # isn't burnt while Wi-Fi is still coming up (Jul 18: 18/18 post-wake
+        # tick failures in ~1.5s).
+        if wake_gap > self.cfg.monitor_interval_s * 3 + 60:
+            self._await_network_settle(wake_gap)
+        cycle_start = time.time()   # WALL clock — the cadence must survive sleep
         self.run_decision_cycle()
-        self._refresh_dashboard()
+        # Refresh the dashboard while the market is open, plus exactly once on
+        # the open->closed transition (the settled end-of-day snapshot). Skip
+        # the hourly overnight rebuilds — they repaint byte-identical HTML.
+        if self._cycle_market_open or self._dashboard_open_last:
+            self._refresh_dashboard()
+        self._dashboard_open_last = self._cycle_market_open
         # Stamp the cycle START, not the end: an end stamp adds each cycle's
         # own runtime (~3-4 min of signal fetches + LLM) to the cadence, so
         # ticks drifted later every hour (Jul 13: 10:30 -> 11:34 -> ... ->
@@ -372,8 +539,63 @@ class Orchestrator:
                 and datetime.now(timezone.utc) >= self._next_open_utc):
             self._next_open_utc = None
 
+    def _await_network_settle(self, gap_s: float) -> None:
+        """After a resume-from-sleep, wait up to wake_settle_seconds for the
+        network to come back before the first decision cycle. Returns as soon as
+        a TCP probe succeeds (typically well under the cap). Best-effort and
+        interruptible via the stop event; never raises."""
+        secs = getattr(self.cfg, "wake_settle_seconds", 0.0)
+        if secs <= 0:
+            return
+        log.info(
+            "Resumed after a %.0f-min gap — settling the network (<= %gs) before "
+            "the first cycle.", gap_s / 60.0, secs,
+        )
+        deadline = time.monotonic() + secs
+        while time.monotonic() < deadline and not self._stop.is_set():
+            if self._network_reachable():
+                return
+            self._stop.wait(2.0)
+
+    @staticmethod
+    def _network_reachable() -> bool:
+        """A DNS-free TCP reachability probe (Cloudflare 1.1.1.1:443, then
+        Google DNS 8.8.8.8:53). True if either connects — 'the internet is
+        back', without depending on the broker host resolving yet."""
+        import socket
+        for host, port in (("1.1.1.1", 443), ("8.8.8.8", 53)):
+            try:
+                socket.create_connection((host, port), timeout=3).close()
+                return True
+            except OSError:
+                continue
+        return False
+
+    def _within_close_fence(self) -> bool:
+        """True when we're inside close_fence_minutes of the session close, so a
+        fresh decision cycle should be skipped. Fail OPEN (return False) on a
+        missing/failed close-time read — an unknown close must not silently
+        freeze trading. Best-effort; never raises."""
+        fence = getattr(self.cfg, "close_fence_minutes", 0.0)
+        if fence <= 0:
+            return False
+        try:
+            close_at = self.broker.next_market_close()
+            if close_at is None:
+                return False
+            mins = (close_at - datetime.now(timezone.utc)).total_seconds() / 60.0
+            if 0.0 <= mins <= fence:
+                log.info(
+                    "Within %.1f min of the close (<= %g-min fence) — skipping new "
+                    "decisions; positions stay watchdog-protected.", mins, fence,
+                )
+                return True
+        except Exception as e:  # noqa: BLE001 — fence is best-effort
+            log.warning("close-fence check failed (%s); proceeding.", e)
+        return False
+
     def _decision_due(self) -> bool:
-        if (time.monotonic() - self._last_decision_at) >= self.cfg.decision_interval_s:
+        if (time.time() - self._last_decision_at) >= self.cfg.decision_interval_s:
             return True
         # The hourly grid rarely lands on the bell: when the last closed-market
         # tick stashed the next session open, fire at that moment too instead
@@ -473,7 +695,8 @@ class Orchestrator:
             log.warning("Nightly post-mortem failed: %s", e)
 
     def run_decision_cycle(self) -> None:
-        if not self.broker.is_market_open():
+        self._cycle_market_open = self.broker.is_market_open()
+        if not self._cycle_market_open:
             log.info("Market closed; skipping decision cycle.")
             self._maybe_run_postmortem()
             self._stamp_liveness()  # the postmortem's LLM call can run ~2 min
@@ -483,8 +706,16 @@ class Orchestrator:
             return
 
         self._reconcile_fills()
-        self._backfill_exchange_exits()
+        self._backfill_exchange_exits_locked()
         self._stamp_liveness()
+        # Close fence (CRITICAL-1): reconcile/backfill above still run near the
+        # bell, but don't START a fresh decision inside the final N minutes — a
+        # buy placed this late can't complete before close, and the model
+        # churning right before the bell is low-value. Positions stay
+        # watchdog-protected; the post-LLM re-check below catches a close that
+        # lands mid-cycle.
+        if self._within_close_fence():
+            return
         # Fresh Quiver data this cycle, but pulled once and shared by the signal
         # and screener layers (both read the same cached live feeds).
         self.quiver.new_cycle()
@@ -579,6 +810,15 @@ class Orchestrator:
                     b.symbol: b.composite_score
                     for b in bundles if b.composite_score is not None
                 }
+                if composites:
+                    top = sorted(
+                        composites.items(), key=lambda kv: kv[1], reverse=True
+                    )[:8]
+                    log.info(
+                        "Composite index (%d scored, top: %s).",
+                        len(composites),
+                        ", ".join(f"{s} {v:+.2f}" for s, v in top),
+                    )
             except Exception as e:
                 log.warning("Composite index unavailable this cycle: %s", e)
 
@@ -646,6 +886,29 @@ class Orchestrator:
                     0.0, buy_excluded.get(prop.symbol, "excluded from slate"),
                     prop.rationale[:120] if prop.rationale else "",
                 )
+        # Post-LLM close fence: signal gathering + the LLM span minutes, so the
+        # bell can ring mid-cycle. Executing proposals after the close places
+        # after-hours orders (Jul 20: 5 proposals returned 41 min past close).
+        # Discard and journal them; positions stay watchdog-protected. Sells are
+        # kept — reducing risk is always allowed, even after hours.
+        if self.cfg.close_fence_minutes > 0 and not self.broker.is_market_open():
+            kept_sells = [p for p in proposals if p.action.value == "sell"]
+            for p in proposals:
+                if p.action.value != "sell":
+                    self._journal_decision(
+                        p.symbol, p.action.value,
+                        p.instrument.value if hasattr(p.instrument, "value") else str(p.instrument),
+                        p.conviction, p.target_weight_pct, "rejected", 0.0,
+                        "Market closed mid-cycle — proposal discarded (close fence).",
+                        p.rationale[:120] if p.rationale else "",
+                    )
+            if len(kept_sells) != len(proposals):
+                log.warning(
+                    "Market closed during the cycle — discarded %d non-sell "
+                    "proposal(s) past the bell; keeping %d risk-reducing sell(s).",
+                    len(proposals) - len(kept_sells), len(kept_sells),
+                )
+            proposals = kept_sells
         undeployed = self._execute_proposals(
             proposals, account, signal_kinds, tech_ctx=tech_ctx,
             composites=composites,
@@ -812,6 +1075,34 @@ class Orchestrator:
             bundle.signals.insert(0, cand.to_signal())
 
     # -- fill reconciliation ------------------------------------------------ #
+    #: how many reconcile passes an oid may stay unresolved before we stop
+    #: re-queuing it and escalate (halt + page) — a mandatory retry bound so a
+    #: permanently unreadable/stuck order neither loops forever nor drops silently.
+    MAX_UNRESOLVED_RETRIES = 5
+
+    def _requeue_unresolved(self, oid: str, symbol: str, why: str) -> bool:
+        """Re-queue an oid whose fate we couldn't confirm this pass (broker read
+        failed, or still non-terminal). Returns True when the retry bound is
+        EXHAUSTED — the caller then treats it as a confirmed mismatch (halt +
+        page) so a human reconciles it against the broker. Never drops it
+        silently (the SPCX/LPLA phantom-row class)."""
+        n = self._oid_retries.get(oid, 0) + 1
+        if n <= self.MAX_UNRESOLVED_RETRIES:
+            self._oid_retries[oid] = n
+            self._pending_oids.append((oid, symbol))
+            log.warning(
+                "Order %s (%s) %s — unresolved, re-queued (%d/%d).",
+                oid, symbol, why, n, self.MAX_UNRESOLVED_RETRIES,
+            )
+            return False
+        self._oid_retries.pop(oid, None)
+        log.error(
+            "Order %s (%s) %s after %d reconcile passes — giving up and flagging "
+            "a divergence; verify it against the broker.",
+            oid, symbol, why, self.MAX_UNRESOLVED_RETRIES,
+        )
+        return True
+
     def _reconcile_fills(self) -> None:
         """Confirm last cycle's orders actually filled. A recorded order id is only
         an intent — rejects and partial fills mean the ledger and our risk picture
@@ -837,12 +1128,15 @@ class Orchestrator:
         mismatches: list[str] = []
         for oid, symbol in pending:
             status, filled, qty = self.broker.order_fill(oid)
-            if status in ("filled", "unknown"):
+            if status == "filled":
+                log.info("Order %s (%s) FILLED (%g/%g).", oid, symbol, filled, qty)
+                self._oid_retries.pop(oid, None)
                 continue
             if status == "replaced":
                 # A watchdog exit superseded by a later re-replace: its ledger
                 # record was already corrected at replace time (the replacement
                 # order carries the exit, and is itself in this list).
+                self._oid_retries.pop(oid, None)
                 continue
             if status in ("rejected", "canceled", "expired"):
                 log.error(
@@ -854,6 +1148,7 @@ class Orchestrator:
                 # resizes a partial — no more phantom BUY rows.
                 self.ledger.record(TradeRecord.correction(oid, symbol, status, filled, qty))
                 mismatches.append(f"{symbol} {status} ({filled:g}/{qty:g} filled)")
+                self._oid_retries.pop(oid, None)
             elif qty and 0 < filled < qty:
                 log.warning(
                     "Order %s (%s) PARTIAL: %g/%g filled (status=%s).",
@@ -863,9 +1158,20 @@ class Orchestrator:
                 # re-queue it and let a later reconcile write the final number.
                 self._pending_oids.append((oid, symbol))
                 mismatches.append(f"{symbol} partial {filled:g}/{qty:g}")
+                self._oid_retries.pop(oid, None)   # partial is progress, not a stall
+            elif status == "unknown":
+                # The broker fetch FAILED (blip/transient) — NOT a confirmation.
+                # drain_pending_orders already cleared the persisted copy, so
+                # dropping here (the old behavior) left a rejected order caught by
+                # a blip with its phantom ledger intent uncorrected forever. Fail
+                # CLOSED: re-queue and re-check next cycle, bounded.
+                if self._requeue_unresolved(oid, symbol, "unreadable"):
+                    mismatches.append(f"{symbol} unresolved (broker read failed)")
             else:  # still new/accepted/pending_new long after submission — may yet
-                # fill; not a confirmed divergence, so warn without halting.
-                log.warning("Order %s (%s) still %s a full cycle later.", oid, symbol, status)
+                # fill; re-queue (bounded) instead of DROPPING (the exact path an
+                # oid was lost through), and true it up on a later reconcile.
+                if self._requeue_unresolved(oid, symbol, f"still {status}"):
+                    mismatches.append(f"{symbol} stuck ({status})")
         if self._pending_oids:
             # Re-queued live partials must survive a crash before the cycle's
             # end-of-run persist, or their final fill never gets corrected.
@@ -902,6 +1208,15 @@ class Orchestrator:
         self.alerter.critical("reconcile_halt", subject, body)
 
     # -- exchange-exit backfill (F.1) ---------------------------------------- #
+    def _backfill_exchange_exits_locked(self) -> None:
+        """Serialized entry point for the backfill — used by both the decision
+        cycle and the watchdog's vanished-position callback. The lock guards the
+        ledger read-modify-append against a concurrent double-record; the body
+        is already idempotent (order-id keyed), so the lock only prevents a
+        rare same-instant duplicate."""
+        with self._backfill_lock:
+            self._backfill_exchange_exits()
+
     def _backfill_exchange_exits(self) -> None:
         """Record exits that happened with NO code running: a resting bracket's
         stop or take-profit leg filling at the exchange, or a manual sell in the
@@ -972,8 +1287,10 @@ class Orchestrator:
                     f", {pl_pct:+.1f}%" if pl_pct is not None else "",
                 )
                 # An exchange-side exit also starts the re-entry cooldown —
-                # stamped at the FILL time when known (falls back to now).
-                self.state.register_exit(o["symbol"], when=ts)
+                # stamped at the FILL time and price when known (price feeds the
+                # price-aware re-entry guard).
+                self.state.register_exit(
+                    o["symbol"], when=ts, price=o["price"] or None)
         except Exception as e:  # bookkeeping must never break a decision cycle
             log.warning("Exchange-exit backfill failed: %s", e)
 
@@ -1084,30 +1401,32 @@ class Orchestrator:
         return None
 
     def _apply_rotation_guard(self, proposals, account, composites):
-        """Enforce the rotation edge the prompt only ASKS for: on a full book,
-        a SELL that locks in a real loss to free a slot must be displaced by a
+        """Enforce the rotation edge the prompt only ASKS for: a SELL that locks
+        in a real loss to free capital for a new name must be displaced by a
         clearly stronger incoming name. Detection is deterministic (never the
-        LLM's rationale text): the equity book is at the slot cap AND the same
-        response BUYs a not-held equity name — the buy that would consume the
-        freed slot. Watchdog stops/trails/flattens never pass through decision
-        proposals, and a standalone risk-off sell has no paired new-name buy,
-        so neither can be blocked here. Two further escape hatches keep this
-        from ever pinning a position the model urgently wants out of: a SELL
-        whose OWN conviction is at/above rotation_guard_exempt_sell_conviction
-        is treated as a risk-off exit (never vetoed — 'never block a
-        legitimate exit' outranks anti-churn), and a missing entry-conviction
-        baseline fails open. Vetoed positions still keep their exchange
-        bracket + watchdog stops — the veto holds, it never strands. Returns
-        the (possibly filtered) list; vetoed sells are journaled so 'Today so
-        far' and the postmortem see them."""
+        LLM's rationale text): the same response BUYs a not-held equity name (the
+        buy the freed capital would fund) AND sells a held loser. This fires
+        whenever that PAIR appears — NOT only at the slot cap: the original
+        `positions < MAX_OPEN` bypass meant the guard never once ran (Jul 17: 13
+        of 15 slots, so the SPCX -9.9% / MU -9.7% loss-rotations it was built to
+        veto sailed straight through). A loss-locking sell frees CAPITAL for the
+        rotation buy regardless of how many slots are open. Watchdog
+        stops/trails/flattens never pass through decision proposals, and a
+        standalone risk-off sell has no paired new-name buy, so neither can be
+        blocked here. Escape hatches keep this from ever pinning a position the
+        model urgently wants out of: buys are halted (kill switch) => nothing to
+        fund, so pass everything; a SELL whose OWN conviction is at/above
+        rotation_guard_exempt_sell_conviction is a risk-off exit (never vetoed —
+        'never block a legitimate exit' outranks anti-churn); and a missing
+        entry-conviction baseline fails open. Vetoed positions still keep their
+        exchange bracket + watchdog stops — the veto holds, it never strands.
+        Every guarded loss-sell leaves an auditable ruling (log + journal),
+        pass or veto."""
         r = self.cfg.risk
         if not r.rotation_loss_guard_enabled or not proposals:
             return proposals
-        equity_rows = sum(
-            1 for p in account.positions if not getattr(p, "is_option", False)
-        )
-        if equity_rows < r.max_open_positions:
-            return proposals  # slots free — sells aren't cap-forced
+        if self.risk.kill_switch:
+            return proposals  # buys are halted — a paired sell funds no rotation
         held_syms = {
             p.symbol for p in account.positions
             if not getattr(p, "is_option", False)
@@ -1118,7 +1437,7 @@ class Orchestrator:
             and p.symbol not in held_syms
         ]
         if not incoming:
-            return proposals  # no new name wants the slot — not a rotation
+            return proposals  # no new name to fund — not a rotation
         best_in_conv = max(p.conviction for p in incoming)
         best_in_comp = max(
             (composites.get(p.symbol) for p in incoming
@@ -1141,11 +1460,20 @@ class Orchestrator:
             if exempt > 0 and p.conviction >= exempt:
                 # The model strongly wants OUT (thesis broken / risk-off) — a
                 # co-occurring unrelated buy must not reclassify this exit as
-                # a lukewarm slot-freeing rotation.
+                # a lukewarm capital-freeing rotation.
+                log.info(
+                    "Rotation guard: PASS %s at %+.1f%% — own sell conviction "
+                    "%.2f >= exempt %.2f (risk-off exit, not vetoed).",
+                    p.symbol, pos.unrealized_pl_pct, p.conviction, exempt,
+                )
                 kept.append(p)
                 continue
             entry_conv = self._entry_conviction(p.symbol)
             if entry_conv is None:
+                log.info(
+                    "Rotation guard: PASS %s at %+.1f%% — no entry-conviction "
+                    "baseline; failing open.", p.symbol, pos.unrealized_pl_pct,
+                )
                 kept.append(p)  # no baseline anywhere — fail open
                 continue
             conv_ok = best_in_conv >= entry_conv + r.rotation_min_conviction_edge
@@ -1155,6 +1483,13 @@ class Orchestrator:
                 if best_in_comp is not None and inc_comp is not None:
                     comp_ok = best_in_comp > inc_comp
             if conv_ok and comp_ok:
+                log.info(
+                    "Rotation guard: PASS %s at %+.1f%% — incoming conviction "
+                    "%.2f clears entry %.2f by +%g%s; rotation allowed.",
+                    p.symbol, pos.unrealized_pl_pct, best_in_conv, entry_conv,
+                    r.rotation_min_conviction_edge,
+                    "" if comp_ok else " (composite edge waived)",
+                )
                 kept.append(p)
                 continue
             reason = (
@@ -1209,6 +1544,7 @@ class Orchestrator:
             self._stamp_liveness()  # order placement progresses per name
             self._handle_equity(
                 proposal, account, signal_kinds.get(proposal.symbol, []),
+                composite=composites.get(proposal.symbol),
             )
         budget_caps = self._cycle_budget_caps(rest, account, composites)
         undeployed = 0.0
@@ -1607,7 +1943,25 @@ class Orchestrator:
         # Respect the cash buffer: keep min_cash_buffer_pct of equity uninvested.
         min_cash = equity * (r.min_cash_buffer_pct / 100.0)
         spendable = max(0.0, account.cash - min_cash)
-        notional = round(min(gap, spendable), 2)
+        # Core position ceiling (CORE_MAX_PCT): the core is exempt from the
+        # single-name cap, so idle cash otherwise sweeps it unbounded (~47% of
+        # equity, 2026-07 audit). Cap the buy so the core never exceeds the
+        # ceiling — this stops further accumulation but does not trim an existing
+        # overweight (that stays a decision/manual action; trimming a resting GTC
+        # stop risks the pending-cancel wedge).
+        core_max_pct = getattr(self.cfg, "core_max_pct", 0.0)
+        core_room = float("inf")
+        if core_max_pct > 0:
+            core_pos = account.position_for(etf)
+            core_val = max(0.0, core_pos.market_value) if core_pos else 0.0
+            core_room = max(0.0, equity * (core_max_pct / 100.0) - core_val)
+            if core_room <= 0:
+                log.info(
+                    "Core fill skipped: %s already at/above the %.0f%% ceiling.",
+                    etf, core_max_pct,
+                )
+                return
+        notional = round(min(gap, spendable, core_room), 2)
         # Same dust guard as satellite buys: a $98k book topping the core up by
         # $5 every cycle pays spread for nothing (min order scales with equity).
         min_fill = max(r.min_order_usd, equity * (r.min_order_pct / 100.0), 1.0)
@@ -1813,10 +2167,14 @@ class Orchestrator:
                             realized_pl=held.unrealized_pl,
                             exit_reason="decision",
                             exit_price=held.current_price or None,
+                            composite_score=composite,
                         ))
                         self._pending_oids.append((oid, proposal.symbol))
-                        # Start the re-entry cooldown clock (churn guard).
-                        self.state.register_exit(proposal.symbol)
+                        # Start the re-entry cooldown clock (churn guard) — with
+                        # the exit price so the price-aware re-entry guard can
+                        # block a re-buy above where we just sold.
+                        self.state.register_exit(
+                            proposal.symbol, price=held.current_price or None)
                         # Reflect the close in this cycle's snapshot so later
                         # proposals see the freed capital / slot.
                         self._apply_pending_close(account, proposal.symbol)
@@ -1827,7 +2185,8 @@ class Orchestrator:
                         # Keep watchdog tracking until the fills land; free
                         # the capital in this cycle's snapshot — marketable
                         # exits fill within ticks.
-                        self.state.register_exit(proposal.symbol)
+                        self.state.register_exit(
+                            proposal.symbol, price=held.current_price or None)
                         self._apply_pending_close(account, proposal.symbol)
                     else:
                         # Nothing was ledgered and nothing must be: a phantom

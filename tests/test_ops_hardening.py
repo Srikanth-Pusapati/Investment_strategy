@@ -17,7 +17,7 @@ class _RecordingAlerter:
     def __init__(self):
         self.calls = []
 
-    def critical(self, key, subject, body):
+    def critical(self, key, subject, body, severity=None):
         self.calls.append((key, subject, body))
 
 
@@ -80,6 +80,7 @@ def _orch(fills=None, *, halt_enabled=True, kill_file=None, heartbeat_url=""):
     o.alerter = _RecordingAlerter()
     o._trade_lock = threading.Lock()
     o._pending_oids = [(oid, f"SYM{i}") for i, oid in enumerate(fills or {})]
+    o._oid_retries = {}
     o._forced_halt = False
     o._last_main_tick = time.monotonic()
     o._last_wall_tick = time.time()
@@ -137,13 +138,39 @@ def test_live_partial_writes_no_correction_yet_and_requeues():
     os.remove(o.cfg.kill_switch_file)
 
 
-def test_clean_fills_do_not_halt():
-    o = _orch({"o1": ("filled", 5.0, 5.0), "o2": ("unknown", 0.0, 0.0)})
+def test_clean_fill_does_not_halt_and_clears():
+    o = _orch({"o1": ("filled", 5.0, 5.0)})
     o._reconcile_fills()
     assert o.risk.kill_switch is False
     assert not os.path.exists(o.cfg.kill_switch_file)
     assert o.alerter.calls == []
-    assert o.state.pending == []  # cleared list persisted before checking
+    assert o.state.pending == []  # a filled order is resolved and dropped
+
+
+def test_unknown_read_requeues_instead_of_dropping():
+    # A failed broker read ("unknown") is NOT a confirmation — the old code
+    # lumped it with "filled" and dropped the oid, so a rejected order caught by
+    # a network blip left its phantom ledger intent uncorrected forever. It must
+    # re-queue (bounded) and not halt on the first blip.
+    o = _orch({"o2": ("unknown", 0.0, 0.0)})
+    o._reconcile_fills()
+    assert o.risk.kill_switch is False                 # one blip doesn't halt
+    assert ("o2", "SYM0") in o.state.pending           # re-queued for next pass
+    assert o._oid_retries.get("o2") == 1
+
+
+def test_unresolved_oid_escalates_after_retry_bound():
+    # After MAX_UNRESOLVED_RETRIES unreadable passes, give up: halt + flag so a
+    # human reconciles it, rather than looping forever.
+    o = _orch({"o2": ("unknown", 0.0, 0.0)})
+    for _ in range(o.MAX_UNRESOLVED_RETRIES):
+        o._pending_oids = [("o2", "SYM0")]             # re-present it each pass
+        o._reconcile_fills()
+    assert o.risk.kill_switch is False                 # not yet — exactly at bound
+    o._pending_oids = [("o2", "SYM0")]
+    o._reconcile_fills()                               # one past the bound
+    assert o.risk.kill_switch is True
+    os.remove(o.cfg.kill_switch_file)
 
 
 def test_reconcile_checks_watchdog_queued_exits():
@@ -358,15 +385,22 @@ def test_gather_reports_progress_per_provider():
 # -- first decision tick after a machine reboot --------------------------------- #
 
 def test_first_decision_due_even_on_fresh_boot(monkeypatch):
-    # time.monotonic() counts from MACHINE boot. With _last_decision_at = 0.0
-    # a bot started minutes after a reboot wasn't "due" until machine uptime
-    # exceeded the whole decision interval (2026-07-14: a silent first hour).
-    # The -inf sentinel makes the first tick unconditionally due.
+    # The cadence now runs on WALL clock (time.time), which survives host sleep;
+    # the old monotonic clock froze during suspend and stalled the schedule. The
+    # -inf sentinel keeps the first tick unconditionally due, and wall-clock is
+    # immune to the old monotonic-boot bug entirely (epoch 0 is far in the past).
     o = Orchestrator.__new__(Orchestrator)
     o.cfg = SimpleNamespace(decision_interval_s=3600)
     o._next_open_utc = None
-    monkeypatch.setattr(orch_mod.time, "monotonic", lambda: 300.0)  # 5 min up
-    o._last_decision_at = 0.0                 # the old init value: NOT due
-    assert o._decision_due() is False         # documents the reboot bug
-    o._last_decision_at = float("-inf")       # the fixed init value: due
+    monkeypatch.setattr(orch_mod.time, "time", lambda: 1_000_000.0)
+    o._last_decision_at = float("-inf")           # init sentinel: due
+    assert o._decision_due() is True
+    o._last_decision_at = 1_000_000.0 - 100.0     # 100s ago, under the interval
+    assert o._decision_due() is False
+    o._last_decision_at = 1_000_000.0 - 4000.0    # a full interval+ ago: due
+    assert o._decision_due() is True
+    # A wall-clock jump forward (host resumed from a long sleep) makes it due —
+    # the whole point of moving off monotonic.
+    o._last_decision_at = 1_000_000.0 - 100.0
+    monkeypatch.setattr(orch_mod.time, "time", lambda: 1_000_000.0 + 7200.0)
     assert o._decision_due() is True

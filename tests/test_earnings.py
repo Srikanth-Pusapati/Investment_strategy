@@ -199,3 +199,32 @@ def test_rh_calendar_nested_payload_tolerated():
     ]})
     cal = EarningsCalendar(reader=reader)
     assert cal.days_until_earnings("NVDA", today=_TODAY) == 3
+
+
+def test_rh_calendar_nested_report_date():
+    # The LIVE payload nests the date: {"symbol": "T", "report": {"date": ...}}.
+    # The flat-key-only parser shipped blind — every row failed to parse and the
+    # empty result suppressed the yfinance fallback (the Jul-20 T buy 2 days
+    # before its report). Both halves are pinned here.
+    reader = _FakeRHReader({"results": [
+        {"symbol": "T", "eps": {"estimate": "0.59", "actual": None},
+         "report": {"date": "2026-06-30", "timing": "am", "verified": True}},
+        {"symbol": "WFRD", "report": {"date": None}},   # date-less row -> dropped
+    ]})
+    cal = EarningsCalendar(reader=reader)
+    cal._yf_lookup = lambda *_: (_ for _ in ()).throw(AssertionError("yf called"))
+    assert cal.days_until_earnings("T", today=_TODAY) == 2
+    assert cal.days_until_earnings("WFRD", today=_TODAY) is None
+
+
+def test_rh_calendar_empty_parse_falls_back_to_yfinance():
+    # Rows that all fail to parse must read as a FAILED calendar, not as
+    # "no reports market-wide in 31d" — otherwise the guard goes blind.
+    reader = _FakeRHReader([{"symbol": "T", "when": "2026-06-30"}])
+    cal = EarningsCalendar(reader=reader)
+    cal._yf_lookup = lambda sym, today: 4
+    assert cal.days_until_earnings("T", today=_TODAY) == 4
+    # Still only one market-wide fetch for the cycle despite the fallback.
+    cal._yf_lookup = lambda sym, today: 9
+    assert cal.days_until_earnings("F", today=_TODAY) == 9
+    assert len(reader.calls) == 1

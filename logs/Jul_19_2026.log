@@ -1,0 +1,134 @@
+2026-07-19 00:01:05,191 WARNING orchestrator | DARK GAP (market closed): no loop tick for 12 min (sleep/suspend?) — positions could not move; not paging.
+2026-07-19 00:01:05,250 WARNING alpaca | get_account: transient network error (ConnectionError); retry 1/2.
+2026-07-19 00:01:05,908 WARNING alpaca | get_account: transient network error (ConnectionError); retry 2/2.
+2026-07-19 00:01:07,065 WARNING orchestrator | Watchdog tick skipped on a transient network error (ConnectionError); retrying next tick.
+2026-07-19 00:52:44,813 WARNING orchestrator | DARK GAP (market closed): no loop tick for 52 min (sleep/suspend?) — positions could not move; not paging.
+2026-07-19 00:52:44,844 WARNING alpaca | get_account: transient network error (ConnectionError); retry 1/2.
+2026-07-19 01:01:35,913 WARNING alpaca | get_account: transient network error (ConnectionError); retry 2/2.
+2026-07-19 01:01:37,105 WARNING orchestrator | Watchdog tick skipped on a transient network error (ConnectionError); retrying next tick.
+2026-07-19 01:02:07,255 WARNING orchestrator | DARK GAP (market closed): no loop tick for 9 min (sleep/suspend?) — positions could not move; not paging.
+2026-07-19 01:02:07,292 WARNING alpaca | get_account: transient network error (ConnectionError); retry 1/2.
+2026-07-19 01:02:07,942 WARNING alpaca | get_account: transient network error (ConnectionError); retry 2/2.
+2026-07-19 01:02:09,063 WARNING orchestrator | Watchdog tick skipped on a transient network error (ConnectionError); retrying next tick.
+2026-07-19 01:07:51,245 WARNING orchestrator | DARK GAP (market closed): no loop tick for 6 min (sleep/suspend?) — positions could not move; not paging.
+2026-07-19 01:07:51,268 WARNING alpaca | get_account: transient network error (ConnectionError); retry 1/2.
+2026-07-19 01:07:51,919 WARNING alpaca | get_account: transient network error (ConnectionError); retry 2/2.
+2026-07-19 01:07:52,999 WARNING orchestrator | Watchdog tick skipped on a transient network error (ConnectionError); retrying next tick.
+2026-07-19 01:17:54,653 WARNING orchestrator | DARK GAP (market closed): no loop tick for 10 min (sleep/suspend?) — positions could not move; not paging.
+2026-07-19 01:17:54,670 WARNING alpaca | get_account: transient network error (ConnectionError); retry 1/2.
+2026-07-19 01:17:55,330 WARNING alpaca | get_account: transient network error (ConnectionError); retry 2/2.
+2026-07-19 01:17:56,489 WARNING orchestrator | Watchdog tick skipped on a transient network error (ConnectionError); retrying next tick.
+2026-07-19 01:20:39,405 WARNING alpaca | get_account: transient network error (ConnectionError); retry 1/2.
+2026-07-19 01:41:38,037 INFO orchestrator | Market closed; skipping decision cycle.
+2026-07-19 01:41:38,292 INFO alpaca | Alpaca client ready (mode=paper).
+2026-07-19 01:41:40,539 INFO dashboard | Wrote dashboard with 58 trades -> dashboard.html
+2026-07-19 02:41:59,356 INFO orchestrator | Market closed; skipping decision cycle.
+2026-07-19 02:41:59,533 INFO alpaca | Alpaca client ready (mode=paper).
+2026-07-19 02:42:01,700 INFO dashboard | Wrote dashboard with 58 trades -> dashboard.html
+2026-07-19 02:49:46,369 WARNING alpaca | get_account: transient network error (ReadTimeout); retry 1/2.
+2026-07-19 02:50:17,059 WARNING alpaca | get_account: transient network error (ConnectionError); retry 2/2.
+2026-07-19 02:50:48,359 WARNING orchestrator | Watchdog tick skipped on a transient network error (ConnectionError); retrying next tick.
+2026-07-19 02:51:48,569 WARNING alpaca | get_account: transient network error (ConnectionError); retry 1/2.
+2026-07-19 02:52:19,250 WARNING alpaca | get_account: transient network error (ConnectionError); retry 2/2.
+2026-07-19 02:52:50,614 WARNING orchestrator | Watchdog tick skipped on a transient network error (ConnectionError); retrying next tick.
+2026-07-19 03:42:18,606 INFO orchestrator | Market closed; skipping decision cycle.
+2026-07-19 03:42:18,794 INFO alpaca | Alpaca client ready (mode=paper).
+2026-07-19 03:42:21,850 INFO dashboard | Wrote dashboard with 58 trades -> dashboard.html
+2026-07-19 04:42:37,938 INFO orchestrator | Market closed; skipping decision cycle.
+2026-07-19 04:42:38,013 INFO alpaca | Alpaca client ready (mode=paper).
+2026-07-19 04:42:39,881 INFO dashboard | Wrote dashboard with 58 trades -> dashboard.html
+2026-07-19 05:42:55,875 INFO orchestrator | Market closed; skipping decision cycle.
+2026-07-19 05:42:55,933 INFO alpaca | Alpaca client ready (mode=paper).
+2026-07-19 05:42:58,112 INFO dashboard | Wrote dashboard with 58 trades -> dashboard.html
+2026-07-19 06:43:13,705 INFO orchestrator | Market closed; skipping decision cycle.
+2026-07-19 06:43:13,773 INFO alpaca | Alpaca client ready (mode=paper).
+2026-07-19 06:43:15,721 INFO dashboard | Wrote dashboard with 58 trades -> dashboard.html
+2026-07-19 07:40:46,285 WARNING alpaca | get_account: transient network error (ReadTimeout); retry 1/2.
+2026-07-19 07:43:31,279 INFO orchestrator | Market closed; skipping decision cycle.
+2026-07-19 07:43:31,372 INFO alpaca | Alpaca client ready (mode=paper).
+2026-07-19 07:43:35,593 INFO dashboard | Wrote dashboard with 58 trades -> dashboard.html
+2026-07-19 08:43:51,583 INFO orchestrator | Market closed; skipping decision cycle.
+2026-07-19 08:43:51,650 INFO alpaca | Alpaca client ready (mode=paper).
+2026-07-19 08:43:53,983 INFO dashboard | Wrote dashboard with 58 trades -> dashboard.html
+2026-07-19 09:44:09,989 INFO orchestrator | Market closed; skipping decision cycle.
+2026-07-19 09:44:10,180 INFO alpaca | Alpaca client ready (mode=paper).
+2026-07-19 09:44:15,824 INFO dashboard | Wrote dashboard with 58 trades -> dashboard.html
+2026-07-19 10:28:25,320 WARNING orchestrator | DARK GAP (market closed): no loop tick for 3 min (sleep/suspend?) — positions could not move; not paging.
+2026-07-19 10:28:25,395 WARNING alpaca | get_account: transient network error (ConnectionError); retry 1/2.
+2026-07-19 10:40:15,775 WARNING orchestrator | DARK GAP (market closed): no loop tick for 5 min (sleep/suspend?) — positions could not move; not paging.
+2026-07-19 10:40:15,857 WARNING alpaca | get_account: transient network error (ConnectionError); retry 1/2.
+2026-07-19 10:57:07,243 INFO orchestrator | Market closed; skipping decision cycle.
+2026-07-19 10:57:07,381 INFO alpaca | Alpaca client ready (mode=paper).
+2026-07-19 10:57:10,952 INFO dashboard | Wrote dashboard with 58 trades -> dashboard.html
+2026-07-19 11:57:22,001 INFO orchestrator | Market closed; skipping decision cycle.
+2026-07-19 11:57:22,098 INFO alpaca | Alpaca client ready (mode=paper).
+2026-07-19 11:57:24,422 INFO dashboard | Wrote dashboard with 58 trades -> dashboard.html
+2026-07-19 12:57:39,762 INFO orchestrator | Market closed; skipping decision cycle.
+2026-07-19 12:57:40,301 INFO alpaca | Alpaca client ready (mode=paper).
+2026-07-19 12:57:44,612 INFO dashboard | Wrote dashboard with 58 trades -> dashboard.html
+2026-07-19 13:58:00,813 INFO orchestrator | Market closed; skipping decision cycle.
+2026-07-19 13:58:00,931 INFO alpaca | Alpaca client ready (mode=paper).
+2026-07-19 13:58:03,382 INFO dashboard | Wrote dashboard with 58 trades -> dashboard.html
+2026-07-19 14:26:24,956 WARNING orchestrator | DARK GAP (market closed): no loop tick for 3 min (sleep/suspend?) — positions could not move; not paging.
+2026-07-19 14:58:22,844 INFO orchestrator | Market closed; skipping decision cycle.
+2026-07-19 14:58:23,400 INFO alpaca | Alpaca client ready (mode=paper).
+2026-07-19 14:58:25,635 INFO dashboard | Wrote dashboard with 58 trades -> dashboard.html
+2026-07-19 15:25:26,728 WARNING alpaca | get_account: transient network error (ConnectionError); retry 1/2.
+2026-07-19 15:29:24,970 WARNING orchestrator | DARK GAP (market closed): no loop tick for 3 min (sleep/suspend?) — positions could not move; not paging.
+2026-07-19 15:29:25,085 WARNING alpaca | get_account: transient network error (ConnectionError); retry 1/2.
+2026-07-19 15:33:57,872 WARNING orchestrator | DARK GAP (market closed): no loop tick for 3 min (sleep/suspend?) — positions could not move; not paging.
+2026-07-19 15:33:57,932 WARNING alpaca | get_account: transient network error (ConnectionError); retry 1/2.
+2026-07-19 15:58:47,206 WARNING alpaca | get_account: transient network error (ConnectionError); retry 1/2.
+2026-07-19 16:14:14,205 WARNING alpaca | get_account: transient network error (ConnectionError); retry 2/2.
+2026-07-19 16:17:10,470 WARNING orchestrator | Watchdog tick skipped on a transient network error (ConnectionError); retrying next tick.
+2026-07-19 16:17:41,024 WARNING orchestrator | DARK GAP (market closed): no loop tick for 36 min (sleep/suspend?) — positions could not move; not paging.
+2026-07-19 16:19:48,083 WARNING alpaca | get_account: transient network error (ConnectionError); retry 1/2.
+2026-07-19 16:42:16,197 WARNING orchestrator | DARK GAP (market closed): no loop tick for 10 min (sleep/suspend?) — positions could not move; not paging.
+2026-07-19 16:50:45,548 WARNING orchestrator | DARK GAP (market closed): no loop tick for 4 min (sleep/suspend?) — positions could not move; not paging.
+2026-07-19 16:50:45,712 WARNING alpaca | get_account: transient network error (ConnectionError); retry 1/2.
+2026-07-19 17:07:18,273 WARNING orchestrator | DARK GAP (market closed): no loop tick for 17 min (sleep/suspend?) — positions could not move; not paging.
+2026-07-19 17:07:18,378 WARNING alpaca | get_account: transient network error (ConnectionError); retry 1/2.
+2026-07-19 17:13:29,167 WARNING orchestrator | DARK GAP (market closed): no loop tick for 6 min (sleep/suspend?) — positions could not move; not paging.
+2026-07-19 17:13:29,255 WARNING alpaca | get_account: transient network error (ConnectionError); retry 1/2.
+2026-07-19 17:15:24,437 WARNING alpaca | get_account: transient network error (ConnectionError); retry 1/2.
+2026-07-19 17:22:55,500 WARNING orchestrator | DARK GAP (market closed): no loop tick for 5 min (sleep/suspend?) — positions could not move; not paging.
+2026-07-19 17:22:55,584 WARNING alpaca | get_account: transient network error (ConnectionError); retry 1/2.
+2026-07-19 17:27:08,247 WARNING alpaca | get_account: transient network error (ConnectionError); retry 1/2.
+2026-07-19 17:30:56,760 WARNING alpaca | get_account: transient network error (ConnectionError); retry 1/2.
+2026-07-19 17:45:30,626 WARNING orchestrator | DARK GAP (market closed): no loop tick for 5 min (sleep/suspend?) — positions could not move; not paging.
+2026-07-19 17:45:39,686 INFO orchestrator | Market closed; skipping decision cycle.
+2026-07-19 17:45:39,769 INFO alpaca | Alpaca client ready (mode=paper).
+2026-07-19 17:45:41,708 INFO dashboard | Wrote dashboard with 58 trades -> dashboard.html
+2026-07-19 17:57:33,366 WARNING orchestrator | DARK GAP (market closed): no loop tick for 5 min (sleep/suspend?) — positions could not move; not paging.
+2026-07-19 17:57:33,641 WARNING alpaca | get_account: transient network error (ConnectionError); retry 1/2.
+2026-07-19 18:09:24,204 WARNING orchestrator | DARK GAP (market closed): no loop tick for 8 min (sleep/suspend?) — positions could not move; not paging.
+2026-07-19 18:18:49,747 WARNING orchestrator | DARK GAP (market closed): no loop tick for 8 min (sleep/suspend?) — positions could not move; not paging.
+2026-07-19 18:18:51,823 WARNING alpaca | get_account: transient network error (ConnectionError); retry 1/2.
+2026-07-19 18:22:01,996 WARNING orchestrator | DARK GAP (market closed): no loop tick for 3 min (sleep/suspend?) — positions could not move; not paging.
+2026-07-19 18:22:02,189 WARNING alpaca | get_account: transient network error (ConnectionError); retry 1/2.
+2026-07-19 18:25:38,558 WARNING orchestrator | DARK GAP (market closed): no loop tick for 4 min (sleep/suspend?) — positions could not move; not paging.
+2026-07-19 18:25:39,234 WARNING alpaca | get_account: transient network error (ConnectionError); retry 1/2.
+2026-07-19 18:29:12,421 WARNING alpaca | get_account: transient network error (ConnectionError); retry 1/2.
+2026-07-19 18:35:03,852 WARNING orchestrator | DARK GAP (market closed): no loop tick for 5 min (sleep/suspend?) — positions could not move; not paging.
+2026-07-19 18:35:03,975 WARNING alpaca | get_account: transient network error (ConnectionError); retry 1/2.
+2026-07-19 18:47:20,203 WARNING orchestrator | DARK GAP (market closed): no loop tick for 12 min (sleep/suspend?) — positions could not move; not paging.
+2026-07-19 18:47:20,525 WARNING alpaca | get_account: transient network error (ConnectionError); retry 1/2.
+2026-07-19 18:55:13,800 WARNING orchestrator | DARK GAP (market closed): no loop tick for 3 min (sleep/suspend?) — positions could not move; not paging.
+2026-07-19 18:55:13,868 WARNING alpaca | get_account: transient network error (ConnectionError); retry 1/2.
+2026-07-19 19:01:34,392 WARNING orchestrator | DARK GAP (market closed): no loop tick for 6 min (sleep/suspend?) — positions could not move; not paging.
+2026-07-19 19:01:34,471 WARNING alpaca | get_account: transient network error (ConnectionError); retry 1/2.
+2026-07-19 19:45:55,954 INFO orchestrator | Market closed; skipping decision cycle.
+2026-07-19 19:45:56,049 INFO alpaca | Alpaca client ready (mode=paper).
+2026-07-19 19:45:58,433 INFO dashboard | Wrote dashboard with 58 trades -> dashboard.html
+2026-07-19 20:46:14,560 INFO orchestrator | Market closed; skipping decision cycle.
+2026-07-19 20:46:15,107 INFO alpaca | Alpaca client ready (mode=paper).
+2026-07-19 20:46:17,876 INFO dashboard | Wrote dashboard with 58 trades -> dashboard.html
+2026-07-19 21:46:33,808 INFO orchestrator | Market closed; skipping decision cycle.
+2026-07-19 21:46:33,990 INFO alpaca | Alpaca client ready (mode=paper).
+2026-07-19 21:46:36,398 INFO dashboard | Wrote dashboard with 58 trades -> dashboard.html
+2026-07-19 22:46:52,437 INFO orchestrator | Market closed; skipping decision cycle.
+2026-07-19 22:46:52,602 INFO alpaca | Alpaca client ready (mode=paper).
+2026-07-19 22:46:54,950 INFO dashboard | Wrote dashboard with 58 trades -> dashboard.html
+2026-07-19 23:47:10,594 INFO orchestrator | Market closed; skipping decision cycle.
+2026-07-19 23:47:10,699 INFO alpaca | Alpaca client ready (mode=paper).
+2026-07-19 23:47:13,052 INFO dashboard | Wrote dashboard with 58 trades -> dashboard.html

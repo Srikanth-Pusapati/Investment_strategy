@@ -50,6 +50,7 @@ def _orch(max_open_positions=2, guard_enabled=True, min_loss=4.0, edge=0.10,
     p = os.path.join(tempfile.gettempdir(), f"_rot_{uuid.uuid4().hex}.json")
     o.state = PortfolioState(path=p)
     o.ledger = SimpleNamespace(effective=lambda: list(ledger_records or []))
+    o.risk = SimpleNamespace(kill_switch=False)
     o.journal_records = []
     o.journal = SimpleNamespace(record=o.journal_records.append)
     return o
@@ -98,8 +99,28 @@ def test_allows_rotation_with_clear_edge():
     assert [p.symbol for p in kept] == ["LOSER", "NEW"]
 
 
-def test_inert_when_book_has_free_slots():
-    o = _orch(max_open_positions=5)
+def test_fires_regardless_of_free_slots():
+    # Inverted from the old behavior: the guard used to bail out when the book
+    # had free slots (positions < MAX_OPEN), which meant it NEVER fired — Jul 17
+    # was at 13/15 slots and the SPCX/MU loss-rotations sailed through. A
+    # loss-locking sell frees CAPITAL for the paired buy no matter how many
+    # slots are open, so the edge must be enforced here too.
+    o = _orch(max_open_positions=5)               # 3 slots free, book of 2
+    acct = _full_book_setup(o)                    # LOSER at -10%, entry conv 0.5
+    props = [_prop("LOSER", Action.SELL, 0.5), _prop("NEW", Action.BUY, 0.5)]
+    kept = o._apply_rotation_guard(props, acct, {})
+    assert [p.symbol for p in kept] == ["NEW"]    # weak buy -> loss-sell vetoed
+    # A clear edge still passes even with free slots.
+    strong = [_prop("LOSER", Action.SELL, 0.5), _prop("NEW", Action.BUY, 0.65)]
+    assert o._apply_rotation_guard(strong, acct, {}) == strong
+
+
+def test_halt_disables_guard_so_standalone_sell_is_never_pinned():
+    # Under the kill switch, buys don't execute — the paired "buy" funds no
+    # rotation, so the loss-sell must pass (never pin an exit when there's
+    # nothing to rotate INTO).
+    o = _orch()
+    o.risk.kill_switch = True
     acct = _full_book_setup(o)
     props = [_prop("LOSER", Action.SELL, 0.5), _prop("NEW", Action.BUY, 0.5)]
     assert o._apply_rotation_guard(props, acct, {}) == props

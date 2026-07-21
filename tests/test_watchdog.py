@@ -86,6 +86,9 @@ class _FakeBroker:
     def has_working_exit(self, symbol, ref_price):
         return self.working_exit
 
+    def is_market_open(self):
+        return getattr(self, "market_open", True)
+
 
 def _cfg(pct, max_hold_days=0.0, time_stop_min_gain_pct=2.0,
          scale_out_enabled=False, scale_out_pct=50.0, whole_shares_only=False):
@@ -128,6 +131,49 @@ def test_trail_giveback_comes_from_risk_limits():
     cfg.risk.trail_giveback_pct = 5.0
     assert Watchdog(cfg, _FakeBroker([]), state=_state()).trail_giveback_pct == 5.0
     assert _wd(0.0, _state()).trail_giveback_pct == 3.0
+
+
+def test_trail_rth_gate_skips_trailing_when_market_closed():
+    # TRAIL_RTH_ONLY: a winner that has given back past the trail threshold must
+    # NOT trail out on a thin pre/post-market mark. Hard exits still run 24/7.
+    state = _state()
+    state.set_high_water("AAPL", 20.0)               # peaked at +20%
+    up = Position(symbol="AAPL", qty=10.0, avg_entry_price=100.0,
+                  current_price=110.0, market_value=1100.0,
+                  unrealized_pl=100.0, unrealized_pl_pct=10.0)  # gave back to +10%
+    acct = AccountSnapshot(equity=10_000.0, last_equity=10_000.0, cash=9_000.0,
+                           buying_power=9_000.0, positions=[up])
+    broker = _FakeBroker([])
+    broker.account = acct
+    cfg = _cfg(0.0)
+    cfg.risk.trail_giveback_pct = 3.0
+    cfg.risk.trail_rth_only = True
+
+    wd = Watchdog(cfg, broker, state=state)
+    broker.market_open = False
+    wd.check_once()
+    assert broker.closed == []                        # trail suppressed off-hours
+
+    broker.market_open = True
+    wd.check_once()
+    assert "AAPL" in broker.closed                    # trails once RTH resumes
+
+
+def test_vanished_position_fires_exchange_exit_callback():
+    # A tracked position that is no longer live = an exchange bracket leg filled
+    # with no code running; the backfill callback must fire immediately.
+    state = _state()
+    state.set_high_water("AAPL", 5.0)                 # tracked, but not in live book
+    acct = AccountSnapshot(equity=10_000.0, last_equity=10_000.0, cash=10_000.0,
+                           buying_power=10_000.0, positions=[])   # AAPL gone
+    broker = _FakeBroker([])
+    broker.account = acct
+    fired = []
+    wd = Watchdog(_cfg(0.0), broker, state=state,
+                  on_exchange_exit=lambda: fired.append(True))
+    wd.check_once()
+    assert fired == [True]
+    assert "AAPL" not in state.high_water             # and tracking was dropped
 
 
 def test_floor_breached_flattens_and_latches():

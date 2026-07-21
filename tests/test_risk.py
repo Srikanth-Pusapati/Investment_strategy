@@ -789,6 +789,42 @@ def test_reentry_cooldown_does_not_gate_adds_to_held_position():
     assert d.verdict is not RiskVerdict.REJECTED, d.reason
 
 
+def test_price_aware_reentry_blocks_rebuy_above_exit():
+    # Time cooldown OFF, but we exited PATH at $90 and it's now $95 — re-buying
+    # above the exit is chasing; blocked unless the composite overrides.
+    state = _fresh_state()
+    state.register_exit("PATH", price=90.0)
+    rm = _rm(_limits(reentry_cooldown_hours=0.0,
+                     reentry_price_override_composite=0.5), state=state)
+    d = rm.evaluate(_buy("PATH"), _account(), price=95.0, volatility=0.3)
+    assert d.verdict is RiskVerdict.REJECTED
+    assert "above the exit" in d.reason
+
+    # Below the exit price -> fine (buying the dip we sold into, not chasing).
+    d2 = rm.evaluate(_buy("PATH"), _account(), price=85.0, volatility=0.3)
+    assert d2.verdict is not RiskVerdict.REJECTED, d2.reason
+
+
+def test_price_aware_reentry_composite_override():
+    state = _fresh_state()
+    state.register_exit("PATH", price=90.0)
+    rm = _rm(_limits(reentry_cooldown_hours=0.0,
+                     reentry_price_override_composite=0.5), state=state)
+    # Strong composite = genuine new edge -> allowed above the exit.
+    d = rm.evaluate(_buy("PATH"), _account(), price=95.0, volatility=0.3,
+                    composite_score=0.8)
+    assert d.verdict is not RiskVerdict.REJECTED, d.reason
+
+
+def test_price_aware_reentry_fails_open_without_exit_price():
+    # An exit recorded with no price (older rows) must not block anything.
+    state = _fresh_state()
+    state.register_exit("PATH")   # no price
+    rm = _rm(_limits(reentry_cooldown_hours=0.0), state=state)
+    d = rm.evaluate(_buy("PATH"), _account(), price=95.0, volatility=0.3)
+    assert d.verdict is not RiskVerdict.REJECTED, d.reason
+
+
 def test_cycle_budget_cap_bounds_the_order():
     # The orchestrator hands each buy its fair share of the cycle's cash; the
     # order must not exceed it even when every other cap allows more.

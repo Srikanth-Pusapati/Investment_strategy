@@ -1,0 +1,637 @@
+2026-07-16 00:19:54,506 WARNING orchestrator | DARK GAP (market closed): no loop tick for 60 min (sleep/suspend?) — positions could not move; not paging.
+2026-07-16 00:19:54,543 WARNING alpaca | get_account: transient network error (ConnectionError); retry 1/2.
+2026-07-16 00:19:55,147 WARNING alpaca | get_account: transient network error (ConnectionError); retry 2/2.
+2026-07-16 00:19:56,352 WARNING orchestrator | Watchdog tick skipped on a transient network error (ConnectionError); retrying next tick.
+2026-07-16 00:20:26,520 WARNING alpaca | get_account: transient network error (ConnectionError); retry 1/2.
+2026-07-16 00:20:27,186 WARNING alpaca | get_account: transient network error (ConnectionError); retry 2/2.
+2026-07-16 00:20:28,343 WARNING orchestrator | Watchdog tick skipped on a transient network error (ConnectionError); retrying next tick.
+2026-07-16 00:48:21,585 WARNING orchestrator | DARK GAP (market closed): no loop tick for 28 min (sleep/suspend?) — positions could not move; not paging.
+2026-07-16 00:52:58,551 WARNING orchestrator | DARK GAP (market closed): no loop tick for 5 min (sleep/suspend?) — positions could not move; not paging.
+2026-07-16 00:52:58,629 WARNING alpaca | get_account: transient network error (ConnectionError); retry 1/2.
+2026-07-16 01:00:45,353 INFO alpaca | Alpaca client ready (mode=paper).
+2026-07-16 01:00:45,672 INFO orchestrator | Discovery-driven mode: trading scanner-found names + holdings.
+2026-07-16 01:00:45,674 INFO orchestrator | Loaded 1 pending order(s) from state to reconcile.
+2026-07-16 01:00:45,675 INFO orchestrator | Starting orchestrator (paper). Kill switch: off. Options: on. Benchmark: QQQ.
+2026-07-16 01:00:45,820 INFO orchestrator | Market closed; skipping decision cycle.
+2026-07-16 01:00:45,882 INFO alpaca | Alpaca client ready (mode=paper).
+2026-07-16 01:00:47,810 INFO dashboard | Wrote dashboard with 42 trades -> dashboard.html
+2026-07-16 01:03:05,371 INFO alpaca | Alpaca client ready (mode=paper).
+2026-07-16 01:03:05,773 INFO orchestrator | Discovery-driven mode: trading scanner-found names + holdings.
+2026-07-16 01:03:05,774 INFO orchestrator | Loaded 1 pending order(s) from state to reconcile.
+2026-07-16 01:03:05,775 INFO orchestrator | Starting orchestrator (paper). Kill switch: off. Options: on. Benchmark: QQQ.
+2026-07-16 01:03:05,929 INFO orchestrator | Market closed; skipping decision cycle.
+2026-07-16 01:03:05,988 INFO alpaca | Alpaca client ready (mode=paper).
+2026-07-16 01:03:07,943 INFO dashboard | Wrote dashboard with 42 trades -> dashboard.html
+2026-07-16 02:03:22,895 INFO orchestrator | Market closed; skipping decision cycle.
+2026-07-16 02:03:23,210 INFO alpaca | Alpaca client ready (mode=paper).
+2026-07-16 02:03:25,119 INFO dashboard | Wrote dashboard with 42 trades -> dashboard.html
+2026-07-16 03:03:40,733 INFO orchestrator | Market closed; skipping decision cycle.
+2026-07-16 03:03:40,804 INFO alpaca | Alpaca client ready (mode=paper).
+2026-07-16 03:03:42,661 INFO dashboard | Wrote dashboard with 42 trades -> dashboard.html
+2026-07-16 04:03:58,112 INFO orchestrator | Market closed; skipping decision cycle.
+2026-07-16 04:03:58,179 INFO alpaca | Alpaca client ready (mode=paper).
+2026-07-16 04:04:00,444 INFO dashboard | Wrote dashboard with 42 trades -> dashboard.html
+2026-07-16 04:08:58,013 WARNING alpaca | get_account: transient network error (ReadTimeout); retry 1/2.
+2026-07-16 05:04:15,874 INFO orchestrator | Market closed; skipping decision cycle.
+2026-07-16 05:04:15,947 INFO alpaca | Alpaca client ready (mode=paper).
+2026-07-16 05:04:17,988 INFO dashboard | Wrote dashboard with 42 trades -> dashboard.html
+2026-07-16 06:04:33,015 INFO orchestrator | Market closed; skipping decision cycle.
+2026-07-16 06:04:33,088 INFO alpaca | Alpaca client ready (mode=paper).
+2026-07-16 06:04:35,063 INFO dashboard | Wrote dashboard with 42 trades -> dashboard.html
+2026-07-16 07:04:50,917 INFO orchestrator | Market closed; skipping decision cycle.
+2026-07-16 07:04:50,976 INFO alpaca | Alpaca client ready (mode=paper).
+2026-07-16 07:04:52,985 INFO dashboard | Wrote dashboard with 42 trades -> dashboard.html
+2026-07-16 08:05:08,299 INFO orchestrator | Market closed; skipping decision cycle.
+2026-07-16 08:05:08,364 INFO alpaca | Alpaca client ready (mode=paper).
+2026-07-16 08:05:10,411 INFO dashboard | Wrote dashboard with 42 trades -> dashboard.html
+2026-07-16 08:30:18,111 INFO orchestrator | Market regime: SPY above 200dma (753 vs 693), VIX 16 -> risk-on, size x1.00.
+2026-07-16 08:30:18,960 INFO quiver | Quiver live/congresstrading -> 1000 row(s).
+2026-07-16 08:30:19,356 INFO screener | EDGAR Form-4 feed -> 57 filing(s) (scanning up to 100).
+2026-07-16 08:30:45,323 INFO screener | Options-flow most-actives pool -> 40 name(s).
+2026-07-16 08:31:04,182 INFO watchdog | Trailing stop hit on PLTR: peak 3.0% -> now -0.2%. Closing.
+2026-07-16 08:31:04,560 WARNING alpaca | Exit via resting sell 86beae3c-25f2-414d-8042-ac68584aa3be (PLTR): replaced limit -> 129.50 (marketable; new order aeeeb90e-dc63-4e35-a7c8-bd66615c292c).
+2026-07-16 08:31:04,571 INFO ledger | Ledger: SELL PLTR qty=30 $3963
+2026-07-16 08:31:04,576 WARNING watchdog | Partial close PLTR (trail): sold 0 available share(s), made 1 resting sell(s) marketable; 30 reserved by open orders — will retry the full close next tick.
+2026-07-16 08:31:07,561 ERROR mcp.client.auth.oauth2 | OAuth flow error
+Traceback (most recent call last):
+  File "/Users/spusapati/Personal/Investment_stratergy/.venv/lib/python3.13/site-packages/mcp/client/auth/oauth2.py", line 597, in async_auth_flow
+    token_response = yield await self._perform_authorization()
+                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/spusapati/Personal/Investment_stratergy/.venv/lib/python3.13/site-packages/mcp/client/auth/oauth2.py", line 313, in _perform_authorization
+    auth_code, code_verifier = await self._perform_authorization_code_grant()
+                               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/spusapati/Personal/Investment_stratergy/.venv/lib/python3.13/site-packages/mcp/client/auth/oauth2.py", line 322, in _perform_authorization_code_grant
+    raise OAuthFlowError("No redirect handler provided for authorization code grant")  # pragma: no cover
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+mcp.client.auth.exceptions.OAuthFlowError: No redirect handler provided for authorization code grant
+2026-07-16 08:31:07,663 WARNING robinhood | Robinhood MCP call get_popular_watchlists failed: unhandled errors in a TaskGroup (1 sub-exception)
+2026-07-16 08:31:07,663 INFO screener | Robinhood: no curated lists resolved (feed empty/unreachable).
+2026-07-16 08:31:07,877 ERROR mcp.client.auth.oauth2 | OAuth flow error
+Traceback (most recent call last):
+  File "/Users/spusapati/Personal/Investment_stratergy/.venv/lib/python3.13/site-packages/mcp/client/auth/oauth2.py", line 597, in async_auth_flow
+    token_response = yield await self._perform_authorization()
+                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/spusapati/Personal/Investment_stratergy/.venv/lib/python3.13/site-packages/mcp/client/auth/oauth2.py", line 313, in _perform_authorization
+    auth_code, code_verifier = await self._perform_authorization_code_grant()
+                               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/spusapati/Personal/Investment_stratergy/.venv/lib/python3.13/site-packages/mcp/client/auth/oauth2.py", line 322, in _perform_authorization_code_grant
+    raise OAuthFlowError("No redirect handler provided for authorization code grant")  # pragma: no cover
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+mcp.client.auth.exceptions.OAuthFlowError: No redirect handler provided for authorization code grant
+2026-07-16 08:31:07,973 WARNING robinhood | Robinhood MCP call get_scans failed: unhandled errors in a TaskGroup (1 sub-exception)
+2026-07-16 08:31:07,974 INFO screener | Robinhood scans: none saved (define scans in the RH app to use this leg).
+2026-07-16 08:31:07,974 INFO screener | Discovered 18 candidate(s) from 5 source(s) (186 merged, 178 above min_score, capped to 18).
+2026-07-16 08:31:07,975 INFO screener |   candidate HUBB [congress] score=+1.00 — Congress: 8 buy / 0 sell filings in last 60d (disclosures lag up to ~45d).
+2026-07-16 08:31:07,975 INFO screener |   candidate TSCO [congress] score=-1.00 — Congress: 0 buy / 5 sell filings in last 60d (disclosures lag up to ~45d).
+2026-07-16 08:31:07,976 INFO screener |   candidate WAB [congress] score=-1.00 — Congress: 0 buy / 4 sell filings in last 60d (disclosures lag up to ~45d).
+2026-07-16 08:31:07,976 INFO screener |   candidate BEP [congress] score=+1.00 — Congress: 7 buy / 0 sell filings in last 60d (disclosures lag up to ~45d).
+2026-07-16 08:31:07,977 INFO screener |   candidate SNDQ [options_flow] score=+0.84 — Options flow: 15,821 call / 1,333 put vol (bullish call imbalance +0.84) on a most-active name.
+2026-07-16 08:31:07,977 INFO screener |   candidate ZTS [congress] score=+0.75 — Congress: 3 buy / 0 sell filings in last 60d (disclosures lag up to ~45d).
+2026-07-16 08:31:07,978 INFO screener |   candidate LYV [congress] score=-0.75 — Congress: 0 buy / 3 sell filings in last 60d (disclosures lag up to ~45d).
+2026-07-16 08:31:07,978 INFO screener |   candidate ENTG [congress] score=+0.75 — Congress: 3 buy / 0 sell filings in last 60d (disclosures lag up to ~45d).
+2026-07-16 08:31:07,979 INFO screener |   candidate WRB [congress] score=-0.75 — Congress: 0 buy / 3 sell filings in last 60d (disclosures lag up to ~45d).
+2026-07-16 08:31:07,979 INFO screener |   candidate OPEN [options_flow] score=+0.72 — Options flow: 68,145 call / 11,005 put vol (bullish call imbalance +0.72) on a most-active name.
+2026-07-16 08:31:07,979 INFO screener |   candidate JOBY [options_flow] score=+0.69 — Options flow: 8,816 call / 1,635 put vol (bullish call imbalance +0.69) on a most-active name.
+2026-07-16 08:31:07,980 INFO screener |   candidate SOXS [options_flow] score=+0.58 — Options flow: 41,643 call / 11,151 put vol (bullish call imbalance +0.58) on a most-active name.
+2026-07-16 08:31:07,981 INFO screener |   candidate BITO [options_flow] score=+0.57 — Options flow: 3,843 call / 1,036 put vol (bullish call imbalance +0.57) on a most-active name.
+2026-07-16 08:31:07,981 INFO screener |   candidate SQQQ [options_flow] score=+0.53 — Options flow: 64,890 call / 20,154 put vol (bullish call imbalance +0.53) on a most-active name.
+2026-07-16 08:31:07,982 INFO screener |   candidate GOOGL [congress] score=-0.50 — Congress: 1 buy / 3 sell filings in last 60d (disclosures lag up to ~45d).
+2026-07-16 08:31:07,982 INFO screener |   candidate BLK [congress] score=-0.50 — Congress: 0 buy / 2 sell filings in last 60d (disclosures lag up to ~45d).
+2026-07-16 08:31:07,982 INFO screener |   candidate MIDD [congress] score=-0.50 — Congress: 0 buy / 2 sell filings in last 60d (disclosures lag up to ~45d).
+2026-07-16 08:31:07,983 INFO screener |   candidate IBM [congress] score=+0.50 — Congress: 3 buy / 1 sell filings in last 60d (disclosures lag up to ~45d).
+2026-07-16 08:31:35,289 INFO watchdog | Trailing stop hit on PLTR: peak 3.0% -> now -0.5%. Closing.
+2026-07-16 08:31:35,489 WARNING alpaca | Exit via resting sell aeeeb90e-dc63-4e35-a7c8-bd66615c292c (PLTR): replaced limit -> 128.91 (marketable; new order bf28dd07-eadf-46a7-b361-3f359532baa1).
+2026-07-16 08:31:35,494 INFO ledger | Ledger: CORRECT PLTR qty=0 $0
+2026-07-16 08:31:35,496 INFO watchdog | Superseded exit aeeeb90e-dc63-4e35-a7c8-bd66615c292c (PLTR): prior SELL record corrected to 0/30 filled; the replacement order carries the exit.
+2026-07-16 08:31:35,500 INFO ledger | Ledger: SELL PLTR qty=30 $3952
+2026-07-16 08:31:35,504 WARNING watchdog | Partial close PLTR (trail): sold 0 available share(s), made 1 resting sell(s) marketable; 30 reserved by open orders — will retry the full close next tick.
+2026-07-16 08:31:41,602 WARNING signals | Finnhub news-sentiment is premium-gated on this key (HTTP 403) — using the VADER fallback for this run.
+2026-07-16 08:31:43,757 INFO quiver | Quiver live/offexchange -> 5496 row(s).
+2026-07-16 08:31:44,312 INFO quiver | Quiver live/govcontractsall -> 20000 row(s).
+2026-07-16 08:32:06,266 INFO watchdog | Trailing stop hit on PLTR: peak 3.0% -> now -1.0%. Closing.
+2026-07-16 08:32:06,753 WARNING alpaca | Exit via resting sell bf28dd07-eadf-46a7-b361-3f359532baa1 (PLTR): replaced limit -> 128.43 (marketable; new order d04274fc-5036-40fb-8dfb-552a152a49f7).
+2026-07-16 08:32:06,756 INFO ledger | Ledger: CORRECT PLTR qty=0 $0
+2026-07-16 08:32:06,758 INFO watchdog | Superseded exit bf28dd07-eadf-46a7-b361-3f359532baa1 (PLTR): prior SELL record corrected to 0/30 filled; the replacement order carries the exit.
+2026-07-16 08:32:06,763 INFO ledger | Ledger: SELL PLTR qty=30 $3932
+2026-07-16 08:32:06,771 WARNING watchdog | Partial close PLTR (trail): sold 0 available share(s), made 1 resting sell(s) marketable; 30 reserved by open orders — will retry the full close next tick.
+2026-07-16 08:32:37,536 INFO watchdog | Trailing stop hit on PLTR: peak 3.0% -> now -1.1%. Closing.
+2026-07-16 08:32:37,702 WARNING alpaca | Exit via resting sell d04274fc-5036-40fb-8dfb-552a152a49f7 (PLTR): replaced limit -> 128.26 (marketable; new order 7d37d013-ff5a-4913-b9ef-0bd47c6a941c).
+2026-07-16 08:32:37,709 INFO ledger | Ledger: CORRECT PLTR qty=0 $0
+2026-07-16 08:32:37,712 INFO watchdog | Superseded exit d04274fc-5036-40fb-8dfb-552a152a49f7 (PLTR): prior SELL record corrected to 0/30 filled; the replacement order carries the exit.
+2026-07-16 08:32:37,717 INFO ledger | Ledger: SELL PLTR qty=30 $3930
+2026-07-16 08:32:37,721 WARNING watchdog | Partial close PLTR (trail): sold 0 available share(s), made 1 resting sell(s) marketable; 30 reserved by open orders — will retry the full close next tick.
+2026-07-16 08:34:27,718 INFO signals | options_chain: reading 25 of 29 symbols this cycle (cap).
+2026-07-16 08:34:35,672 INFO signals | Gathered signals for 29/29 symbols (+3 market signals).
+2026-07-16 08:34:36,366 ERROR mcp.client.auth.oauth2 | OAuth flow error
+Traceback (most recent call last):
+  File "/Users/spusapati/Personal/Investment_stratergy/.venv/lib/python3.13/site-packages/mcp/client/auth/oauth2.py", line 597, in async_auth_flow
+    token_response = yield await self._perform_authorization()
+                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/spusapati/Personal/Investment_stratergy/.venv/lib/python3.13/site-packages/mcp/client/auth/oauth2.py", line 313, in _perform_authorization
+    auth_code, code_verifier = await self._perform_authorization_code_grant()
+                               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/spusapati/Personal/Investment_stratergy/.venv/lib/python3.13/site-packages/mcp/client/auth/oauth2.py", line 322, in _perform_authorization_code_grant
+    raise OAuthFlowError("No redirect handler provided for authorization code grant")  # pragma: no cover
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+mcp.client.auth.exceptions.OAuthFlowError: No redirect handler provided for authorization code grant
+2026-07-16 08:34:36,463 WARNING robinhood | Robinhood MCP call get_equity_positions failed: unhandled errors in a TaskGroup (1 sub-exception)
+2026-07-16 08:34:36,469 INFO orchestrator | Buy-excluded from slate this cycle: BEP (exited 19.0h ago (cooldown 24h)), HUBB (exited 20.0h ago (cooldown 24h))
+2026-07-16 08:35:14,254 INFO usage | decision call: 22421 in / 2238 out (cache r=0 w=0) ~$0.1681 [claude-opus-4-8]
+2026-07-16 08:35:14,258 INFO decision | Claude returned 4 proposal(s).
+2026-07-16 08:35:14,370 INFO orchestrator | SELL SPCX -> approved: Closing existing position. | Dust position (6 sh, -3.3%) with conflicting evidence: net option flow negative (-0.07), insider For
+2026-07-16 08:35:14,532 ERROR alpaca | close_position(SPCX) failed: {"available":"0","code":40310000,"existing_qty":"6","held_for_orders":"6","message":"insufficient qty available for order (requested: 6, available: 0)","symbol":"SPCX"}
+2026-07-16 08:35:14,541 INFO ledger | Ledger: SELL SPCX qty=6 $808
+2026-07-16 08:35:14,545 INFO orchestrator | Cycle budget $1,578 split across 2 buy(s): GOOGL $880, ZTS $699.
+2026-07-16 08:35:15,164 ERROR mcp.client.auth.oauth2 | OAuth flow error
+Traceback (most recent call last):
+  File "/Users/spusapati/Personal/Investment_stratergy/.venv/lib/python3.13/site-packages/mcp/client/auth/oauth2.py", line 597, in async_auth_flow
+    token_response = yield await self._perform_authorization()
+                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/spusapati/Personal/Investment_stratergy/.venv/lib/python3.13/site-packages/mcp/client/auth/oauth2.py", line 313, in _perform_authorization
+    auth_code, code_verifier = await self._perform_authorization_code_grant()
+                               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/spusapati/Personal/Investment_stratergy/.venv/lib/python3.13/site-packages/mcp/client/auth/oauth2.py", line 322, in _perform_authorization_code_grant
+    raise OAuthFlowError("No redirect handler provided for authorization code grant")  # pragma: no cover
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+mcp.client.auth.exceptions.OAuthFlowError: No redirect handler provided for authorization code grant
+2026-07-16 08:35:15,264 WARNING robinhood | Robinhood MCP call get_earnings_calendar failed: unhandled errors in a TaskGroup (1 sub-exception)
+2026-07-16 08:35:23,437 INFO orchestrator | BUY GOOGL -> resized: Sized to 2.37548 sh ($880) within caps. Reduced from request. | Strong fundamentals (EBITDA $161B, 38% margin, +21.8% rev growth), technical uptrend px>50>200 with 
+2026-07-16 08:35:23,551 WARNING alpaca | GOOGL: floored 2.37548 sh -> 2 for the exchange bracket; $139.04 of the $879.75 allocation NOT deployed (stays cash; core sweep / next cycle can redeploy).
+2026-07-16 08:35:23,610 INFO alpaca | BUY market GOOGL qty=2.0 notional=None lim=None (order 5077c40e-a815-43a2-8eb4-d7b8d913dbfd)
+2026-07-16 08:35:23,615 INFO ledger | Ledger: BUY GOOGL qty=2 $741
+2026-07-16 08:35:24,124 ERROR mcp.client.auth.oauth2 | OAuth flow error
+Traceback (most recent call last):
+  File "/Users/spusapati/Personal/Investment_stratergy/.venv/lib/python3.13/site-packages/mcp/client/auth/oauth2.py", line 597, in async_auth_flow
+    token_response = yield await self._perform_authorization()
+                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/spusapati/Personal/Investment_stratergy/.venv/lib/python3.13/site-packages/mcp/client/auth/oauth2.py", line 313, in _perform_authorization
+    auth_code, code_verifier = await self._perform_authorization_code_grant()
+                               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/spusapati/Personal/Investment_stratergy/.venv/lib/python3.13/site-packages/mcp/client/auth/oauth2.py", line 322, in _perform_authorization_code_grant
+    raise OAuthFlowError("No redirect handler provided for authorization code grant")  # pragma: no cover
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+mcp.client.auth.exceptions.OAuthFlowError: No redirect handler provided for authorization code grant
+2026-07-16 08:35:24,223 WARNING robinhood | Robinhood MCP call get_earnings_calendar failed: unhandled errors in a TaskGroup (1 sub-exception)
+2026-07-16 08:35:24,677 INFO orchestrator | BUY ZTS -> resized: Sized to 9.14666 sh ($699) within caps. Reduced from request. | Corroborated smart-money buying: insider open-market buys +1.00, congress 3 buy/0 sell, buy-side off
+2026-07-16 08:35:24,735 WARNING alpaca | ZTS: floored 9.14666 sh -> 9 for the exchange bracket; $11.20 of the $698.62 allocation NOT deployed (stays cash; core sweep / next cycle can redeploy).
+2026-07-16 08:35:24,831 INFO alpaca | BUY market ZTS qty=9.0 notional=None lim=None (order a31713fb-9028-476e-995e-c92b6b293638)
+2026-07-16 08:35:24,837 INFO ledger | Ledger: BUY ZTS qty=9 $687
+2026-07-16 08:35:24,992 INFO orchestrator | HOLD MU (no action) | Elite fundamentals (75.6% margin, +345% rev growth) but technical decaying (MACD bear, RSI 43) and i
+2026-07-16 08:35:24,997 INFO orchestrator | Cycle budget not fully deployed: $150.24 dropped by whole-share flooring across this cycle's buys (stays cash; core sweep / next cycle can redeploy).
+2026-07-16 08:35:25,132 INFO alpaca | Alpaca client ready (mode=paper).
+2026-07-16 08:35:27,109 INFO dashboard | Wrote dashboard with 46 trades -> dashboard.html
+2026-07-16 09:30:41,623 INFO orchestrator | Market regime: SPY above 200dma (754 vs 693), VIX 16 -> risk-on, size x1.00.
+2026-07-16 09:30:42,388 INFO quiver | Quiver live/congresstrading -> 1000 row(s).
+2026-07-16 09:30:44,683 INFO screener | EDGAR Form-4 feed -> 29 filing(s) (scanning up to 100).
+2026-07-16 09:30:59,712 INFO screener | Options-flow most-actives pool -> 40 name(s).
+2026-07-16 09:31:28,425 ERROR mcp.client.auth.oauth2 | OAuth flow error
+Traceback (most recent call last):
+  File "/Users/spusapati/Personal/Investment_stratergy/.venv/lib/python3.13/site-packages/mcp/client/auth/oauth2.py", line 597, in async_auth_flow
+    token_response = yield await self._perform_authorization()
+                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/spusapati/Personal/Investment_stratergy/.venv/lib/python3.13/site-packages/mcp/client/auth/oauth2.py", line 313, in _perform_authorization
+    auth_code, code_verifier = await self._perform_authorization_code_grant()
+                               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/spusapati/Personal/Investment_stratergy/.venv/lib/python3.13/site-packages/mcp/client/auth/oauth2.py", line 322, in _perform_authorization_code_grant
+    raise OAuthFlowError("No redirect handler provided for authorization code grant")  # pragma: no cover
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+mcp.client.auth.exceptions.OAuthFlowError: No redirect handler provided for authorization code grant
+2026-07-16 09:31:28,526 WARNING robinhood | Robinhood MCP call get_popular_watchlists failed: unhandled errors in a TaskGroup (1 sub-exception)
+2026-07-16 09:31:28,526 INFO screener | Robinhood: no curated lists resolved (feed empty/unreachable).
+2026-07-16 09:31:28,709 ERROR mcp.client.auth.oauth2 | OAuth flow error
+Traceback (most recent call last):
+  File "/Users/spusapati/Personal/Investment_stratergy/.venv/lib/python3.13/site-packages/mcp/client/auth/oauth2.py", line 597, in async_auth_flow
+    token_response = yield await self._perform_authorization()
+                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/spusapati/Personal/Investment_stratergy/.venv/lib/python3.13/site-packages/mcp/client/auth/oauth2.py", line 313, in _perform_authorization
+    auth_code, code_verifier = await self._perform_authorization_code_grant()
+                               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/spusapati/Personal/Investment_stratergy/.venv/lib/python3.13/site-packages/mcp/client/auth/oauth2.py", line 322, in _perform_authorization_code_grant
+    raise OAuthFlowError("No redirect handler provided for authorization code grant")  # pragma: no cover
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+mcp.client.auth.exceptions.OAuthFlowError: No redirect handler provided for authorization code grant
+2026-07-16 09:31:28,796 WARNING robinhood | Robinhood MCP call get_scans failed: unhandled errors in a TaskGroup (1 sub-exception)
+2026-07-16 09:31:28,797 INFO screener | Robinhood scans: none saved (define scans in the RH app to use this leg).
+2026-07-16 09:31:28,797 INFO screener | Discovered 18 candidate(s) from 5 source(s) (177 merged, 169 above min_score, capped to 18).
+2026-07-16 09:31:28,798 INFO screener |   candidate HUBB [congress] score=+1.00 — Congress: 8 buy / 0 sell filings in last 60d (disclosures lag up to ~45d).
+2026-07-16 09:31:28,799 INFO screener |   candidate TSCO [congress] score=-1.00 — Congress: 0 buy / 5 sell filings in last 60d (disclosures lag up to ~45d).
+2026-07-16 09:31:28,800 INFO screener |   candidate WAB [congress] score=-1.00 — Congress: 0 buy / 4 sell filings in last 60d (disclosures lag up to ~45d).
+2026-07-16 09:31:28,800 INFO screener |   candidate BEP [congress] score=+1.00 — Congress: 7 buy / 0 sell filings in last 60d (disclosures lag up to ~45d).
+2026-07-16 09:31:28,800 INFO screener |   candidate FFAI [options_flow] score=+1.00 — Options flow: 218 call / 0 put vol (bullish call imbalance +1.00) on a most-active name.
+2026-07-16 09:31:28,801 INFO screener |   candidate SNDQ [options_flow] score=+0.94 — Options flow: 5,830 call / 183 put vol (bullish call imbalance +0.94) on a most-active name.
+2026-07-16 09:31:28,801 INFO screener |   candidate EOSE [options_flow] score=+0.85 — Options flow: 8,065 call / 653 put vol (bullish call imbalance +0.85) on a most-active name.
+2026-07-16 09:31:28,802 INFO screener |   candidate NOK [options_flow] score=+0.80 — Options flow: 53,386 call / 5,903 put vol (bullish call imbalance +0.80) on a most-active name.
+2026-07-16 09:31:28,802 INFO screener |   candidate LYV [congress] score=-0.75 — Congress: 0 buy / 3 sell filings in last 60d (disclosures lag up to ~45d).
+2026-07-16 09:31:28,803 INFO screener |   candidate ENTG [congress] score=+0.75 — Congress: 3 buy / 0 sell filings in last 60d (disclosures lag up to ~45d).
+2026-07-16 09:31:28,803 INFO screener |   candidate WRB [congress] score=-0.75 — Congress: 0 buy / 3 sell filings in last 60d (disclosures lag up to ~45d).
+2026-07-16 09:31:28,804 INFO screener |   candidate AMC [options_flow] score=+0.72 — Options flow: 13,106 call / 2,085 put vol (bullish call imbalance +0.72) on a most-active name.
+2026-07-16 09:31:28,804 INFO screener |   candidate PLUG [options_flow] score=+0.71 — Options flow: 977 call / 166 put vol (bullish call imbalance +0.71) on a most-active name.
+2026-07-16 09:31:28,805 INFO screener |   candidate ONDS [options_flow] score=+0.70 — Options flow: 12,822 call / 2,298 put vol (bullish call imbalance +0.70) on a most-active name.
+2026-07-16 09:31:28,805 INFO screener |   candidate ATAI [options_flow] score=+0.62 — Options flow: 14,948 call / 3,523 put vol (bullish call imbalance +0.62) on a most-active name.
+2026-07-16 09:31:28,806 INFO screener |   candidate SQQQ [options_flow] score=+0.52 — Options flow: 17,326 call / 5,530 put vol (bullish call imbalance +0.52) on a most-active name.
+2026-07-16 09:31:28,806 INFO screener |   candidate SOXS [options_flow] score=+0.51 — Options flow: 14,077 call / 4,528 put vol (bullish call imbalance +0.51) on a most-active name.
+2026-07-16 09:31:28,807 INFO screener |   candidate BLK [congress] score=-0.50 — Congress: 0 buy / 2 sell filings in last 60d (disclosures lag up to ~45d).
+2026-07-16 09:31:56,822 INFO quiver | Quiver live/offexchange -> 5496 row(s).
+2026-07-16 09:31:57,357 INFO quiver | Quiver live/govcontractsall -> 20000 row(s).
+2026-07-16 09:32:43,963 INFO signals | options_chain: reading 25 of 30 symbols this cycle (cap).
+2026-07-16 09:32:51,530 INFO signals | Gathered signals for 30/30 symbols (+3 market signals).
+2026-07-16 09:32:52,423 ERROR mcp.client.auth.oauth2 | OAuth flow error
+Traceback (most recent call last):
+  File "/Users/spusapati/Personal/Investment_stratergy/.venv/lib/python3.13/site-packages/mcp/client/auth/oauth2.py", line 597, in async_auth_flow
+    token_response = yield await self._perform_authorization()
+                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/spusapati/Personal/Investment_stratergy/.venv/lib/python3.13/site-packages/mcp/client/auth/oauth2.py", line 313, in _perform_authorization
+    auth_code, code_verifier = await self._perform_authorization_code_grant()
+                               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/spusapati/Personal/Investment_stratergy/.venv/lib/python3.13/site-packages/mcp/client/auth/oauth2.py", line 322, in _perform_authorization_code_grant
+    raise OAuthFlowError("No redirect handler provided for authorization code grant")  # pragma: no cover
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+mcp.client.auth.exceptions.OAuthFlowError: No redirect handler provided for authorization code grant
+2026-07-16 09:32:52,520 WARNING robinhood | Robinhood MCP call get_equity_positions failed: unhandled errors in a TaskGroup (1 sub-exception)
+2026-07-16 09:32:52,525 INFO orchestrator | Buy-excluded from slate this cycle: BEP (exited 20.0h ago (cooldown 24h)), GOOGL (topped up 1.0h ago (next ok in 4h)), HUBB (exited 21.0h ago (cooldown 24h)), ZTS (topped up 1.0h ago (next ok in 4h))
+2026-07-16 09:33:37,195 INFO usage | decision call: 22162 in / 3071 out (cache r=0 w=0) ~$0.1876 [claude-opus-4-8]
+2026-07-16 09:33:37,201 INFO decision | Claude returned 4 proposal(s).
+2026-07-16 09:33:37,432 INFO orchestrator | SELL T -> approved: Closing existing position. | Weakest incumbent: entry conviction 0.48, price in downtrend (px<50<200), MACD-supported but bearish
+2026-07-16 09:33:37,597 INFO alpaca | CLOSE T (order c7c02c54-3198-4d5c-baae-5f5830c57145)
+2026-07-16 09:33:37,605 INFO ledger | Ledger: SELL T qty=372 $8015
+2026-07-16 09:33:38,273 ERROR mcp.client.auth.oauth2 | OAuth flow error
+Traceback (most recent call last):
+  File "/Users/spusapati/Personal/Investment_stratergy/.venv/lib/python3.13/site-packages/mcp/client/auth/oauth2.py", line 597, in async_auth_flow
+    token_response = yield await self._perform_authorization()
+                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/spusapati/Personal/Investment_stratergy/.venv/lib/python3.13/site-packages/mcp/client/auth/oauth2.py", line 313, in _perform_authorization
+    auth_code, code_verifier = await self._perform_authorization_code_grant()
+                               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/spusapati/Personal/Investment_stratergy/.venv/lib/python3.13/site-packages/mcp/client/auth/oauth2.py", line 322, in _perform_authorization_code_grant
+    raise OAuthFlowError("No redirect handler provided for authorization code grant")  # pragma: no cover
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+mcp.client.auth.exceptions.OAuthFlowError: No redirect handler provided for authorization code grant
+2026-07-16 09:33:38,373 WARNING robinhood | Robinhood MCP call get_earnings_calendar failed: unhandled errors in a TaskGroup (1 sub-exception)
+2026-07-16 09:33:43,758 INFO risk | REJECT buy AMC: Price $1.99 below min $5.00 (liquidity guard).
+2026-07-16 09:33:43,762 INFO orchestrator | BUY AMC -> rejected: Price $1.99 below min $5.00 (liquidity guard). | Multi-signal corroboration: genuine SEC Form 4 insider open-market buying of 250k shares (w=0.91), b
+2026-07-16 09:33:43,888 INFO orchestrator | HOLD MU (no action) | Fundamentals exceptional (margin 75.6%, rev +345%, low D/E) but technicals decaying hard amid a broa
+2026-07-16 09:33:44,024 INFO orchestrator | HOLD SOFI (no action) | Held -4.4% but bullish options-chain positioning (+0.46, put/call OI 0.28) and strong rev growth +42
+2026-07-16 09:33:44,388 INFO alpaca | BUY market QQQ qty=None notional=4229.76 lim=None (order 8fd53124-60c0-49b5-ac13-612c4834bb2a)
+2026-07-16 09:33:44,393 INFO orchestrator | Core fill: bought $4230 of QQQ (invested 86% -> ~90%, target 90%).
+2026-07-16 09:33:44,396 INFO ledger | Ledger: BUY QQQ qty=5.93734 $4230
+2026-07-16 09:33:45,781 INFO alpaca | SELL stop QQQ qty=63.0 notional=None lim=None (order 4d3c15bd-6982-4d43-b83d-e7b849a28107)
+2026-07-16 09:33:45,785 INFO orchestrator | Core stop: GTC stop resting for 63 QQQ @ 609.91 (15% under basis 717.54).
+2026-07-16 09:33:45,794 INFO alpaca | Alpaca client ready (mode=paper).
+2026-07-16 09:33:47,839 INFO dashboard | Wrote dashboard with 48 trades -> dashboard.html
+2026-07-16 10:31:03,154 INFO orchestrator | Market regime: SPY above 200dma (754 vs 693), VIX 16 -> risk-on, size x1.00.
+2026-07-16 10:31:03,908 INFO quiver | Quiver live/congresstrading -> 1000 row(s).
+2026-07-16 10:31:06,308 INFO screener | EDGAR Form-4 feed -> 64 filing(s) (scanning up to 100).
+2026-07-16 10:31:35,865 INFO screener | Options-flow most-actives pool -> 40 name(s).
+2026-07-16 10:31:54,169 ERROR mcp.client.auth.oauth2 | OAuth flow error
+Traceback (most recent call last):
+  File "/Users/spusapati/Personal/Investment_stratergy/.venv/lib/python3.13/site-packages/mcp/client/auth/oauth2.py", line 597, in async_auth_flow
+    token_response = yield await self._perform_authorization()
+                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/spusapati/Personal/Investment_stratergy/.venv/lib/python3.13/site-packages/mcp/client/auth/oauth2.py", line 313, in _perform_authorization
+    auth_code, code_verifier = await self._perform_authorization_code_grant()
+                               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/spusapati/Personal/Investment_stratergy/.venv/lib/python3.13/site-packages/mcp/client/auth/oauth2.py", line 322, in _perform_authorization_code_grant
+    raise OAuthFlowError("No redirect handler provided for authorization code grant")  # pragma: no cover
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+mcp.client.auth.exceptions.OAuthFlowError: No redirect handler provided for authorization code grant
+2026-07-16 10:31:54,277 WARNING robinhood | Robinhood MCP call get_popular_watchlists failed: unhandled errors in a TaskGroup (1 sub-exception)
+2026-07-16 10:31:54,278 INFO screener | Robinhood: no curated lists resolved (feed empty/unreachable).
+2026-07-16 10:31:54,547 ERROR mcp.client.auth.oauth2 | OAuth flow error
+Traceback (most recent call last):
+  File "/Users/spusapati/Personal/Investment_stratergy/.venv/lib/python3.13/site-packages/mcp/client/auth/oauth2.py", line 597, in async_auth_flow
+    token_response = yield await self._perform_authorization()
+                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/spusapati/Personal/Investment_stratergy/.venv/lib/python3.13/site-packages/mcp/client/auth/oauth2.py", line 313, in _perform_authorization
+    auth_code, code_verifier = await self._perform_authorization_code_grant()
+                               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/spusapati/Personal/Investment_stratergy/.venv/lib/python3.13/site-packages/mcp/client/auth/oauth2.py", line 322, in _perform_authorization_code_grant
+    raise OAuthFlowError("No redirect handler provided for authorization code grant")  # pragma: no cover
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+mcp.client.auth.exceptions.OAuthFlowError: No redirect handler provided for authorization code grant
+2026-07-16 10:31:54,647 WARNING robinhood | Robinhood MCP call get_scans failed: unhandled errors in a TaskGroup (1 sub-exception)
+2026-07-16 10:31:54,647 INFO screener | Robinhood scans: none saved (define scans in the RH app to use this leg).
+2026-07-16 10:31:54,647 INFO screener | Discovered 18 candidate(s) from 5 source(s) (179 merged, 171 above min_score, capped to 18).
+2026-07-16 10:31:54,648 INFO screener |   candidate HUBB [congress] score=+1.00 — Congress: 8 buy / 0 sell filings in last 60d (disclosures lag up to ~45d).
+2026-07-16 10:31:54,650 INFO screener |   candidate TSCO [congress] score=-1.00 — Congress: 0 buy / 5 sell filings in last 60d (disclosures lag up to ~45d).
+2026-07-16 10:31:54,650 INFO screener |   candidate WAB [congress] score=-1.00 — Congress: 0 buy / 4 sell filings in last 60d (disclosures lag up to ~45d).
+2026-07-16 10:31:54,651 INFO screener |   candidate BEP [congress] score=+1.00 — Congress: 7 buy / 0 sell filings in last 60d (disclosures lag up to ~45d).
+2026-07-16 10:31:54,651 INFO screener |   candidate FFAI [options_flow] score=+1.00 — Options flow: 354 call / 0 put vol (bullish call imbalance +1.00) on a most-active name.
+2026-07-16 10:31:54,652 INFO screener |   candidate SNDQ [options_flow] score=+0.90 — Options flow: 6,872 call / 367 put vol (bullish call imbalance +0.90) on a most-active name.
+2026-07-16 10:31:54,652 INFO screener |   candidate BITO [options_flow] score=+0.80 — Options flow: 2,936 call / 332 put vol (bullish call imbalance +0.80) on a most-active name.
+2026-07-16 10:31:54,653 INFO screener |   candidate LYV [congress] score=-0.75 — Congress: 0 buy / 3 sell filings in last 60d (disclosures lag up to ~45d).
+2026-07-16 10:31:54,653 INFO screener |   candidate ENTG [congress] score=+0.75 — Congress: 3 buy / 0 sell filings in last 60d (disclosures lag up to ~45d).
+2026-07-16 10:31:54,653 INFO screener |   candidate WRB [congress] score=-0.75 — Congress: 0 buy / 3 sell filings in last 60d (disclosures lag up to ~45d).
+2026-07-16 10:31:54,654 INFO screener |   candidate AMC [options_flow] score=+0.71 — Options flow: 17,852 call / 2,972 put vol (bullish call imbalance +0.71) on a most-active name.
+2026-07-16 10:31:54,654 INFO screener |   candidate NOK [options_flow] score=+0.63 — Options flow: 71,449 call / 15,978 put vol (bullish call imbalance +0.63) on a most-active name.
+2026-07-16 10:31:54,655 INFO screener |   candidate ATAI [options_flow] score=+0.60 — Options flow: 17,921 call / 4,413 put vol (bullish call imbalance +0.60) on a most-active name.
+2026-07-16 10:31:54,656 INFO screener |   candidate T [congress] score=+0.60 — Congress: 4 buy / 1 sell filings in last 60d (disclosures lag up to ~45d).
+2026-07-16 10:31:54,656 INFO screener |   candidate ONDS [options_flow] score=+0.59 — Options flow: 19,556 call / 5,027 put vol (bullish call imbalance +0.59) on a most-active name.
+2026-07-16 10:31:54,656 INFO screener |   candidate MSTU [options_flow] score=+0.59 — Options flow: 2,597 call / 675 put vol (bullish call imbalance +0.59) on a most-active name.
+2026-07-16 10:31:54,657 INFO screener |   candidate SQQQ [options_flow] score=+0.56 — Options flow: 25,382 call / 7,105 put vol (bullish call imbalance +0.56) on a most-active name.
+2026-07-16 10:31:54,657 INFO screener |   candidate SOXS [options_flow] score=+0.51 — Options flow: 20,470 call / 6,596 put vol (bullish call imbalance +0.51) on a most-active name.
+2026-07-16 10:32:14,681 INFO quiver | Quiver live/offexchange -> 5496 row(s).
+2026-07-16 10:32:15,749 INFO quiver | Quiver live/govcontractsall -> 20000 row(s).
+2026-07-16 10:32:33,022 INFO signals | options_chain: reading 25 of 29 symbols this cycle (cap).
+2026-07-16 10:32:39,678 INFO signals | Gathered signals for 29/29 symbols (+3 market signals).
+2026-07-16 10:32:40,521 ERROR mcp.client.auth.oauth2 | OAuth flow error
+Traceback (most recent call last):
+  File "/Users/spusapati/Personal/Investment_stratergy/.venv/lib/python3.13/site-packages/mcp/client/auth/oauth2.py", line 597, in async_auth_flow
+    token_response = yield await self._perform_authorization()
+                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/spusapati/Personal/Investment_stratergy/.venv/lib/python3.13/site-packages/mcp/client/auth/oauth2.py", line 313, in _perform_authorization
+    auth_code, code_verifier = await self._perform_authorization_code_grant()
+                               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/spusapati/Personal/Investment_stratergy/.venv/lib/python3.13/site-packages/mcp/client/auth/oauth2.py", line 322, in _perform_authorization_code_grant
+    raise OAuthFlowError("No redirect handler provided for authorization code grant")  # pragma: no cover
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+mcp.client.auth.exceptions.OAuthFlowError: No redirect handler provided for authorization code grant
+2026-07-16 10:32:40,613 WARNING robinhood | Robinhood MCP call get_equity_positions failed: unhandled errors in a TaskGroup (1 sub-exception)
+2026-07-16 10:32:40,619 INFO orchestrator | Buy-excluded from slate this cycle: BEP (exited 21.0h ago (cooldown 24h)), GOOGL (topped up 2.0h ago (next ok in 4h)), HUBB (exited 22.0h ago (cooldown 24h)), T (exited 1.0h ago (cooldown 24h)), ZTS (topped up 2.0h ago (next ok in 4h))
+2026-07-16 10:33:17,833 INFO usage | decision call: 20645 in / 2707 out (cache r=0 w=0) ~$0.1709 [claude-opus-4-8]
+2026-07-16 10:33:17,839 INFO decision | Claude returned 7 proposal(s).
+2026-07-16 10:33:17,841 INFO orchestrator | Cycle budget $7,861 split across 3 buy(s): UBER $2,894, AMC $2,315, F $2,652.
+2026-07-16 10:33:18,520 ERROR mcp.client.auth.oauth2 | OAuth flow error
+Traceback (most recent call last):
+  File "/Users/spusapati/Personal/Investment_stratergy/.venv/lib/python3.13/site-packages/mcp/client/auth/oauth2.py", line 597, in async_auth_flow
+    token_response = yield await self._perform_authorization()
+                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/spusapati/Personal/Investment_stratergy/.venv/lib/python3.13/site-packages/mcp/client/auth/oauth2.py", line 313, in _perform_authorization
+    auth_code, code_verifier = await self._perform_authorization_code_grant()
+                               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/spusapati/Personal/Investment_stratergy/.venv/lib/python3.13/site-packages/mcp/client/auth/oauth2.py", line 322, in _perform_authorization_code_grant
+    raise OAuthFlowError("No redirect handler provided for authorization code grant")  # pragma: no cover
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+mcp.client.auth.exceptions.OAuthFlowError: No redirect handler provided for authorization code grant
+2026-07-16 10:33:18,616 WARNING robinhood | Robinhood MCP call get_earnings_calendar failed: unhandled errors in a TaskGroup (1 sub-exception)
+2026-07-16 10:33:23,777 INFO risk | REJECT buy UBER: Top-up conviction 0.60 shows no new edge over prior entry 0.56 (needs +0.05) — 'adding to a winner' is not a signal.
+2026-07-16 10:33:23,783 INFO orchestrator | BUY UBER -> rejected: Top-up conviction 0.60 shows no new edge over prior entry 0.56 (needs +0.05) — 'adding to a winner' is not a signal. | Add on improving momentum: news sentiment improving (+0.26/d, Delivery Hero acquisition), options fl
+2026-07-16 10:33:24,362 ERROR mcp.client.auth.oauth2 | OAuth flow error
+Traceback (most recent call last):
+  File "/Users/spusapati/Personal/Investment_stratergy/.venv/lib/python3.13/site-packages/mcp/client/auth/oauth2.py", line 597, in async_auth_flow
+    token_response = yield await self._perform_authorization()
+                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/spusapati/Personal/Investment_stratergy/.venv/lib/python3.13/site-packages/mcp/client/auth/oauth2.py", line 313, in _perform_authorization
+    auth_code, code_verifier = await self._perform_authorization_code_grant()
+                               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/spusapati/Personal/Investment_stratergy/.venv/lib/python3.13/site-packages/mcp/client/auth/oauth2.py", line 322, in _perform_authorization_code_grant
+    raise OAuthFlowError("No redirect handler provided for authorization code grant")  # pragma: no cover
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+mcp.client.auth.exceptions.OAuthFlowError: No redirect handler provided for authorization code grant
+2026-07-16 10:33:24,459 WARNING robinhood | Robinhood MCP call get_earnings_calendar failed: unhandled errors in a TaskGroup (1 sub-exception)
+2026-07-16 10:33:25,089 INFO risk | REJECT buy AMC: Price $1.98 below min $5.00 (liquidity guard).
+2026-07-16 10:33:25,091 INFO orchestrator | BUY AMC -> rejected: Price $1.98 below min $5.00 (liquidity guard). | Starter only: genuine insider open-market buying 250k sh (Form 4, w=0.91), bullish call flow +0.71, 
+2026-07-16 10:33:25,658 ERROR mcp.client.auth.oauth2 | OAuth flow error
+Traceback (most recent call last):
+  File "/Users/spusapati/Personal/Investment_stratergy/.venv/lib/python3.13/site-packages/mcp/client/auth/oauth2.py", line 597, in async_auth_flow
+    token_response = yield await self._perform_authorization()
+                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/spusapati/Personal/Investment_stratergy/.venv/lib/python3.13/site-packages/mcp/client/auth/oauth2.py", line 313, in _perform_authorization
+    auth_code, code_verifier = await self._perform_authorization_code_grant()
+                               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/spusapati/Personal/Investment_stratergy/.venv/lib/python3.13/site-packages/mcp/client/auth/oauth2.py", line 322, in _perform_authorization_code_grant
+    raise OAuthFlowError("No redirect handler provided for authorization code grant")  # pragma: no cover
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+mcp.client.auth.exceptions.OAuthFlowError: No redirect handler provided for authorization code grant
+2026-07-16 10:33:25,757 WARNING robinhood | Robinhood MCP call get_earnings_calendar failed: unhandled errors in a TaskGroup (1 sub-exception)
+2026-07-16 10:33:25,859 INFO risk | REJECT buy F: Top-up conviction 0.55 shows no new edge over prior entry 0.58 (needs +0.05) — 'adding to a winner' is not a signal.
+2026-07-16 10:33:25,860 INFO orchestrator | BUY F -> rejected: Top-up conviction 0.55 shows no new edge over prior entry 0.58 (needs +0.05) — 'adding to a winner' is not a signal. | Add on timing: technical improving (+0.14/d), uptrend px>50>200 MACD bull, insider open-market buyin
+2026-07-16 10:33:26,137 INFO orchestrator | HOLD LPLA (no action) | Winner up 4.2%, strong technical (RSI70, MACD bull, improving +0.11/d), congress + insider net buyin
+2026-07-16 10:33:26,274 INFO orchestrator | HOLD LLY (no action) | Strong fundamentals (50% margin, 55% rev growth), up 2.8%, but options-chain bearish (put/call OI 2.
+2026-07-16 10:33:26,481 INFO orchestrator | HOLD MU (no action) | Down 5.4% with deteriorating technical (MACD bear decaying -0.25/d) and heavy insider selling, but e
+2026-07-16 10:33:26,661 INFO orchestrator | HOLD SOFI (no action) | Down 5.1% but options chain bullish +0.44 and call flow +0.44 with 42% rev growth offset the bearish
+2026-07-16 10:33:26,720 INFO alpaca | Alpaca client ready (mode=paper).
+2026-07-16 10:33:28,970 INFO dashboard | Wrote dashboard with 48 trades -> dashboard.html
+2026-07-16 11:01:51,724 INFO alpaca | Alpaca client ready (mode=paper).
+2026-07-16 11:01:51,996 INFO orchestrator | Discovery-driven mode: trading scanner-found names + holdings.
+2026-07-16 11:01:51,998 INFO orchestrator | Starting orchestrator (paper). Kill switch: off. Options: on. Benchmark: QQQ.
+2026-07-16 11:01:53,100 INFO orchestrator | Market regime: SPY above 200dma (753 vs 693), VIX 16 -> risk-on, size x1.00.
+2026-07-16 11:01:53,965 INFO quiver | Quiver live/congresstrading -> 1000 row(s).
+2026-07-16 11:01:54,289 INFO screener | EDGAR Form-4 feed -> 66 filing(s) (scanning up to 100).
+2026-07-16 11:02:19,629 INFO screener | Options-flow most-actives pool -> 40 name(s).
+2026-07-16 11:02:33,465 ERROR mcp.client.auth.oauth2 | OAuth flow error
+Traceback (most recent call last):
+  File "/Users/spusapati/Personal/Investment_stratergy/.venv/lib/python3.13/site-packages/mcp/client/auth/oauth2.py", line 597, in async_auth_flow
+    token_response = yield await self._perform_authorization()
+                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/spusapati/Personal/Investment_stratergy/.venv/lib/python3.13/site-packages/mcp/client/auth/oauth2.py", line 313, in _perform_authorization
+    auth_code, code_verifier = await self._perform_authorization_code_grant()
+                               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/spusapati/Personal/Investment_stratergy/.venv/lib/python3.13/site-packages/mcp/client/auth/oauth2.py", line 322, in _perform_authorization_code_grant
+    raise OAuthFlowError("No redirect handler provided for authorization code grant")  # pragma: no cover
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+mcp.client.auth.exceptions.OAuthFlowError: No redirect handler provided for authorization code grant
+2026-07-16 11:02:33,606 ERROR robinhood | Robinhood OAuth token is dead (refresh failed; a browser handshake is needed). Disabling ALL Robinhood context reads for this run — the bot trades fine without them. To restore: run `python -m investment_strategy.portfolio.robinhood_auth login`, then restart the bot.
+2026-07-16 11:02:33,607 INFO screener | Robinhood: no curated lists resolved (feed empty/unreachable).
+2026-07-16 11:02:33,608 INFO screener | robinhood_scans screener disabled (no credentials); skipping.
+2026-07-16 11:02:33,609 INFO screener | Discovered 18 candidate(s) from 5 source(s) (179 merged, 171 above min_score, capped to 18).
+2026-07-16 11:02:33,609 INFO screener |   candidate T [congress+options_flow] score=+1.11 — Congress: 4 buy / 1 sell filings in last 60d (disclosures lag up to ~45d). | Options flow: 15,449 call / 5,033 put vol (bullish call imbalance +0.51) on a most-active name.
+2026-07-16 11:02:33,611 INFO screener |   candidate TSCO [congress] score=-1.00 — Congress: 0 buy / 5 sell filings in last 60d (disclosures lag up to ~45d).
+2026-07-16 11:02:33,611 INFO screener |   candidate HUBB [congress] score=+1.00 — Congress: 8 buy / 0 sell filings in last 60d (disclosures lag up to ~45d).
+2026-07-16 11:02:33,612 INFO screener |   candidate WAB [congress] score=-1.00 — Congress: 0 buy / 4 sell filings in last 60d (disclosures lag up to ~45d).
+2026-07-16 11:02:33,613 INFO screener |   candidate BEP [congress] score=+1.00 — Congress: 7 buy / 0 sell filings in last 60d (disclosures lag up to ~45d).
+2026-07-16 11:02:33,614 INFO screener |   candidate FFAI [options_flow] score=+1.00 — Options flow: 386 call / 0 put vol (bullish call imbalance +1.00) on a most-active name.
+2026-07-16 11:02:33,615 INFO screener |   candidate BITO [options_flow] score=+0.81 — Options flow: 3,354 call / 359 put vol (bullish call imbalance +0.81) on a most-active name.
+2026-07-16 11:02:33,615 INFO screener |   candidate LYV [congress] score=-0.75 — Congress: 0 buy / 3 sell filings in last 60d (disclosures lag up to ~45d).
+2026-07-16 11:02:33,616 INFO screener |   candidate WRB [congress] score=-0.75 — Congress: 0 buy / 3 sell filings in last 60d (disclosures lag up to ~45d).
+2026-07-16 11:02:33,617 INFO screener |   candidate ENTG [congress] score=+0.75 — Congress: 3 buy / 0 sell filings in last 60d (disclosures lag up to ~45d).
+2026-07-16 11:02:33,618 INFO screener |   candidate UMH [insider] score=+0.67 — Insider: 2 open-market buy filing(s), 134 sh (SEC Form 4, last filings feed).
+2026-07-16 11:02:33,619 INFO screener |   candidate MSTU [options_flow] score=+0.65 — Options flow: 3,494 call / 742 put vol (bullish call imbalance +0.65) on a most-active name.
+2026-07-16 11:02:33,619 INFO screener |   candidate NOK [options_flow] score=+0.64 — Options flow: 79,047 call / 17,356 put vol (bullish call imbalance +0.64) on a most-active name.
+2026-07-16 11:02:33,620 INFO screener |   candidate ATAI [options_flow] score=+0.62 — Options flow: 19,265 call / 4,581 put vol (bullish call imbalance +0.62) on a most-active name.
+2026-07-16 11:02:33,621 INFO screener |   candidate SNDQ [options_flow] score=+0.57 — Options flow: 7,814 call / 2,123 put vol (bullish call imbalance +0.57) on a most-active name.
+2026-07-16 11:02:33,622 INFO screener |   candidate SQQQ [options_flow] score=+0.54 — Options flow: 27,834 call / 8,418 put vol (bullish call imbalance +0.54) on a most-active name.
+2026-07-16 11:02:33,623 INFO screener |   candidate ONDS [options_flow] score=+0.50 — Options flow: 22,361 call / 7,369 put vol (bullish call imbalance +0.50) on a most-active name.
+2026-07-16 11:02:33,624 INFO screener |   candidate MPWR [congress] score=-0.50 — Congress: 0 buy / 2 sell filings in last 60d (disclosures lag up to ~45d).
+2026-07-16 11:02:54,787 WARNING signals | Finnhub news-sentiment is premium-gated on this key (HTTP 403) — using the VADER fallback for this run.
+2026-07-16 11:02:56,599 INFO quiver | Quiver live/offexchange -> 5496 row(s).
+2026-07-16 11:03:00,902 INFO quiver | Quiver live/govcontractsall -> 20000 row(s).
+2026-07-16 11:05:25,086 INFO signals | options_chain: reading 25 of 29 symbols this cycle (cap).
+2026-07-16 11:05:32,457 INFO signals | Gathered signals for 29/29 symbols (+3 market signals).
+2026-07-16 11:05:32,791 INFO orchestrator | Buy-excluded from slate this cycle: BEP (exited 21.5h ago (cooldown 24h)), GOOGL (topped up 2.5h ago (next ok in 4h)), HUBB (exited 22.5h ago (cooldown 24h)), T (exited 1.5h ago (cooldown 24h)), ZTS (topped up 2.5h ago (next ok in 4h))
+2026-07-16 11:06:06,547 INFO usage | decision call: 21054 in / 2537 out (cache r=0 w=0) ~$0.1687 [claude-opus-4-8]
+2026-07-16 11:06:06,550 INFO decision | Claude returned 6 proposal(s).
+2026-07-16 11:06:06,552 INFO orchestrator | Cycle budget $7,864 split across 2 buy(s): UMH $4,119, NOK $3,745.
+2026-07-16 11:06:11,961 INFO orchestrator | BUY UMH -> approved: Sized to 187.129 sh ($2,936) within caps. | Insider open-market buying (Form 4 +1.00 w=0.91) corroborated by solid REIT fundamentals (margin 44.
+2026-07-16 11:06:12,012 WARNING alpaca | UMH: floored 187.129 sh -> 187 for the exchange bracket; $2.02 of the $2936.05 allocation NOT deployed (stays cash; core sweep / next cycle can redeploy).
+2026-07-16 11:06:12,102 INFO alpaca | BUY market UMH qty=187.0 notional=None lim=None (order f858fe4d-5b02-4c47-876a-c8e22137c572)
+2026-07-16 11:06:12,108 INFO ledger | Ledger: BUY UMH qty=187 $2934
+2026-07-16 11:06:12,736 INFO orchestrator | BUY NOK -> approved: Sized to 234.922 sh ($2,447) within caps. | Heavy bullish call flow (79k call/17k put, +0.64) plus bullish options-chain positioning (+0.47, cal
+2026-07-16 11:06:12,784 WARNING alpaca | NOK: floored 234.922 sh -> 234 for the exchange bracket; $9.60 of the $2446.71 allocation NOT deployed (stays cash; core sweep / next cycle can redeploy).
+2026-07-16 11:06:12,880 INFO alpaca | BUY market NOK qty=234.0 notional=None lim=None (order a53f1b48-3aad-4116-b954-679262cfc786)
+2026-07-16 11:06:12,884 INFO ledger | Ledger: BUY NOK qty=234 $2437
+2026-07-16 11:06:13,037 INFO orchestrator | HOLD MU (no action) | Exceptional fundamentals (margin 75.6%, rev +345.7%, low D/E) but technical is deteriorating fast (M
+2026-07-16 11:06:13,178 INFO orchestrator | HOLD SOFI (no action) | Down 5.5% but bullish options positioning (+0.49) and call flow (+0.40) with strong rev growth (+42.
+2026-07-16 11:06:13,378 INFO orchestrator | HOLD LPLA (no action) | Best-performing holding (+3.7%), improving technical (+0.65, RSI 69, MACD bull), congressional and i
+2026-07-16 11:06:13,518 INFO orchestrator | HOLD BRK.B (no action) | Solid fundamentals (margin 31.4%, $118B EBITDA) but technical decaying (MACD bear, RSI 45) and beari
+2026-07-16 11:06:13,524 INFO orchestrator | Cycle budget not fully deployed: $11.62 dropped by whole-share flooring across this cycle's buys (stays cash; core sweep / next cycle can redeploy).
+2026-07-16 11:06:13,590 INFO alpaca | Alpaca client ready (mode=paper).
+2026-07-16 11:06:15,428 INFO dashboard | Wrote dashboard with 49 trades -> dashboard.html
+2026-07-16 12:01:56,902 INFO orchestrator | Market regime: SPY above 200dma (753 vs 693), VIX 16 -> risk-on, size x1.00.
+2026-07-16 12:02:00,634 INFO quiver | Quiver live/congresstrading -> 1000 row(s).
+2026-07-16 12:02:00,963 INFO screener | EDGAR Form-4 feed -> 54 filing(s) (scanning up to 100).
+2026-07-16 12:02:22,461 INFO screener | Options-flow most-actives pool -> 40 name(s).
+2026-07-16 12:02:38,791 INFO screener | robinhood screener disabled (no credentials); skipping.
+2026-07-16 12:02:38,797 INFO screener | robinhood_scans screener disabled (no credentials); skipping.
+2026-07-16 12:02:38,799 INFO screener | Discovered 18 candidate(s) from 5 source(s) (179 merged, 170 above min_score, capped to 18).
+2026-07-16 12:02:38,801 INFO screener |   candidate T [congress+options_flow] score=+1.24 — Congress: 4 buy / 1 sell filings in last 60d (disclosures lag up to ~45d). | Options flow: 33,866 call / 7,422 put vol (bullish call imbalance +0.64) on a most-active name.
+2026-07-16 12:02:38,804 INFO screener |   candidate TSCO [congress] score=-1.00 — Congress: 0 buy / 5 sell filings in last 60d (disclosures lag up to ~45d).
+2026-07-16 12:02:38,806 INFO screener |   candidate HUBB [congress] score=+1.00 — Congress: 8 buy / 0 sell filings in last 60d (disclosures lag up to ~45d).
+2026-07-16 12:02:38,808 INFO screener |   candidate WAB [congress] score=-1.00 — Congress: 0 buy / 4 sell filings in last 60d (disclosures lag up to ~45d).
+2026-07-16 12:02:38,809 INFO screener |   candidate BEP [congress] score=+1.00 — Congress: 7 buy / 0 sell filings in last 60d (disclosures lag up to ~45d).
+2026-07-16 12:02:38,811 INFO screener |   candidate FFAI [options_flow] score=+1.00 — Options flow: 396 call / 0 put vol (bullish call imbalance +1.00) on a most-active name.
+2026-07-16 12:02:38,813 INFO screener |   candidate BITO [options_flow] score=+0.77 — Options flow: 3,683 call / 469 put vol (bullish call imbalance +0.77) on a most-active name.
+2026-07-16 12:02:38,815 INFO screener |   candidate MSTU [options_flow] score=+0.77 — Options flow: 6,371 call / 837 put vol (bullish call imbalance +0.77) on a most-active name.
+2026-07-16 12:02:38,817 INFO screener |   candidate LYV [congress] score=-0.75 — Congress: 0 buy / 3 sell filings in last 60d (disclosures lag up to ~45d).
+2026-07-16 12:02:38,819 INFO screener |   candidate WRB [congress] score=-0.75 — Congress: 0 buy / 3 sell filings in last 60d (disclosures lag up to ~45d).
+2026-07-16 12:02:38,820 INFO screener |   candidate ENTG [congress] score=+0.75 — Congress: 3 buy / 0 sell filings in last 60d (disclosures lag up to ~45d).
+2026-07-16 12:02:38,822 INFO screener |   candidate EOSE [options_flow] score=+0.75 — Options flow: 19,909 call / 2,867 put vol (bullish call imbalance +0.75) on a most-active name.
+2026-07-16 12:02:38,824 INFO screener |   candidate ATAI [options_flow] score=+0.62 — Options flow: 20,889 call / 4,937 put vol (bullish call imbalance +0.62) on a most-active name.
+2026-07-16 12:02:38,825 INFO screener |   candidate SNDQ [options_flow] score=+0.56 — Options flow: 9,441 call / 2,642 put vol (bullish call imbalance +0.56) on a most-active name.
+2026-07-16 12:02:38,827 INFO screener |   candidate SQQQ [options_flow] score=+0.55 — Options flow: 40,758 call / 11,684 put vol (bullish call imbalance +0.55) on a most-active name.
+2026-07-16 12:02:38,828 INFO screener |   candidate SOXS [options_flow] score=+0.51 — Options flow: 29,983 call / 9,657 put vol (bullish call imbalance +0.51) on a most-active name.
+2026-07-16 12:02:38,830 INFO screener |   candidate MPWR [congress] score=-0.50 — Congress: 0 buy / 2 sell filings in last 60d (disclosures lag up to ~45d).
+2026-07-16 12:02:38,831 INFO screener |   candidate COO [congress] score=+0.50 — Congress: 2 buy / 0 sell filings in last 60d (disclosures lag up to ~45d).
+2026-07-16 12:02:59,734 INFO quiver | Quiver live/offexchange -> 5496 row(s).
+2026-07-16 12:03:00,913 INFO quiver | Quiver live/govcontractsall -> 20000 row(s).
+2026-07-16 12:03:33,672 INFO signals | options_chain: reading 25 of 31 symbols this cycle (cap).
+2026-07-16 12:03:43,186 INFO signals | Gathered signals for 31/31 symbols (+3 market signals).
+2026-07-16 12:03:43,637 INFO orchestrator | Buy-excluded from slate this cycle: BEP (exited 22.5h ago (cooldown 24h)), GOOGL (topped up 3.5h ago (next ok in 4h)), HUBB (exited 23.5h ago (cooldown 24h)), NOK (topped up 1.0h ago (next ok in 4h)), T (exited 2.5h ago (cooldown 24h)) …+2 more
+2026-07-16 12:04:28,385 INFO usage | decision call: 21950 in / 3051 out (cache r=0 w=0) ~$0.1860 [claude-opus-4-8]
+2026-07-16 12:04:28,392 INFO decision | Claude returned 7 proposal(s).
+2026-07-16 12:04:28,803 INFO orchestrator | HOLD GOOGL (no action) | Best fundamental quality on the slate: EBITDA $161B, 38% margin, rev +21.8%, MACD bull. Congress/ins
+2026-07-16 12:04:28,910 INFO orchestrator | HOLD MU (no action) | Stellar fundamentals (75% margin, rev +346%) but technicals decaying hard (-0.23/d, MACD bear) and h
+2026-07-16 12:04:29,059 INFO orchestrator | HOLD LPLA (no action) | Best momentum among holds: technical improving (+0.12/d), MACD bull, RSI 69, congress/insider buying
+2026-07-16 12:04:29,240 INFO orchestrator | HOLD SOFI (no action) | Down -6% but options_chain bullish (+0.54, improving) and positive flow; fundamentals soft, technica
+2026-07-16 12:04:29,409 INFO orchestrator | HOLD LLY (no action) | Elite fundamentals (50% margin, rev +55%) and uptrend, but options_chain bearish (-0.43, put/call OI
+2026-07-16 12:04:29,546 INFO orchestrator | HOLD F (no action) | Technical improving (+0.12/d), MACD bull, uptrend, insider buying and federal contract awards, but w
+2026-07-16 12:04:29,765 INFO orchestrator | HOLD UBER (no action) | News sentiment improving sharply (+0.26/d, Delivery Hero acquisition), strong options flow (+0.58). 
+2026-07-16 12:04:29,833 INFO alpaca | Alpaca client ready (mode=paper).
+2026-07-16 12:04:31,955 INFO dashboard | Wrote dashboard with 49 trades -> dashboard.html
+2026-07-16 13:02:14,419 INFO ledger | Ledger: SELL SOFI qty=429 $7460
+2026-07-16 13:02:14,440 INFO orchestrator | Backfilled exchange exit: SOFI 429 sh @ 17.39 (stop -> bracket_stop, -6.6%).
+2026-07-16 13:02:15,260 INFO orchestrator | Market regime: SPY above 200dma (751 vs 693), VIX 16 -> risk-on, size x1.00.
+2026-07-16 13:02:16,019 INFO quiver | Quiver live/congresstrading -> 1000 row(s).
+2026-07-16 13:02:16,501 INFO screener | EDGAR Form-4 feed -> 63 filing(s) (scanning up to 100).
+2026-07-16 13:02:42,498 INFO screener | Options-flow most-actives pool -> 40 name(s).
+2026-07-16 13:02:58,660 INFO screener | robinhood screener disabled (no credentials); skipping.
+2026-07-16 13:02:58,666 INFO screener | robinhood_scans screener disabled (no credentials); skipping.
+2026-07-16 13:02:58,669 INFO screener | Discovered 18 candidate(s) from 5 source(s) (179 merged, 170 above min_score, capped to 18).
+2026-07-16 13:02:58,671 INFO screener |   candidate T [congress+options_flow] score=+1.27 — Congress: 4 buy / 1 sell filings in last 60d (disclosures lag up to ~45d). | Options flow: 39,802 call / 7,934 put vol (bullish call imbalance +0.67) on a most-active name.
+2026-07-16 13:02:58,677 INFO screener |   candidate TSCO [congress] score=-1.00 — Congress: 0 buy / 5 sell filings in last 60d (disclosures lag up to ~45d).
+2026-07-16 13:02:58,679 INFO screener |   candidate HUBB [congress] score=+1.00 — Congress: 8 buy / 0 sell filings in last 60d (disclosures lag up to ~45d).
+2026-07-16 13:02:58,681 INFO screener |   candidate WAB [congress] score=-1.00 — Congress: 0 buy / 4 sell filings in last 60d (disclosures lag up to ~45d).
+2026-07-16 13:02:58,683 INFO screener |   candidate BEP [congress] score=+1.00 — Congress: 7 buy / 0 sell filings in last 60d (disclosures lag up to ~45d).
+2026-07-16 13:02:58,685 INFO screener |   candidate BITO [options_flow] score=+0.80 — Options flow: 4,745 call / 520 put vol (bullish call imbalance +0.80) on a most-active name.
+2026-07-16 13:02:58,688 INFO screener |   candidate MSTU [options_flow] score=+0.79 — Options flow: 7,285 call / 873 put vol (bullish call imbalance +0.79) on a most-active name.
+2026-07-16 13:02:58,689 INFO screener |   candidate LYV [congress] score=-0.75 — Congress: 0 buy / 3 sell filings in last 60d (disclosures lag up to ~45d).
+2026-07-16 13:02:58,691 INFO screener |   candidate WRB [congress] score=-0.75 — Congress: 0 buy / 3 sell filings in last 60d (disclosures lag up to ~45d).
+2026-07-16 13:02:58,692 INFO screener |   candidate ENTG [congress] score=+0.75 — Congress: 3 buy / 0 sell filings in last 60d (disclosures lag up to ~45d).
+2026-07-16 13:02:58,694 INFO screener |   candidate ATAI [options_flow] score=+0.66 — Options flow: 24,658 call / 5,101 put vol (bullish call imbalance +0.66) on a most-active name.
+2026-07-16 13:02:58,695 INFO screener |   candidate SNDQ [options_flow] score=+0.55 — Options flow: 9,834 call / 2,828 put vol (bullish call imbalance +0.55) on a most-active name.
+2026-07-16 13:02:58,697 INFO screener |   candidate SQQQ [options_flow] score=+0.54 — Options flow: 47,663 call / 14,269 put vol (bullish call imbalance +0.54) on a most-active name.
+2026-07-16 13:02:58,698 INFO screener |   candidate NVD [options_flow] score=+0.52 — Options flow: 108 call / 34 put vol (bullish call imbalance +0.52) on a most-active name.
+2026-07-16 13:02:58,699 INFO screener |   candidate MPWR [congress] score=-0.50 — Congress: 0 buy / 2 sell filings in last 60d (disclosures lag up to ~45d).
+2026-07-16 13:02:58,700 INFO screener |   candidate COO [congress] score=+0.50 — Congress: 2 buy / 0 sell filings in last 60d (disclosures lag up to ~45d).
+2026-07-16 13:02:58,702 INFO screener |   candidate IBM [congress] score=+0.50 — Congress: 3 buy / 1 sell filings in last 60d (disclosures lag up to ~45d).
+2026-07-16 13:02:58,703 INFO screener |   candidate UNH [congress] score=-0.50 — Congress: 1 buy / 3 sell filings in last 60d (disclosures lag up to ~45d).
+2026-07-16 13:03:21,865 INFO quiver | Quiver live/offexchange -> 5496 row(s).
+2026-07-16 13:03:22,431 INFO quiver | Quiver live/govcontractsall -> 20000 row(s).
+2026-07-16 13:03:55,107 INFO signals | options_chain: reading 25 of 30 symbols this cycle (cap).
+2026-07-16 13:04:02,010 INFO signals | Gathered signals for 30/30 symbols (+3 market signals).
+2026-07-16 13:04:02,535 INFO orchestrator | Buy-excluded from slate this cycle: BEP (exited 23.5h ago (cooldown 24h)), NOK (topped up 2.0h ago (next ok in 4h)), T (exited 3.5h ago (cooldown 24h)), UMH (topped up 2.0h ago (next ok in 4h))
+2026-07-16 13:04:44,154 INFO usage | decision call: 22272 in / 2732 out (cache r=0 w=0) ~$0.1797 [claude-opus-4-8]
+2026-07-16 13:04:44,163 INFO decision | Claude returned 2 proposal(s).
+2026-07-16 13:04:50,291 INFO orchestrator | BUY COO -> approved: Sized to 40.2024 sh ($2,928) within caps. | Corroborated smart-money: congress 2 buys/0 sells (w=0.23) plus insider net buying 2,814/0 sh, on so
+2026-07-16 13:04:50,420 WARNING alpaca | COO: floored 40.2024 sh -> 40 for the exchange bracket; $14.74 of the $2927.54 allocation NOT deployed (stays cash; core sweep / next cycle can redeploy).
+2026-07-16 13:04:50,497 INFO alpaca | BUY market COO qty=40.0 notional=None lim=None (order f379c0ab-86c5-4709-a9ee-a30c3d3a5937)
+2026-07-16 13:04:50,505 INFO ledger | Ledger: BUY COO qty=40 $2913
+2026-07-16 13:04:50,631 INFO orchestrator | HOLD MU (no action) | Exceptional fundamentals (75% margin, rev +345%) argue against dumping into weakness, but technical 
+2026-07-16 13:04:50,636 INFO orchestrator | Cycle budget not fully deployed: $14.74 dropped by whole-share flooring across this cycle's buys (stays cash; core sweep / next cycle can redeploy).
+2026-07-16 13:04:50,701 INFO alpaca | Alpaca client ready (mode=paper).
+2026-07-16 13:04:52,891 INFO dashboard | Wrote dashboard with 51 trades -> dashboard.html
+2026-07-16 14:02:35,723 INFO orchestrator | Market regime: SPY above 200dma (751 vs 693), VIX 17 -> risk-on, size x1.00.
+2026-07-16 14:02:36,371 INFO quiver | Quiver live/congresstrading -> 1000 row(s).
+2026-07-16 14:02:36,734 INFO screener | EDGAR Form-4 feed -> 61 filing(s) (scanning up to 100).
+2026-07-16 14:03:03,967 INFO screener | Options-flow most-actives pool -> 40 name(s).
+2026-07-16 14:03:22,167 INFO screener | robinhood screener disabled (no credentials); skipping.
+2026-07-16 14:03:22,170 INFO screener | robinhood_scans screener disabled (no credentials); skipping.
+2026-07-16 14:03:22,172 INFO screener | Discovered 18 candidate(s) from 5 source(s) (176 merged, 167 above min_score, capped to 18).
+2026-07-16 14:03:22,173 INFO screener |   candidate T [congress+options_flow] score=+1.18 — Congress: 4 buy / 1 sell filings in last 60d (disclosures lag up to ~45d). | Options flow: 46,754 call / 12,509 put vol (bullish call imbalance +0.58) on a most-active name.
+2026-07-16 14:03:22,176 INFO screener |   candidate TSCO [congress] score=-1.00 — Congress: 0 buy / 5 sell filings in last 60d (disclosures lag up to ~45d).
+2026-07-16 14:03:22,177 INFO screener |   candidate HUBB [congress] score=+1.00 — Congress: 8 buy / 0 sell filings in last 60d (disclosures lag up to ~45d).
+2026-07-16 14:03:22,178 INFO screener |   candidate WAB [congress] score=-1.00 — Congress: 0 buy / 4 sell filings in last 60d (disclosures lag up to ~45d).
+2026-07-16 14:03:22,179 INFO screener |   candidate BEP [congress] score=+1.00 — Congress: 7 buy / 0 sell filings in last 60d (disclosures lag up to ~45d).
+2026-07-16 14:03:22,180 INFO screener |   candidate LYV [congress] score=-0.75 — Congress: 0 buy / 3 sell filings in last 60d (disclosures lag up to ~45d).
+2026-07-16 14:03:22,181 INFO screener |   candidate WRB [congress] score=-0.75 — Congress: 0 buy / 3 sell filings in last 60d (disclosures lag up to ~45d).
+2026-07-16 14:03:22,182 INFO screener |   candidate ENTG [congress] score=+0.75 — Congress: 3 buy / 0 sell filings in last 60d (disclosures lag up to ~45d).
+2026-07-16 14:03:22,184 INFO screener |   candidate ATAI [options_flow] score=+0.66 — Options flow: 25,810 call / 5,305 put vol (bullish call imbalance +0.66) on a most-active name.
+2026-07-16 14:03:22,186 INFO screener |   candidate SNDQ [options_flow] score=+0.64 — Options flow: 13,320 call / 2,909 put vol (bullish call imbalance +0.64) on a most-active name.
+2026-07-16 14:03:22,188 INFO screener |   candidate MSTU [options_flow] score=+0.61 — Options flow: 7,672 call / 1,851 put vol (bullish call imbalance +0.61) on a most-active name.
+2026-07-16 14:03:22,191 INFO screener |   candidate SQQQ [options_flow] score=+0.56 — Options flow: 55,905 call / 15,667 put vol (bullish call imbalance +0.56) on a most-active name.
+2026-07-16 14:03:22,193 INFO screener |   candidate SOXS [options_flow] score=+0.56 — Options flow: 50,167 call / 14,225 put vol (bullish call imbalance +0.56) on a most-active name.
+2026-07-16 14:03:22,194 INFO screener |   candidate NVD [options_flow] score=+0.51 — Options flow: 115 call / 37 put vol (bullish call imbalance +0.51) on a most-active name.
+2026-07-16 14:03:22,195 INFO screener |   candidate BITO [options_flow] score=+0.51 — Options flow: 5,249 call / 1,721 put vol (bullish call imbalance +0.51) on a most-active name.
+2026-07-16 14:03:22,197 INFO screener |   candidate MPWR [congress] score=-0.50 — Congress: 0 buy / 2 sell filings in last 60d (disclosures lag up to ~45d).
+2026-07-16 14:03:22,197 INFO screener |   candidate IBM [congress] score=+0.50 — Congress: 3 buy / 1 sell filings in last 60d (disclosures lag up to ~45d).
+2026-07-16 14:03:22,198 INFO screener |   candidate UNH [congress] score=-0.50 — Congress: 1 buy / 3 sell filings in last 60d (disclosures lag up to ~45d).
+2026-07-16 14:03:41,449 INFO quiver | Quiver live/offexchange -> 5496 row(s).
+2026-07-16 14:03:42,222 INFO quiver | Quiver live/govcontractsall -> 20000 row(s).
+2026-07-16 14:04:00,530 INFO signals | options_chain: reading 25 of 31 symbols this cycle (cap).
+2026-07-16 14:04:07,527 INFO signals | Gathered signals for 31/31 symbols (+3 market signals).
+2026-07-16 14:04:08,072 INFO orchestrator | Buy-excluded from slate this cycle: COO (topped up 1.0h ago (next ok in 4h)), NOK (topped up 3.0h ago (next ok in 4h)), T (exited 4.5h ago (cooldown 24h)), UMH (topped up 3.0h ago (next ok in 4h))
+2026-07-16 14:04:56,286 INFO usage | decision call: 23110 in / 3121 out (cache r=0 w=0) ~$0.1936 [claude-opus-4-8]
+2026-07-16 14:04:56,292 INFO decision | Claude returned 8 proposal(s).
+2026-07-16 14:04:56,520 INFO orchestrator | HOLD GOOGL (no action) | Strong fundamentals (rev +21.8%, 38.2% margin, EBITDA $161B) and bullish options positioning; techni
+2026-07-16 14:04:56,718 INFO orchestrator | HOLD LLY (no action) | Elite fundamentals (rev +55.5%, 50% margin) and uptrend intact; improving news sentiment. Offset by 
+2026-07-16 14:04:56,859 INFO orchestrator | HOLD MU (no action) | Exceptional fundamentals (rev +345%, 75% margin) but technical decaying (MACD bear, RSI 41) and heav
+2026-07-16 14:04:57,057 INFO orchestrator | HOLD LPLA (no action) | Up +3.7%; strong improving technical (RSI 69, MACD bull) and congress/insider buying, but negative o
+2026-07-16 14:04:57,222 INFO orchestrator | HOLD UBER (no action) | Improving news sentiment and bullish options flow (+0.56), solid fundamentals; technical improving. 
+2026-07-16 14:04:57,405 INFO orchestrator | HOLD PATH (no action) | Up +1.6%; bullish options flow (+0.61) and MACD bull, but insider selling (-1.00). Thin edge — hold.
+2026-07-16 14:04:57,647 INFO orchestrator | HOLD SPCX (no action) | Down -5.6% but improving news/options-chain trend and bullish positioning; congress/insider net buyi
+2026-07-16 14:04:57,764 INFO orchestrator | HOLD BRK.B (no action) | Solid fundamentals and positive news, but technical decaying (MACD bear, RSI 47) and bearish OI. Hol
+2026-07-16 14:04:57,827 INFO alpaca | Alpaca client ready (mode=paper).
+2026-07-16 14:04:59,937 INFO dashboard | Wrote dashboard with 51 trades -> dashboard.html
+2026-07-16 15:02:43,364 INFO orchestrator | Market closed; skipping decision cycle.
+2026-07-16 15:02:43,395 INFO orchestrator | Running nightly post-mortem for 2026-07-16 …
+2026-07-16 15:02:52,622 INFO usage | postmortem call: 2870 in / 484 out (cache r=0 w=0) ~$0.0265 [claude-opus-4-8]
+2026-07-16 15:02:52,631 INFO postmortem | Post-mortem written to state/lessons/2026-07-16.md
+2026-07-16 15:02:52,657 INFO postmortem | Post-mortem lessons: Auto-suppress sub-$5 names (e.g. AMC) from the slate after first liquidity-guard rejection to cut repeat waste. | Keep single-symbol dollars capped: QQQ hit ~30% today — flag any name exceeding one-third of daily buys.
+2026-07-16 15:02:52,666 INFO orchestrator | API spend today: $1.28 across 8 calls (156,484 in / 19,941 out tokens).
+2026-07-16 15:02:52,725 INFO alpaca | Alpaca client ready (mode=paper).
+2026-07-16 15:02:55,045 INFO dashboard | Wrote dashboard with 51 trades -> dashboard.html
+2026-07-16 16:03:10,007 INFO orchestrator | Market closed; skipping decision cycle.
+2026-07-16 16:03:10,100 INFO alpaca | Alpaca client ready (mode=paper).
+2026-07-16 16:03:12,144 INFO dashboard | Wrote dashboard with 51 trades -> dashboard.html
+2026-07-16 17:03:28,008 INFO orchestrator | Market closed; skipping decision cycle.
+2026-07-16 17:03:28,380 INFO alpaca | Alpaca client ready (mode=paper).
+2026-07-16 17:03:30,644 INFO dashboard | Wrote dashboard with 51 trades -> dashboard.html
+2026-07-16 17:08:49,534 INFO alpaca | Alpaca client ready (mode=paper).
+2026-07-16 17:08:49,819 INFO orchestrator | Discovery-driven mode: trading scanner-found names + holdings.
+2026-07-16 17:08:49,820 INFO orchestrator | Starting orchestrator (paper). Kill switch: off. Options: on. Benchmark: QQQ.
+2026-07-16 17:08:50,135 INFO orchestrator | Market closed; skipping decision cycle.
+2026-07-16 17:08:50,194 INFO alpaca | Alpaca client ready (mode=paper).
+2026-07-16 17:08:52,315 INFO dashboard | Wrote dashboard with 51 trades -> dashboard.html
+2026-07-16 18:09:19,227 INFO orchestrator | Market closed; skipping decision cycle.
+2026-07-16 18:10:09,592 INFO alpaca | Alpaca client ready (mode=paper).
+2026-07-16 18:10:54,754 INFO dashboard | Wrote dashboard with 51 trades -> dashboard.html
+2026-07-16 19:09:08,843 INFO orchestrator | Market closed; skipping decision cycle.
+2026-07-16 19:09:08,974 INFO alpaca | Alpaca client ready (mode=paper).
+2026-07-16 19:09:11,352 INFO dashboard | Wrote dashboard with 51 trades -> dashboard.html
+2026-07-16 19:24:54,579 INFO alpaca | Alpaca client ready (mode=paper).
+2026-07-16 19:24:54,838 INFO orchestrator | Discovery-driven mode: trading scanner-found names + holdings.
+2026-07-16 19:24:54,840 INFO orchestrator | Starting orchestrator (paper). Kill switch: off. Options: on. Benchmark: QQQ.
+2026-07-16 19:24:55,152 INFO orchestrator | Market closed; skipping decision cycle.
+2026-07-16 19:24:55,216 INFO alpaca | Alpaca client ready (mode=paper).
+2026-07-16 19:24:57,376 INFO dashboard | Wrote dashboard with 51 trades -> dashboard.html
+2026-07-16 20:25:13,410 INFO orchestrator | Market closed; skipping decision cycle.
+2026-07-16 20:25:13,714 INFO alpaca | Alpaca client ready (mode=paper).
+2026-07-16 20:25:15,783 INFO dashboard | Wrote dashboard with 51 trades -> dashboard.html
+2026-07-16 21:25:31,674 INFO orchestrator | Market closed; skipping decision cycle.
+2026-07-16 21:25:31,738 INFO alpaca | Alpaca client ready (mode=paper).
+2026-07-16 21:25:33,904 INFO dashboard | Wrote dashboard with 51 trades -> dashboard.html
+2026-07-16 22:25:50,067 INFO orchestrator | Market closed; skipping decision cycle.
+2026-07-16 22:25:50,134 INFO alpaca | Alpaca client ready (mode=paper).
+2026-07-16 22:25:52,260 INFO dashboard | Wrote dashboard with 51 trades -> dashboard.html
+2026-07-16 23:26:09,929 INFO orchestrator | Market closed; skipping decision cycle.
+2026-07-16 23:26:10,011 INFO alpaca | Alpaca client ready (mode=paper).
+2026-07-16 23:26:15,234 INFO dashboard | Wrote dashboard with 51 trades -> dashboard.html

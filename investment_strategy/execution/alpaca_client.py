@@ -261,6 +261,20 @@ class AlpacaClient:
             log.warning("next_market_open failed: %s", e)
             return None
 
+    def next_market_close(self) -> Optional[datetime]:
+        """UTC datetime of the current/next session close, or None on a failed
+        clock read (callers treat None as 'unknown — don't fence'). Feeds the
+        decision loop's close fence."""
+        try:
+            clock = _retry_read(self.trading.get_clock, what="get_clock")
+            nxt = getattr(clock, "next_close", None)
+            if nxt is not None and nxt.tzinfo is None:
+                nxt = nxt.replace(tzinfo=timezone.utc)
+            return nxt
+        except Exception as e:
+            log.warning("next_market_close failed: %s", e)
+            return None
+
     def portfolio_basis(self) -> Optional[tuple[float, float]]:
         """(base_value, net_cashflows) since account inception, for true
         total-return math: total_return = equity - base_value - net_cashflows
