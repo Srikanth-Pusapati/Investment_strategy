@@ -999,6 +999,8 @@ def test_bell_stash_survives_failed_cycle_and_clears_on_success():
     o._last_decision_at = 0.0            # hourly due -> _tick runs the cycle
     o._refresh_runtime_controls = lambda: None
     o._refresh_dashboard = lambda: None
+    o._cycle_market_open = True
+    o._dashboard_open_last = True
     bell = datetime.now(timezone.utc) - timedelta(seconds=1)  # consumed stash
     o._next_open_utc = bell
 

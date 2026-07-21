@@ -158,6 +158,13 @@ class Orchestrator:
         # can fire a decision AT the bell instead of at the next hourly tick
         # (2026-07-13: a tick 17s before the open slept through the first hour).
         self._next_open_utc: datetime | None = None
+        # Whether the last cycle found the market open. Gates the dashboard
+        # refresh: rebuilding the HTML every hour overnight burns an AlpacaClient
+        # + full price sweep for byte-identical output. True initially so the
+        # first tick always paints; a final refresh still fires on the
+        # open->closed transition to capture the settled end-of-day picture.
+        self._cycle_market_open = True
+        self._dashboard_open_last = True
         # Serializes broker order mutations so the watchdog's emergency closes and
         # the decision cycle's order placement can't interleave (e.g. double-close).
         # It guards only the quick submit/close calls — never the slow LLM call —
@@ -357,7 +364,12 @@ class Orchestrator:
             return
         cycle_start = time.monotonic()
         self.run_decision_cycle()
-        self._refresh_dashboard()
+        # Refresh the dashboard while the market is open, plus exactly once on
+        # the open->closed transition (the settled end-of-day snapshot). Skip
+        # the hourly overnight rebuilds — they repaint byte-identical HTML.
+        if self._cycle_market_open or self._dashboard_open_last:
+            self._refresh_dashboard()
+        self._dashboard_open_last = self._cycle_market_open
         # Stamp the cycle START, not the end: an end stamp adds each cycle's
         # own runtime (~3-4 min of signal fetches + LLM) to the cadence, so
         # ticks drifted later every hour (Jul 13: 10:30 -> 11:34 -> ... ->
@@ -473,7 +485,8 @@ class Orchestrator:
             log.warning("Nightly post-mortem failed: %s", e)
 
     def run_decision_cycle(self) -> None:
-        if not self.broker.is_market_open():
+        self._cycle_market_open = self.broker.is_market_open()
+        if not self._cycle_market_open:
             log.info("Market closed; skipping decision cycle.")
             self._maybe_run_postmortem()
             self._stamp_liveness()  # the postmortem's LLM call can run ~2 min
@@ -579,6 +592,15 @@ class Orchestrator:
                     b.symbol: b.composite_score
                     for b in bundles if b.composite_score is not None
                 }
+                if composites:
+                    top = sorted(
+                        composites.items(), key=lambda kv: kv[1], reverse=True
+                    )[:8]
+                    log.info(
+                        "Composite index (%d scored, top: %s).",
+                        len(composites),
+                        ", ".join(f"{s} {v:+.2f}" for s, v in top),
+                    )
             except Exception as e:
                 log.warning("Composite index unavailable this cycle: %s", e)
 

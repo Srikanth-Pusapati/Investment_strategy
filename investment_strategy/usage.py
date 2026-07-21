@@ -10,8 +10,26 @@ import json
 import logging
 from datetime import datetime, timezone
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 log = logging.getLogger("usage")
+
+_ET = ZoneInfo("America/New_York")
+
+
+def _et_day(ts: str) -> str:
+    """ET calendar day for a UTC ISO timestamp string. The rollup keys on the
+    ET trading day (not the UTC day) so a post-mortem that runs after UTC
+    midnight — e.g. 03:43Z, which is still the SAME ET trading day — tallies
+    the whole session's spend, not the sliver after 00:00Z. Same bug class as
+    the PR #27 post-mortem UTC-midnight fix."""
+    try:
+        dt = datetime.fromisoformat(ts)
+    except (ValueError, TypeError):
+        return ""
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    return dt.astimezone(_ET).date().isoformat()
 
 DEFAULT_USAGE_PATH = Path("state") / "api_usage.jsonl"
 
@@ -76,9 +94,11 @@ def record_usage(
 def summarize_day(
     day: str | None = None, path: Path = DEFAULT_USAGE_PATH,
 ) -> tuple[int, int, int, float]:
-    """Return (calls, input_tokens, output_tokens, est_cost_usd) for a UTC day
-    (``YYYY-MM-DD``, default today)."""
-    day = day or datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    """Return (calls, input_tokens, output_tokens, est_cost_usd) for an ET
+    trading day (``YYYY-MM-DD``, default today in ET). Records are stamped in
+    UTC but bucketed by their ET day, so the nightly rollup — which fires after
+    the close, sometimes past UTC midnight — counts the whole session."""
+    day = day or datetime.now(_ET).strftime("%Y-%m-%d")
     calls = in_tok = out_tok = 0
     cost = 0.0
     try:
@@ -88,7 +108,7 @@ def summarize_day(
                     rec = json.loads(line)
                 except json.JSONDecodeError:
                     continue
-                if not str(rec.get("ts", "")).startswith(day):
+                if _et_day(str(rec.get("ts", ""))) != day:
                     continue
                 calls += 1
                 in_tok += rec.get("in", 0)
