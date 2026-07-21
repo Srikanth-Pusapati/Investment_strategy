@@ -1357,6 +1357,17 @@ class Orchestrator:
         the CVX 0.46 vs MU 0.63 gap was visible only in our journal). Best-
         effort: a name traded before conviction tracking simply has no note."""
         notes: dict[str, str] = {}
+        # Latest entry rationale per symbol (head), so a rotation debate sees WHY
+        # each incumbent is held — not just its stale conviction number. The
+        # rotation guard enforces a conviction EDGE; showing the thesis lets the
+        # model argue against the incumbent's REASONING, which the number can't.
+        latest_rationale: dict[str, str] = {}
+        try:
+            for t in self.ledger.effective():
+                if t.action == "buy" and getattr(t, "rationale", ""):
+                    latest_rationale[t.symbol] = t.rationale
+        except Exception:
+            pass
         for p in account.positions:
             if p.is_option:
                 continue
@@ -1372,8 +1383,12 @@ class Orchestrator:
             age = self.state.entry_age_days(p.symbol)
             if age is not None:
                 bits.append(f"held {age:.1f}d")
-            if bits:
-                notes[p.symbol] = ", ".join(bits)
+            note = ", ".join(bits)
+            why = latest_rationale.get(p.symbol, "")
+            if why:
+                note = (note + "; thesis: " if note else "thesis: ") + why[:90]
+            if note:
+                notes[p.symbol] = note
         return notes
 
     # -- rotation loss guard (week of 2026-07-13: UNH -$204 / HUBB -$158
@@ -1819,6 +1834,11 @@ class Orchestrator:
                 if not oid:
                     continue
                 self._pending_oids.append((oid, pos.symbol))
+                # Persist the oid at SUBMIT (mirror the watchdog, watchdog.py:644):
+                # _pending_oids otherwise persists only at cycle end, so a crash
+                # between here and merge_pending_orders would orphan the fill-check
+                # and leave a rejected/partial trim uncorrected forever.
+                self.state.add_pending_order(oid, pos.symbol)
                 self.ledger.record(TradeRecord.for_sell(
                     pos.symbol, f"regime risk-off trim {r.regime_trim_pct:.0f}%", oid,
                     qty=sell_qty, realized_pl_pct=pos.unrealized_pl_pct,
@@ -1885,6 +1905,8 @@ class Orchestrator:
                         exit_price=live.current_price or None,
                     ))
                     self._pending_oids.append((oid, pos.symbol))
+                    # Persist at submit (mirror the watchdog) — crash-safe fill-check.
+                    self.state.add_pending_order(oid, pos.symbol)
                     # Start the re-entry cooldown clock (churn guard).
                     self.state.register_exit(pos.symbol)
                 elif outcome == "partial":
@@ -1984,6 +2006,8 @@ class Orchestrator:
         )
         self.ledger.record(TradeRecord.from_core_fill(etf, notional, price, oid))
         self._pending_oids.append((oid, etf))
+        # Persist at submit (mirror the watchdog) — crash-safe fill-check.
+        self.state.add_pending_order(oid, etf)
         self.state.register_entry(etf)
         # Fold into this cycle's snapshot so a later call sees the deployed capital.
         self._apply_pending_buy(
@@ -2170,6 +2194,8 @@ class Orchestrator:
                             composite_score=composite,
                         ))
                         self._pending_oids.append((oid, proposal.symbol))
+                        # Persist at submit (mirror the watchdog) — crash-safe fill-check.
+                        self.state.add_pending_order(oid, proposal.symbol)
                         # Start the re-entry cooldown clock (churn guard) — with
                         # the exit price so the price-aware re-entry guard can
                         # block a re-buy above where we just sold.
@@ -2213,6 +2239,8 @@ class Orchestrator:
                         submitted_qty=sub.qty, submitted_cost=sub.notional,
                         composite_score=composite))
                     self._pending_oids.append((sub.order_id, proposal.symbol))
+                    # Persist at submit (mirror the watchdog) — crash-safe fill-check.
+                    self.state.add_pending_order(sub.order_id, proposal.symbol)
                     # Start (or preserve) the hold clock for the deterministic
                     # time-stop (1B.4). register_entry only stamps a first entry.
                     self.state.register_entry(proposal.symbol)
@@ -2279,6 +2307,8 @@ class Orchestrator:
             self.ledger.record(TradeRecord.from_option(
                 decision, premium, oid, entry_signals=signal_kinds or []))
             self._pending_oids.append((oid, proposal.symbol))
+            # Persist at submit (mirror the watchdog) — crash-safe fill-check.
+            self.state.add_pending_order(oid, proposal.symbol)
             # Same churn bookkeeping as equity buys: top-up spacing + the
             # per-symbol daily budget both count option debits.
             self.state.register_buy(proposal.symbol, conviction=proposal.conviction)

@@ -46,6 +46,13 @@ Your task:
    missed diversification, or any guard that should have been tighter/looser.
 4. IGNORE normal volatility and small losses — only flag repeatable patterns \
    worth changing.
+5. Before emitting each lesson, FILTER it (do NOT write lessons ABOUT bias — use \
+   this only to DISCARD weak ones): drop it if it is a one-day or single-name \
+   blip dressed up as a repeatable pattern (recency/availability), a tidy story \
+   the exit P&L does not actually support (narrative), or a mere re-assertion of \
+   your existing style that the evidence does not force (confirmation). Each \
+   surviving lesson is injected into EVERY future decision via a size-capped \
+   file, so a bad one misdirects weeks of trading — when in doubt, drop it.
 
 Return JSON: {"summary_md": "<concise markdown summary, ≤300 words>", \
 "lessons": ["<lesson 1>", "<lesson 2>"]}  (0–3 lessons; empty list if nothing \
@@ -201,6 +208,26 @@ def run_postmortem(
     user_text += "\n".join(ledger_lines[:50]) or "  (none)"
     user_text += "\n\nClosed positions (realized P&L, worst first):\n"
     user_text += "\n".join(sell_lines) or "  (none)"
+
+    # Deterministic behavior diagnostics — the numeric counterpart to the prose
+    # diagnosis above (which only eyeballs these from raw trade lines).
+    # Disposition effect + overtrading come from the full ledger; the anti-chase
+    # gate bind-rate comes from TODAY's journal and measures whether the gate
+    # built for this book's dominant loss pattern is actually binding.
+    from .attribution import behavior_diagnostics
+    diag = behavior_diagnostics(ledger)
+    buy_props = [r for r in recs if r.action == "buy"]
+    if buy_props:
+        gate_hits = sum(1 for r in buy_props if "overext" in (r.reason or "").lower())
+        gate_line = (
+            f"Anti-chase gate: {gate_hits}/{len(buy_props)} buy proposals hit the "
+            f"overextension gate today ({gate_hits / len(buy_props) * 100:.0f}%)."
+        )
+        if not diag:
+            diag = ["## Behavior diagnostics (deterministic — trusted)"]
+        diag.append(gate_line)
+    if diag:
+        user_text += "\n\n" + "\n".join(diag)
 
     if dry_run:
         print(user_text)

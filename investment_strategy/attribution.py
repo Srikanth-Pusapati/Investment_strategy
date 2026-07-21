@@ -193,6 +193,71 @@ def conviction_calibration(trips: list[RoundTrip], min_trips: int = 3) -> list[s
     return lines
 
 
+def behavior_diagnostics(ledger: TradeLedger, min_trips: int = 3) -> list[str]:
+    """Numeric behavior metrics for the nightly post-mortem — the deterministic
+    counterpart to the LLM's prose diagnosis (which only eyeballs these from raw
+    trade lines). Computed from the CORRECTED ledger, so they span all closed
+    history, not just the day under review.
+
+    - Disposition effect: are LOSERS held longer than WINNERS? The classic
+      behavioral leak (ride losers, cut winners short). Live risk for THIS book:
+      the rotation loss guard can institutionalize loss-holding, and only a
+      hold-duration split surfaces it.
+    - Overtrading: average opening BUYS per active trading day.
+
+    Both cohorts are suppressed below `min_trips` samples — the same small-sample
+    guard the attribution blocks use, because the account is fresh.
+    """
+    from .lots import build_lot_history
+
+    records = ledger.effective()
+    lines: list[str] = []
+
+    # -- disposition effect (FIFO realized lots carry entry/exit timestamps) -- #
+    _open, realized = build_lot_history(records)
+    winners = [r for r in realized if r.pl_pct > 0]
+    losers = [r for r in realized if r.pl_pct <= 0]
+    if len(winners) >= min_trips and len(losers) >= min_trips:
+        def _avg_days(lots: list) -> float:
+            return sum(
+                (r.exit_ts - r.entry_ts).total_seconds() for r in lots
+            ) / len(lots) / 86400.0
+        win_days = _avg_days(winners)
+        lose_days = _avg_days(losers)
+        flag = ""
+        # Losers meaningfully longer-held than winners = the disposition effect.
+        if win_days > 0 and lose_days > win_days * 1.25:
+            flag = (
+                f" — DISPOSITION EFFECT: losers held {lose_days / win_days:.1f}x "
+                "longer than winners (riding losers, cutting winners short)."
+            )
+        lines.append(
+            f"Avg hold: winners {win_days:.1f}d ({len(winners)} lots) vs losers "
+            f"{lose_days:.1f}d ({len(losers)} lots).{flag}"
+        )
+
+    # -- overtrading: opening buys per active trading day -------------------- #
+    buys_per_day: dict[str, int] = {}
+    for t in records:
+        if t.action == "buy":
+            d = str(t.ts)[:10]
+            if d:
+                buys_per_day[d] = buys_per_day.get(d, 0) + 1
+    if len(buys_per_day) >= min_trips:
+        total = sum(buys_per_day.values())
+        lines.append(
+            f"Buys/active-day: {total / len(buys_per_day):.1f} "
+            f"({total} buys over {len(buys_per_day)} active days)."
+        )
+
+    if not lines:
+        return []
+    return [
+        "## Behavior diagnostics (deterministic, from your full ledger — trusted)",
+        *lines,
+    ]
+
+
 def attribute(trips: list[RoundTrip]) -> dict[str, SourceStats]:
     """Per-source win-rate and average realized P&L across round-trips."""
     stats: dict[str, SourceStats] = {}

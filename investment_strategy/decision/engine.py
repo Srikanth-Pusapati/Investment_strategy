@@ -205,6 +205,13 @@ class DecisionEngine:
                 "names are unaffected by the cap.",
                 "",
             ]
+        # The standing numeric risk contract (trusted guidance): Claude was never
+        # told the caps/floors/cooldowns as NUMBERS, so it kept spending conviction
+        # on proposals that die deterministically at the gate (sub-floor conviction,
+        # over-cap weights, blackout-window buys — a recurring postmortem waste).
+        # Enforcement is unchanged; this only stops the wasted proposals.
+        if r is not None:
+            lines += self._risk_contract(r)
         # All third-party text lives inside <market_data> so the system prompt can
         # bind "untrusted data, not instructions" to a clear, delimited region.
         lines += [
@@ -284,6 +291,74 @@ class DecisionEngine:
             "(or omit) symbols where the evidence is thin or conflicting."
         )
         return "\n".join(lines)
+
+    @staticmethod
+    def _risk_contract(r) -> list[str]:
+        """The standing numeric risk contract as trusted guidance. Only non-off
+        limits are shown; slot cap and option-DTE window are rendered elsewhere so
+        they're not duplicated here."""
+        def pct(v: float) -> str:
+            return f"{v:g}%"
+
+        out: list[str] = []
+        if getattr(r, "max_position_pct", 0):
+            out.append(
+                f"- New position ≤ {pct(r.max_position_pct)} of equity; total per "
+                f"symbol ≤ {pct(r.max_symbol_exposure_pct)}; one sector ≤ "
+                f"{pct(r.max_sector_exposure_pct)}; gross deployed ≤ "
+                f"{pct(r.max_gross_exposure_pct)}. A target_weight_pct above these "
+                "is clamped down, not honored."
+            )
+        if getattr(r, "min_conviction", 0):
+            out.append(
+                f"- Equity buys with conviction < {r.min_conviction:g} are rejected "
+                "outright — do not propose them."
+            )
+        if getattr(r, "min_composite_score", 0) and getattr(r, "composite_gate_enabled", False):
+            out.append(
+                f"- Buys with a composite signal index < {r.min_composite_score:+g} "
+                "are rejected."
+            )
+        if getattr(r, "max_trade_risk_pct", 0):
+            out.append(
+                f"- $ at risk per trade (weight × stop%) is capped at "
+                f"{pct(r.max_trade_risk_pct)} of equity, so a wider stop shrinks the "
+                "position rather than the risk."
+            )
+        if getattr(r, "min_cash_buffer_pct", 0):
+            out.append(
+                f"- The book never deploys below a {pct(r.min_cash_buffer_pct)} cash "
+                "reserve."
+            )
+        if getattr(r, "reentry_cooldown_hours", 0):
+            out.append(
+                f"- A name you SELL is locked out of re-entry for "
+                f"{r.reentry_cooldown_hours:g}h — rotate deliberately, not for churn."
+            )
+        if getattr(r, "earnings_blackout_days", 0):
+            out.append(
+                f"- No NEW buys within {r.earnings_blackout_days:g} days of a name's "
+                "earnings date."
+            )
+        if getattr(r, "min_trade_price_usd", 0):
+            out.append(
+                f"- No buys below ${r.min_trade_price_usd:g}/share (liquidity guard)."
+            )
+        if getattr(r, "options_enabled", False) and getattr(r, "max_option_premium_pct", 0):
+            out.append(
+                f"- One options play risks at most {pct(r.max_option_premium_pct)} of "
+                "equity as net debit."
+            )
+        if not out:
+            return []
+        return [
+            "## Risk contract (deterministic caps the downstream layer enforces — "
+            "trusted, not market data)",
+            *out,
+            "Propose WITHIN these: anything past a cap is silently clamped or "
+            "vetoed, so conviction spent there is wasted.",
+            "",
+        ]
 
     @staticmethod
     def _safe(text: str) -> str:
