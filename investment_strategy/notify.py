@@ -24,6 +24,7 @@ from __future__ import annotations
 
 import json
 import logging
+import queue
 import smtplib
 import threading
 import time
@@ -36,6 +37,12 @@ log = logging.getLogger("notify")
 # Don't re-send the same alert key more than once per this window. The event
 # keeps logging every tick regardless; this only bounds the OUTBOUND paging.
 DEFAULT_COOLDOWN_S = 900.0  # 15 minutes
+
+# A same-key alert whose severity is at least this multiple of the last one sent
+# bypasses the cooldown: a 4-min dark gap must not silence the 67-min gap that
+# follows it inside the window (Jul 17: the smallest gap claimed the window and
+# suppressed every larger one).
+SEVERITY_ESCALATION = 2.0
 
 
 @dataclass(frozen=True)
@@ -60,10 +67,24 @@ class Alerter:
     a logged warning rather than taking down the watchdog thread that called it.
     """
 
-    def __init__(self, cfg: AlertConfig) -> None:
+    def __init__(self, cfg: AlertConfig, async_send: bool = False) -> None:
         self.cfg = cfg
-        self._last_sent: dict[str, float] = {}
+        # key -> (wall-clock ts, severity) of the last SENT alert for that key.
+        self._last_sent: dict[str, tuple[float, float]] = {}
         self._lock = threading.Lock()
+        # Optional background sender. The throttle decision still runs on the
+        # CALLER's thread (fast, deterministic), but the blocking SMTP/webhook
+        # I/O moves to a worker so a post-wake getaddrinfo stall can't wedge the
+        # watchdog thread that paged. Short-lived callers (deadman, preflight)
+        # keep async_send=False so their page can't die with the process; the
+        # long-lived orchestrator opts in and flush()es on shutdown.
+        self._async = async_send
+        self._queue: queue.Queue | None = None
+        if async_send:
+            self._queue = queue.Queue()
+            threading.Thread(
+                target=self._drain, name="alerter", daemon=True,
+            ).start()
         if cfg.enabled and not (self._email_configured or cfg.webhook_url):
             log.warning(
                 "ALERTS_ENABLED is on but no email or webhook is configured — "
@@ -76,35 +97,79 @@ class Alerter:
         c = self.cfg
         return bool(c.smtp_host and c.smtp_user and c.smtp_password and c.email_to)
 
-    def critical(self, key: str, subject: str, body: str) -> None:
+    def critical(
+        self, key: str, subject: str, body: str, severity: float | None = None,
+    ) -> None:
         """Page a human about a CRITICAL condition. `key` de-dupes recurring
         events (e.g. the same symbol failing to close every tick) so we send at
-        most once per cooldown. Best-effort; swallows all errors."""
+        most once per cooldown. `severity` (optional, higher = worse — e.g. a
+        dark-gap's minutes) lets a materially worse same-key event bypass a
+        cooldown a milder one claimed. Best-effort; swallows all errors."""
         if not self.cfg.enabled:
             return
-        if not self._should_send(key):
+        if not self._should_send(key, severity):
             return
+        if self._async and self._queue is not None:
+            self._queue.put((key, subject, body))
+        else:
+            self._dispatch(key, subject, body)
+
+    def _dispatch(self, key: str, subject: str, body: str) -> None:
+        """Actually deliver to the configured sinks. On total failure, un-record
+        the throttle stamp so the next tick retries delivery."""
         sent = False
         if self._email_configured:
             sent = self._send_email(subject, body) or sent
         if self.cfg.webhook_url:
             sent = self._send_webhook(subject, body) or sent
         if not sent:
-            # Either nothing configured or every sink failed — make sure the
-            # missed page is at least loud in the log, and DON'T record it as
-            # sent so the next tick retries delivery.
             log.error("ALERT not delivered (no working sink): %s", subject)
             with self._lock:
                 self._last_sent.pop(key, None)
 
+    def _drain(self) -> None:
+        """Background worker: deliver queued alerts so blocking I/O never wedges
+        the caller (watchdog) thread. Daemon; never raises out."""
+        assert self._queue is not None
+        while True:
+            item = self._queue.get()
+            try:
+                if item is None:
+                    return
+                self._dispatch(*item)
+            except Exception:  # noqa: BLE001 — a bad send must not kill the worker
+                log.exception("alert worker failed to dispatch")
+            finally:
+                self._queue.task_done()
+
+    def flush(self, timeout: float = 10.0) -> None:
+        """Block until queued alerts drain (or `timeout`). Call before a
+        long-lived process exits so in-flight pages aren't lost. No-op in sync
+        mode."""
+        if not self._async or self._queue is None:
+            return
+        deadline = time.monotonic() + timeout
+        while not self._queue.empty() and time.monotonic() < deadline:
+            time.sleep(0.1)
+
     # -- throttle ----------------------------------------------------------- #
-    def _should_send(self, key: str) -> bool:
-        now = time.monotonic()
+    def _should_send(self, key: str, severity: float | None = None) -> bool:
+        now = time.time()   # WALL clock — the cooldown must not stretch across
+        # host sleep (time.monotonic froze during suspend, turning a 15-min
+        # window into ~6.2 wall-clock hours on Jul 17 and swallowing the pages).
         with self._lock:
-            last = self._last_sent.get(key)
-            if last is not None and (now - last) < self.cfg.cooldown_s:
-                return False
-            self._last_sent[key] = now  # optimistic; cleared below if all sinks fail
+            prev = self._last_sent.get(key)
+            if prev is not None:
+                last_ts, last_sev = prev
+                within_cooldown = (now - last_ts) < self.cfg.cooldown_s
+                escalated = (
+                    severity is not None and last_sev > 0
+                    and severity >= last_sev * SEVERITY_ESCALATION
+                )
+                if within_cooldown and not escalated:
+                    return False
+            # optimistic; _dispatch clears it if every sink fails
+            self._last_sent[key] = (now, severity if severity is not None else 0.0)
             return True
 
     # -- sinks -------------------------------------------------------------- #

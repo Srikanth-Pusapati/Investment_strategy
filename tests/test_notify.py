@@ -111,6 +111,45 @@ def test_partial_sink_success_still_throttles():
     assert len(a.webhooks) == 1
 
 
+def test_worse_severity_bypasses_cooldown():
+    # A 4-min dark gap must not silence the 67-min gap inside the same window
+    # (Jul 17): a same-key alert >= 2x the last severity escalates past the
+    # cooldown, but a milder or comparable follow-up stays suppressed.
+    a = _RecordingAlerter(_alert_cfg(cooldown_s=900.0))
+    a.critical("dark_gap", "4 min", "b", severity=4.0)
+    a.critical("dark_gap", "5 min", "b", severity=5.0)    # not 2x -> suppressed
+    assert len(a.emails) == 1
+    a.critical("dark_gap", "67 min", "b", severity=67.0)  # >= 2x -> escalates
+    assert len(a.emails) == 2
+    a.critical("dark_gap", "60 min", "b", severity=60.0)  # milder -> suppressed
+    assert len(a.emails) == 2
+
+
+def test_severityless_alerts_keep_pure_cooldown():
+    # Without a severity, behavior is the old pure-cooldown throttle.
+    a = _RecordingAlerter(_alert_cfg(cooldown_s=900.0))
+    a.critical("k", "s", "b")
+    a.critical("k", "s", "b", severity=100.0)   # last had no severity -> no escalate
+    assert len(a.emails) == 1
+
+
+def test_async_mode_flush_delivers():
+    import queue as _q
+
+    class _AsyncRecording(Alerter):
+        def __init__(self, cfg):
+            super().__init__(cfg, async_send=True)
+            self.emails = []
+        def _send_email(self, subject, body):
+            self.emails.append((subject, body))
+            return True
+
+    a = _AsyncRecording(_alert_cfg(cooldown_s=0.0))
+    a.critical("k", "s", "b")
+    a.flush(timeout=5.0)
+    assert a.emails == [("s", "b")]
+
+
 def test_load_alert_config_from_env():
     env = {
         "ALERTS_ENABLED": "on",

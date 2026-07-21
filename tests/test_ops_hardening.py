@@ -17,7 +17,7 @@ class _RecordingAlerter:
     def __init__(self):
         self.calls = []
 
-    def critical(self, key, subject, body):
+    def critical(self, key, subject, body, severity=None):
         self.calls.append((key, subject, body))
 
 

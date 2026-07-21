@@ -120,7 +120,10 @@ class Orchestrator:
         self.ledger = TradeLedger()
         # Out-of-band paging for watchdog CRITICALs (failed close = naked position;
         # latched halt). Log-only unless ALERTS_ENABLED + a sink is configured.
-        self.alerter = Alerter(cfg.alerts)
+        # async_send: this is a long-lived process, so blocking SMTP/webhook I/O
+        # moves off the watchdog thread (a post-wake DNS stall must not wedge the
+        # safety loop); run() flushes on shutdown so no page is lost.
+        self.alerter = Alerter(cfg.alerts, async_send=True)
         # Last RH dead-auth latch timestamp we paged for: one page per latch
         # EVENT (not per cycle), and a fresh latch after recovery pages again.
         self._rh_paged_for: float = 0.0
@@ -213,6 +216,11 @@ class Orchestrator:
         # never). Throttled: clamshell/battery sleep is a standing condition, not
         # a one-shot event, so one page per BATTERY_WARN_COOLDOWN_S is enough.
         self._last_battery_warn = 0.0
+        # Consecutive watchdog ticks that failed on a transient network error.
+        # A one-off skip is normal; a RUN of them during market hours means the
+        # safety loop is effectively blind and must page (Jul 17: 9 in a row,
+        # zero alerts). Reset on any clean tick.
+        self._watchdog_skips = 0
 
     # -- main loop ---------------------------------------------------------- #
     def run(self) -> None:
@@ -257,6 +265,11 @@ class Orchestrator:
         finally:
             self._stop.set()
             wd_thread.join(timeout=self.cfg.monitor_interval_s + 5)
+            # Drain any in-flight page before exiting (async alert worker).
+            try:
+                self.alerter.flush()
+            except Exception:  # noqa: BLE001 — shutdown best-effort
+                pass
 
     def _watchdog_loop(self) -> None:
         """Independent safety loop: closing positions is never gated, so this runs
@@ -268,14 +281,45 @@ class Orchestrator:
                 with self._trade_lock:
                     self.watchdog.check_once()
                 self._maybe_heartbeat()
+                self._watchdog_skips = 0   # a clean tick clears the run
             except _TRANSIENT_NET as e:
+                self._watchdog_skips += 1
                 log.warning(
                     "Watchdog tick skipped on a transient network error (%s); "
-                    "retrying next tick.", e.__class__.__name__,
+                    "retrying next tick (%d in a row).",
+                    e.__class__.__name__, self._watchdog_skips,
                 )
+                self._maybe_page_on_skip_run()
             except Exception:
                 log.exception("Watchdog tick failed; continuing.")
             self._stop.wait(self.cfg.monitor_interval_s)
+
+    #: consecutive watchdog skips (network) before we page the safety loop is blind.
+    WATCHDOG_SKIP_ESCALATE = 5
+
+    def _maybe_page_on_skip_run(self) -> None:
+        """Page when the watchdog has skipped WATCHDOG_SKIP_ESCALATE ticks in a
+        row on network errors during market hours — the safety loop can't see the
+        book. Throttled by the alerter's dark_gap-style key; only fires in-hours
+        (an overnight outage strands nothing). Best-effort."""
+        if self._watchdog_skips < self.WATCHDOG_SKIP_ESCALATE:
+            return
+        now = time.time()
+        if not self._overlaps_paging_hours(now, now):
+            return
+        secs = self._watchdog_skips * self.cfg.monitor_interval_s
+        log.critical(
+            "Watchdog BLIND: %d consecutive ticks failed (~%.0fs) — positions "
+            "unwatched during market hours.", self._watchdog_skips, secs,
+        )
+        self.alerter.critical(
+            "watchdog_blind",
+            f"Watchdog blind for {self._watchdog_skips} ticks (~{secs:.0f}s)",
+            "The safety loop has failed to read the account for several ticks in "
+            "a row (network). Stops/floor/flatten can't fire while it's blind. "
+            "Check the host's connectivity.",
+            severity=float(self._watchdog_skips),
+        )
 
     #: page at most once per this window about running on battery in-hours.
     BATTERY_WARN_COOLDOWN_S = 1800.0
@@ -358,6 +402,7 @@ class Orchestrator:
                     "The process missed loop ticks (host slept, was suspended, or the "
                     "clock jumped). Position monitoring resumed; the next decision "
                     "cycle reconciles pending orders first. Check the host.",
+                    severity=gap / 60.0,   # minutes — a bigger gap out-pages a smaller
                 )
             else:
                 log.warning(
@@ -422,6 +467,25 @@ class Orchestrator:
         the watchdog thread and never from an except path, so a wedged network
         read stops the stamps and the external monitor still pages."""
         self._last_main_tick = time.monotonic()
+        self._write_tick_stamp()
+
+    def _write_tick_stamp(self) -> None:
+        """Write a wall-clock freshness stamp for the LOCAL deadman (state/
+        last_tick.stamp). The deadman used to key only on logs/bot.log mtime,
+        which the 24/7 watchdog keeps warm even when the MAIN loop is wedged —
+        so a stuck decision thread stayed invisible below the ~75-min log-stale
+        threshold. This stamp moves only from main-thread forward progress, so a
+        wedge goes stale in minutes. Throttled + best-effort."""
+        now = time.monotonic()
+        if now - getattr(self, "_last_stamp_write", 0.0) < 10.0:
+            return
+        self._last_stamp_write = now
+        try:
+            from pathlib import Path
+            stamp = Path(self.cfg.state_file).parent / "last_tick.stamp"
+            stamp.write_text(f"{time.time():.0f}\n", encoding="utf-8")
+        except Exception as e:  # noqa: BLE001 — liveness stamp must never raise
+            log.debug("tick-stamp write failed: %s", e)
 
     def _tick(self) -> None:
         """One monitor-cadence pass of the decision-loop body (extracted from
@@ -431,6 +495,7 @@ class Orchestrator:
         # minutes inside a decision cycle (LLM + signal fetches), and busy is
         # not dark — the watchdog keeps watching positions the whole time.
         self._last_main_tick = time.monotonic()
+        self._write_tick_stamp()   # local deadman freshness (idle ticks too)
         now_wall = time.time()
         wake_gap = now_wall - self._last_main_wall
         self._last_main_wall = now_wall
