@@ -47,9 +47,16 @@ class Watchdog:
         self, cfg: Config, broker: AlpacaClient,
         state: PortfolioState | None = None, ledger: TradeLedger | None = None,
         alerter: Alerter | None = None,
+        on_exchange_exit=None,
     ):
         self.cfg = cfg
         self.broker = broker
+        # Called (best-effort, no args) when a tracked position vanishes — an
+        # exchange bracket leg filled with no code running. The orchestrator
+        # points it at a locked exchange-exit backfill so the ledger and the
+        # re-entry cooldown learn about the exit within ~1 watchdog tick instead
+        # of at the next hourly cycle. None => no immediate backfill (legacy).
+        self._on_exchange_exit = on_exchange_exit
         self.state = state or PortfolioState(cfg.state_file)
         # Watchdog exits (stops, take-profits, flattens) close positions the
         # decision loop never sees — without recording them the ledger's round-trip
@@ -91,6 +98,19 @@ class Watchdog:
         equities = [p for p in account.positions if not p.is_option]
         option_rows = [p for p in account.positions if p.is_option]
 
+        # Gate the trailing stop to regular hours (TRAIL_RTH_ONLY): thin
+        # pre/post-market marks false-trigger it and ratchet phantom peaks. The
+        # HARD exits below (stop/take/time-stop/floor/flatten) stay 24/7 —
+        # they're the actual protection; the trail only locks in gains. A clock
+        # read failure fails toward trailing (protection over noise-suppression).
+        trail_ok = True
+        if getattr(self.cfg.risk, "trail_rth_only", True) and equities:
+            try:
+                trail_ok = self.broker.is_market_open()
+            except Exception as e:  # noqa: BLE001 — never break the safety loop
+                log.debug("trail RTH gate: clock read failed (%s); trailing on.", e)
+                trail_ok = True
+
         live = {p.symbol for p in equities}
         for pos in equities:
             # Hard stop/take first — fractional positions have no exchange bracket,
@@ -101,12 +121,24 @@ class Watchdog:
             # stalled position isn't held indefinitely (1B.4).
             if self._enforce_time_stop(pos):
                 continue
-            self._update_trailing_stop(pos)
+            if trail_ok:
+                self._update_trailing_stop(pos)
         self._check_option_positions(option_rows)
-        # Drop tracking for positions that are gone (filled stop/tp/sell).
+        # Drop tracking for positions that are gone (filled stop/tp/sell). A
+        # vanished tracked position means an exchange-side bracket leg (or a
+        # manual sell) filled with no code running — fire the exchange-exit
+        # backfill NOW instead of waiting for the next hourly decision cycle
+        # (SOFI 2026-07-16: broker stop filled, ledger/cooldown blind ~1h).
+        vanished = False
         for sym in set(self.state.high_water) | set(self.state.exits):
             if sym not in live:
                 self.state.forget_symbol(sym)
+                vanished = True
+        if vanished and self._on_exchange_exit is not None:
+            try:
+                self._on_exchange_exit()
+            except Exception as e:  # noqa: BLE001 — backfill must never break the loop
+                log.warning("exchange-exit backfill callback failed: %s", e)
 
     # -- hard equity floor (latched) --------------------------------------- #
     def _equity_floor_breached(self, account: AccountSnapshot) -> bool:
@@ -206,13 +238,23 @@ class Watchdog:
     #: shorter and would otherwise spam identical WARNINGs for hours.
     WAIT_LOG_THROTTLE_S = 300
 
-    def _log_waiting_throttled(self, symbol: str, msg: str, *args) -> None:
+    def _log_throttled(
+        self, key: str, msg: str, *args, level: int = logging.WARNING,
+    ) -> None:
+        """Emit `msg` at most once per WAIT_LOG_THROTTLE_S per `key`. The
+        watchdog re-evaluates every ~30s, so any condition that persists across
+        ticks (an illiquid exit sitting unfilled, a trail that keeps re-firing
+        while the close works) would otherwise repeat the same line hundreds of
+        times a day. `key` namespaces the throttle (e.g. wait:SYM vs trail:SYM)."""
         now = datetime.now(timezone.utc)
-        last = self._last_wait_log.get(symbol)
+        last = self._last_wait_log.get(key)
         if last is not None and (now - last).total_seconds() < self.WAIT_LOG_THROTTLE_S:
             return
-        self._last_wait_log[symbol] = now
-        log.warning(msg, *args)
+        self._last_wait_log[key] = now
+        log.log(level, msg, *args)
+
+    def _log_waiting_throttled(self, symbol: str, msg: str, *args) -> None:
+        self._log_throttled(f"wait:{symbol}", msg, *args, level=logging.WARNING)
 
     def close_now(self, pos: Position, reason: str) -> tuple[str, str | None]:
         """Public entry for decision-loop closes (orchestrator SELL / thesis
@@ -458,9 +500,13 @@ class Watchdog:
         if peak <= self.trail_giveback_pct:
             return
         if pos.unrealized_pl_pct <= peak - self.trail_giveback_pct:
-            log.info(
+            # Throttled: while the close works through an illiquid book the
+            # trigger keeps re-evaluating every tick (PATH 2026-07-20: 24 lines
+            # in 19 min). Throttle the announcement, never the close itself.
+            self._log_throttled(
+                f"trail:{pos.symbol}",
                 "Trailing stop hit on %s: peak %.1f%% -> now %.1f%%. Closing.",
-                pos.symbol, peak, pos.unrealized_pl_pct,
+                pos.symbol, peak, pos.unrealized_pl_pct, level=logging.INFO,
             )
             outcome, oid = self._close_hard(pos, "trail")
             if outcome == "full":

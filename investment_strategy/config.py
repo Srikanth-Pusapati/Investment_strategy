@@ -123,6 +123,14 @@ class RiskLimits:
     # watchdog (and the backtest's mirror of it) closes a runner. Previously a
     # hardcoded 3.0 in both places.
     trail_giveback_pct: float = 3.0
+    # Gate the trailing-stop ratchet + trigger to regular trading hours. Thin
+    # pre/post-market prints are unreliable — a bad mark either ratchets the
+    # high-water mark to a phantom peak or fires the trail into an
+    # extended-hours limit that can't fill (LPLA 2026-07-20: trail fired 07:16
+    # premarket, the exit sat "new" 74+ min). Hard stops, the equity floor, and
+    # the daily-loss flatten stay 24/7 — only the trail is RTH-gated. Off =
+    # legacy always-on behavior.
+    trail_rth_only: bool = True
     # --- R.2 pairwise-correlation guard ---
     # The sector cap's finer-grained sibling: two "different" names whose daily
     # returns move together are ONE bet. Reject a NEW buy whose return
@@ -488,6 +496,7 @@ def load_config() -> Config:
             vol_stop_min_pct=_f("VOL_STOP_MIN_PCT", 4.0),
             vol_stop_max_pct=_f("VOL_STOP_MAX_PCT", 15.0),
             trail_giveback_pct=_f("TRAIL_GIVEBACK_PCT", 3.0),
+            trail_rth_only=_flag("TRAIL_RTH_ONLY", "on"),
             # R.2: 0 disables; 0.85 = "effectively the same trade" line (two
             # normal tech megacaps sit ~0.6-0.8; near-clones sit above 0.85).
             max_pairwise_corr=_f("MAX_PAIRWISE_CORR", 0.85),

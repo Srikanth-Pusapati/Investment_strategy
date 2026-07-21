@@ -127,6 +127,7 @@ class Orchestrator:
         self.watchdog = Watchdog(
             cfg, self.broker, state=self.state, ledger=self.ledger,
             alerter=self.alerter,
+            on_exchange_exit=self._backfill_exchange_exits_locked,
         )
         self.benchmark = BenchmarkTracker(cfg, self.broker, symbol=cfg.benchmark_symbol)
         self.options = OptionsHelper(cfg) if cfg.risk.options_enabled else None
@@ -170,6 +171,10 @@ class Orchestrator:
         # It guards only the quick submit/close calls — never the slow LLM call —
         # so the safety thread is delayed at most by an order-submission window.
         self._trade_lock = threading.Lock()
+        # Serializes the exchange-exit backfill's ledger read-modify-append: it
+        # now runs from BOTH the decision cycle and the watchdog thread (on a
+        # vanished position), and the two must not interleave a double-append.
+        self._backfill_lock = threading.Lock()
         self._stop = threading.Event()
         # Order ids submitted last cycle, reconciled against actual fills at the
         # start of the next one (by then ~a decision interval has passed, so async
@@ -496,7 +501,7 @@ class Orchestrator:
             return
 
         self._reconcile_fills()
-        self._backfill_exchange_exits()
+        self._backfill_exchange_exits_locked()
         self._stamp_liveness()
         # Fresh Quiver data this cycle, but pulled once and shared by the signal
         # and screener layers (both read the same cached live feeds).
@@ -924,6 +929,15 @@ class Orchestrator:
         self.alerter.critical("reconcile_halt", subject, body)
 
     # -- exchange-exit backfill (F.1) ---------------------------------------- #
+    def _backfill_exchange_exits_locked(self) -> None:
+        """Serialized entry point for the backfill — used by both the decision
+        cycle and the watchdog's vanished-position callback. The lock guards the
+        ledger read-modify-append against a concurrent double-record; the body
+        is already idempotent (order-id keyed), so the lock only prevents a
+        rare same-instant duplicate."""
+        with self._backfill_lock:
+            self._backfill_exchange_exits()
+
     def _backfill_exchange_exits(self) -> None:
         """Record exits that happened with NO code running: a resting bracket's
         stop or take-profit leg filling at the exchange, or a manual sell in the
