@@ -1,0 +1,335 @@
+2026-07-17 00:26:31,449 INFO orchestrator | Market closed; skipping decision cycle.
+2026-07-17 00:26:31,533 INFO alpaca | Alpaca client ready (mode=paper).
+2026-07-17 00:26:33,806 INFO dashboard | Wrote dashboard with 51 trades -> dashboard.html
+2026-07-17 01:26:49,849 INFO orchestrator | Market closed; skipping decision cycle.
+2026-07-17 01:26:49,917 INFO alpaca | Alpaca client ready (mode=paper).
+2026-07-17 01:26:52,109 INFO dashboard | Wrote dashboard with 51 trades -> dashboard.html
+2026-07-17 02:27:08,033 INFO orchestrator | Market closed; skipping decision cycle.
+2026-07-17 02:27:08,388 INFO alpaca | Alpaca client ready (mode=paper).
+2026-07-17 02:27:10,539 INFO dashboard | Wrote dashboard with 51 trades -> dashboard.html
+2026-07-17 03:27:26,838 INFO orchestrator | Market closed; skipping decision cycle.
+2026-07-17 03:27:27,147 INFO alpaca | Alpaca client ready (mode=paper).
+2026-07-17 03:27:29,175 INFO dashboard | Wrote dashboard with 51 trades -> dashboard.html
+2026-07-17 04:27:45,342 INFO orchestrator | Market closed; skipping decision cycle.
+2026-07-17 04:27:45,411 INFO alpaca | Alpaca client ready (mode=paper).
+2026-07-17 04:27:47,532 INFO dashboard | Wrote dashboard with 51 trades -> dashboard.html
+2026-07-17 05:28:03,832 INFO orchestrator | Market closed; skipping decision cycle.
+2026-07-17 05:28:03,897 INFO alpaca | Alpaca client ready (mode=paper).
+2026-07-17 05:28:06,283 INFO dashboard | Wrote dashboard with 51 trades -> dashboard.html
+2026-07-17 06:28:23,024 INFO orchestrator | Market closed; skipping decision cycle.
+2026-07-17 06:28:23,509 INFO alpaca | Alpaca client ready (mode=paper).
+2026-07-17 06:28:25,712 INFO dashboard | Wrote dashboard with 51 trades -> dashboard.html
+2026-07-17 07:28:43,410 INFO orchestrator | Market closed; skipping decision cycle.
+2026-07-17 07:28:43,478 INFO alpaca | Alpaca client ready (mode=paper).
+2026-07-17 07:28:45,644 INFO dashboard | Wrote dashboard with 51 trades -> dashboard.html
+2026-07-17 07:54:36,790 INFO alpaca | Alpaca client ready (mode=paper).
+2026-07-17 07:54:37,063 INFO orchestrator | Discovery-driven mode: trading scanner-found names + holdings.
+2026-07-17 07:54:37,064 INFO orchestrator | Starting orchestrator (paper). Kill switch: off. Options: on. Benchmark: QQQ.
+2026-07-17 07:54:37,260 INFO orchestrator | Market closed; skipping decision cycle.
+2026-07-17 07:54:37,349 INFO alpaca | Alpaca client ready (mode=paper).
+2026-07-17 07:54:39,419 INFO dashboard | Wrote dashboard with 51 trades -> dashboard.html
+2026-07-17 08:30:15,813 INFO ledger | Ledger: SELL GOOGL qty=2 $710
+2026-07-17 08:30:15,845 INFO orchestrator | Backfilled exchange exit: GOOGL 2 sh @ 355.05 (stop -> bracket_stop, -4.1%).
+2026-07-17 08:30:18,108 INFO orchestrator | Market regime: SPY above 200dma (742 vs 693), VIX 19 -> risk-on, size x1.00.
+2026-07-17 08:30:18,875 INFO quiver | Quiver live/congresstrading -> 1000 row(s).
+2026-07-17 08:30:19,235 INFO screener | EDGAR Form-4 feed -> 59 filing(s) (scanning up to 100).
+2026-07-17 08:30:36,282 INFO screener | Options-flow most-actives pool -> 40 name(s).
+2026-07-17 08:31:00,473 INFO screener | Robinhood 'Daily movers' -> 20 name(s).
+2026-07-17 08:31:01,900 INFO screener | Robinhood '100 most popular' -> 100 name(s).
+2026-07-17 08:31:02,972 INFO screener | Robinhood scans: none saved (define scans in the RH app to use this leg).
+2026-07-17 08:31:02,976 INFO screener | Discovered 18 candidate(s) from 5 source(s) (272 merged, 256 above min_score, capped to 18).
+2026-07-17 08:31:02,977 INFO screener |   candidate T [congress+options_flow+robinhood] score=+1.37 — Congress: 3 buy / 1 sell filings in last 60d (disclosures lag up to ~45d). | Options flow: 50,513 call / 15,934 put vol (bullish call imbalance +0.52) on a most-active name. | Robinhood 100 Most Popular (retail crowd positioning)
+2026-07-17 08:31:02,981 INFO screener |   candidate ATAI [options_flow+robinhood] score=+1.30 — Options flow: 30,604 call / 5,435 put vol (bullish call imbalance +0.70) on a most-active name. | Robinhood Daily Movers (today's biggest movers — momentum)
+2026-07-17 08:31:02,982 INFO screener |   candidate TSCO [congress] score=-1.00 — Congress: 0 buy / 5 sell filings in last 60d (disclosures lag up to ~45d).
+2026-07-17 08:31:02,983 INFO screener |   candidate BEP [congress] score=+1.00 — Congress: 7 buy / 0 sell filings in last 60d (disclosures lag up to ~45d).
+2026-07-17 08:31:02,985 INFO screener |   candidate WAB [congress] score=-1.00 — Congress: 0 buy / 5 sell filings in last 60d (disclosures lag up to ~45d).
+2026-07-17 08:31:02,986 INFO screener |   candidate HUBB [congress] score=+1.00 — Congress: 8 buy / 0 sell filings in last 60d (disclosures lag up to ~45d).
+2026-07-17 08:31:02,987 INFO screener |   candidate IBM [congress+robinhood] score=+0.85 — Congress: 3 buy / 1 sell filings in last 60d (disclosures lag up to ~45d). | Robinhood 100 Most Popular (retail crowd positioning)
+2026-07-17 08:31:02,988 INFO screener |   candidate ENTG [congress] score=+0.75 — Congress: 3 buy / 0 sell filings in last 60d (disclosures lag up to ~45d).
+2026-07-17 08:31:02,989 INFO screener |   candidate LYV [congress] score=-0.75 — Congress: 0 buy / 3 sell filings in last 60d (disclosures lag up to ~45d).
+2026-07-17 08:31:02,990 INFO screener |   candidate WRB [congress] score=-0.75 — Congress: 0 buy / 3 sell filings in last 60d (disclosures lag up to ~45d).
+2026-07-17 08:31:02,991 INFO screener |   candidate SNDQ [options_flow] score=+0.73 — Options flow: 20,414 call / 3,191 put vol (bullish call imbalance +0.73) on a most-active name.
+2026-07-17 08:31:02,992 INFO screener |   candidate NVDA [congress+options_flow+robinhood] score=+0.71 — Congress: 3 buy / 3 sell filings in last 60d (disclosures lag up to ~45d). | Options flow: 1,591,570 call / 756,743 put vol (bullish call imbalance +0.36) on a most-active name. | Robinhood 100 Most Popular (retail crowd positioning)
+2026-07-17 08:31:02,993 INFO screener |   candidate SOFI [options_flow+robinhood] score=+0.67 — Options flow: 152,683 call / 78,364 put vol (bullish call imbalance +0.32) on a most-active name. | Robinhood 100 Most Popular (retail crowd positioning)
+2026-07-17 08:31:02,994 INFO screener |   candidate MSTU [options_flow] score=+0.61 — Options flow: 8,218 call / 1,992 put vol (bullish call imbalance +0.61) on a most-active name.
+2026-07-17 08:31:02,995 INFO screener |   candidate TSLA [congress+robinhood] score=+0.60 — Congress: 1 buy / 0 sell filings in last 60d (disclosures lag up to ~45d). | Robinhood 100 Most Popular (retail crowd positioning)
+2026-07-17 08:31:02,996 INFO screener |   candidate CVX [congress+robinhood] score=+0.60 — Congress: 1 buy / 0 sell filings in last 60d (disclosures lag up to ~45d). | Robinhood 100 Most Popular (retail crowd positioning)
+2026-07-17 08:31:02,997 INFO screener |   candidate AMD [congress+robinhood] score=+0.60 — Congress: 1 buy / 0 sell filings in last 60d (disclosures lag up to ~45d). | Robinhood 100 Most Popular (retail crowd positioning)
+2026-07-17 08:31:02,998 INFO screener |   candidate CHCJY [robinhood] score=+0.60 — Robinhood Daily Movers (today's biggest movers — momentum)
+2026-07-17 08:31:37,681 WARNING signals | Finnhub news-sentiment is premium-gated on this key (HTTP 403) — using the VADER fallback for this run.
+2026-07-17 08:31:39,970 INFO quiver | Quiver live/offexchange -> 5496 row(s).
+2026-07-17 08:31:40,433 INFO quiver | Quiver live/govcontractsall -> 20000 row(s).
+2026-07-17 08:33:54,131 INFO signals | options_chain: reading 25 of 30 symbols this cycle (cap).
+2026-07-17 08:34:01,173 INFO signals | Gathered signals for 30/30 symbols (+3 market signals).
+2026-07-17 08:34:03,577 INFO robinhood | Imported 1 Robinhood holding(s) for context (read-only).
+2026-07-17 08:34:03,594 INFO orchestrator | Buy-excluded from slate this cycle: SOFI (exited 19.9h ago (cooldown 24h)), T (exited 23.0h ago (cooldown 24h))
+2026-07-17 08:34:35,830 INFO usage | decision call: 24129 in / 2534 out (cache r=0 w=0) ~$0.1840 [claude-opus-4-8]
+2026-07-17 08:34:35,836 INFO decision | Claude returned 6 proposal(s).
+2026-07-17 08:34:36,027 INFO orchestrator | SELL MU -> approved: Closing existing position. | Down 8.6% since entry with deteriorating technicals (RSI 40, MACD bear, decaying -0.16/d), heavy ins
+2026-07-17 08:34:36,337 WARNING alpaca | Exit via resting sell 574ff141-bb0b-4309-84f0-942075c60244 (MU): replaced limit -> 800.19 (marketable; new order e4944964-77af-4e10-a2d6-2722b995aeba).
+2026-07-17 08:34:36,347 INFO ledger | Ledger: SELL MU qty=5 $4083
+2026-07-17 08:34:36,358 WARNING watchdog | Partial close MU (decision): sold 0 available share(s), made 1 resting sell(s) marketable; 5 reserved by open orders — will retry the full close next tick.
+2026-07-17 08:34:36,525 INFO orchestrator | SELL SPCX -> approved: Closing existing position. | Down 8.2% in 1 day, composite 0.00 with no clear edge. Insider open-market selling, negative news se
+2026-07-17 08:34:36,622 INFO alpaca | CLOSE SPCX (order bcc86803-e7c9-4d88-9966-81ef0d27c0e7)
+2026-07-17 08:34:36,627 INFO ledger | Ledger: SELL SPCX qty=6 $752
+2026-07-17 08:34:36,632 INFO orchestrator | Cycle budget $12,671 split across 2 buy(s): CVX $7,487, NVDA $5,185.
+2026-07-17 08:34:38,741 INFO earnings | Robinhood earnings calendar: 0 name(s) reporting within 31d.
+2026-07-17 08:34:44,420 INFO orchestrator | BUY CVX -> resized: Sized to 15.5238 sh ($2,897) within caps. Reduced from request. Overextension haircut x0.5 (3.2xATR above the 20d SMA (extreme extension)). | Bullish technical setup: RSI 64 (not extended), MACD bull, uptrend px>50>200 with improving trend. S
+2026-07-17 08:34:44,477 WARNING alpaca | CVX: floored 15.5238 sh -> 15 for the exchange bracket; $97.75 of the $2896.90 allocation NOT deployed (stays cash; core sweep / next cycle can redeploy).
+2026-07-17 08:34:44,536 INFO alpaca | BUY market CVX qty=15.0 notional=None lim=None (order 914f5e80-3ee0-4790-8a8b-d11164c612a8)
+2026-07-17 08:34:44,543 INFO ledger | Ledger: BUY CVX qty=15 $2799
+2026-07-17 08:34:45,800 INFO orchestrator | BUY NVDA -> resized: Sized to 25.8708 sh ($5,185) within caps. Reduced from request. | Elite fundamentals (EBITDA $165B, 65% margin, +85% rev growth, low D/E). MACD bull, RSI 48 neutral (
+2026-07-17 08:34:45,876 WARNING alpaca | NVDA: floored 25.8708 sh -> 25 for the exchange bracket; $174.52 of the $5184.76 allocation NOT deployed (stays cash; core sweep / next cycle can redeploy).
+2026-07-17 08:34:46,347 INFO alpaca | BUY market NVDA qty=25.0 notional=None lim=None (order 6e11ed57-eb00-4e4e-8358-32d469bee948)
+2026-07-17 08:34:46,353 INFO ledger | Ledger: BUY NVDA qty=25 $5010
+2026-07-17 08:34:46,465 INFO orchestrator | HOLD UMH (no action) | Strongest composite (+1.35) among holdings: uptrend RSI 64 MACD bull, insider buying, rising rental 
+2026-07-17 08:34:46,775 INFO orchestrator | HOLD ZTS (no action) | Strong composite (+1.22): insider open-market buying (11,650 sh), congress buys, buy-side off-exchan
+2026-07-17 08:34:46,780 INFO orchestrator | Cycle budget not fully deployed: $272.27 dropped by whole-share flooring across this cycle's buys (stays cash; core sweep / next cycle can redeploy).
+2026-07-17 08:34:46,842 INFO alpaca | Alpaca client ready (mode=paper).
+2026-07-17 08:34:49,257 INFO dashboard | Wrote dashboard with 56 trades -> dashboard.html
+2026-07-17 08:52:47,383 CRITICAL orchestrator | DARK GAP: no loop tick for 4 min (sleep/suspend?). Positions were unwatched; reconciling before trading resumes.
+2026-07-17 08:52:49,142 INFO notify | CRITICAL alert emailed to srikanthpusapati1@gmail.com: Bot was dark for 4 min
+2026-07-17 08:52:49,203 WARNING alpaca | get_account: transient network error (ConnectionError); retry 1/2.
+2026-07-17 08:56:57,805 CRITICAL orchestrator | DARK GAP: no loop tick for 4 min (sleep/suspend?). Positions were unwatched; reconciling before trading resumes.
+2026-07-17 08:56:58,187 WARNING alpaca | get_account: transient network error (ConnectionError); retry 1/2.
+2026-07-17 08:57:44,738 WARNING alpaca | get_account: transient network error (ReadTimeout); retry 1/2.
+2026-07-17 08:57:45,355 WARNING alpaca | get_account: transient network error (ConnectionError); retry 2/2.
+2026-07-17 08:57:46,433 WARNING orchestrator | Watchdog tick skipped on a transient network error (ConnectionError); retrying next tick.
+2026-07-17 08:58:16,553 WARNING alpaca | get_account: transient network error (ConnectionError); retry 1/2.
+2026-07-17 08:58:17,137 WARNING alpaca | get_account: transient network error (ConnectionError); retry 2/2.
+2026-07-17 08:58:18,197 WARNING orchestrator | Watchdog tick skipped on a transient network error (ConnectionError); retrying next tick.
+2026-07-17 10:04:58,989 CRITICAL orchestrator | DARK GAP: no loop tick for 67 min (sleep/suspend?). Positions were unwatched; reconciling before trading resumes.
+2026-07-17 10:04:59,027 WARNING alpaca | get_account: transient network error (ConnectionError); retry 1/2.
+2026-07-17 10:04:59,678 WARNING alpaca | get_account: transient network error (ConnectionError); retry 2/2.
+2026-07-17 10:05:00,796 WARNING orchestrator | Watchdog tick skipped on a transient network error (ConnectionError); retrying next tick.
+2026-07-17 10:59:35,173 CRITICAL orchestrator | DARK GAP: no loop tick for 55 min (sleep/suspend?). Positions were unwatched; reconciling before trading resumes.
+2026-07-17 10:59:35,199 WARNING alpaca | get_account: transient network error (ConnectionError); retry 1/2.
+2026-07-17 10:59:35,852 WARNING alpaca | get_account: transient network error (ConnectionError); retry 2/2.
+2026-07-17 10:59:36,996 WARNING orchestrator | Watchdog tick skipped on a transient network error (ConnectionError); retrying next tick.
+2026-07-17 11:00:07,020 WARNING alpaca | get_account: transient network error (ConnectionError); retry 1/2.
+2026-07-17 11:00:07,661 WARNING alpaca | get_account: transient network error (ConnectionError); retry 2/2.
+2026-07-17 11:15:46,000 WARNING orchestrator | Watchdog tick skipped on a transient network error (ConnectionError); retrying next tick.
+2026-07-17 12:00:36,568 CRITICAL orchestrator | DARK GAP: no loop tick for 60 min (sleep/suspend?). Positions were unwatched; reconciling before trading resumes.
+2026-07-17 12:00:36,647 WARNING alpaca | get_account: transient network error (ConnectionError); retry 1/2.
+2026-07-17 12:00:37,252 WARNING alpaca | get_account: transient network error (ConnectionError); retry 2/2.
+2026-07-17 12:00:38,397 WARNING orchestrator | Watchdog tick skipped on a transient network error (ConnectionError); retrying next tick.
+2026-07-17 12:19:05,950 CRITICAL orchestrator | DARK GAP: no loop tick for 18 min (sleep/suspend?). Positions were unwatched; reconciling before trading resumes.
+2026-07-17 12:19:06,089 WARNING alpaca | get_account: transient network error (ConnectionError); retry 1/2.
+2026-07-17 12:19:06,742 WARNING alpaca | get_account: transient network error (ConnectionError); retry 2/2.
+2026-07-17 12:19:07,880 WARNING orchestrator | Watchdog tick skipped on a transient network error (ConnectionError); retrying next tick.
+2026-07-17 12:53:10,815 CRITICAL orchestrator | DARK GAP: no loop tick for 34 min (sleep/suspend?). Positions were unwatched; reconciling before trading resumes.
+2026-07-17 12:53:10,843 WARNING alpaca | get_account: transient network error (ConnectionError); retry 1/2.
+2026-07-17 12:53:11,492 WARNING alpaca | get_account: transient network error (ConnectionError); retry 2/2.
+2026-07-17 12:53:12,624 WARNING orchestrator | Watchdog tick skipped on a transient network error (ConnectionError); retrying next tick.
+2026-07-17 13:01:23,496 CRITICAL orchestrator | DARK GAP: no loop tick for 8 min (sleep/suspend?). Positions were unwatched; reconciling before trading resumes.
+2026-07-17 13:01:23,523 WARNING alpaca | get_account: transient network error (ConnectionError); retry 1/2.
+2026-07-17 13:01:24,079 WARNING alpaca | get_account: transient network error (ConnectionError); retry 2/2.
+2026-07-17 13:01:25,235 WARNING orchestrator | Watchdog tick skipped on a transient network error (ConnectionError); retrying next tick.
+2026-07-17 13:01:55,375 WARNING alpaca | get_account: transient network error (ConnectionError); retry 1/2.
+2026-07-17 13:01:56,021 WARNING alpaca | get_account: transient network error (ConnectionError); retry 2/2.
+2026-07-17 13:01:57,115 WARNING orchestrator | Watchdog tick skipped on a transient network error (ConnectionError); retrying next tick.
+2026-07-17 13:19:11,229 CRITICAL orchestrator | DARK GAP: no loop tick for 17 min (sleep/suspend?). Positions were unwatched; reconciling before trading resumes.
+2026-07-17 13:19:11,254 WARNING alpaca | get_account: transient network error (ConnectionError); retry 1/2.
+2026-07-17 13:19:11,908 WARNING alpaca | get_account: transient network error (ConnectionError); retry 2/2.
+2026-07-17 13:19:13,034 WARNING orchestrator | Watchdog tick skipped on a transient network error (ConnectionError); retrying next tick.
+2026-07-17 13:19:43,208 WARNING alpaca | get_account: transient network error (ConnectionError); retry 1/2.
+2026-07-17 13:19:43,871 WARNING alpaca | get_account: transient network error (ConnectionError); retry 2/2.
+2026-07-17 13:19:52,676 WARNING orchestrator | Watchdog tick skipped on a transient network error (ConnectionError); retrying next tick.
+2026-07-17 13:20:23,012 WARNING alpaca | get_account: transient network error (ConnectionError); retry 1/2.
+2026-07-17 13:20:23,649 WARNING alpaca | get_account: transient network error (ConnectionError); retry 2/2.
+2026-07-17 13:20:24,806 WARNING orchestrator | Watchdog tick skipped on a transient network error (ConnectionError); retrying next tick.
+2026-07-17 13:20:54,983 WARNING alpaca | get_account: transient network error (ConnectionError); retry 1/2.
+2026-07-17 13:20:55,635 WARNING alpaca | get_account: transient network error (ConnectionError); retry 2/2.
+2026-07-17 13:20:56,788 WARNING orchestrator | Watchdog tick skipped on a transient network error (ConnectionError); retrying next tick.
+2026-07-17 13:21:34,424 WARNING alpaca | get_account: transient network error (ConnectionError); retry 1/2.
+2026-07-17 13:21:35,081 WARNING alpaca | get_account: transient network error (ConnectionError); retry 2/2.
+2026-07-17 13:21:36,235 WARNING orchestrator | Watchdog tick skipped on a transient network error (ConnectionError); retrying next tick.
+2026-07-17 13:22:07,200 WARNING alpaca | get_account: transient network error (ConnectionError); retry 1/2.
+2026-07-17 13:22:07,779 WARNING alpaca | get_account: transient network error (ConnectionError); retry 2/2.
+2026-07-17 13:22:08,831 WARNING orchestrator | Watchdog tick skipped on a transient network error (ConnectionError); retrying next tick.
+2026-07-17 13:22:38,939 WARNING alpaca | get_account: transient network error (ConnectionError); retry 1/2.
+2026-07-17 13:22:39,535 WARNING alpaca | get_account: transient network error (ConnectionError); retry 2/2.
+2026-07-17 13:22:40,603 WARNING orchestrator | Watchdog tick skipped on a transient network error (ConnectionError); retrying next tick.
+2026-07-17 13:23:10,724 WARNING alpaca | get_account: transient network error (ConnectionError); retry 1/2.
+2026-07-17 13:23:11,277 WARNING alpaca | get_account: transient network error (ConnectionError); retry 2/2.
+2026-07-17 13:23:12,329 WARNING orchestrator | Watchdog tick skipped on a transient network error (ConnectionError); retrying next tick.
+2026-07-17 13:24:12,430 WARNING alpaca | get_account: transient network error (ConnectionError); retry 1/2.
+2026-07-17 13:24:26,542 WARNING alpaca | get_account: transient network error (ConnectionError); retry 2/2.
+2026-07-17 13:24:27,704 WARNING orchestrator | Watchdog tick skipped on a transient network error (ConnectionError); retrying next tick.
+2026-07-17 13:53:47,781 INFO orchestrator | Market regime: SPY above 200dma (744 vs 693), VIX 19 -> risk-on, size x1.00.
+2026-07-17 13:53:49,981 INFO quiver | Quiver live/congresstrading -> 1000 row(s).
+2026-07-17 13:53:50,555 INFO screener | EDGAR Form-4 feed -> 54 filing(s) (scanning up to 100).
+2026-07-17 13:54:41,180 INFO screener | Options-flow most-actives pool -> 40 name(s).
+2026-07-17 13:55:27,615 INFO screener | Robinhood 'Daily movers' -> 20 name(s).
+2026-07-17 13:55:29,187 INFO screener | Robinhood '100 most popular' -> 100 name(s).
+2026-07-17 13:55:30,510 INFO screener | Robinhood scans: none saved (define scans in the RH app to use this leg).
+2026-07-17 13:55:30,513 INFO screener | Discovered 18 candidate(s) from 5 source(s) (274 merged, 257 above min_score, capped to 18).
+2026-07-17 13:55:30,514 INFO screener |   candidate T [congress+options_flow+robinhood] score=+1.22 — Congress: 3 buy / 1 sell filings in last 60d (disclosures lag up to ~45d). | Options flow: 43,593 call / 19,901 put vol (bullish call imbalance +0.37) on a most-active name. | Robinhood 100 Most Popular (retail crowd positioning)
+2026-07-17 13:55:30,518 INFO screener |   candidate SPCX [congress+robinhood] score=+1.10 — Congress: 3 buy / 0 sell filings in last 60d (disclosures lag up to ~45d). | Robinhood 100 Most Popular (retail crowd positioning)
+2026-07-17 13:55:30,520 INFO screener |   candidate TSCO [congress] score=-1.00 — Congress: 0 buy / 5 sell filings in last 60d (disclosures lag up to ~45d).
+2026-07-17 13:55:30,521 INFO screener |   candidate BEP [congress] score=+1.00 — Congress: 7 buy / 0 sell filings in last 60d (disclosures lag up to ~45d).
+2026-07-17 13:55:30,523 INFO screener |   candidate WAB [congress] score=-1.00 — Congress: 0 buy / 5 sell filings in last 60d (disclosures lag up to ~45d).
+2026-07-17 13:55:30,524 INFO screener |   candidate HUBB [congress] score=+1.00 — Congress: 8 buy / 0 sell filings in last 60d (disclosures lag up to ~45d).
+2026-07-17 13:55:30,525 INFO screener |   candidate FFAI [options_flow] score=+0.86 — Options flow: 1,052 call / 76 put vol (bullish call imbalance +0.86) on a most-active name.
+2026-07-17 13:55:30,526 INFO screener |   candidate IBM [congress+robinhood] score=+0.85 — Congress: 3 buy / 1 sell filings in last 60d (disclosures lag up to ~45d). | Robinhood 100 Most Popular (retail crowd positioning)
+2026-07-17 13:55:30,528 INFO screener |   candidate SNDQ [options_flow] score=+0.76 — Options flow: 13,687 call / 1,832 put vol (bullish call imbalance +0.76) on a most-active name.
+2026-07-17 13:55:30,529 INFO screener |   candidate ENTG [congress] score=+0.75 — Congress: 3 buy / 0 sell filings in last 60d (disclosures lag up to ~45d).
+2026-07-17 13:55:30,530 INFO screener |   candidate LYV [congress] score=-0.75 — Congress: 0 buy / 3 sell filings in last 60d (disclosures lag up to ~45d).
+2026-07-17 13:55:30,532 INFO screener |   candidate WRB [congress] score=-0.75 — Congress: 0 buy / 3 sell filings in last 60d (disclosures lag up to ~45d).
+2026-07-17 13:55:30,533 INFO screener |   candidate SOFI [options_flow+robinhood] score=+0.73 — Options flow: 185,340 call / 83,719 put vol (bullish call imbalance +0.38) on a most-active name. | Robinhood 100 Most Popular (retail crowd positioning)
+2026-07-17 13:55:30,534 INFO screener |   candidate NVD [options_flow] score=+0.73 — Options flow: 604 call / 96 put vol (bullish call imbalance +0.73) on a most-active name.
+2026-07-17 13:55:30,535 INFO screener |   candidate SQQQ [options_flow] score=+0.72 — Options flow: 115,092 call / 18,783 put vol (bullish call imbalance +0.72) on a most-active name.
+2026-07-17 13:55:30,536 INFO screener |   candidate SOXS [options_flow] score=+0.64 — Options flow: 63,970 call / 14,143 put vol (bullish call imbalance +0.64) on a most-active name.
+2026-07-17 13:55:30,537 INFO screener |   candidate TSLA [congress+robinhood] score=+0.60 — Congress: 1 buy / 0 sell filings in last 60d (disclosures lag up to ~45d). | Robinhood 100 Most Popular (retail crowd positioning)
+2026-07-17 13:55:30,539 INFO screener |   candidate MU [congress+robinhood] score=+0.60 — Congress: 2 buy / 1 sell filings in last 60d (disclosures lag up to ~45d). | Robinhood 100 Most Popular (retail crowd positioning)
+2026-07-17 13:55:53,843 INFO quiver | Quiver live/offexchange -> 5496 row(s).
+2026-07-17 13:55:55,008 INFO quiver | Quiver live/govcontractsall -> 20000 row(s).
+2026-07-17 13:56:42,667 INFO signals | options_chain: reading 25 of 30 symbols this cycle (cap).
+2026-07-17 13:56:55,534 INFO signals | Gathered signals for 30/30 symbols (+3 market signals).
+2026-07-17 13:57:02,714 INFO robinhood | Imported 1 Robinhood holding(s) for context (read-only).
+2026-07-17 13:57:02,734 INFO orchestrator | Buy-excluded from slate this cycle: MU (exited 5.4h ago (cooldown 24h)), SPCX (exited 5.4h ago (cooldown 24h))
+2026-07-17 13:57:47,574 INFO usage | decision call: 24466 in / 3289 out (cache r=0 w=0) ~$0.2046 [claude-opus-4-8]
+2026-07-17 13:57:47,585 INFO decision | Claude returned 6 proposal(s).
+2026-07-17 13:57:47,854 INFO orchestrator | SELL UBER -> approved: Closing existing position. | Weakest holding: technical downtrend (px<50<200, MACD bear), massive insider open-market selling (67
+2026-07-17 13:57:48,369 WARNING alpaca | Exit via resting sell 48a5d2a3-6a62-4b15-baa7-1d42bed843d1 (UBER): replaced limit -> 71.53 (marketable; new order 1b5709c1-edd1-466d-8436-57f22329172c).
+2026-07-17 13:57:48,394 INFO ledger | Ledger: SELL UBER qty=56 $4087
+2026-07-17 13:57:48,399 WARNING watchdog | Partial close UBER (decision): sold 0 available share(s), made 1 resting sell(s) marketable; 56 reserved by open orders — will retry the full close next tick.
+2026-07-17 13:57:48,406 INFO orchestrator | Cycle budget $8,878 split across 2 buy(s): BEP $3,746, F $5,132.
+2026-07-17 13:57:53,048 INFO earnings | Robinhood earnings calendar: 0 name(s) reporting within 31d.
+2026-07-17 13:58:01,310 INFO orchestrator | BUY BEP -> approved: Sized to 91.0194 sh ($2,903) within caps. | Scanner-surfaced with heaviest smart-money tell on the slate: 7 congressional buys / 0 sells in 60d 
+2026-07-17 13:58:01,397 WARNING alpaca | BEP: floored 91.0194 sh -> 91 for the exchange bracket; $0.62 of the $2902.61 allocation NOT deployed (stays cash; core sweep / next cycle can redeploy).
+2026-07-17 13:58:01,467 INFO alpaca | BUY market BEP qty=91.0 notional=None lim=None (order 11ba08d8-1372-4c65-bfd6-99a91b52380f)
+2026-07-17 13:58:01,472 INFO ledger | Ledger: BUY BEP qty=91 $2902
+2026-07-17 13:58:02,022 INFO risk | REJECT buy F: Top-up conviction 0.56 shows no new edge over prior entry 0.58 (needs +0.05) — 'adding to a winner' is not a signal.
+2026-07-17 13:58:02,024 INFO orchestrator | BUY F -> rejected: Top-up conviction 0.56 shows no new edge over prior entry 0.58 (needs +0.05) — 'adding to a winner' is not a signal. | Strongest composite on the book (+1.26) with momentum behind it: uptrend px>50>200, MACD bull improv
+2026-07-17 13:58:02,306 INFO orchestrator | HOLD UMH (no action) | Uptrend with MACD bull, solid 44.5% margin and rising rental income, insider buying. High off-exchan
+2026-07-17 13:58:02,548 INFO orchestrator | HOLD ZTS (no action) | Composite +0.93 with insider open-market buying (11,650/0) and congress buys, but technical still do
+2026-07-17 13:58:02,708 INFO orchestrator | HOLD LLY (no action) | Elite fundamentals (55.5% rev growth, 50% margin) offset by bearish options-chain positioning (put/c
+2026-07-17 13:58:02,795 INFO alpaca | Alpaca client ready (mode=paper).
+2026-07-17 13:58:24,630 INFO dashboard | Wrote dashboard with 58 trades -> dashboard.html
+2026-07-17 15:07:26,554 CRITICAL orchestrator | DARK GAP: no loop tick for 49 min (sleep/suspend?). Positions were unwatched; reconciling before trading resumes.
+2026-07-17 15:07:26,664 WARNING notify | Alert email send failed (attempt 1/2): [Errno 8] nodename nor servname provided, or not known
+2026-07-17 15:24:44,756 WARNING notify | Alert email send failed (attempt 2/2): [Errno 8] nodename nor servname provided, or not known
+2026-07-17 15:24:44,776 ERROR notify | ALERT not delivered (no working sink): Bot was dark for 49 min
+2026-07-17 15:25:00,540 WARNING alpaca | get_account: transient network error (ReadTimeout); retry 1/2.
+2026-07-17 15:25:01,282 WARNING alpaca | get_account: transient network error (ConnectionError); retry 2/2.
+2026-07-17 15:26:21,835 WARNING orchestrator | DARK GAP (market closed): no loop tick for 19 min (sleep/suspend?) — positions could not move; not paging.
+2026-07-17 15:51:09,972 INFO alpaca | Alpaca client ready (mode=paper).
+2026-07-17 15:51:10,432 INFO orchestrator | Discovery-driven mode: trading scanner-found names + holdings.
+2026-07-17 15:51:10,434 INFO orchestrator | Loaded 2 pending order(s) from state to reconcile.
+2026-07-17 15:51:10,435 INFO orchestrator | Starting orchestrator (paper). Kill switch: off. Options: on. Benchmark: QQQ.
+2026-07-17 15:51:10,765 INFO orchestrator | Market closed; skipping decision cycle.
+2026-07-17 15:51:10,768 INFO orchestrator | Running nightly post-mortem for 2026-07-17 …
+2026-07-17 15:51:22,728 INFO usage | postmortem call: 1705 in / 635 out (cache r=0 w=0) ~$0.0244 [claude-opus-4-8]
+2026-07-17 15:51:22,732 INFO postmortem | Post-mortem written to state/lessons/2026-07-17.md
+2026-07-17 15:51:22,734 INFO postmortem | Post-mortem lessons: Reject entries driven only by extreme/anomalous fundamentals or hype-discovery signals without technical price confirmation. | Cap single-name buys near ~40% of daily deployed dollars; NVDA took ~47% today—diversify. | Treat unvetted stats like +345% rev growth as red flags, not conviction boosters; verify before sizing.
+2026-07-17 15:51:22,738 INFO orchestrator | API spend today: $0.41 across 3 calls (50,300 in / 6,458 out tokens).
+2026-07-17 15:51:22,907 INFO alpaca | Alpaca client ready (mode=paper).
+2026-07-17 15:51:27,309 INFO dashboard | Wrote dashboard with 58 trades -> dashboard.html
+2026-07-17 16:45:57,184 WARNING alpaca | get_account: transient network error (ReadTimeout); retry 1/2.
+2026-07-17 16:45:57,878 WARNING alpaca | get_account: transient network error (ConnectionError); retry 2/2.
+2026-07-17 16:45:59,102 WARNING orchestrator | Watchdog tick skipped on a transient network error (ConnectionError); retrying next tick.
+2026-07-17 17:02:02,891 WARNING orchestrator | DARK GAP (market closed): no loop tick for 16 min (sleep/suspend?) — positions could not move; not paging.
+2026-07-17 17:02:02,942 WARNING alpaca | get_account: transient network error (ConnectionError); retry 1/2.
+2026-07-17 17:02:03,584 WARNING alpaca | get_account: transient network error (ConnectionError); retry 2/2.
+2026-07-17 17:02:04,742 WARNING orchestrator | Watchdog tick skipped on a transient network error (ConnectionError); retrying next tick.
+2026-07-17 17:02:34,912 WARNING alpaca | get_account: transient network error (ConnectionError); retry 1/2.
+2026-07-17 17:02:35,553 WARNING alpaca | get_account: transient network error (ConnectionError); retry 2/2.
+2026-07-17 17:02:36,708 WARNING orchestrator | Watchdog tick skipped on a transient network error (ConnectionError); retrying next tick.
+2026-07-17 18:22:20,921 WARNING orchestrator | DARK GAP (market closed): no loop tick for 80 min (sleep/suspend?) — positions could not move; not paging.
+2026-07-17 18:22:20,961 WARNING alpaca | get_account: transient network error (ConnectionError); retry 1/2.
+2026-07-17 18:22:21,475 WARNING alpaca | get_account: transient network error (ConnectionError); retry 2/2.
+2026-07-17 18:22:22,650 WARNING orchestrator | Watchdog tick skipped on a transient network error (ConnectionError); retrying next tick.
+2026-07-17 18:39:22,645 WARNING orchestrator | DARK GAP (market closed): no loop tick for 17 min (sleep/suspend?) — positions could not move; not paging.
+2026-07-17 18:39:22,675 WARNING alpaca | get_account: transient network error (ConnectionError); retry 1/2.
+2026-07-17 18:39:23,328 WARNING alpaca | get_account: transient network error (ConnectionError); retry 2/2.
+2026-07-17 18:39:24,483 WARNING orchestrator | Watchdog tick skipped on a transient network error (ConnectionError); retrying next tick.
+2026-07-17 18:44:18,465 WARNING orchestrator | DARK GAP (market closed): no loop tick for 5 min (sleep/suspend?) — positions could not move; not paging.
+2026-07-17 18:44:18,486 WARNING alpaca | get_account: transient network error (ConnectionError); retry 1/2.
+2026-07-17 18:44:19,141 WARNING alpaca | get_account: transient network error (ConnectionError); retry 2/2.
+2026-07-17 18:44:20,238 WARNING orchestrator | Watchdog tick skipped on a transient network error (ConnectionError); retrying next tick.
+2026-07-17 18:44:50,384 WARNING alpaca | get_account: transient network error (ConnectionError); retry 1/2.
+2026-07-17 18:44:51,034 WARNING alpaca | get_account: transient network error (ConnectionError); retry 2/2.
+2026-07-17 18:44:52,189 WARNING orchestrator | Watchdog tick skipped on a transient network error (ConnectionError); retrying next tick.
+2026-07-17 18:54:28,268 WARNING orchestrator | DARK GAP (market closed): no loop tick for 10 min (sleep/suspend?) — positions could not move; not paging.
+2026-07-17 18:57:23,917 WARNING orchestrator | DARK GAP (market closed): no loop tick for 3 min (sleep/suspend?) — positions could not move; not paging.
+2026-07-17 18:57:24,015 WARNING alpaca | get_account: transient network error (ConnectionError); retry 1/2.
+2026-07-17 19:04:31,824 WARNING orchestrator | DARK GAP (market closed): no loop tick for 7 min (sleep/suspend?) — positions could not move; not paging.
+2026-07-17 19:04:32,020 WARNING alpaca | get_account: transient network error (ConnectionError); retry 1/2.
+2026-07-17 19:17:07,984 WARNING orchestrator | DARK GAP (market closed): no loop tick for 13 min (sleep/suspend?) — positions could not move; not paging.
+2026-07-17 19:17:08,170 WARNING alpaca | get_account: transient network error (ConnectionError); retry 1/2.
+2026-07-17 19:27:51,746 WARNING orchestrator | DARK GAP (market closed): no loop tick for 11 min (sleep/suspend?) — positions could not move; not paging.
+2026-07-17 19:27:51,837 WARNING alpaca | get_account: transient network error (ConnectionError); retry 1/2.
+2026-07-17 19:31:47,002 WARNING alpaca | get_clock: transient network error (ConnectionError); retry 1/2.
+2026-07-17 19:31:47,842 INFO orchestrator | Market closed; skipping decision cycle.
+2026-07-17 19:31:47,918 INFO alpaca | Alpaca client ready (mode=paper).
+2026-07-17 19:31:49,860 INFO dashboard | Wrote dashboard with 58 trades -> dashboard.html
+2026-07-17 19:32:03,751 WARNING orchestrator | DARK GAP (market closed): no loop tick for 4 min (sleep/suspend?) — positions could not move; not paging.
+2026-07-17 19:34:16,798 WARNING alpaca | get_account: transient network error (ConnectionError); retry 1/2.
+2026-07-17 19:41:36,641 WARNING orchestrator | DARK GAP (market closed): no loop tick for 7 min (sleep/suspend?) — positions could not move; not paging.
+2026-07-17 19:41:36,751 WARNING alpaca | get_account: transient network error (ConnectionError); retry 1/2.
+2026-07-17 19:43:16,340 WARNING alpaca | get_account: transient network error (ConnectionError); retry 1/2.
+2026-07-17 19:57:26,768 WARNING orchestrator | DARK GAP (market closed): no loop tick for 9 min (sleep/suspend?) — positions could not move; not paging.
+2026-07-17 19:57:26,862 WARNING alpaca | get_account: transient network error (ConnectionError); retry 1/2.
+2026-07-17 19:59:20,890 WARNING alpaca | get_account: transient network error (ConnectionError); retry 1/2.
+2026-07-17 20:04:24,099 WARNING orchestrator | DARK GAP (market closed): no loop tick for 3 min (sleep/suspend?) — positions could not move; not paging.
+2026-07-17 20:04:24,168 WARNING alpaca | get_account: transient network error (ConnectionError); retry 1/2.
+2026-07-17 20:16:01,012 WARNING orchestrator | DARK GAP (market closed): no loop tick for 11 min (sleep/suspend?) — positions could not move; not paging.
+2026-07-17 20:16:01,194 WARNING alpaca | get_account: transient network error (ConnectionError); retry 1/2.
+2026-07-17 20:32:31,009 WARNING orchestrator | DARK GAP (market closed): no loop tick for 16 min (sleep/suspend?) — positions could not move; not paging.
+2026-07-17 20:32:31,188 WARNING alpaca | get_account: transient network error (ConnectionError); retry 1/2.
+2026-07-17 20:38:09,474 WARNING orchestrator | DARK GAP (market closed): no loop tick for 6 min (sleep/suspend?) — positions could not move; not paging.
+2026-07-17 20:38:09,563 WARNING alpaca | get_account: transient network error (ConnectionError); retry 1/2.
+2026-07-17 20:40:16,512 WARNING alpaca | get_account: transient network error (ConnectionError); retry 1/2.
+2026-07-17 20:40:22,280 WARNING alpaca | get_account: transient network error (ReadTimeout); retry 2/2.
+2026-07-17 20:42:55,659 WARNING orchestrator | DARK GAP (market closed): no loop tick for 3 min (sleep/suspend?) — positions could not move; not paging.
+2026-07-17 20:42:55,720 WARNING alpaca | get_account: transient network error (ConnectionError); retry 1/2.
+2026-07-17 20:46:30,169 WARNING orchestrator | DARK GAP (market closed): no loop tick for 3 min (sleep/suspend?) — positions could not move; not paging.
+2026-07-17 20:46:30,241 WARNING alpaca | get_account: transient network error (ConnectionError); retry 1/2.
+2026-07-17 20:53:51,123 WARNING orchestrator | DARK GAP (market closed): no loop tick for 7 min (sleep/suspend?) — positions could not move; not paging.
+2026-07-17 20:53:51,261 WARNING alpaca | get_account: transient network error (ConnectionError); retry 1/2.
+2026-07-17 21:00:51,073 WARNING orchestrator | DARK GAP (market closed): no loop tick for 6 min (sleep/suspend?) — positions could not move; not paging.
+2026-07-17 21:00:51,151 WARNING alpaca | get_account: transient network error (ConnectionError); retry 1/2.
+2026-07-17 21:06:54,134 WARNING orchestrator | DARK GAP (market closed): no loop tick for 6 min (sleep/suspend?) — positions could not move; not paging.
+2026-07-17 21:06:54,536 WARNING alpaca | get_account: transient network error (ConnectionError); retry 1/2.
+2026-07-17 21:11:51,824 WARNING orchestrator | DARK GAP (market closed): no loop tick for 4 min (sleep/suspend?) — positions could not move; not paging.
+2026-07-17 21:11:52,021 WARNING alpaca | get_account: transient network error (ConnectionError); retry 1/2.
+2026-07-17 21:19:48,168 WARNING orchestrator | DARK GAP (market closed): no loop tick for 5 min (sleep/suspend?) — positions could not move; not paging.
+2026-07-17 21:28:44,071 WARNING orchestrator | DARK GAP (market closed): no loop tick for 7 min (sleep/suspend?) — positions could not move; not paging.
+2026-07-17 21:28:44,147 WARNING alpaca | get_account: transient network error (ConnectionError); retry 1/2.
+2026-07-17 21:30:50,059 WARNING alpaca | get_account: transient network error (ConnectionError); retry 1/2.
+2026-07-17 21:35:54,795 WARNING orchestrator | DARK GAP (market closed): no loop tick for 3 min (sleep/suspend?) — positions could not move; not paging.
+2026-07-17 21:35:54,881 WARNING alpaca | get_account: transient network error (ConnectionError); retry 1/2.
+2026-07-17 21:43:44,379 WARNING alpaca | get_account: transient network error (ConnectionError); retry 1/2.
+2026-07-17 21:47:15,924 WARNING orchestrator | DARK GAP (market closed): no loop tick for 3 min (sleep/suspend?) — positions could not move; not paging.
+2026-07-17 21:47:16,105 WARNING alpaca | get_account: transient network error (ConnectionError); retry 1/2.
+2026-07-17 21:54:00,099 WARNING orchestrator | DARK GAP (market closed): no loop tick for 4 min (sleep/suspend?) — positions could not move; not paging.
+2026-07-17 21:54:00,317 WARNING alpaca | get_account: transient network error (ConnectionError); retry 1/2.
+2026-07-17 21:56:07,795 WARNING alpaca | get_account: transient network error (ConnectionError); retry 1/2.
+2026-07-17 22:03:38,363 WARNING orchestrator | DARK GAP (market closed): no loop tick for 5 min (sleep/suspend?) — positions could not move; not paging.
+2026-07-17 22:03:38,437 WARNING alpaca | get_account: transient network error (ConnectionError); retry 1/2.
+2026-07-17 22:08:17,150 WARNING alpaca | get_account: transient network error (ConnectionError); retry 1/2.
+2026-07-17 22:14:07,015 WARNING orchestrator | DARK GAP (market closed): no loop tick for 5 min (sleep/suspend?) — positions could not move; not paging.
+2026-07-17 22:14:07,160 WARNING alpaca | get_account: transient network error (ConnectionError); retry 1/2.
+2026-07-17 22:17:49,780 WARNING orchestrator | DARK GAP (market closed): no loop tick for 4 min (sleep/suspend?) — positions could not move; not paging.
+2026-07-17 22:17:50,311 WARNING alpaca | get_account: transient network error (ConnectionError); retry 1/2.
+2026-07-17 22:30:01,856 WARNING orchestrator | DARK GAP (market closed): no loop tick for 12 min (sleep/suspend?) — positions could not move; not paging.
+2026-07-17 22:30:02,093 WARNING alpaca | get_account: transient network error (ConnectionError); retry 1/2.
+2026-07-17 22:47:51,894 WARNING orchestrator | DARK GAP (market closed): no loop tick for 18 min (sleep/suspend?) — positions could not move; not paging.
+2026-07-17 22:47:52,559 WARNING alpaca | get_account: transient network error (ConnectionError); retry 1/2.
+2026-07-17 22:51:00,331 WARNING orchestrator | DARK GAP (market closed): no loop tick for 3 min (sleep/suspend?) — positions could not move; not paging.
+2026-07-17 22:51:00,424 WARNING alpaca | get_account: transient network error (ConnectionError); retry 1/2.
+2026-07-17 22:53:17,704 WARNING alpaca | get_account: transient network error (ConnectionError); retry 1/2.
+2026-07-17 22:56:56,857 WARNING alpaca | get_account: transient network error (ConnectionError); retry 1/2.
+2026-07-17 23:02:23,121 WARNING orchestrator | DARK GAP (market closed): no loop tick for 5 min (sleep/suspend?) — positions could not move; not paging.
+2026-07-17 23:12:31,637 WARNING orchestrator | DARK GAP (market closed): no loop tick for 9 min (sleep/suspend?) — positions could not move; not paging.
+2026-07-17 23:18:49,673 WARNING alpaca | get_account: transient network error (ConnectionError); retry 1/2.
+2026-07-17 23:29:24,490 WARNING orchestrator | DARK GAP (market closed): no loop tick for 8 min (sleep/suspend?) — positions could not move; not paging.
+2026-07-17 23:29:24,788 WARNING alpaca | get_account: transient network error (ConnectionError); retry 1/2.
+2026-07-17 23:42:11,619 WARNING orchestrator | DARK GAP (market closed): no loop tick for 6 min (sleep/suspend?) — positions could not move; not paging.
+2026-07-17 23:42:11,707 WARNING alpaca | get_account: transient network error (ConnectionError); retry 1/2.
+2026-07-17 23:43:57,794 WARNING alpaca | get_account: transient network error (ConnectionError); retry 1/2.
+2026-07-17 23:49:20,333 WARNING orchestrator | DARK GAP (market closed): no loop tick for 4 min (sleep/suspend?) — positions could not move; not paging.
+2026-07-17 23:49:20,397 WARNING alpaca | get_account: transient network error (ConnectionError); retry 1/2.
+2026-07-17 23:52:13,471 WARNING orchestrator | DARK GAP (market closed): no loop tick for 3 min (sleep/suspend?) — positions could not move; not paging.
+2026-07-17 23:52:13,541 WARNING alpaca | get_account: transient network error (ConnectionError); retry 1/2.
