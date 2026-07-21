@@ -970,13 +970,32 @@ from unittest.mock import patch  # noqa: E402
 def test_decision_due_fires_at_stashed_next_open_and_not_before():
     o = Orchestrator.__new__(Orchestrator)
     o.cfg = SimpleNamespace(decision_interval_s=3600)
-    o._last_decision_at = time.monotonic()   # hourly grid not due
+    o._last_decision_at = time.time()        # wall-clock: hourly grid not due
     o._next_open_utc = None
     assert not o._decision_due()
     o._next_open_utc = datetime.now(timezone.utc) + timedelta(seconds=30)
     assert not o._decision_due()
     o._next_open_utc = datetime.now(timezone.utc) - timedelta(seconds=1)
     assert o._decision_due()
+
+
+def test_within_close_fence_only_near_the_bell():
+    o = Orchestrator.__new__(Orchestrator)
+    o.cfg = SimpleNamespace(close_fence_minutes=5.0)
+    now = datetime.now(timezone.utc)
+    # 3 min to close -> fenced; 30 min -> not; already closed (negative) -> not;
+    # unknown close time -> fail open (not fenced).
+    o.broker = SimpleNamespace(next_market_close=lambda: now + timedelta(minutes=3))
+    assert o._within_close_fence() is True
+    o.broker = SimpleNamespace(next_market_close=lambda: now + timedelta(minutes=30))
+    assert o._within_close_fence() is False
+    o.broker = SimpleNamespace(next_market_close=lambda: now - timedelta(minutes=1))
+    assert o._within_close_fence() is False
+    o.broker = SimpleNamespace(next_market_close=lambda: None)
+    assert o._within_close_fence() is False
+    o.cfg = SimpleNamespace(close_fence_minutes=0.0)   # disabled
+    o.broker = SimpleNamespace(next_market_close=lambda: now + timedelta(minutes=1))
+    assert o._within_close_fence() is False
 
 
 def test_closed_tick_arms_the_bell_wakeup():
@@ -994,8 +1013,9 @@ def test_bell_stash_survives_failed_cycle_and_clears_on_success():
     # An exception AT the open must keep the stash armed (30s retry at the
     # bell); only a successful cycle consumes it; a FUTURE stash survives.
     o = Orchestrator.__new__(Orchestrator)
-    o.cfg = SimpleNamespace(decision_interval_s=3600)
+    o.cfg = SimpleNamespace(decision_interval_s=3600, monitor_interval_s=30)
     o._last_main_tick = 0.0
+    o._last_main_wall = time.time()     # recent -> no post-wake settle path
     o._last_decision_at = 0.0            # hourly due -> _tick runs the cycle
     o._refresh_runtime_controls = lambda: None
     o._refresh_dashboard = lambda: None

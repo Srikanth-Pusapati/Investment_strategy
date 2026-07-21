@@ -324,6 +324,17 @@ class Config:
     # switch file) until a human deletes the file to acknowledge.
     heartbeat_url: str = ""
     reconcile_halt_enabled: bool = True
+    # Close fence (CRITICAL-1): don't START a fresh decision inside this many
+    # minutes of the session close, and discard any proposals the LLM returns
+    # after the bell — a buy placed this late can't complete before close, and a
+    # cycle that spans the close executed after hours (Jul 20: 5 proposals 41
+    # min past the close). 0 = off. Reconcile/backfill still run near the close.
+    close_fence_minutes: float = 5.0
+    # Post-wake settle (CRITICAL-1): after a wall-clock jump larger than this
+    # many seconds (laptop sleep/suspend), wait briefly for the network to come
+    # back before the first decision cycle, so the read-retry budget isn't burnt
+    # while Wi-Fi is still reconnecting. 0 = off.
+    wake_settle_seconds: float = 20.0
     # Nightly self post-mortem (B2): on the first market-closed decision tick
     # after a day that has journal entries, feed the day's decisions to Claude
     # and fold its one-line lessons back into the next day's decision prompt.
@@ -409,6 +420,8 @@ def load_config() -> Config:
         benchmark_symbol=os.getenv("BENCHMARK_SYMBOL", "QQQ").upper(),
         decision_interval_s=_i("DECISION_INTERVAL_SECONDS", 900),
         monitor_interval_s=_i("MONITOR_INTERVAL_SECONDS", 30),
+        close_fence_minutes=_f("CLOSE_FENCE_MINUTES", 5.0),
+        wake_settle_seconds=_f("WAKE_SETTLE_SECONDS", 20.0),
         kill_switch_file=os.getenv("KILL_SWITCH_FILE", "state/KILL"),
         heartbeat_url=os.getenv("HEARTBEAT_URL", "").strip(),
         reconcile_halt_enabled=_flag("RECONCILE_HALT", "on"),

@@ -358,15 +358,22 @@ def test_gather_reports_progress_per_provider():
 # -- first decision tick after a machine reboot --------------------------------- #
 
 def test_first_decision_due_even_on_fresh_boot(monkeypatch):
-    # time.monotonic() counts from MACHINE boot. With _last_decision_at = 0.0
-    # a bot started minutes after a reboot wasn't "due" until machine uptime
-    # exceeded the whole decision interval (2026-07-14: a silent first hour).
-    # The -inf sentinel makes the first tick unconditionally due.
+    # The cadence now runs on WALL clock (time.time), which survives host sleep;
+    # the old monotonic clock froze during suspend and stalled the schedule. The
+    # -inf sentinel keeps the first tick unconditionally due, and wall-clock is
+    # immune to the old monotonic-boot bug entirely (epoch 0 is far in the past).
     o = Orchestrator.__new__(Orchestrator)
     o.cfg = SimpleNamespace(decision_interval_s=3600)
     o._next_open_utc = None
-    monkeypatch.setattr(orch_mod.time, "monotonic", lambda: 300.0)  # 5 min up
-    o._last_decision_at = 0.0                 # the old init value: NOT due
-    assert o._decision_due() is False         # documents the reboot bug
-    o._last_decision_at = float("-inf")       # the fixed init value: due
+    monkeypatch.setattr(orch_mod.time, "time", lambda: 1_000_000.0)
+    o._last_decision_at = float("-inf")           # init sentinel: due
+    assert o._decision_due() is True
+    o._last_decision_at = 1_000_000.0 - 100.0     # 100s ago, under the interval
+    assert o._decision_due() is False
+    o._last_decision_at = 1_000_000.0 - 4000.0    # a full interval+ ago: due
+    assert o._decision_due() is True
+    # A wall-clock jump forward (host resumed from a long sleep) makes it due —
+    # the whole point of moving off monotonic.
+    o._last_decision_at = 1_000_000.0 - 100.0
+    monkeypatch.setattr(orch_mod.time, "time", lambda: 1_000_000.0 + 7200.0)
     assert o._decision_due() is True

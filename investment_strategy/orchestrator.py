@@ -12,6 +12,8 @@ from __future__ import annotations
 
 import logging
 import os
+import subprocess
+import sys
 import threading
 import time
 from datetime import datetime, timedelta, timezone
@@ -149,11 +151,15 @@ class Orchestrator:
         self.journal = DecisionJournal()
         # Persisted daily equity snapshots so the account P&L curve survives restarts.
         self.equity_history = EquityHistory()
-        # -inf so the FIRST decision tick is unconditionally due. 0.0 looked
-        # equivalent but wasn't: time.monotonic() is seconds since BOOT, so on
-        # a freshly rebooted machine (2026-07-14: bot up 6 min after boot) the
-        # bot silently idled until MACHINE uptime exceeded the decision
-        # interval — a whole quiet hour, even mid-session.
+        # WALL-CLOCK stamp (time.time()) of the last decision cycle's START.
+        # -inf => the FIRST tick is unconditionally due. This used to be
+        # time.monotonic(), which on macOS freezes during sleep/suspend: a
+        # laptop that slept an hour advanced monotonic by only the awake time,
+        # so the cadence stalled and cycles were MISSED for the whole slept span
+        # (Jul 18: 02:05 -> 12:34 starvation). Wall-clock keeps ticking through
+        # sleep, so the next cycle is due the moment the host wakes. Hang
+        # detection (_last_main_tick) stays monotonic — that's the correct clock
+        # for 'is the loop wedged', which sleep is not.
         self._last_decision_at = float("-inf")
         # Next session open (UTC), stashed by closed-market ticks so the loop
         # can fire a decision AT the bell instead of at the next hourly tick
@@ -194,10 +200,19 @@ class Orchestrator:
         # clock jumps) that monotonic timers can't see.
         self._last_main_tick = time.monotonic()
         self._last_wall_tick = time.time()
+        # Wall-clock stamp of the last MAIN-loop tick (distinct from the
+        # watchdog's _last_wall_tick): a big jump here means the host just
+        # resumed from sleep, so the decision loop settles the network before
+        # its first post-wake cycle (see _tick / _await_network_settle).
+        self._last_main_wall = time.time()
         # In-memory halt latch: backs the kill-switch FILE when the file write
         # itself failed (disk full/read-only). Cleared only by restart — if we
         # couldn't write the ack file, there's nothing a human can delete to ack.
         self._forced_halt = False
+        # Last time we paged about running on battery during market hours (0 =
+        # never). Throttled: clamshell/battery sleep is a standing condition, not
+        # a one-shot event, so one page per BATTERY_WARN_COOLDOWN_S is enough.
+        self._last_battery_warn = 0.0
 
     # -- main loop ---------------------------------------------------------- #
     def run(self) -> None:
@@ -249,6 +264,7 @@ class Orchestrator:
         while not self._stop.is_set():
             try:
                 self._note_loop_tick()
+                self._maybe_warn_on_battery()
                 with self._trade_lock:
                     self.watchdog.check_once()
                 self._maybe_heartbeat()
@@ -260,6 +276,57 @@ class Orchestrator:
             except Exception:
                 log.exception("Watchdog tick failed; continuing.")
             self._stop.wait(self.cfg.monitor_interval_s)
+
+    #: page at most once per this window about running on battery in-hours.
+    BATTERY_WARN_COOLDOWN_S = 1800.0
+
+    def _maybe_warn_on_battery(self) -> None:
+        """Proactively page when the host is on BATTERY during market hours.
+        `caffeinate` can't prevent clamshell/battery sleep (Jul 20: pmset
+        'Clamshell Sleep … Using Batt 39%' mapped 1:1 to the dark gaps), so the
+        only in-code mitigation is to warn BEFORE the bot goes dark — the
+        durable fix is AC power or the always-on host in ops/. macOS-only,
+        throttled, best-effort; never raises."""
+        if sys.platform != "darwin":
+            return
+        now = time.time()
+        if now - self._last_battery_warn < self.BATTERY_WARN_COOLDOWN_S:
+            return
+        if not self._overlaps_paging_hours(now, now):
+            return  # off-hours: sleeping on battery is fine, don't cry wolf
+        if self._on_battery() is not True:
+            return
+        self._last_battery_warn = now
+        log.critical(
+            "On BATTERY during market hours — clamshell/battery sleep will blind "
+            "the bot (caffeinate cannot prevent it). Plug in AC or move to the "
+            "always-on host (ops/)."
+        )
+        self.alerter.critical(
+            "on_battery",
+            "Bot on battery during market hours",
+            "The host is running on battery while the market is open. macOS will "
+            "sleep on lid-close/idle even with caffeinate held, and the bot goes "
+            "dark with positions unwatched between watchdog ticks. Plug in AC "
+            "power, or move to the always-on host (ops/Dockerfile).",
+        )
+
+    @staticmethod
+    def _on_battery() -> bool | None:
+        """True on battery, False on AC, None if undetermined (pmset missing /
+        parse fail). macOS `pmset -g batt` prints 'Now drawing from Battery
+        Power' or 'AC Power'."""
+        try:
+            out = subprocess.run(
+                ["pmset", "-g", "batt"], capture_output=True, text=True, timeout=3,
+            ).stdout
+        except Exception:  # noqa: BLE001 — advisory probe, never raises
+            return None
+        if "AC Power" in out:
+            return False
+        if "Battery Power" in out:
+            return True
+        return None
 
     def _note_loop_tick(self) -> None:
         """Detect dark gaps. A wall-clock jump much larger than the tick interval
@@ -364,10 +431,20 @@ class Orchestrator:
         # minutes inside a decision cycle (LLM + signal fetches), and busy is
         # not dark — the watchdog keeps watching positions the whole time.
         self._last_main_tick = time.monotonic()
+        now_wall = time.time()
+        wake_gap = now_wall - self._last_main_wall
+        self._last_main_wall = now_wall
         self._refresh_runtime_controls()
         if not self._decision_due():
             return
-        cycle_start = time.monotonic()
+        # Post-wake settle: a wall-clock jump far larger than the tick interval
+        # means the host just resumed from sleep. Give the network a moment to
+        # reconnect before the cycle's reconcile/reads, so their retry budget
+        # isn't burnt while Wi-Fi is still coming up (Jul 18: 18/18 post-wake
+        # tick failures in ~1.5s).
+        if wake_gap > self.cfg.monitor_interval_s * 3 + 60:
+            self._await_network_settle(wake_gap)
+        cycle_start = time.time()   # WALL clock — the cadence must survive sleep
         self.run_decision_cycle()
         # Refresh the dashboard while the market is open, plus exactly once on
         # the open->closed transition (the settled end-of-day snapshot). Skip
@@ -389,8 +466,63 @@ class Orchestrator:
                 and datetime.now(timezone.utc) >= self._next_open_utc):
             self._next_open_utc = None
 
+    def _await_network_settle(self, gap_s: float) -> None:
+        """After a resume-from-sleep, wait up to wake_settle_seconds for the
+        network to come back before the first decision cycle. Returns as soon as
+        a TCP probe succeeds (typically well under the cap). Best-effort and
+        interruptible via the stop event; never raises."""
+        secs = getattr(self.cfg, "wake_settle_seconds", 0.0)
+        if secs <= 0:
+            return
+        log.info(
+            "Resumed after a %.0f-min gap — settling the network (<= %gs) before "
+            "the first cycle.", gap_s / 60.0, secs,
+        )
+        deadline = time.monotonic() + secs
+        while time.monotonic() < deadline and not self._stop.is_set():
+            if self._network_reachable():
+                return
+            self._stop.wait(2.0)
+
+    @staticmethod
+    def _network_reachable() -> bool:
+        """A DNS-free TCP reachability probe (Cloudflare 1.1.1.1:443, then
+        Google DNS 8.8.8.8:53). True if either connects — 'the internet is
+        back', without depending on the broker host resolving yet."""
+        import socket
+        for host, port in (("1.1.1.1", 443), ("8.8.8.8", 53)):
+            try:
+                socket.create_connection((host, port), timeout=3).close()
+                return True
+            except OSError:
+                continue
+        return False
+
+    def _within_close_fence(self) -> bool:
+        """True when we're inside close_fence_minutes of the session close, so a
+        fresh decision cycle should be skipped. Fail OPEN (return False) on a
+        missing/failed close-time read — an unknown close must not silently
+        freeze trading. Best-effort; never raises."""
+        fence = getattr(self.cfg, "close_fence_minutes", 0.0)
+        if fence <= 0:
+            return False
+        try:
+            close_at = self.broker.next_market_close()
+            if close_at is None:
+                return False
+            mins = (close_at - datetime.now(timezone.utc)).total_seconds() / 60.0
+            if 0.0 <= mins <= fence:
+                log.info(
+                    "Within %.1f min of the close (<= %g-min fence) — skipping new "
+                    "decisions; positions stay watchdog-protected.", mins, fence,
+                )
+                return True
+        except Exception as e:  # noqa: BLE001 — fence is best-effort
+            log.warning("close-fence check failed (%s); proceeding.", e)
+        return False
+
     def _decision_due(self) -> bool:
-        if (time.monotonic() - self._last_decision_at) >= self.cfg.decision_interval_s:
+        if (time.time() - self._last_decision_at) >= self.cfg.decision_interval_s:
             return True
         # The hourly grid rarely lands on the bell: when the last closed-market
         # tick stashed the next session open, fire at that moment too instead
@@ -503,6 +635,14 @@ class Orchestrator:
         self._reconcile_fills()
         self._backfill_exchange_exits_locked()
         self._stamp_liveness()
+        # Close fence (CRITICAL-1): reconcile/backfill above still run near the
+        # bell, but don't START a fresh decision inside the final N minutes — a
+        # buy placed this late can't complete before close, and the model
+        # churning right before the bell is low-value. Positions stay
+        # watchdog-protected; the post-LLM re-check below catches a close that
+        # lands mid-cycle.
+        if self._within_close_fence():
+            return
         # Fresh Quiver data this cycle, but pulled once and shared by the signal
         # and screener layers (both read the same cached live feeds).
         self.quiver.new_cycle()
@@ -673,6 +813,29 @@ class Orchestrator:
                     0.0, buy_excluded.get(prop.symbol, "excluded from slate"),
                     prop.rationale[:120] if prop.rationale else "",
                 )
+        # Post-LLM close fence: signal gathering + the LLM span minutes, so the
+        # bell can ring mid-cycle. Executing proposals after the close places
+        # after-hours orders (Jul 20: 5 proposals returned 41 min past close).
+        # Discard and journal them; positions stay watchdog-protected. Sells are
+        # kept — reducing risk is always allowed, even after hours.
+        if self.cfg.close_fence_minutes > 0 and not self.broker.is_market_open():
+            kept_sells = [p for p in proposals if p.action.value == "sell"]
+            for p in proposals:
+                if p.action.value != "sell":
+                    self._journal_decision(
+                        p.symbol, p.action.value,
+                        p.instrument.value if hasattr(p.instrument, "value") else str(p.instrument),
+                        p.conviction, p.target_weight_pct, "rejected", 0.0,
+                        "Market closed mid-cycle — proposal discarded (close fence).",
+                        p.rationale[:120] if p.rationale else "",
+                    )
+            if len(kept_sells) != len(proposals):
+                log.warning(
+                    "Market closed during the cycle — discarded %d non-sell "
+                    "proposal(s) past the bell; keeping %d risk-reducing sell(s).",
+                    len(proposals) - len(kept_sells), len(kept_sells),
+                )
+            proposals = kept_sells
         undeployed = self._execute_proposals(
             proposals, account, signal_kinds, tech_ctx=tech_ctx,
             composites=composites,
