@@ -864,11 +864,18 @@ class Orchestrator:
             log.warning("Could not render today block: %s", e)
 
         self._stamp_liveness()
+        # Surface the deterministic regime to the model so it can express the
+        # DOWNSIDE with a defined-risk put when the market turns risk-off (assess()
+        # is cached per-cycle). Without this the model never sees the risk-off
+        # state and a long-only book just bleeds through a decline.
+        _reg = self.regime.assess() if self.cfg.risk.regime_filter_enabled else None
         proposals = self.engine.decide(
             bundles, account, bench_line, external, lessons,
             today=today_block, buy_excluded=buy_excluded,
             signal_notes=signal_notes, held_notes=self._held_notes(account),
             data_health=data_health, composites=composites,
+            regime_label=(_reg.label if _reg else ""),
+            regime_reason=(_reg.reason if _reg else ""),
         )
         self._stamp_liveness()
         proposals = self._filter_to_slate(proposals, bundles, account)
