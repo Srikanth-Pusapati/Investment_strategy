@@ -118,7 +118,11 @@ class RiskLimits:
                                      # the --sweep-stops evidence at BOTH lookbacks
     vol_stop_take_ratio: float = 2.5 # take = ratio x stop (reward:risk)
     vol_stop_min_pct: float = 4.0    # clamp: never tighter than this stop
-    vol_stop_max_pct: float = 15.0   # clamp: never wider than this stop
+    vol_stop_max_pct: float = 10.0   # clamp: never wider than this stop. Lowered
+    # from 15 (2026-07 audit): a 15% clamp let high-IV names (MU ~14%) carry ~3x
+    # the dollar risk of quiet peers because the position-weight cap binds before
+    # the per-trade $-risk cap. A tighter clamp keeps dollar risk more uniform;
+    # the trade-off is more noise stop-outs on volatile names — monitor.
     # Trailing-stop giveback: % of the peak gain surrendered before the
     # watchdog (and the backtest's mirror of it) closes a runner. Previously a
     # hardcoded 3.0 in both places.
@@ -167,6 +171,12 @@ class RiskLimits:
     # than this many hours ago (trail/stop/take/time/decision). Instant re-buys
     # pay the spread twice and usually chase the same falling knife. 0 = off.
     reentry_cooldown_hours: float = 24.0
+    # Price-aware re-entry guard: re-buying a recently exited name AT OR ABOVE
+    # the price we sold it for is chasing (CVX +3.9%, PATH +6.4%, HUBB +2.3%
+    # re-entries the time-only cooldown couldn't see). Blocked while the exit
+    # clock is warm unless the composite clears the override (genuine new edge).
+    reentry_price_guard_enabled: bool = True
+    reentry_price_override_composite: float = 0.5
     # --- daily concentration brake (2026-07-06: LLY took ~81% of the day's buy
     # dollars across 10 orders; the guards above space the orders but nothing
     # capped the DAY). All three are hard, deterministic, and per ET trading
@@ -303,6 +313,13 @@ class Config:
     # cash isn't a structural short against the benchmark. Off when core_etf="".
     core_etf: str = ""
     target_invested_pct: float = 0.0
+    # Ceiling on the CORE position as a % of equity. The core is exempt from the
+    # single-name cap (it IS the diversified core), so idle satellite cash swept
+    # it to ~47% of equity with nothing to stop it (2026-07 audit). This caps the
+    # per-cycle core BUY so the position never exceeds the ceiling; it does not
+    # trim an existing overweight (that stays a manual/decision action to avoid
+    # the pending-cancel wedge on the resting GTC stop). 0 = no ceiling.
+    core_max_pct: float = 30.0
     # GA-2.3: standalone GTC stop protecting the CORE position at the exchange,
     # this % under its average basis (the core accumulates via notional buys and
     # previously had NO exchange-side stop — watchdog-only). Covers the whole-
@@ -513,7 +530,7 @@ def load_config() -> Config:
             vol_stop_mult=_f("VOL_STOP_MULT", 2.0),
             vol_stop_take_ratio=_f("VOL_STOP_TAKE_RATIO", 2.5),
             vol_stop_min_pct=_f("VOL_STOP_MIN_PCT", 4.0),
-            vol_stop_max_pct=_f("VOL_STOP_MAX_PCT", 15.0),
+            vol_stop_max_pct=_f("VOL_STOP_MAX_PCT", 10.0),
             trail_giveback_pct=_f("TRAIL_GIVEBACK_PCT", 3.0),
             trail_rth_only=_flag("TRAIL_RTH_ONLY", "on"),
             # R.2: 0 disables; 0.85 = "effectively the same trade" line (two
@@ -528,6 +545,9 @@ def load_config() -> Config:
             min_order_pct=_f("MIN_ORDER_PCT", 0.05),
             min_add_interval_hours=_f("MIN_ADD_INTERVAL_HOURS", 4.0),
             reentry_cooldown_hours=_f("REENTRY_COOLDOWN_HOURS", 24.0),
+            reentry_price_guard_enabled=_flag("REENTRY_PRICE_GUARD_ENABLED", "on"),
+            reentry_price_override_composite=_f(
+                "REENTRY_PRICE_OVERRIDE_COMPOSITE", 0.5),
             # Daily concentration brake (see the RiskLimits field notes).
             max_daily_symbol_deploy_pct=_f("MAX_DAILY_SYMBOL_DEPLOY_PCT", 8.0),
             max_daily_buys_per_symbol=_i("MAX_DAILY_BUYS_PER_SYMBOL", 3),
@@ -583,6 +603,7 @@ def load_config() -> Config:
         # TARGET_INVESTED_PCT is clamped to the no-leverage gross cap downstream.
         core_etf=os.getenv("CORE_ETF", "").strip().upper(),
         target_invested_pct=_f("TARGET_INVESTED_PCT", 0.0),
+        core_max_pct=_f("CORE_MAX_PCT", 30.0),
         core_stop_pct=_f("CORE_STOP_PCT", 15.0),
         track_record_file=os.getenv("TRACK_RECORD_FILE", "").strip(),
     )

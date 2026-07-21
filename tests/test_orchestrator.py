@@ -179,11 +179,12 @@ def _orch(trim_enabled=True, trim_pct=25.0, state=None,
           thesis_decay_enabled=False, thesis_decay_min_age_days=3.0,
           thesis_min_score=0.1, core_etf="", target_invested_pct=0.0,
           min_cash_buffer_pct=2.0, max_gross_exposure_pct=100.0,
-          kill_switch=False, whole_shares_only=False, core_stop_pct=15.0):
+          kill_switch=False, whole_shares_only=False, core_stop_pct=15.0,
+          core_max_pct=0.0):
     o = Orchestrator.__new__(Orchestrator)
     o.cfg = SimpleNamespace(
         core_etf=core_etf, target_invested_pct=target_invested_pct,
-        core_stop_pct=core_stop_pct,
+        core_stop_pct=core_stop_pct, core_max_pct=core_max_pct,
         # These reconcile tests assert the LOG output; the enforcing halt
         # behavior has its own suite in test_ops_hardening.py.
         reconcile_halt_enabled=False,
@@ -456,6 +457,23 @@ def test_core_fill_accounts_for_existing_positions():
 def test_core_fill_noop_when_already_at_target():
     o = _orch(core_etf="QQQ", target_invested_pct=90.0)
     acct = _acct(cash=50.0, positions=[_pos("AAPL", 950.0)])  # 95% invested
+    o._apply_core_fill(acct)
+    assert o.broker.core_buys == []
+
+
+def test_core_fill_capped_by_core_max_pct():
+    # Target wants the core near 90% of a $1000 book, but CORE_MAX_PCT=30 caps
+    # the QQQ position at $300; it already holds $250, so only $50 more is bought.
+    o = _orch(core_etf="QQQ", target_invested_pct=90.0, min_cash_buffer_pct=2.0,
+              core_max_pct=30.0)
+    acct = _acct(cash=750.0, positions=[_pos("QQQ", 250.0)])
+    o._apply_core_fill(acct)
+    assert o.broker.core_buys == [("QQQ", 50.0)]
+
+
+def test_core_fill_skips_when_core_at_ceiling():
+    o = _orch(core_etf="QQQ", target_invested_pct=90.0, core_max_pct=30.0)
+    acct = _acct(cash=700.0, positions=[_pos("QQQ", 300.0)])  # already at 30%
     o._apply_core_fill(acct)
     assert o.broker.core_buys == []
 

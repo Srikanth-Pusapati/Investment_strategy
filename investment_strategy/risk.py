@@ -354,6 +354,32 @@ class RiskManager:
                     f"waits {self.limits.reentry_cooldown_hours:g}h (churn guard).",
                 )
 
+        # Price-aware re-entry guard (2026-07 audit): the time cooldown above
+        # can't see PRICE — after it lapses, re-buying a recently exited name AT
+        # OR ABOVE the price we sold it for is chasing (CVX/PATH/HUBB were re-
+        # bought higher). Blocked while the exit clock is still warm, unless the
+        # composite clears the override (a genuine new edge, not just momentum).
+        # Fails open on a missing exit price or composite.
+        if (
+            self.limits.reentry_price_guard_enabled
+            and account.position_for(proposal.symbol) is None
+        ):
+            exit_price = self.state.last_exit_price(proposal.symbol)
+            if exit_price is not None and exit_price > 0 and price >= exit_price:
+                override = (
+                    composite_score is not None
+                    and composite_score >= self.limits.reentry_price_override_composite
+                )
+                if not override:
+                    return self._reject(
+                        proposal,
+                        f"Re-buying {proposal.symbol} at ${price:.2f} >= recent "
+                        f"exit ${exit_price:.2f} — chasing above the exit; "
+                        f"composite {'n/a' if composite_score is None else f'{composite_score:+.2f}'}"
+                        f" doesn't clear the +{self.limits.reentry_price_override_composite:g} "
+                        "override (churn guard).",
+                    )
+
         # Daily concentration brake, count leg (2026-07-06: 10 LLY buys in one
         # session). Hard cap on submitted buy orders per symbol per ET trading
         # day; the dollar leg lives below once equity is known. Inert at 0.

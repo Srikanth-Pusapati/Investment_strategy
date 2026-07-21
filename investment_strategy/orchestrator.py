@@ -1287,8 +1287,10 @@ class Orchestrator:
                     f", {pl_pct:+.1f}%" if pl_pct is not None else "",
                 )
                 # An exchange-side exit also starts the re-entry cooldown —
-                # stamped at the FILL time when known (falls back to now).
-                self.state.register_exit(o["symbol"], when=ts)
+                # stamped at the FILL time and price when known (price feeds the
+                # price-aware re-entry guard).
+                self.state.register_exit(
+                    o["symbol"], when=ts, price=o["price"] or None)
         except Exception as e:  # bookkeeping must never break a decision cycle
             log.warning("Exchange-exit backfill failed: %s", e)
 
@@ -1941,7 +1943,25 @@ class Orchestrator:
         # Respect the cash buffer: keep min_cash_buffer_pct of equity uninvested.
         min_cash = equity * (r.min_cash_buffer_pct / 100.0)
         spendable = max(0.0, account.cash - min_cash)
-        notional = round(min(gap, spendable), 2)
+        # Core position ceiling (CORE_MAX_PCT): the core is exempt from the
+        # single-name cap, so idle cash otherwise sweeps it unbounded (~47% of
+        # equity, 2026-07 audit). Cap the buy so the core never exceeds the
+        # ceiling — this stops further accumulation but does not trim an existing
+        # overweight (that stays a decision/manual action; trimming a resting GTC
+        # stop risks the pending-cancel wedge).
+        core_max_pct = getattr(self.cfg, "core_max_pct", 0.0)
+        core_room = float("inf")
+        if core_max_pct > 0:
+            core_pos = account.position_for(etf)
+            core_val = max(0.0, core_pos.market_value) if core_pos else 0.0
+            core_room = max(0.0, equity * (core_max_pct / 100.0) - core_val)
+            if core_room <= 0:
+                log.info(
+                    "Core fill skipped: %s already at/above the %.0f%% ceiling.",
+                    etf, core_max_pct,
+                )
+                return
+        notional = round(min(gap, spendable, core_room), 2)
         # Same dust guard as satellite buys: a $98k book topping the core up by
         # $5 every cycle pays spread for nothing (min order scales with equity).
         min_fill = max(r.min_order_usd, equity * (r.min_order_pct / 100.0), 1.0)
@@ -2150,8 +2170,11 @@ class Orchestrator:
                             composite_score=composite,
                         ))
                         self._pending_oids.append((oid, proposal.symbol))
-                        # Start the re-entry cooldown clock (churn guard).
-                        self.state.register_exit(proposal.symbol)
+                        # Start the re-entry cooldown clock (churn guard) — with
+                        # the exit price so the price-aware re-entry guard can
+                        # block a re-buy above where we just sold.
+                        self.state.register_exit(
+                            proposal.symbol, price=held.current_price or None)
                         # Reflect the close in this cycle's snapshot so later
                         # proposals see the freed capital / slot.
                         self._apply_pending_close(account, proposal.symbol)
@@ -2162,7 +2185,8 @@ class Orchestrator:
                         # Keep watchdog tracking until the fills land; free
                         # the capital in this cycle's snapshot — marketable
                         # exits fill within ticks.
-                        self.state.register_exit(proposal.symbol)
+                        self.state.register_exit(
+                            proposal.symbol, price=held.current_price or None)
                         self._apply_pending_close(account, proposal.symbol)
                     else:
                         # Nothing was ledgered and nothing must be: a phantom

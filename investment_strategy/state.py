@@ -54,6 +54,11 @@ class PortfolioState:
         # can't grow unbounded.
         self.last_buy_times: dict[str, str] = {}
         self.exit_times: dict[str, str] = {}
+        # Last EXIT price per symbol (when known) — the price-aware re-entry
+        # guard: within the cooldown, re-buying ABOVE the price we just exited is
+        # chasing (paying up for the same name the exit just left). Pruned with
+        # exit_times so a stale price never outlives its clock.
+        self.exit_prices: dict[str, float] = {}
         # Conviction of the LAST buy per symbol — the top-up evidence gate
         # rejects an add whose conviction shows no new edge over the prior entry
         # ("adding to a winner" is not a signal).
@@ -112,6 +117,9 @@ class PortfolioState:
             self.exit_times = {
                 k: str(v) for k, v in d.get("exit_times", {}).items()
             }
+            self.exit_prices = {
+                k: float(v) for k, v in d.get("exit_prices", {}).items()
+            }
             self.last_buy_convictions = {
                 k: float(v) for k, v in d.get("last_buy_convictions", {}).items()
             }
@@ -152,6 +160,7 @@ class PortfolioState:
                         "entry_times": self.entry_times,
                         "last_buy_times": self.last_buy_times,
                         "exit_times": self.exit_times,
+                        "exit_prices": self.exit_prices,
                         "last_buy_convictions": self.last_buy_convictions,
                         "daily_deploy_day": self.daily_deploy_day,
                         "daily_deploy_usd": self.daily_deploy_usd,
@@ -296,16 +305,31 @@ class PortfolioState:
     def last_buy_conviction(self, symbol: str) -> float | None:
         return self.last_buy_convictions.get(symbol)
 
-    def register_exit(self, symbol: str, when: datetime | None = None) -> None:
+    def register_exit(
+        self, symbol: str, when: datetime | None = None,
+        price: float | None = None,
+    ) -> None:
         """Stamp the time `symbol` was exited (any reason: decision sell, trail,
         stop, take, time-stop, flatten, exchange-side fill). Drives the post-exit
-        re-entry cooldown."""
+        re-entry cooldown. `price` (the exit fill/mark, when known) drives the
+        price-aware re-entry guard — re-buying above it within the cooldown is
+        chasing."""
         with self._lock:
             self.exit_times[symbol] = (
                 when or datetime.now(timezone.utc)
             ).isoformat()
+            if price is not None and price > 0:
+                self.exit_prices[symbol] = float(price)
             self._prune_clock(self.exit_times)
+            # Drop any exit price whose clock was just pruned away.
+            for sym in list(self.exit_prices):
+                if sym not in self.exit_times:
+                    del self.exit_prices[sym]
             self._save()
+
+    def last_exit_price(self, symbol: str) -> float | None:
+        """The price at which `symbol` was last exited, or None if unknown."""
+        return self.exit_prices.get(symbol)
 
     def hours_since_buy(self, symbol: str, now: datetime | None = None) -> float | None:
         return self._hours_since(self.last_buy_times.get(symbol), now)
