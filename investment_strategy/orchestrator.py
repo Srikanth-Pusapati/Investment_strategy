@@ -196,6 +196,14 @@ class Orchestrator:
                 "Loaded %d pending order(s) from state to reconcile.",
                 len(self._pending_oids),
             )  # (order_id, symbol)
+        # How many reconcile passes each oid has come back UNRESOLVED (broker read
+        # failed = "unknown", or still "new"/"accepted"). In-memory: a restart
+        # re-reconciles from the persisted pending list. Bounds the re-queue so a
+        # permanently unreadable oid isn't chased forever, but isn't DROPPED on a
+        # single blip either (the old code lumped "unknown" with "filled" and
+        # dropped it after one look — a rejected order caught by a network blip
+        # left its phantom ledger intent uncorrected forever).
+        self._oid_retries: dict[str, int] = {}
         # Liveness stamps (goGA GA-2.1/2.2). _last_main_tick gates the heartbeat:
         # the watchdog thread only pings the external dead-man URL while the main
         # loop is ALSO fresh, so either thread dying silences the ping and the
@@ -1067,6 +1075,34 @@ class Orchestrator:
             bundle.signals.insert(0, cand.to_signal())
 
     # -- fill reconciliation ------------------------------------------------ #
+    #: how many reconcile passes an oid may stay unresolved before we stop
+    #: re-queuing it and escalate (halt + page) — a mandatory retry bound so a
+    #: permanently unreadable/stuck order neither loops forever nor drops silently.
+    MAX_UNRESOLVED_RETRIES = 5
+
+    def _requeue_unresolved(self, oid: str, symbol: str, why: str) -> bool:
+        """Re-queue an oid whose fate we couldn't confirm this pass (broker read
+        failed, or still non-terminal). Returns True when the retry bound is
+        EXHAUSTED — the caller then treats it as a confirmed mismatch (halt +
+        page) so a human reconciles it against the broker. Never drops it
+        silently (the SPCX/LPLA phantom-row class)."""
+        n = self._oid_retries.get(oid, 0) + 1
+        if n <= self.MAX_UNRESOLVED_RETRIES:
+            self._oid_retries[oid] = n
+            self._pending_oids.append((oid, symbol))
+            log.warning(
+                "Order %s (%s) %s — unresolved, re-queued (%d/%d).",
+                oid, symbol, why, n, self.MAX_UNRESOLVED_RETRIES,
+            )
+            return False
+        self._oid_retries.pop(oid, None)
+        log.error(
+            "Order %s (%s) %s after %d reconcile passes — giving up and flagging "
+            "a divergence; verify it against the broker.",
+            oid, symbol, why, self.MAX_UNRESOLVED_RETRIES,
+        )
+        return True
+
     def _reconcile_fills(self) -> None:
         """Confirm last cycle's orders actually filled. A recorded order id is only
         an intent — rejects and partial fills mean the ledger and our risk picture
@@ -1092,12 +1128,15 @@ class Orchestrator:
         mismatches: list[str] = []
         for oid, symbol in pending:
             status, filled, qty = self.broker.order_fill(oid)
-            if status in ("filled", "unknown"):
+            if status == "filled":
+                log.info("Order %s (%s) FILLED (%g/%g).", oid, symbol, filled, qty)
+                self._oid_retries.pop(oid, None)
                 continue
             if status == "replaced":
                 # A watchdog exit superseded by a later re-replace: its ledger
                 # record was already corrected at replace time (the replacement
                 # order carries the exit, and is itself in this list).
+                self._oid_retries.pop(oid, None)
                 continue
             if status in ("rejected", "canceled", "expired"):
                 log.error(
@@ -1109,6 +1148,7 @@ class Orchestrator:
                 # resizes a partial — no more phantom BUY rows.
                 self.ledger.record(TradeRecord.correction(oid, symbol, status, filled, qty))
                 mismatches.append(f"{symbol} {status} ({filled:g}/{qty:g} filled)")
+                self._oid_retries.pop(oid, None)
             elif qty and 0 < filled < qty:
                 log.warning(
                     "Order %s (%s) PARTIAL: %g/%g filled (status=%s).",
@@ -1118,9 +1158,20 @@ class Orchestrator:
                 # re-queue it and let a later reconcile write the final number.
                 self._pending_oids.append((oid, symbol))
                 mismatches.append(f"{symbol} partial {filled:g}/{qty:g}")
+                self._oid_retries.pop(oid, None)   # partial is progress, not a stall
+            elif status == "unknown":
+                # The broker fetch FAILED (blip/transient) — NOT a confirmation.
+                # drain_pending_orders already cleared the persisted copy, so
+                # dropping here (the old behavior) left a rejected order caught by
+                # a blip with its phantom ledger intent uncorrected forever. Fail
+                # CLOSED: re-queue and re-check next cycle, bounded.
+                if self._requeue_unresolved(oid, symbol, "unreadable"):
+                    mismatches.append(f"{symbol} unresolved (broker read failed)")
             else:  # still new/accepted/pending_new long after submission — may yet
-                # fill; not a confirmed divergence, so warn without halting.
-                log.warning("Order %s (%s) still %s a full cycle later.", oid, symbol, status)
+                # fill; re-queue (bounded) instead of DROPPING (the exact path an
+                # oid was lost through), and true it up on a later reconcile.
+                if self._requeue_unresolved(oid, symbol, f"still {status}"):
+                    mismatches.append(f"{symbol} stuck ({status})")
         if self._pending_oids:
             # Re-queued live partials must survive a crash before the cycle's
             # end-of-run persist, or their final fill never gets corrected.

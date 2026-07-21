@@ -212,6 +212,7 @@ def _orch(trim_enabled=True, trim_pct=25.0, state=None,
     o.state = state or _state_tmp()
     o._trade_lock = threading.Lock()
     o._pending_oids = []
+    o._oid_retries = {}
     return o
 
 
@@ -564,9 +565,16 @@ def test_reconcile_partial_fill_logs_warning():
     )
 
 
-def test_reconcile_still_pending_logs_warning():
-    _, recs = _reconcile("new", 0.0, 3.0)
-    assert any("full cycle later" in r.getMessage() for r in recs)
+def test_reconcile_still_pending_requeues_with_warning():
+    # A still-"new" order long after submission is re-queued (bounded), NOT
+    # dropped — dropping it was the exact path an oid was lost through.
+    o, recs = _reconcile("new", 0.0, 3.0)
+    assert any(
+        r.levelno == logging.WARNING and "unresolved, re-queued" in r.getMessage()
+        for r in recs
+    )
+    assert ("oid-1", "AAPL") in o._pending_oids
+    assert o._oid_retries.get("oid-1") == 1
 
 
 # --------------------------------------------------------------------------- #

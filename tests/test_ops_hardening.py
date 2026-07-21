@@ -80,6 +80,7 @@ def _orch(fills=None, *, halt_enabled=True, kill_file=None, heartbeat_url=""):
     o.alerter = _RecordingAlerter()
     o._trade_lock = threading.Lock()
     o._pending_oids = [(oid, f"SYM{i}") for i, oid in enumerate(fills or {})]
+    o._oid_retries = {}
     o._forced_halt = False
     o._last_main_tick = time.monotonic()
     o._last_wall_tick = time.time()
@@ -137,13 +138,39 @@ def test_live_partial_writes_no_correction_yet_and_requeues():
     os.remove(o.cfg.kill_switch_file)
 
 
-def test_clean_fills_do_not_halt():
-    o = _orch({"o1": ("filled", 5.0, 5.0), "o2": ("unknown", 0.0, 0.0)})
+def test_clean_fill_does_not_halt_and_clears():
+    o = _orch({"o1": ("filled", 5.0, 5.0)})
     o._reconcile_fills()
     assert o.risk.kill_switch is False
     assert not os.path.exists(o.cfg.kill_switch_file)
     assert o.alerter.calls == []
-    assert o.state.pending == []  # cleared list persisted before checking
+    assert o.state.pending == []  # a filled order is resolved and dropped
+
+
+def test_unknown_read_requeues_instead_of_dropping():
+    # A failed broker read ("unknown") is NOT a confirmation — the old code
+    # lumped it with "filled" and dropped the oid, so a rejected order caught by
+    # a network blip left its phantom ledger intent uncorrected forever. It must
+    # re-queue (bounded) and not halt on the first blip.
+    o = _orch({"o2": ("unknown", 0.0, 0.0)})
+    o._reconcile_fills()
+    assert o.risk.kill_switch is False                 # one blip doesn't halt
+    assert ("o2", "SYM0") in o.state.pending           # re-queued for next pass
+    assert o._oid_retries.get("o2") == 1
+
+
+def test_unresolved_oid_escalates_after_retry_bound():
+    # After MAX_UNRESOLVED_RETRIES unreadable passes, give up: halt + flag so a
+    # human reconciles it, rather than looping forever.
+    o = _orch({"o2": ("unknown", 0.0, 0.0)})
+    for _ in range(o.MAX_UNRESOLVED_RETRIES):
+        o._pending_oids = [("o2", "SYM0")]             # re-present it each pass
+        o._reconcile_fills()
+    assert o.risk.kill_switch is False                 # not yet — exactly at bound
+    o._pending_oids = [("o2", "SYM0")]
+    o._reconcile_fills()                               # one past the bound
+    assert o.risk.kill_switch is True
+    os.remove(o.cfg.kill_switch_file)
 
 
 def test_reconcile_checks_watchdog_queued_exits():
