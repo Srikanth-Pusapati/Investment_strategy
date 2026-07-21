@@ -28,6 +28,7 @@ import argparse
 import html
 import json
 import logging
+import statistics
 from datetime import datetime
 from pathlib import Path
 from typing import Optional
@@ -112,6 +113,51 @@ def _return_pct(series: list[float]) -> float:
     if len(series) < 2 or series[0] <= 0:
         return 0.0
     return (series[-1] / series[0] - 1.0) * 100.0
+
+
+_TRADING_DAYS = 252
+# Below this many daily returns an annualized Sharpe/Sortino is dominated by
+# noise — a fresh paper account has only a handful of days, so we WITHHOLD the
+# number rather than print a misleadingly precise ratio. It appears on its own
+# once enough history accrues.
+_MIN_RATIO_DAYS = 20
+
+
+def _daily_returns(series: list[float]) -> list[float]:
+    return [
+        series[i] / series[i - 1] - 1.0
+        for i in range(1, len(series))
+        if series[i - 1] > 0
+    ]
+
+
+def _sharpe(series: list[float]) -> Optional[float]:
+    """Annualized Sharpe of the daily equity curve (risk-free = 0). None until
+    there are _MIN_RATIO_DAYS returns — below that it is noise. Same math as the
+    offline backtest harness, applied to the live curve."""
+    rets = _daily_returns(series)
+    if len(rets) < _MIN_RATIO_DAYS:
+        return None
+    sd = statistics.pstdev(rets)
+    if sd == 0:
+        return None
+    return statistics.fmean(rets) / sd * (_TRADING_DAYS ** 0.5)
+
+
+def _sortino(series: list[float]) -> Optional[float]:
+    """Annualized Sortino — like Sharpe but the denominator is downside
+    deviation vs a 0 target (penalizes losses, not upside vol), measured over
+    ALL periods. None below the min sample or with no downside days."""
+    rets = _daily_returns(series)
+    if len(rets) < _MIN_RATIO_DAYS:
+        return None
+    neg_sq = [r * r for r in rets if r < 0]
+    if not neg_sq:
+        return None
+    dd = (sum(neg_sq) / len(rets)) ** 0.5
+    if dd == 0:
+        return None
+    return statistics.fmean(rets) / dd * (_TRADING_DAYS ** 0.5)
 
 
 def _align_benchmark(
@@ -239,6 +285,14 @@ def _stat_cards(series: dict[str, list[float]], trail_exits: int) -> str:
         ret = _return_pct(vals)
         dd = _max_drawdown_pct(vals)
         sub = f"max DD {dd:.1f}%"
+        # Risk-adjusted return, once enough daily history exists to be meaningful
+        # (withheld during the noisy first weeks of a fresh account).
+        sharpe = _sharpe(vals)
+        if sharpe is not None:
+            sub += f" · Sharpe {sharpe:.2f}"
+            sortino = _sortino(vals)
+            if sortino is not None:
+                sub += f" · Sortino {sortino:.2f}"
         if label.endswith("trail") and trail_exits:
             sub += f" · {trail_exits} stop exit(s) — the seatbelt cost"
         cards.append(

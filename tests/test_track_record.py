@@ -19,7 +19,10 @@ from pathlib import Path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from investment_strategy.track_record import (
+    _MIN_RATIO_DAYS,
     _align_benchmark,
+    _sharpe,
+    _sortino,
     build_html,
     generate,
     trailing_stop_series,
@@ -107,6 +110,41 @@ def test_generate_writes_offline_page():
     text = out.read_text(encoding="utf-8")
     assert "Track record" in text and "Hypothetical" in text
     out.unlink()
+
+
+# -- risk-adjusted stats: Sharpe / Sortino ------------------------------------ #
+def _series_from_returns(rets):
+    s = [100.0]
+    for r in rets:
+        s.append(s[-1] * (1 + r))
+    return s
+
+
+def test_sharpe_none_below_min_days():
+    # Only two daily returns — far below the min sample; withheld as noise.
+    assert _sharpe([100.0, 101.0, 102.0]) is None
+
+
+def test_sharpe_none_on_flat_curve():
+    # Enough points but zero variance -> undefined (no risk to divide by).
+    assert _sharpe([100.0] * (_MIN_RATIO_DAYS + 5)) is None
+
+
+def test_sharpe_positive_for_rising_varied_curve():
+    rets = [0.01, 0.005, 0.015, 0.008, 0.012] * 5   # 25 positive, varied -> sd>0
+    sh = _sharpe(_series_from_returns(rets))
+    assert sh is not None and sh > 0
+
+
+def test_sortino_none_when_no_downside():
+    rets = [0.01, 0.005, 0.015, 0.008, 0.012] * 5   # all up -> no downside days
+    assert _sortino(_series_from_returns(rets)) is None
+
+
+def test_sortino_defined_with_downside():
+    rets = [0.02, -0.01, 0.015, -0.008, 0.012] * 5  # 25, has downside, net +
+    so = _sortino(_series_from_returns(rets))
+    assert so is not None and so > 0
 
 
 def _run_all():
