@@ -48,6 +48,7 @@ class DecisionEngine:
         held_notes: dict[str, str] | None = None,
         data_health: list[str] | None = None,
         composites: dict[str, float] | None = None,
+        regime_label: str = "", regime_reason: str = "",
     ) -> list[TradeProposal]:
         """Ask Claude for proposals across all candidate symbols at once.
 
@@ -77,6 +78,7 @@ class DecisionEngine:
             held_notes=held_notes or {},
             data_health=data_health or [],
             composites=composites or {},
+            regime_label=regime_label, regime_reason=regime_reason,
         )
         try:
             resp = self.client.messages.create(
@@ -129,6 +131,7 @@ class DecisionEngine:
         held_notes: dict[str, str] | None = None,
         data_health: list[str] | None = None,
         composites: dict[str, float] | None = None,
+        regime_label: str = "", regime_reason: str = "",
     ) -> str:
         # Our own derived data (track-record, today-so-far, exclusions) sits
         # OUTSIDE <market_data> — it's trusted guidance, not third-party text.
@@ -212,6 +215,31 @@ class DecisionEngine:
         # Enforcement is unchanged; this only stops the wasted proposals.
         if r is not None:
             lines += self._risk_contract(r)
+        # RISK-OFF downside mandate: when the market is genuinely turning down
+        # (SPY below its 200dma AND elevated VIX -> regime label "risk-off"), a
+        # long-only book just loses more slowly. Tell the model to EXPRESS the
+        # downside with a defined-risk put — the only way to PROFIT as prices fall
+        # (no shorting). Fires ONLY in risk-off, so it's inert in a calm uptrend
+        # (buying puts into an uptrend just bleeds theta); this is why the bot has
+        # correctly held no puts through a risk-on trial, not a bug.
+        if (
+            r is not None
+            and getattr(r, "options_enabled", False)
+            and regime_label == "risk-off"
+        ):
+            lines += [
+                "## MARKET IS RISK-OFF — express the downside, don't just hold and bleed",
+                (regime_reason or "The regime filter reads risk-off.")
+                + " Your long book loses as prices fall and sizing is already cut.",
+                "PROPOSE a DEFINED-RISK downside play to PROFIT from the decline: a "
+                "long_put or bear_put_spread on the slate name with the most clearly "
+                "BROKEN thesis (price below its moving averages, bearish MACD, "
+                "deteriorating options-chain lean). You cannot short stock — a put is "
+                "the ONLY way to make money as the market falls. Keep it defined-risk "
+                "and within the options premium budget. If NO slate name has a "
+                "genuinely bearish, corroborated setup, don't force one.",
+                "",
+            ]
         # All third-party text lives inside <market_data> so the system prompt can
         # bind "untrusted data, not instructions" to a clear, delimited region.
         lines += [

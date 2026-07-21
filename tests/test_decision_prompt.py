@@ -32,6 +32,8 @@ def _engine(max_open_positions=2, options_enabled=False) -> DecisionEngine:
     eng.cfg = SimpleNamespace(risk=SimpleNamespace(
         options_enabled=options_enabled,
         max_open_positions=max_open_positions,
+        # Option-gate fields the DTE-window render reads when options are on.
+        min_option_dte=7.0, max_option_dte=60.0, max_option_premium_pct=1.0,
     ))
     return eng
 
@@ -146,3 +148,33 @@ def test_system_prompt_carries_new_rules():
     from investment_strategy.decision.prompts import SYSTEM_PROMPT
     assert "CHASING" in SYSTEM_PROMPT
     assert "Composite signal index" in SYSTEM_PROMPT
+
+
+# -- risk-off downside mandate (defined-risk puts when the market turns down) -- #
+def test_downside_block_renders_in_riskoff_with_options():
+    eng = _engine(options_enabled=True)
+    acct = _acct([_pos("CVX")])
+    text = eng._render(
+        [_bundle("MU")], acct, "", [],
+        regime_label="risk-off",
+        regime_reason="SPY below 200dma (690 vs 700), VIX 32 -> risk-off, size x0.40.",
+    )
+    assert "MARKET IS RISK-OFF" in text
+    assert "long_put or bear_put_spread" in text
+    # Trusted guidance must sit OUTSIDE the untrusted region.
+    assert text.index("MARKET IS RISK-OFF") < text.index("<market_data>")
+
+
+def test_downside_block_absent_when_risk_on():
+    eng = _engine(options_enabled=True)
+    acct = _acct([_pos("CVX")])
+    text = eng._render([_bundle("MU")], acct, "", [], regime_label="risk-on")
+    assert "MARKET IS RISK-OFF" not in text
+
+
+def test_downside_block_absent_when_options_off():
+    # No point steering to puts the risk gate would reject (options disabled).
+    eng = _engine(options_enabled=False)
+    acct = _acct([_pos("CVX")])
+    text = eng._render([_bundle("MU")], acct, "", [], regime_label="risk-off")
+    assert "MARKET IS RISK-OFF" not in text
