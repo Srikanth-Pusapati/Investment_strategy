@@ -6,7 +6,11 @@ gauges and turns them into a single RISK MULTIPLIER (0..1) the risk layer applie
 position sizing, so gross exposure shrinks automatically when the market is risk-off:
 
   - Trend: SPY vs its 200-day moving average (above = risk-on, below = risk-off).
-  - Fear:  VIX level (calm < 20, elevated 20–30, high > 30).
+  - Fear:  VIX level (calm < 20, elevated 20–30, high > 30), PLUS the VIX term
+           structure (spot ^VIX vs 3-month ^VIX3M): backwardation (spot above
+           3-month) is near-term fear bid over longer-term — an earlier risk-off
+           tell than the spot LEVEL crossing 20, so it forces at least the
+           elevated vol tier. It only ever tightens sizing, never loosens it.
 
 multiplier = trend_factor * vol_factor, floored so we never size to ~zero on noise.
 It is advisory data feeding a DETERMINISTIC gate in risk.py — the gate never depends
@@ -33,6 +37,10 @@ _FLOOR = 0.25          # never shrink new positions below this fraction on regim
 # Size DOWN to this fraction when the regime read fails (yfinance degraded), rather
 # than to full — because the same outage almost certainly blinds the sector cap too.
 _DEFAULT_DEGRADED_MULT = 0.5
+# Force at least the "elevated" vol tier when the VIX term structure inverts (spot
+# ^VIX above 3-month ^VIX3M = backwardation). Applied via min(), so it only ever
+# tightens the level-based vol_factor, never loosens it.
+_BACKWARDATION_VOL_FACTOR = 0.7
 
 
 @dataclass
@@ -89,6 +97,17 @@ class RegimeReader:
         above = price >= sma
         trend_factor = 1.0 if above else 0.5
         vol_factor = 1.0 if vix < 20 else (0.7 if vix < 30 else 0.4)
+        # VIX term structure: when spot ^VIX rises ABOVE 3-month ^VIX3M the curve
+        # is in BACKWARDATION — near-term fear bid over longer-term, historically
+        # an earlier risk-off tell than the spot LEVEL crossing 20. Force at least
+        # the elevated tier even when spot looks calm; min() means it never loosens
+        # an already-stressed read. ^VIX3M is an ENHANCEMENT, not a requirement: if
+        # it's unavailable we keep the level-only read (NO degraded posture — SPY
+        # and spot VIX are still in hand, so the two risk-off guards aren't blind).
+        vix3m = self._last_close("^VIX3M")
+        backwardated = vix3m is not None and vix > vix3m
+        if backwardated:
+            vol_factor = min(vol_factor, _BACKWARDATION_VOL_FACTOR)
         mult = round(max(_FLOOR, trend_factor * vol_factor), 2)
 
         if mult >= 0.9:
@@ -98,8 +117,11 @@ class RegimeReader:
         else:
             label = "risk-off"
         trend = "above" if above else "below"
+        term = ""
+        if vix3m is not None:
+            term = f", VIX3M {vix3m:.0f} ({'BACKWARDATION' if backwardated else 'contango'})"
         reason = (
-            f"SPY {trend} 200dma ({price:.0f} vs {sma:.0f}), VIX {vix:.0f} "
+            f"SPY {trend} 200dma ({price:.0f} vs {sma:.0f}), VIX {vix:.0f}{term} "
             f"-> {label}, size x{mult:.2f}."
         )
         return Regime(mult, label, reason)

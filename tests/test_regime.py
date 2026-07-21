@@ -24,16 +24,20 @@ _DOWNTREND = [float(i) for i in range(210, 0, -1)]
 
 
 class _FakeRegime(RegimeReader):
-    """Injects SPY closes + a VIX level instead of hitting yfinance."""
-    def __init__(self, spy, vix):
+    """Injects SPY closes + a VIX level (and optional 3-month VIX3M) instead of
+    hitting yfinance."""
+    def __init__(self, spy, vix, vix3m=None):
         super().__init__()
         self._spy = spy
         self._vix = vix
+        self._vix3m = vix3m
 
     def _daily_closes(self, symbol, days):   # overrides the static parent method
         return self._spy if symbol == "SPY" else ([self._vix] if self._vix else [])
 
     def _last_close(self, symbol):
+        if symbol == "^VIX3M":
+            return self._vix3m
         return self._vix
 
 
@@ -72,6 +76,34 @@ def test_degraded_multiplier_is_configurable_and_clamped():
     # Out-of-range values are clamped to [floor, 1.0] at construction.
     assert RegimeReader(degraded_mult=5.0).degraded_mult == 1.0
     assert RegimeReader(degraded_mult=0.0).degraded_mult == 0.25
+
+
+def test_backwardation_forces_elevated_tier_when_spot_calm():
+    # Spot VIX calm (<20) alone would be full size, but the term structure is
+    # inverted (spot 18 > 3-month 15) — backwardation forces at least the
+    # elevated tier even though the spot LEVEL hasn't crossed 20.
+    r = _FakeRegime(_UPTREND, vix=18.0, vix3m=15.0).assess()
+    assert r.multiplier == 0.7 and "BACKWARDATION" in r.reason
+
+
+def test_contango_leaves_level_read_untouched():
+    # Normal term structure (spot 15 < 3-month 18) — no tightening; full size.
+    r = _FakeRegime(_UPTREND, vix=15.0, vix3m=18.0).assess()
+    assert r.multiplier == 1.0 and "contango" in r.reason
+
+
+def test_backwardation_never_loosens_a_stressed_read():
+    # High VIX (35) in a downtrend already floors to 0.25; backwardation must
+    # not raise it — min() only ever tightens.
+    r = _FakeRegime(_DOWNTREND, vix=35.0, vix3m=30.0).assess()
+    assert r.multiplier == 0.25
+
+
+def test_missing_vix3m_keeps_level_only_read_not_degraded():
+    # ^VIX3M unavailable is an enhancement gap, NOT a degraded posture: spot VIX
+    # + SPY still drive the full level-based read (risk-on, full size).
+    r = _FakeRegime(_UPTREND, vix=15.0, vix3m=None).assess()
+    assert r.multiplier == 1.0 and r.label == "risk-on"
 
 
 def test_assess_is_cached_until_new_cycle():

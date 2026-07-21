@@ -18,7 +18,7 @@ from datetime import datetime, timedelta, timezone
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from investment_strategy.attribution import (
-    attribute, render_lessons, round_trips,
+    attribute, behavior_diagnostics, render_lessons, round_trips,
 )
 from investment_strategy.ledger import TradeLedger, TradeRecord
 
@@ -216,6 +216,52 @@ def test_render_lessons_includes_calibration_block():
     out = render_lessons(led)
     assert "Conviction calibration" in out
     assert "CONVICTION INVERTED" in out
+
+
+# -- behavior diagnostics: disposition effect + overtrading ------------------- #
+def _lot_buy(symbol, entry, day):
+    return TradeRecord(symbol=symbol, action="buy", qty=1.0, entry_price=entry,
+                       cost_usd=entry, order_id=f"b-{symbol}",
+                       ts=_T0 + timedelta(days=day))
+
+
+def _lot_sell(symbol, price, day):
+    return TradeRecord.for_sell(symbol, "exit", f"s-{symbol}", qty=1.0,
+                                exit_price=price, exit_reason="decision",
+                                ts=_T0 + timedelta(days=day))
+
+
+def _ledger_of(recs):
+    led = TradeLedger(path=tempfile.mktemp())
+    led.effective = lambda: recs  # type: ignore[method-assign]
+    return led
+
+
+def test_behavior_diagnostics_flags_disposition_effect():
+    # 3 winners held ~1 day, 3 losers held ~10 days -> losers held far longer,
+    # so the disposition-effect flag fires. (Distinct symbols so FIFO lots don't
+    # interfere; all buys on day 0 so the overtrading line stays suppressed.)
+    recs = []
+    for i in range(3):
+        s = f"WIN{i}"
+        recs += [_lot_buy(s, 100.0, 0), _lot_sell(s, 110.0, 1)]     # +10%, 1d
+    for i in range(3):
+        s = f"LOSE{i}"
+        recs += [_lot_buy(s, 100.0, 0), _lot_sell(s, 90.0, 10)]     # -10%, 10d
+    lines = behavior_diagnostics(_ledger_of(recs))
+    text = "\n".join(lines)
+    assert "DISPOSITION EFFECT" in text
+    assert "winners 1.0d" in text and "losers 10.0d" in text
+
+
+def test_behavior_diagnostics_suppressed_below_min_trips():
+    # Only 2 winners / 2 losers -> below min_trips (3): no disposition line, and
+    # all buys land on one day so no overtrading line either -> empty block.
+    recs = []
+    for i in range(2):
+        recs += [_lot_buy(f"W{i}", 100.0, 0), _lot_sell(f"W{i}", 110.0, 1)]
+        recs += [_lot_buy(f"L{i}", 100.0, 0), _lot_sell(f"L{i}", 90.0, 5)]
+    assert behavior_diagnostics(_ledger_of(recs)) == []
 
 
 def _run_all():
