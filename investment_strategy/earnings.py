@@ -66,9 +66,11 @@ class EarningsCalendar:
     # -- sources ------------------------------------------------------------ #
     def _lookup(self, symbol: str, today: date) -> int | None:
         rh = self._rh_calendar(today)
-        if rh is not None:
+        if rh:
             # Successful market-wide read: absence from the 31-day window IS
             # the answer (no upcoming report -> no blackout). No fallback call.
+            # An EMPTY market-wide window is treated as a failed read, not an
+            # answer — the whole market never has zero reports in 31 days.
             return rh.get(symbol)
         return self._yf_lookup(symbol, today)
 
@@ -102,16 +104,26 @@ class EarningsCalendar:
                 row.get("report_date") or row.get("date")
                 or row.get("earnings_date")
             )
+            if when is None and isinstance(row.get("report"), dict):
+                # Live payload shape: {"symbol": "T", "report": {"date": ...}}.
+                when = row["report"].get("date")
             days = self._to_days(when, today)
             if not sym or days is None or days < 0:
                 continue
             # Keep the NEAREST future report if a symbol appears twice.
             if sym not in cal or days < cal[sym]:
                 cal[sym] = days
-        log.info(
-            "Robinhood earnings calendar: %d name(s) reporting within %dd.",
-            len(cal), _RH_WINDOW_DAYS,
-        )
+        if cal:
+            log.info(
+                "Robinhood earnings calendar: %d name(s) reporting within %dd.",
+                len(cal), _RH_WINDOW_DAYS,
+            )
+        else:
+            log.warning(
+                "Robinhood earnings calendar parsed EMPTY from %d row(s) — "
+                "treating as a failed read; falling back to per-symbol lookups.",
+                len(rows),
+            )
         with self._lock:
             self._rh_map = cal
         return cal
