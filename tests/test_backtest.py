@@ -178,6 +178,58 @@ def test_guards_off_change_nothing():
     assert "GUARD" not in r.summary()
 
 
+def test_default_crash_still_engages_account_brakes():
+    """Regression for the D.3 gate (scripts/backtest_real.py --stress): the DEFAULT
+    crash_overlay must still drive the account-level brakes even with TIGHT
+    per-position stops. Position stops de-risk a full book to cash within a bar or
+    two, so a gentle crash lets them front-run the account brakes and the gate
+    proves nothing. This locks the crash defaults hard enough that:
+      - Pass 1 (live-like knobs): the daily-loss flatten engages, and the equity
+        floor stays QUIET (the outer brakes catch it first — correct layering);
+      - Pass 2 (daily-loss/drawdown OFF): the equity-floor latch is the last line
+        and MUST flatten + latch.
+    If a future stop-tightening breaks this, the crash defaults need re-deepening —
+    do NOT loosen the guards to make it pass."""
+    from dataclasses import replace
+
+    from investment_strategy.backtest_data import crash_overlay, stubborn_entries
+
+    # A full book that fills over 20 FLAT bars (no stops trip pre-crash), then a
+    # default-severity crash grafted on from bar 20 over 10 liquid names.
+    syms = [f"S{i}" for i in range(10)]
+    dates = [f"2026-01-{d:02d}" for d in range(1, 61)]      # 60 bookkeeping dates
+    prices = {s: [100.0] * 60 for s in syms}
+    crashed = crash_overlay(prices, start=20)               # DEFAULT crash params
+    entries = stubborn_entries(dates, crashed, every=5)
+
+    limits = _limits(
+        max_position_pct=10.0, max_gross_exposure_pct=100.0, max_open_positions=15,
+        kelly_fraction=0.5, target_annual_vol_pct=45.0,
+        default_stop_loss_pct=8.0, default_take_profit_pct=20.0,  # tight, live-like
+        max_daily_loss_pct=3.0, max_drawdown_pct=15.0, equity_floor_pct=60.0,
+        min_cash_buffer_pct=2.0, max_trade_risk_pct=1.0,
+    )
+
+    # Pass 1 — live-like: the daily-loss flatten must fire; the floor stays quiet.
+    r1 = BacktestEngine(limits, crashed).run(list(entries))
+    daily_fired = (
+        any(e.kind == "daily_loss" for e in r1.halt_events)
+        or r1.blocked_buys.get("daily_loss_halt", 0) > 0
+    )
+    assert daily_fired, "daily-loss brake never engaged under the default crash"
+    assert not any(e.kind == "floor" for e in r1.halt_events), \
+        "floor fired in pass 1 — outer brakes should catch it first (layering)"
+
+    # Pass 2 — outer brakes off: the equity floor is the only line left, and must
+    # latch + keep blocking every later re-entry (no auto-resume).
+    naked = replace(limits, max_daily_loss_pct=100.0, max_drawdown_pct=100.0)
+    r2 = BacktestEngine(naked, crashed).run(list(entries))
+    assert any(e.kind == "floor" for e in r2.halt_events), \
+        "equity-floor latch never engaged as the last line of defense"
+    assert r2.blocked_buys.get("halt_latch", 0) > 0, \
+        "latch did not keep blocking re-entries after firing"
+
+
 def _run_all():
     fns = [v for k, v in sorted(globals().items()) if k.startswith("test_") and callable(v)]
     failed = 0
