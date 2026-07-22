@@ -250,6 +250,24 @@ class RiskManager:
                 f"{self.limits.min_conviction:.2f} — no real edge; skip.",
             )
 
+        # New-name conviction floor (Jul 17-22: every ~-10% realized loss — MU,
+        # SPCX twice — was a FRESH position opened at 0.45-0.50 conviction on
+        # lagged congress/crowd theses). A new name claims a slot, pays the
+        # spread, and starts a churn clock; sub-coin-flip conviction doesn't
+        # earn that. Top-ups are exempt — the held position already cleared
+        # this bar at entry and has its own evidence gate below. Inert at 0.
+        if (
+            self.limits.min_new_name_conviction > 0
+            and account.position_for(proposal.symbol) is None
+            and proposal.conviction < self.limits.min_new_name_conviction
+        ):
+            return self._reject(
+                proposal,
+                f"Fresh-name conviction {proposal.conviction:.2f} below the "
+                f"new-position floor {self.limits.min_new_name_conviction:.2f} "
+                "— starter positions need better than coin-flip conviction.",
+            )
+
         # Composite floor (opt-in): the deterministic weighted signal index
         # must corroborate the LLM's conviction. Fails open on None — the
         # composite is best-effort context, not a required feed.

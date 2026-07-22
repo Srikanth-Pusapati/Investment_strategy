@@ -127,6 +127,9 @@ class Orchestrator:
         # Last RH dead-auth latch timestamp we paged for: one page per latch
         # EVENT (not per cycle), and a fresh latch after recovery pages again.
         self._rh_paged_for: float = 0.0
+        # Rotation-guard persistence memory: symbol -> (ET day, loss% at the
+        # day's FIRST veto), feeding the repeated-veto deterioration release.
+        self._rotation_vetoes: dict[str, tuple[str, float]] = {}
         # The watchdog records its own exits (stops/take-profits/flattens) to the
         # ledger so signal attribution sees every close, not just decision sells.
         self.watchdog = Watchdog(
@@ -1439,8 +1442,12 @@ class Orchestrator:
         model urgently wants out of: buys are halted (kill switch) => nothing to
         fund, so pass everything; a SELL whose OWN conviction is at/above
         rotation_guard_exempt_sell_conviction is a risk-off exit (never vetoed —
-        'never block a legitimate exit' outranks anti-churn); and a missing
-        entry-conviction baseline fails open. Vetoed positions still keep their
+        'never block a legitimate exit' outranks anti-churn); a missing
+        entry-conviction baseline fails open; a loss deeper than
+        rotation_guard_max_loss_pct passes (the guard band is exhausted); and a
+        sell already vetoed today whose loss has deteriorated by
+        rotation_guard_repeat_release_pct since that veto passes (persistent
+        exit intent — SPCX Jul 22 was vetoed at -5.4% and stopped out at -9.8%). Vetoed positions still keep their
         exchange bracket + watchdog stops — the veto holds, it never strands.
         Every guarded loss-sell leaves an auditable ruling (log + journal),
         pass or veto."""
@@ -1477,6 +1484,41 @@ class Orchestrator:
             pos = account.position_for(p.symbol)
             if pos is None or pos.unrealized_pl_pct > -r.rotation_guard_min_loss_pct:
                 kept.append(p)  # not a loss-locking sell
+                continue
+            # Deterioration releases (SPCX Jul 22: vetoed at -5.4/-5.6/-6.6/
+            # -9.3%, then the bracket stop fired at -9.8% — the guard pinned a
+            # sinking position all the way into a WORSE exit). (a) Depth: past
+            # max_loss the guarded band [min_loss, max_loss] is exhausted;
+            # only the stop remains, so the sell passes. (b) Persistence: a
+            # sell already vetoed earlier TODAY whose loss has since worsened
+            # by the release delta is a repeated exit request against a
+            # deteriorating tape — a thesis-break, not lukewarm churn.
+            max_loss = r.rotation_guard_max_loss_pct
+            if (
+                max_loss > r.rotation_guard_min_loss_pct
+                and pos.unrealized_pl_pct <= -max_loss
+            ):
+                log.info(
+                    "Rotation guard: PASS %s at %+.1f%% — loss beyond the "
+                    "%.1f%% guard band; pinning it further only rides into "
+                    "the stop.", p.symbol, pos.unrealized_pl_pct, max_loss,
+                )
+                kept.append(p)
+                continue
+            today = self.state._trading_day()
+            veto_day, veto_loss = self._rotation_vetoes.get(p.symbol, ("", 0.0))
+            release = r.rotation_guard_repeat_release_pct
+            if (
+                release > 0 and veto_day == today
+                and pos.unrealized_pl_pct <= veto_loss - release
+            ):
+                log.info(
+                    "Rotation guard: PASS %s at %+.1f%% — already vetoed "
+                    "today at %+.1f%% and the loss kept deteriorating "
+                    "(persistent exit intent released).",
+                    p.symbol, pos.unrealized_pl_pct, veto_loss,
+                )
+                kept.append(p)
                 continue
             exempt = r.rotation_guard_exempt_sell_conviction
             if exempt > 0 and p.conviction >= exempt:
@@ -1524,6 +1566,12 @@ class Orchestrator:
                 + " — holding instead."
             )
             log.warning("%s", reason)
+            # Persistence baseline: remember today's FIRST veto loss for this
+            # symbol (in-memory; a restart just means one more veto before the
+            # release can fire). Keyed to the ET day so yesterday's veto can't
+            # release today's first sell.
+            if veto_day != today:
+                self._rotation_vetoes[p.symbol] = (today, pos.unrealized_pl_pct)
             self._journal_decision(
                 p.symbol, "sell", "equity", p.conviction, p.target_weight_pct,
                 "rotation_guard", 0.0, reason,
@@ -1639,6 +1687,11 @@ class Orchestrator:
         """Split bundles into (filtered_bundles, buy_excluded_map).
         - Not-held + headroom < min_order → drop entirely (nothing to sell; saves tokens).
         - Held + headroom < min_order → keep for SELL/HOLD, add to buy_excluded.
+        - Not-held + price under the liquidity floor → same as headroom-blocked:
+          the risk gate rejects these unconditionally, yet AMC (~$2.20) was
+          re-proposed and rejected EVERY day Jul 17-22 while topping the
+          composite — a permanent reject must not keep costing prompt tokens
+          and proposal slots.
         Both paths are also captured in buy_excluded so the prompt's "excluded" section
         is complete and the backstop pass can check the full set."""
         r = self.cfg.risk
@@ -1648,6 +1701,21 @@ class Orchestrator:
         filtered: list = []
         for b in bundles:
             headroom, reason = self._buy_headroom_usd(b.symbol, account)
+            px = next(
+                (s.data.get("price") for s in b.signals
+                 if s.kind is SignalKind.TECHNICAL and s.data
+                 and s.data.get("price")),
+                None,
+            )
+            if (
+                headroom >= min_order
+                and px is not None and px < r.min_trade_price_usd
+            ):
+                headroom = 0.0
+                reason = (
+                    f"price ${px:.2f} < ${r.min_trade_price_usd:g} "
+                    "liquidity floor"
+                )
             if headroom < min_order:
                 buy_excluded[b.symbol] = reason or "no buy headroom"
                 if account.position_for(b.symbol) is not None:

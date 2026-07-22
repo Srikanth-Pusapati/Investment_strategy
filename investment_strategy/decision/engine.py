@@ -342,6 +342,12 @@ class DecisionEngine:
                 f"- Equity buys with conviction < {r.min_conviction:g} are rejected "
                 "outright — do not propose them."
             )
+        if getattr(r, "min_new_name_conviction", 0):
+            out.append(
+                f"- A NEW name (not currently held) needs conviction ≥ "
+                f"{r.min_new_name_conviction:g} — starter positions on lagged/"
+                "crowd theses below that bar are rejected; top-ups are exempt."
+            )
         if getattr(r, "min_composite_score", 0) and getattr(r, "composite_gate_enabled", False):
             out.append(
                 f"- Buys with a composite signal index < {r.min_composite_score:+g} "

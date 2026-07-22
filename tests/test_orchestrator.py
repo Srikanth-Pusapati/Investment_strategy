@@ -915,10 +915,12 @@ if __name__ == "__main__":
 # --------------------------------------------------------------------------- #
 # Bearish option path through slate exclusions (the "earn on lows" fix)
 # --------------------------------------------------------------------------- #
-def _slate_orch(options_on=True, headroom=0.0, min_score=0.2):
+def _slate_orch(options_on=True, headroom=0.0, min_score=0.2,
+                min_trade_price=5.0):
     o = Orchestrator.__new__(Orchestrator)
     o.cfg = SimpleNamespace(
-        risk=SimpleNamespace(min_order_usd=1.0, min_order_pct=0.0),
+        risk=SimpleNamespace(min_order_usd=1.0, min_order_pct=0.0,
+                             min_trade_price_usd=min_trade_price),
         screener=SimpleNamespace(min_score=min_score),
     )
     o.options = object() if options_on else None
@@ -954,6 +956,28 @@ def test_partition_drops_bullish_notheld_when_blocked():
     o = _slate_orch(options_on=True)
     kept, _ = o._partition_slate([_discovery_bundle(score=0.5)], _acct())
     assert kept == []
+
+
+def test_partition_drops_notheld_name_under_liquidity_floor():
+    # AMC (~$2.20) was re-proposed and liquidity-rejected EVERY day Jul 17-22
+    # while topping the composite — a permanently doomed buy must leave the
+    # slate before the prompt, not after the LLM spends a proposal on it.
+    o = _slate_orch(options_on=False, headroom=10_000.0)
+    sigs = [
+        Signal(kind=SignalKind.DISCOVERY, symbol="AMC", summary="scan", score=0.9),
+        Signal(kind=SignalKind.TECHNICAL, symbol="AMC", summary="tech", score=0.2,
+               data={"price": 2.20}),
+    ]
+    kept, excluded = o._partition_slate(
+        [SignalBundle(symbol="AMC", signals=sigs)], _acct()
+    )
+    assert kept == []
+    assert "liquidity floor" in excluded["AMC"]
+    # A missing technical price fails open — the name stays on the slate.
+    o2 = _slate_orch(options_on=False, headroom=10_000.0)
+    kept2, excluded2 = o2._partition_slate([_discovery_bundle(score=0.5)], _acct())
+    assert [b.symbol for b in kept2] == ["XYZ"]
+    assert "XYZ" not in excluded2
 
 
 def test_bearish_lean_falls_back_to_mean_of_scored_signals():
