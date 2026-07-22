@@ -264,6 +264,71 @@ def test_behavior_diagnostics_suppressed_below_min_trips():
     assert behavior_diagnostics(_ledger_of(recs)) == []
 
 
+# -- episode-opening conviction/composite (weekly auto-tuner inputs) --------- #
+def test_opening_conviction_survives_partial_exit_and_topup():
+    # Buy opens at 0.45, a later top-up buys more at 0.70 — a scale-out consumes
+    # the OPENING lot FIFO, so both resulting trips' opening_conviction must
+    # stay 0.45 (the entry's own number), never drift to the top-up's.
+    recs = [
+        TradeRecord(symbol="SPCX", action="buy", qty=1.0, conviction=0.45,
+                    composite_score=0.66, ts=_T0),
+        TradeRecord(symbol="SPCX", action="buy", qty=1.0, conviction=0.70,
+                    composite_score=1.10, ts=_T0 + timedelta(hours=1)),
+        _sell("SPCX", 3.0, 2, reason="scale", qty=1.0),   # consumes the OPENING lot
+        _sell("SPCX", -8.0, 3, reason="stop", qty=1.0),   # remainder, full close
+    ]
+    trips = round_trips(recs)
+    assert len(trips) == 2
+    assert all(abs(t.opening_conviction - 0.45) < 1e-9 for t in trips)
+    assert all(abs(t.opening_composite - 0.66) < 1e-9 for t in trips)
+
+
+def test_opening_conviction_none_when_opener_unrecorded():
+    # conviction 0.0 (core fills, pre-tracking) -> None, same sentinel as the
+    # existing mean-conviction field.
+    recs = [_buy("A", ["technical"], 0), _sell("A", 5.0, 1)]
+    trip = round_trips(recs)[0]
+    assert trip.opening_conviction is None
+    assert trip.opening_composite is None
+
+
+def test_opening_conviction_resets_across_episodes():
+    # A full close then a fresh re-entry: the SECOND episode's opening numbers
+    # must be its OWN entry, not the first episode's leftover.
+    recs = [
+        TradeRecord(symbol="A", action="buy", qty=1.0, conviction=0.40, ts=_T0),
+        _sell("A", 5.0, 1, reason="take", qty=1.0),
+        TradeRecord(symbol="A", action="buy", qty=1.0, conviction=0.80,
+                    ts=_T0 + timedelta(hours=2)),
+        _sell("A", -3.0, 3, reason="stop", qty=1.0),
+    ]
+    trips = round_trips(recs)
+    assert len(trips) == 2
+    assert abs(trips[0].opening_conviction - 0.40) < 1e-9
+    assert abs(trips[1].opening_conviction - 0.80) < 1e-9
+
+
+def test_realized_pl_and_exit_ts_carried():
+    ts_exit = _T0 + timedelta(hours=1)
+    recs = [
+        TradeRecord(symbol="A", action="buy", qty=1.0, ts=_T0),
+        TradeRecord(symbol="A", action="sell", realized_pl_pct=5.0,
+                    realized_pl=123.45, ts=ts_exit),
+    ]
+    trip = round_trips(recs)[0]
+    assert trip.realized_pl == 123.45
+    assert trip.exit_ts == str(ts_exit)
+
+
+def test_new_roundtrip_fields_default_for_backcompat():
+    from investment_strategy.attribution import RoundTrip
+    trip = RoundTrip(symbol="X", pl_pct=1.0, signals=[])
+    assert trip.opening_conviction is None
+    assert trip.opening_composite is None
+    assert trip.realized_pl is None
+    assert trip.exit_ts == ""
+
+
 def _run_all():
     fns = [v for k, v in sorted(globals().items()) if k.startswith("test_") and callable(v)]
     failed = 0

@@ -1050,7 +1050,7 @@ def test_within_close_fence_only_near_the_bell():
 
 def test_closed_tick_arms_the_bell_wakeup():
     o = Orchestrator.__new__(Orchestrator)
-    o.cfg = SimpleNamespace(postmortem_enabled=False)
+    o.cfg = SimpleNamespace(postmortem_enabled=False, autotune_enabled=False)
     bell = datetime.now(timezone.utc) + timedelta(hours=1)
     o.broker = SimpleNamespace(is_market_open=lambda: False,
                                next_market_open=lambda: bell)

@@ -697,11 +697,43 @@ class Orchestrator:
         except Exception as e:
             log.warning("Nightly post-mortem failed: %s", e)
 
+    def _maybe_run_weekly_autotune(self) -> None:
+        """Fire the deterministic ledger-driven auto-tune report once per ET
+        week, on a market-closed tick that falls on the weekend — clone of
+        _maybe_run_postmortem's once-per-day latch, at week granularity."""
+        if not self.cfg.autotune_enabled:
+            return
+        try:
+            from datetime import datetime
+            from zoneinfo import ZoneInfo
+            now_et = datetime.now(ZoneInfo("America/New_York"))
+            if now_et.weekday() < 5:  # Mon-Fri: wait for the weekend
+                return
+            iso_year, iso_week, _ = now_et.isocalendar()
+            week = f"{iso_year}-W{iso_week:02d}"
+            if week == self.state.get_autotune_done_week():
+                return  # already ran this week
+            log.info("Running weekly auto-tune report for %s …", week)
+            from .autotune import run_autotune
+            result = run_autotune(
+                self.cfg, self.ledger, self.journal,
+                days=self.cfg.autotune_days, min_sample=self.cfg.autotune_min_sample,
+            )
+            # Latch only on success (same lost-run lesson as the post-mortem):
+            # a None result — no data, or a mid-run failure — retries on the
+            # next closed weekend tick instead of being silently skipped for
+            # the rest of the week.
+            if result is not None:
+                self.state.set_autotune_done(week)
+        except Exception as e:
+            log.warning("Weekly auto-tune failed: %s", e)
+
     def run_decision_cycle(self) -> None:
         self._cycle_market_open = self.broker.is_market_open()
         if not self._cycle_market_open:
             log.info("Market closed; skipping decision cycle.")
             self._maybe_run_postmortem()
+            self._maybe_run_weekly_autotune()
             self._stamp_liveness()  # the postmortem's LLM call can run ~2 min
             # Arm the at-the-bell wake-up (see _decision_due; _tick clears it
             # only after the first SUCCESSFUL open-market cycle consumes it).
@@ -840,7 +872,10 @@ class Orchestrator:
         data_health = self._check_robinhood_health()
         # Reflection loop: our realized P&L per entry signal, fed back so Claude can
         # weight by what has actually paid off. Best-effort; never blocks a cycle.
-        lessons = self._lessons()
+        # Split dynamic (per-cycle) from stable (once-a-day) so the latter can
+        # sit in the cached half of the decision prompt (engine._render_stable).
+        lessons = self._attribution_lessons()
+        curated = self._curated_lessons()
 
         # The signal kinds present per symbol at decision time — recorded on each
         # entry so closed round-trips can later be attributed back to their sources.
@@ -879,6 +914,7 @@ class Orchestrator:
             data_health=data_health, composites=composites,
             regime_label=(_reg.label if _reg else ""),
             regime_reason=(_reg.reason if _reg else ""),
+            curated=curated,
         )
         self._stamp_liveness()
         proposals = self._filter_to_slate(proposals, bundles, account)
@@ -1047,22 +1083,25 @@ class Orchestrator:
         except Exception as e:
             log.warning("Could not record equity snapshot: %s", e)
 
-    def _lessons(self) -> str:
-        parts = []
+    def _attribution_lessons(self) -> str:
+        """Per-cycle track-record block (attribution.py) — recomputed every
+        cycle and changes whenever a position closes, so it stays in the
+        decision prompt's DYNAMIC half (see engine._render_dynamic)."""
         try:
-            attr = render_lessons(self.ledger)
-            if attr:
-                parts.append(attr)
+            return render_lessons(self.ledger)
         except Exception as e:
             log.warning("Could not render track-record lessons: %s", e)
+            return ""
+
+    def _curated_lessons(self) -> str:
+        """Nightly post-mortem's curated lessons file — changes at most once a
+        day, so it belongs in the decision prompt's STABLE/cached half (see
+        engine._render_stable), separate from _attribution_lessons above."""
         try:
             from .postmortem import read_curated
-            curated = read_curated(self.cfg.postmortem_max_lessons)
-            if curated:
-                parts.append(curated)
+            return read_curated(self.cfg.postmortem_max_lessons)
         except Exception:
-            pass  # postmortem module may not exist yet; silently skip
-        return "\n\n".join(parts) if parts else ""
+            return ""  # postmortem module may not exist yet; silently skip
 
     def _inject_discovery(
         self, bundles: list[SignalBundle], discovered: list[Candidate]

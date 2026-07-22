@@ -234,6 +234,15 @@ def test_postmortem_done_day_round_trip():
     assert s2.get_postmortem_done_day() == "2026-07-06"
 
 
+def test_autotune_done_week_round_trip():
+    path = _tmp()
+    s1 = PortfolioState(path=path)
+    assert s1.get_autotune_done_week() == ""
+    s1.set_autotune_done("2026-W30")
+    s2 = PortfolioState(path=path)
+    assert s2.get_autotune_done_week() == "2026-W30"
+
+
 def _run_all():
     fns = [v for k, v in sorted(globals().items()) if k.startswith("test_") and callable(v)]
     failed = 0

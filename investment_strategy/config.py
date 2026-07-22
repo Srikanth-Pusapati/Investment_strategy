@@ -377,6 +377,13 @@ class Config:
     # and fold its one-line lessons back into the next day's decision prompt.
     postmortem_enabled: bool = True
     postmortem_max_lessons: int = 15
+    # Weekly ledger-driven auto-tune report (Jul 22 upgrade): a deterministic,
+    # no-LLM replay of the ledger + decisions journal against the entry-quality
+    # risk knobs, fired once per ET weekend. Report-only — writes
+    # state/autotune/{iso-week}.md; never changes a knob itself.
+    autotune_enabled: bool = True
+    autotune_days: int = 14
+    autotune_min_sample: int = 5
     # C.4 options-chain positioning signal: per-name ATM IV, put-call IV skew
     # and put/call open-interest lean from Alpaca's option snapshots (the free
     # 'indicative' feed the execution path already uses — no extra key). Feeds
@@ -464,6 +471,9 @@ def load_config() -> Config:
         reconcile_halt_enabled=_flag("RECONCILE_HALT", "on"),
         postmortem_enabled=_flag("POSTMORTEM_ENABLED", "on"),
         postmortem_max_lessons=_i("POSTMORTEM_MAX_LESSONS", 15),
+        autotune_enabled=_flag("AUTOTUNE_ENABLED", "on"),
+        autotune_days=_i("AUTOTUNE_DAYS", 14),
+        autotune_min_sample=_i("AUTOTUNE_MIN_SAMPLE", 5),
         options_chain_signal=_flag("OPTIONS_CHAIN_SIGNAL"),
         options_chain_max_symbols=_i("OPTIONS_CHAIN_MAX_SYMBOLS", 25),
         state_file=os.getenv("STATE_FILE", "state/risk_state.json"),

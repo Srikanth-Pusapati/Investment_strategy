@@ -73,6 +73,9 @@ class PortfolioState:
         # Last trading day the nightly post-mortem ran, so the market-closed
         # tick fires it exactly once per day.
         self.postmortem_done_day: str = ""
+        # Last ISO week (e.g. "2026-W30") the weekly auto-tune report ran, so
+        # the market-closed weekend tick fires it exactly once per week.
+        self.autotune_done_week: str = ""
         # Order ids submitted but not yet reconciled against their fills, as
         # [order_id, symbol] pairs. Persisted so a restart between cycles still
         # reconciles a reject/partial fill instead of leaving a phantom ledger
@@ -131,6 +134,7 @@ class PortfolioState:
                 k: int(v) for k, v in d.get("daily_buy_counts", {}).items()
             }
             self.postmortem_done_day = str(d.get("postmortem_done_day", ""))
+            self.autotune_done_week = str(d.get("autotune_done_week", ""))
             self.pending_orders = [
                 [str(oid), str(sym)] for oid, sym in d.get("pending_orders", [])
             ]
@@ -166,6 +170,7 @@ class PortfolioState:
                         "daily_deploy_usd": self.daily_deploy_usd,
                         "daily_buy_counts": self.daily_buy_counts,
                         "postmortem_done_day": self.postmortem_done_day,
+                        "autotune_done_week": self.autotune_done_week,
                         "pending_orders": self.pending_orders,
                         "ledgered_exit_oids": self.ledgered_exit_oids,
                         "regime_label": self.regime_label,
@@ -413,6 +418,16 @@ class PortfolioState:
         with self._lock:
             if day != self.postmortem_done_day:
                 self.postmortem_done_day = day
+                self._save()
+
+    # -- weekly auto-tune once-per-week marker ------------------------------- #
+    def get_autotune_done_week(self) -> str:
+        return self.autotune_done_week
+
+    def set_autotune_done(self, week: str) -> None:
+        with self._lock:
+            if week != self.autotune_done_week:
+                self.autotune_done_week = week
                 self._save()
 
     # -- pending-order reconciliation list (survives a restart) ------------- #

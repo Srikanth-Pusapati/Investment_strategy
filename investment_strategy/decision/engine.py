@@ -49,6 +49,7 @@ class DecisionEngine:
         data_health: list[str] | None = None,
         composites: dict[str, float] | None = None,
         regime_label: str = "", regime_reason: str = "",
+        curated: str = "",
     ) -> list[TradeProposal]:
         """Ask Claude for proposals across all candidate symbols at once.
 
@@ -56,6 +57,10 @@ class DecisionEngine:
         model rank candidates against each other rather than in isolation.
         `lessons` is our own derived track-record (signal attribution), passed as
         trusted context so the model can weight by what has actually paid off.
+        `curated` is the nightly post-mortem's curated lessons file — split out
+        from `lessons` because it only changes once a day (lessons/attribution
+        can change intraday whenever a position closes), so it belongs in the
+        CACHED stable block instead of forcing a cache write every cycle.
         `signal_notes` (symbol -> kind -> note) carries OUR deterministic
         freshness/trend annotations (E.1+R.4) — trusted, computed from persisted
         history, never from third-party text.
@@ -71,7 +76,8 @@ class DecisionEngine:
         if not bundles:
             return []
 
-        user_content = self._render(
+        stable_text = self._render_stable(curated)
+        dynamic_text = self._render_dynamic(
             bundles, account, benchmark_line, external or [], lessons,
             today=today, buy_excluded=buy_excluded or {},
             signal_notes=signal_notes or {},
@@ -88,18 +94,35 @@ class DecisionEngine:
                 # silently drops the whole cycle). We detect truncation below too.
                 max_tokens=16000,
                 thinking={"type": "adaptive"},
-                # No prompt caching: the decision cadence (>= 60 min start-to-
-                # start) outlives even the 1h cache TTL, so every cycle paid the
-                # cache-write premium and never read it back (Jul 13 ledger:
-                # cache_write 3,839 tokens on all 6 calls, 0 cache reads). The
-                # output_config schema is still cached automatically for 24h by
-                # structured outputs.
+                # Prompt caching (Jul 22 upgrade #2): _render_stable's output —
+                # date/DTE window/curated lessons/risk contract — is byte-
+                # identical across a day's decision cycles, so ONE ephemeral 1h
+                # breakpoint on it caches system+stable together (Anthropic's
+                # cache prefix is tools -> system -> messages, so `system` stays
+                # a plain string; no separate breakpoint needed there). This only
+                # pays off because DECISION_INTERVAL_SECONDS now keeps
+                # consecutive calls inside the 1h TTL — caching was removed once
+                # before because the old 60-min cadence outlived even a 1h cache
+                # (Jul 13 ledger: writes on all 6 calls, 0 reads). Also note:
+                # Opus prefix caching silently no-ops below a ~4,096-token
+                # prefix — if state/api_usage.jsonl keeps showing cache_read=0,
+                # the stable block needs to grow before this buys anything.
                 system=SYSTEM_PROMPT,
                 output_config={
                     "effort": self.cfg.decision_effort,
                     "format": {"type": "json_schema", "schema": PROPOSALS_SCHEMA},
                 },
-                messages=[{"role": "user", "content": user_content}],
+                messages=[{
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "text",
+                            "text": stable_text,
+                            "cache_control": {"type": "ephemeral", "ttl": "1h"},
+                        },
+                        {"type": "text", "text": dynamic_text},
+                    ],
+                }],
             )
         except anthropic.APITimeoutError as e:
             log.error("Claude decision call timed out (%ss): %s", self.cfg.decision_timeout_s, e)
@@ -123,18 +146,14 @@ class DecisionEngine:
         return self._parse(text)
 
     # -- prompt rendering --------------------------------------------------- #
-    def _render(
-        self, bundles: list[SignalBundle], account: AccountSnapshot,
-        benchmark_line: str, external: list[ExternalHolding], lessons: str = "",
-        today: str = "", buy_excluded: dict[str, str] | None = None,
-        signal_notes: dict[str, dict[str, str]] | None = None,
-        held_notes: dict[str, str] | None = None,
-        data_health: list[str] | None = None,
-        composites: dict[str, float] | None = None,
-        regime_label: str = "", regime_reason: str = "",
-    ) -> str:
-        # Our own derived data (track-record, today-so-far, exclusions) sits
-        # OUTSIDE <market_data> — it's trusted guidance, not third-party text.
+    def _render_stable(self, curated: str = "") -> str:
+        """The cache-eligible prefix: content that's byte-identical across a
+        day's decision cycles — the date/DTE window change only at ET
+        midnight, curated lessons only after the nightly post-mortem, and the
+        risk contract only on a config change or restart. This is placed FIRST
+        in the user message under a single `cache_control` breakpoint, so it
+        must stay deterministic for a given day or the cache silently misses
+        every cycle instead of paying off."""
         lines: list[str] = []
         # The model has no clock; without an anchor it dates things from its
         # training data — the 2026-07-13 session proposed option legs expiring
@@ -154,6 +173,29 @@ class DecisionEngine:
                 "accepted."
             )
         lines.append("")
+        if curated:
+            lines += [curated, ""]
+        if r is not None:
+            lines += self._risk_contract(r)
+        return "\n".join(lines)
+
+    def _render_dynamic(
+        self, bundles: list[SignalBundle], account: AccountSnapshot,
+        benchmark_line: str, external: list[ExternalHolding], lessons: str = "",
+        today: str = "", buy_excluded: dict[str, str] | None = None,
+        signal_notes: dict[str, dict[str, str]] | None = None,
+        held_notes: dict[str, str] | None = None,
+        data_health: list[str] | None = None,
+        composites: dict[str, float] | None = None,
+        regime_label: str = "", regime_reason: str = "",
+    ) -> str:
+        # Our own derived data (track-record, today-so-far, exclusions) sits
+        # OUTSIDE <market_data> — it's trusted guidance, not third-party text.
+        # Everything here can change cycle-to-cycle (a position closing moves
+        # `lessons`; the slate/account/market data always do) — none of it
+        # belongs in the cached stable block (see _render_stable).
+        lines: list[str] = []
+        r = getattr(self.cfg, "risk", None)
         if lessons:
             lines += [lessons, ""]
         if today:
@@ -208,13 +250,9 @@ class DecisionEngine:
                 "names are unaffected by the cap.",
                 "",
             ]
-        # The standing numeric risk contract (trusted guidance): Claude was never
-        # told the caps/floors/cooldowns as NUMBERS, so it kept spending conviction
-        # on proposals that die deterministically at the gate (sub-floor conviction,
-        # over-cap weights, blackout-window buys — a recurring postmortem waste).
-        # Enforcement is unchanged; this only stops the wasted proposals.
-        if r is not None:
-            lines += self._risk_contract(r)
+        # The standing numeric risk contract (trusted guidance) lives in the
+        # STABLE block now (_render_stable) — it's invariant per process, so it
+        # belongs under the cache breakpoint rather than repeated here.
         # RISK-OFF downside mandate: when the market is genuinely turning down
         # (SPY below its 200dma AND elevated VIX -> regime label "risk-off"), a
         # long-only book just loses more slowly. Tell the model to EXPRESS the
