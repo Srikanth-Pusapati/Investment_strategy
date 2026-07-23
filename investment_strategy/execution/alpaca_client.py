@@ -523,36 +523,76 @@ class AlpacaClient:
         ))
 
     # -- write: options (defined-risk) ------------------------------------- #
+    #: Entry-side limit buffer: cap what we're willing to pay at the pre-trade
+    #: estimated net premium plus this much headroom (percentage, floored by
+    #: the $ minimum below) rather than sending a plain market order with no
+    #: ceiling at all. Regression 2026-07-23: a long call estimated (mid-quote)
+    #: at $0.01/share was sized to a $900 cap, but the market order filled at
+    #: $0.03/share — 3x the estimate — turning an intended $900 debit into a
+    #: real $2,700 one on a thin/illiquid book. A limit order that doesn't fill
+    #: just means the position isn't opened this cycle (safe); an unbounded
+    #: market fill is not.
+    ENTRY_LIMIT_BUFFER_PCT = 20.0
+    #: Floor buffer in $/share, so a sub-dime estimate (like $0.01) still gets
+    #: real headroom instead of a percentage buffer that rounds to nothing at
+    #: Alpaca's whole-cent option tick.
+    ENTRY_LIMIT_MIN_BUFFER = 0.02
+
     def submit_option_legs(
         self, legs: list[OptionLegRequest], qty: int = 1,
+        est_premium_per_share: float | None = None,
     ) -> Optional[str]:
-        """Submit a single- or multi-leg options order (market, DAY). Caller is
-        responsible for building OCC-symbol legs that form a defined-risk play."""
+        """Submit a single- or multi-leg options ENTRY order (DAY).
+
+        Priced as a limit at the estimated net premium plus a buffer whenever
+        `est_premium_per_share` is provided (the normal, expected path — see
+        ENTRY_LIMIT_BUFFER_PCT above for why this replaced a plain market
+        order). Falls back to a market order only when no estimate is
+        available. Caller is responsible for building OCC-symbol legs that
+        form a defined-risk play."""
         if not self.cfg.can_open_orders:
             log.warning("Option order blocked: new orders disabled (kill switch).")
             return None
+        limit_price = None
+        if est_premium_per_share is not None and est_premium_per_share > 0:
+            buffer = max(
+                est_premium_per_share * self.ENTRY_LIMIT_BUFFER_PCT / 100.0,
+                self.ENTRY_LIMIT_MIN_BUFFER,
+            )
+            limit_price = round(est_premium_per_share + buffer, 2)
         try:
             if len(legs) == 1:
                 # A 1-leg "MLEG" is rejected by the SDK (MLEG needs 2-4 legs)
                 # and OrderClass.SIMPLE requires symbol+side on the request
-                # itself — so a long call/put goes out as a plain market order
-                # on the OCC symbol, carrying the leg's position intent.
+                # itself — so a long call/put goes out on the OCC symbol
+                # directly, carrying the leg's position intent.
                 leg = legs[0]
-                req = MarketOrderRequest(
+                kwargs = dict(
                     symbol=leg.symbol, qty=qty * int(leg.ratio_qty or 1),
                     side=leg.side, time_in_force=TimeInForce.DAY,
                     position_intent=leg.position_intent,
                 )
+                req = (
+                    LimitOrderRequest(limit_price=limit_price, **kwargs)
+                    if limit_price is not None else MarketOrderRequest(**kwargs)
+                )
             else:
-                req = MarketOrderRequest(
+                kwargs = dict(
                     qty=qty, time_in_force=TimeInForce.DAY,
                     order_class=OrderClass.MLEG, legs=legs,
+                )
+                req = (
+                    LimitOrderRequest(limit_price=limit_price, **kwargs)
+                    if limit_price is not None else MarketOrderRequest(**kwargs)
                 )
             placed = self.trading.submit_order(req)
         except Exception as e:
             log.error("submit_option_legs failed: %s", e)
             return None
-        log.info("OPTION %d-leg order qty=%d (order %s)", len(legs), qty, placed.id)
+        log.info(
+            "OPTION %d-leg order qty=%d limit=%s (order %s)",
+            len(legs), qty, limit_price, placed.id,
+        )
         return str(placed.id)
 
     #: Minimum valid option limit price (Alpaca ticks options in whole cents;

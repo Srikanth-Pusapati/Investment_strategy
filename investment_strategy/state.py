@@ -76,6 +76,16 @@ class PortfolioState:
         # Last ISO week (e.g. "2026-W30") the weekly auto-tune report ran, so
         # the market-closed weekend tick fires it exactly once per week.
         self.autotune_done_week: str = ""
+        # Decision-driven SELLs whose close attempt FAILED — retried by the
+        # watchdog every tick (the same escalation ladder as any other exit)
+        # instead of waiting for the next hourly decision cycle to maybe
+        # re-propose the same sell, with no alert in between (2026-07-20 COO:
+        # a real thesis-break exit sat unretried ~26h; every OTHER exit path
+        # already retries + pages on failure). Keyed by symbol; the value
+        # carries the ORIGINAL decision's rationale/signals/composite so the
+        # eventual successful close still ledgers with real context, not a
+        # generic "watchdog decision" label.
+        self.pending_decision_sells: dict[str, dict] = {}
         # Order ids submitted but not yet reconciled against their fills, as
         # [order_id, symbol] pairs. Persisted so a restart between cycles still
         # reconciles a reject/partial fill instead of leaving a phantom ledger
@@ -135,6 +145,9 @@ class PortfolioState:
             }
             self.postmortem_done_day = str(d.get("postmortem_done_day", ""))
             self.autotune_done_week = str(d.get("autotune_done_week", ""))
+            self.pending_decision_sells = {
+                k: dict(v) for k, v in d.get("pending_decision_sells", {}).items()
+            }
             self.pending_orders = [
                 [str(oid), str(sym)] for oid, sym in d.get("pending_orders", [])
             ]
@@ -171,6 +184,7 @@ class PortfolioState:
                         "daily_buy_counts": self.daily_buy_counts,
                         "postmortem_done_day": self.postmortem_done_day,
                         "autotune_done_week": self.autotune_done_week,
+                        "pending_decision_sells": self.pending_decision_sells,
                         "pending_orders": self.pending_orders,
                         "ledgered_exit_oids": self.ledgered_exit_oids,
                         "regime_label": self.regime_label,
@@ -429,6 +443,31 @@ class PortfolioState:
             if week != self.autotune_done_week:
                 self.autotune_done_week = week
                 self._save()
+
+    # -- decision-sell retry queue (survives a restart) ---------------------- #
+    def queue_decision_sell(
+        self, symbol: str, rationale: str, key_signals: list[str] | None = None,
+        composite_score: float | None = None,
+    ) -> None:
+        """Remember a decision-driven SELL whose close attempt failed, so the
+        watchdog retries it every tick — see the field's docstring above."""
+        with self._lock:
+            self.pending_decision_sells[symbol] = {
+                "rationale": rationale,
+                "key_signals": list(key_signals or []),
+                "composite_score": composite_score,
+            }
+            self._save()
+
+    def pop_decision_sell(self, symbol: str) -> dict | None:
+        with self._lock:
+            d = self.pending_decision_sells.pop(symbol, None)
+            if d is not None:
+                self._save()
+            return d
+
+    def get_pending_decision_sells(self) -> dict[str, dict]:
+        return dict(self.pending_decision_sells)
 
     # -- pending-order reconciliation list (survives a restart) ------------- #
     def set_pending_orders(self, pairs: list[tuple[str, str]]) -> None:

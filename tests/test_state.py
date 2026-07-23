@@ -243,6 +243,24 @@ def test_autotune_done_week_round_trip():
     assert s2.get_autotune_done_week() == "2026-W30"
 
 
+def test_pending_decision_sell_queue_round_trip():
+    path = _tmp()
+    s1 = PortfolioState(path=path)
+    assert s1.get_pending_decision_sells() == {}
+    s1.queue_decision_sell("ZTS", "thesis broken", ["technical -0.3"], 0.42)
+    s2 = PortfolioState(path=path)
+    pending = s2.get_pending_decision_sells()
+    assert pending["ZTS"] == {
+        "rationale": "thesis broken",
+        "key_signals": ["technical -0.3"],
+        "composite_score": 0.42,
+    }
+    popped = s2.pop_decision_sell("ZTS")
+    assert popped["rationale"] == "thesis broken"
+    assert s2.get_pending_decision_sells() == {}
+    assert s2.pop_decision_sell("ZTS") is None   # already gone -> no-op
+
+
 def _run_all():
     fns = [v for k, v in sorted(globals().items()) if k.startswith("test_") and callable(v)]
     failed = 0

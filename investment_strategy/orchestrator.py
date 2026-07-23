@@ -2342,10 +2342,33 @@ class Orchestrator:
                         # Nothing was ledgered and nothing must be: a phantom
                         # SELL with no order id is invisible to reconcile and
                         # poisons attribution forever (SPCX 2026-07-16).
+                        # Regression 2026-07-20/23: this used to just log and
+                        # wait for the NEXT hourly cycle to maybe re-propose
+                        # the same sell, with no alert in between — a real
+                        # thesis-break exit (COO) sat unretried for ~26h.
+                        # Every OTHER exit path (watchdog trailing/premium/
+                        # time-stop) retries every ~30s tick and pages on
+                        # failure; queue the same retry here instead, keeping
+                        # the original rationale so a later successful close
+                        # still ledgers with real context.
+                        self.state.queue_decision_sell(
+                            proposal.symbol, proposal.rationale,
+                            proposal.key_signals, composite,
+                        )
                         log.error(
-                            "SELL %s approved but the close FAILED — position "
-                            "stays held and tracked; next cycle re-decides.",
+                            "SELL %s approved but the close FAILED — queued "
+                            "for the watchdog to retry every tick.",
                             proposal.symbol,
+                        )
+                        self.alerter.critical(
+                            f"decision-sell-fail:{proposal.symbol}",
+                            f"{proposal.symbol} SELL approved but close FAILED",
+                            f"The decision engine approved a SELL for "
+                            f"{proposal.symbol} ({decision.reason[:160]}) but "
+                            "the close order did not go through. Queued for "
+                            "the watchdog to retry every "
+                            f"~{self.cfg.monitor_interval_s}s until it "
+                            "succeeds or the position is confirmed gone.",
                         )
                         executed_notional = 0.0
             else:  # buy (approved or resized)
@@ -2426,7 +2449,10 @@ class Orchestrator:
             return
         legs = self.options.build_legs(proposal)
         with self._trade_lock:
-            oid = self.broker.submit_option_legs(legs, qty=int(decision.approved_qty))
+            oid = self.broker.submit_option_legs(
+                legs, qty=int(decision.approved_qty),
+                est_premium_per_share=premium,
+            )
         if oid:
             self.ledger.record(TradeRecord.from_option(
                 decision, premium, oid, entry_signals=signal_kinds or []))

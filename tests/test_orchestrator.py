@@ -185,6 +185,7 @@ def _orch(trim_enabled=True, trim_pct=25.0, state=None,
     o.cfg = SimpleNamespace(
         core_etf=core_etf, target_invested_pct=target_invested_pct,
         core_stop_pct=core_stop_pct, core_max_pct=core_max_pct,
+        monitor_interval_s=30,
         # These reconcile tests assert the LOG output; the enforcing halt
         # behavior has its own suite in test_ops_hardening.py.
         reconcile_halt_enabled=False,
@@ -222,6 +223,7 @@ def _orch(trim_enabled=True, trim_pct=25.0, state=None,
     o.broker = _FakeBroker()
     o.ledger = _FakeLedger()
     o.watchdog = _FakeWatchdog(o.broker)
+    o.alerter = SimpleNamespace(critical=lambda *a, **k: None)
     o.state = state or _state_tmp()
     o._trade_lock = threading.Lock()
     o._pending_oids = []
@@ -848,6 +850,60 @@ def test_execute_proposals_runs_equity_sells_first():
     assert [c[:2] for c in o._calls] == [("sell", "CVX"), ("buy", "MU")]
     assert acct.position_for("CVX") is None   # slot freed before the buy ran
     assert acct.cash == 500.0                 # capital freed before the buy ran
+
+
+# -- decision-sell close failure: queue for watchdog retry, alert (2026-07-23) - #
+from investment_strategy.models import Action as _Action
+from investment_strategy.models import RiskDecision as _RiskDecision
+from investment_strategy.models import RiskVerdict as _RiskVerdict
+from investment_strategy.models import TradeProposal as _TradeProposal
+
+
+def _sell_prop(symbol, rationale="test rationale", key_signals=None):
+    return _TradeProposal(
+        symbol=symbol, action=_Action.SELL, conviction=0.6,
+        target_weight_pct=0.0, rationale=rationale,
+        key_signals=key_signals or [],
+    )
+
+
+def _held_position(symbol, qty=10.0, price=50.0):
+    return Position(
+        symbol=symbol, qty=qty, avg_entry_price=price, current_price=price,
+        market_value=qty * price, unrealized_pl=-25.0, unrealized_pl_pct=-5.0,
+    )
+
+
+def test_decision_sell_close_failure_queues_retry_and_alerts():
+    # Regression 2026-07-20/23: a failed decision-SELL used to just log and
+    # wait for the next hourly cycle — no retry, no page. It must now queue
+    # for the watchdog (with the original rationale/signals/composite) and
+    # alert immediately, same as every other exit path.
+    o = _orch()
+    held = _held_position("ZTS")
+    o.broker.annualized_vol = lambda s: 0.3
+    o.broker.open_position = lambda s: held
+    o._regime_mult = 1.0
+    prop = _sell_prop("ZTS", rationale="thesis broken",
+                       key_signals=["technical -0.3"])
+    decision = _RiskDecision(
+        proposal=prop, verdict=_RiskVerdict.APPROVED, approved_qty=held.qty,
+        approved_notional=held.market_value, reason="approved sell",
+    )
+    o.risk.evaluate = lambda *a, **k: decision
+    o.watchdog.outcomes = [("failed", None)]
+    alerts = []
+    o.alerter = SimpleNamespace(critical=lambda k, s, b: alerts.append((k, s, b)))
+    acct = _acct(cash=0.0, positions=[held])
+
+    o._handle_equity(prop, acct, [], composite=0.42)
+
+    assert o.ledger.records == []   # nothing ledgered on a failed close
+    pending = o.state.get_pending_decision_sells()
+    assert pending["ZTS"]["rationale"] == "thesis broken"
+    assert pending["ZTS"]["key_signals"] == ["technical -0.3"]
+    assert pending["ZTS"]["composite_score"] == 0.42
+    assert alerts and alerts[0][0] == "decision-sell-fail:ZTS"
 
 
 def test_execute_proposals_budget_split_sees_freed_capital():

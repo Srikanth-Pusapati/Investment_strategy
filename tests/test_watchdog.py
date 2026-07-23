@@ -715,3 +715,49 @@ def test_watchdog_exit_orders_queued_for_reconcile():
     wd = Watchdog(_cfg(0.0), broker, state=state, ledger=led)
     wd._close_hard(_pos_locked("NU", qty=172.0, avail=0.0), "trail")
     assert ("new-1", "NU") in state.get_pending_orders()
+
+
+# -- decision-sell retry queue (2026-07-20/23: no retry, no alert before) ---- #
+def test_retry_pending_decision_sell_success_ledgers_with_original_context():
+    state, led = _state(), _FakeLedger()
+    state.queue_decision_sell("ZTS", "thesis broken", ["technical -0.3"], 0.42)
+    wd = Watchdog(_cfg(0.0), _FakeBroker([]), state=state, ledger=led)
+    wd.close_now = lambda pos, reason: ("full", "oid-1")
+    wd._retry_pending_decision_sells({"ZTS": _pos("ZTS")})
+    assert state.get_pending_decision_sells() == {}
+    rec = led.records[-1]
+    assert rec.rationale == "thesis broken"
+    assert rec.key_signals == ["technical -0.3"]
+    assert rec.composite_score == 0.42
+    assert rec.exit_reason == "decision"
+
+
+def test_retry_pending_decision_sell_partial_stays_queued():
+    state = _state()
+    state.queue_decision_sell("ZTS", "thesis broken", [], None)
+    wd = Watchdog(_cfg(0.0), _FakeBroker([]), state=state)
+    wd.close_now = lambda pos, reason: ("partial", "oid-1")
+    wd._retry_pending_decision_sells({"ZTS": _pos("ZTS")})
+    assert "ZTS" in state.get_pending_decision_sells()
+
+
+def test_retry_pending_decision_sell_failure_stays_queued_and_alerts():
+    state = _state()
+    state.queue_decision_sell("ZTS", "thesis broken", [], None)
+    alerts = []
+    wd = Watchdog(_cfg(0.0), _FakeBroker([]), state=state,
+                  alerter=SimpleNamespace(critical=lambda k, s, b: alerts.append(k)))
+    wd.close_now = lambda pos, reason: ("failed", None)
+    wd._retry_pending_decision_sells({"ZTS": _pos("ZTS")})
+    assert "ZTS" in state.get_pending_decision_sells()
+    assert alerts == ["decision-sell-fail:ZTS"]
+
+
+def test_retry_pending_decision_sell_drops_when_position_gone():
+    # A different exit path already closed it (or it's a broker-side fill not
+    # yet reconciled) — stop retrying rather than trying to close a phantom.
+    state = _state()
+    state.queue_decision_sell("ZTS", "thesis broken", [], None)
+    wd = Watchdog(_cfg(0.0), _FakeBroker([]), state=state)
+    wd._retry_pending_decision_sells({})
+    assert state.get_pending_decision_sells() == {}

@@ -684,6 +684,59 @@ def test_two_leg_option_submits_one_mleg_order():
     assert len(req.legs) == 2 and req.qty == 2
 
 
+# -- submit_option_legs: entry-side limit price (2026-07-23 slippage fix) --- #
+# Regression: a long call estimated (mid-quote) at $0.01/share, sized to a
+# $900 cap, went out as a plain MARKET order and filled at $0.03/share — 3x
+# the estimate — a real $2,700 loss instead of the intended $900. Entries now
+# price a DAY limit at the estimate plus a buffer instead of an unbounded
+# market order.
+def test_single_leg_option_entry_uses_buffered_limit_when_estimate_given():
+    c = _opt_client()
+    leg = _OLR(symbol="T260821C00028000", ratio_qty=1, side=_OS.BUY,
+               position_intent=_PI.BUY_TO_OPEN)
+    oid = c.submit_option_legs([leg], qty=900, est_premium_per_share=0.01)
+    assert oid == "opt-oid-1"
+    req = c.trading.submitted[0]
+    # min $-buffer floor applies (20% of $0.01 rounds to nothing at the cent
+    # tick) -> $0.01 + $0.02 floor = $0.03, matching the real incident's fill.
+    assert req.limit_price == 0.03
+    assert req.symbol == "T260821C00028000"
+    assert req.qty == 900
+
+
+def test_single_leg_option_entry_uses_percentage_buffer_above_the_floor():
+    c = _opt_client()
+    leg = _OLR(symbol="AAPL260814P00150000", ratio_qty=1, side=_OS.BUY,
+               position_intent=_PI.BUY_TO_OPEN)
+    oid = c.submit_option_legs([leg], qty=3, est_premium_per_share=1.50)
+    req = c.trading.submitted[0]
+    assert req.limit_price == 1.80   # 1.50 + max(1.50*0.20, 0.02) = 1.80
+
+
+def test_multi_leg_option_entry_uses_buffered_net_limit():
+    c = _opt_client()
+    legs = [
+        _OLR(symbol="AAPL260814P00160000", ratio_qty=1, side=_OS.BUY,
+             position_intent=_PI.BUY_TO_OPEN),
+        _OLR(symbol="AAPL260814P00150000", ratio_qty=1, side=_OS.SELL,
+             position_intent=_PI.SELL_TO_OPEN),
+    ]
+    oid = c.submit_option_legs(legs, qty=2, est_premium_per_share=0.50)
+    req = c.trading.submitted[0]
+    assert req.order_class == _OC.MLEG
+    assert req.limit_price == 0.60    # 0.50 + max(0.50*0.20, 0.02) = 0.60
+
+
+def test_option_entry_falls_back_to_market_without_an_estimate():
+    # No estimate available (e.g. a quote-less leg) -> unchanged legacy path.
+    c = _opt_client()
+    leg = _OLR(symbol="AAPL260814P00150000", ratio_qty=1, side=_OS.BUY,
+               position_intent=_PI.BUY_TO_OPEN)
+    oid = c.submit_option_legs([leg], qty=3)
+    req = c.trading.submitted[0]
+    assert not hasattr(req, "limit_price") or req.limit_price is None
+
+
 def test_parse_occ_round_trips_and_rejects_equities():
     sym = occ_symbol("AAPL", "2026-08-14", 150.0, "put")
     assert sym == "AAPL260814P00150000"
