@@ -652,6 +652,57 @@ def test_defined_risk_spread_approved_and_premium_capped():
     assert d.approved_notional <= 1000 + 1e-6
 
 
+def test_option_sub_floor_leg_premium_rejected():
+    """A cheapest-leg mid below the premium floor is a deep-OTM/illiquid junk
+    contract (the 2026-07-23 T blowup: a $0.01 leg minted 900 dead contracts) —
+    refuse it even though the tiny net debit fits the cap."""
+    rm = _rm(_limits(options_enabled=True, min_option_premium=0.10))
+    p = _opt(OptionStrategy.LONG_CALL,
+             [OptionLeg(expiry=_opt_exp(30), strike=200, right="call", side=Action.BUY)])
+    d = rm.evaluate_option(p, _account(), est_premium_per_contract=0.05,
+                           min_leg_premium=0.01)
+    assert d.verdict is RiskVerdict.REJECTED
+    assert "floor" in d.reason.lower()
+
+
+def test_option_leg_premium_at_floor_passes_floor_gate():
+    """Exactly at the floor the leg is a real contract — not rejected on the
+    floor (strictly-less-than, so the boundary is admitted)."""
+    rm = _rm(_limits(options_enabled=True, min_option_premium=0.10))
+    p = _opt(OptionStrategy.LONG_CALL,
+             [OptionLeg(expiry=_opt_exp(30), strike=200, right="call", side=Action.BUY)])
+    d = rm.evaluate_option(p, _account(), est_premium_per_contract=0.50,
+                           min_leg_premium=0.10)
+    assert d.verdict is RiskVerdict.APPROVED
+
+
+def test_option_none_min_leg_premium_fails_open():
+    """No per-leg data (None) must not reject on the floor — est_premium<=0 is
+    the backstop for quote-less legs; the floor only acts on data we have."""
+    rm = _rm(_limits(options_enabled=True, min_option_premium=0.10))
+    p = _opt(OptionStrategy.LONG_CALL,
+             [OptionLeg(expiry=_opt_exp(30), strike=200, right="call", side=Action.BUY)])
+    d = rm.evaluate_option(p, _account(), est_premium_per_contract=2.0,
+                           min_leg_premium=None)
+    assert d.verdict is RiskVerdict.APPROVED
+
+
+def test_option_contract_count_clamped_to_cap():
+    """A cheap-but-valid premium that would size past the count cap is clamped —
+    never the 900-lot thin-book order that tripled the T fill."""
+    rm = _rm(_limits(options_enabled=True, max_option_premium_pct=1.0,
+                     min_option_premium=0.10, max_option_contracts=50))
+    p = _opt(OptionStrategy.LONG_CALL,
+             [OptionLeg(expiry=_opt_exp(30), strike=200, right="call", side=Action.BUY)])
+    # $0.10/share -> $10/contract; 1% of $100k = $1000 budget -> 100 contracts,
+    # clamped to 50 (and $500 spent, well under the cap).
+    d = rm.evaluate_option(p, _account(), est_premium_per_contract=0.10,
+                           min_leg_premium=0.10)
+    assert d.verdict is RiskVerdict.APPROVED
+    assert d.approved_qty == 50
+    assert d.approved_notional == 500.0
+
+
 # --------------------------------------------------------------------------- #
 # R.1 — vol-scaled ("ATR-style") dynamic stops
 # --------------------------------------------------------------------------- #
