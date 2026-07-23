@@ -2062,8 +2062,18 @@ class Orchestrator:
         etf = self.cfg.core_etf
         if not etf or self.cfg.target_invested_pct <= 0:
             return
-        if self.risk.kill_switch:
-            return  # new buys halted — don't top up the core either
+        # Regression 2026-07-23: this only checked kill_switch, so a daily-loss
+        # halt, a drawdown halt, an equity-floor HALT LATCH, or a PDT block all
+        # left the core sweep free to buy right through them — confirmed live:
+        # the risk gate correctly rejected buys at "Daily loss 3.70% >= 3.00%"
+        # and one second later the core fill bought $28,155 of QQQ anyway,
+        # forcing an immediate unwind. trading_halted() is the SAME account-wide
+        # check every other new-buy path goes through; the core sweep is a new
+        # buy and must be gated the same way.
+        halted, why = self.risk.trading_halted(account)
+        if halted:
+            log.info("Core fill skipped: %s", why)
+            return
         r = self.cfg.risk
         equity = account.equity
         if equity <= 0:

@@ -180,7 +180,7 @@ def _orch(trim_enabled=True, trim_pct=25.0, state=None,
           thesis_min_score=0.1, core_etf="", target_invested_pct=0.0,
           min_cash_buffer_pct=2.0, max_gross_exposure_pct=100.0,
           kill_switch=False, whole_shares_only=False, core_stop_pct=15.0,
-          core_max_pct=0.0):
+          core_max_pct=0.0, trading_halted=None):
     o = Orchestrator.__new__(Orchestrator)
     o.cfg = SimpleNamespace(
         core_etf=core_etf, target_invested_pct=target_invested_pct,
@@ -206,7 +206,19 @@ def _orch(trim_enabled=True, trim_pct=25.0, state=None,
             rotation_loss_guard_enabled=False,
         ),
     )
-    o.risk = SimpleNamespace(kill_switch=kill_switch)
+    # trading_halted mirrors RiskManager.trading_halted()'s (bool, reason)
+    # shape; defaults to kill_switch-only so every pre-existing test (which
+    # only ever set kill_switch) keeps its old semantics unchanged. Pass an
+    # explicit (bool, reason) tuple to simulate a daily-loss/drawdown/halt-
+    # latch/PDT halt distinct from the kill switch.
+    _halted_result = (
+        trading_halted if trading_halted is not None
+        else (kill_switch, "KILL_SWITCH is on — no new positions." if kill_switch else "")
+    )
+    o.risk = SimpleNamespace(
+        kill_switch=kill_switch,
+        trading_halted=lambda account, _r=_halted_result: _r,
+    )
     o.broker = _FakeBroker()
     o.ledger = _FakeLedger()
     o.watchdog = _FakeWatchdog(o.broker)
@@ -490,6 +502,34 @@ def test_core_fill_noop_under_kill_switch():
     acct = _acct(cash=1_000.0)
     o._apply_core_fill(acct)
     assert o.broker.core_buys == []
+
+
+def test_core_fill_noop_under_daily_loss_halt():
+    # Regression 2026-07-23: _apply_core_fill only checked kill_switch, so a
+    # daily-loss halt (or drawdown halt, or HALT LATCH, or PDT block — every
+    # OTHER reason trading_halted() can return True) left the core sweep free
+    # to buy right through it. Confirmed live: the risk gate correctly
+    # rejected buys for "Daily loss 3.70% >= 3.00%" and the core fill bought
+    # $28,155 of QQQ one second later, forcing an immediate unwind.
+    o = _orch(
+        core_etf="QQQ", target_invested_pct=90.0, kill_switch=False,
+        trading_halted=(True, "Daily loss 3.70% >= limit 3.00% — halting new buys."),
+    )
+    acct = _acct(cash=1_000.0)
+    o._apply_core_fill(acct)
+    assert o.broker.core_buys == []
+
+
+def test_core_fill_proceeds_when_not_halted():
+    # Sanity check the fixture itself: an explicit "not halted" result must
+    # still let a normal core fill through (the new gate isn't fail-closed).
+    o = _orch(
+        core_etf="QQQ", target_invested_pct=90.0, kill_switch=False,
+        trading_halted=(False, ""),
+    )
+    acct = _acct(cash=1_000.0)
+    o._apply_core_fill(acct)
+    assert o.broker.core_buys == [("QQQ", 900.0)]
 
 
 def test_core_fill_clamped_to_gross_cap():
