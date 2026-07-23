@@ -604,7 +604,19 @@ class Watchdog:
         """Close every leg of one option structure as a single order, ledger the
         round-trip under the UNDERLYING (pairing it with the entry record so
         attribution scores option trades), and page on failure. Returns True
-        when the close order went in."""
+        when the close order went in (or one is ALREADY resting from a prior
+        tick — see the qty_available check below).
+
+        Regression 2026-07-23: after close_option_leg's DAY-limit fallback got
+        a close order resting at the venue, this loop had no memory of that
+        and re-submitted ANOTHER close next tick. With every contract already
+        reserved by the first order, qty_available was 0 and the SECOND
+        attempt came back "account not eligible to trade uncovered option
+        contracts" — a real API rejection, but a false CRITICAL page, since a
+        working exit was already in flight. qty_available (Alpaca's own
+        reserved-by-open-orders tracking) is the same signal the equity path
+        uses via has_working_exit; a leg whose contracts are already fully
+        reserved is treated as protected, not failed."""
         if under is None:
             occ = parse_occ(group[0].symbol)
             under = occ[0] if occ else group[0].symbol
@@ -613,6 +625,17 @@ class Watchdog:
         if pl_pct is None:
             basis = sum(p.avg_entry_price * p.qty * 100.0 for p in group)
             pl_pct = (pl / basis * 100.0) if basis > 1e-9 else None
+        if all(
+            p.qty_available is not None
+            and abs(p.qty_available) < abs(p.qty) - 1e-9
+            for p in group
+        ):
+            log.info(
+                "Option exit on %s already resting (every leg's contracts are "
+                "reserved by an open order) — skipping a redundant close "
+                "this tick.", under,
+            )
+            return True
         oid = self.broker.close_option_group(group)
         if oid:
             self._record_option_exit(under, group, oid, reason, pl_pct, pl)
