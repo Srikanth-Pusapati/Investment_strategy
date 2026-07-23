@@ -686,6 +686,7 @@ class RiskManager:
         self, proposal: TradeProposal, account: AccountSnapshot,
         est_premium_per_contract: float,
         leg_liquidity: list[dict] | None = None,
+        min_leg_premium: float | None = None,
     ) -> RiskDecision:
         """Size a defined-risk options play by capped DEBIT. Max loss on a long
         option / debit spread is the premium paid, so we bound that premium to a
@@ -731,6 +732,19 @@ class RiskManager:
             return self._reject(
                 proposal, "Net credit / no debit — not a bounded-loss debit play."
             )
+        # Per-leg premium floor: the cheapest leg must be a real, priced
+        # contract. A sub-floor mid ($0.01 on the T blowup) is a deep-OTM /
+        # illiquid lottery ticket whose penny price mints a huge, un-exitable
+        # contract count. Applies to the LEG, not the net, so a legitimately
+        # tight debit spread still passes. None = caller had no per-leg data
+        # (fails open — est_premium<=0 already refused any quote-less leg).
+        floor = getattr(self.limits, "min_option_premium", 0.0)
+        if floor > 0 and min_leg_premium is not None and 0 < min_leg_premium < floor:
+            return self._reject(
+                proposal,
+                f"Cheapest leg ${min_leg_premium:.2f}/share < ${floor:.2f} floor "
+                f"— sub-floor premium is a deep-OTM/illiquid lottery ticket.",
+            )
 
         equity = account.equity
         cap = equity * (self.limits.max_option_premium_pct / 100.0)
@@ -746,6 +760,16 @@ class RiskManager:
                 f"Premium ${per_contract_cost:,.0f}/contract exceeds "
                 f"${cap:,.0f} options budget.",
             )
+        # Hard contract-count ceiling: even within the debit cap, a cheap
+        # premium can size a monster order that itself moves a thin book (or
+        # can't fill). Clamp — deploying LESS than the cap is always safe.
+        max_ct = int(getattr(self.limits, "max_option_contracts", 0))
+        if max_ct > 0 and contracts > max_ct:
+            log.info(
+                "Option %s: clamping %d contracts to %d (thin-book count cap).",
+                proposal.symbol, contracts, max_ct,
+            )
+            contracts = max_ct
         spent = contracts * per_contract_cost
         return RiskDecision(
             proposal=proposal,

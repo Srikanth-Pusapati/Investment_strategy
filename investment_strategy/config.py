@@ -103,6 +103,13 @@ class RiskLimits:
     min_option_open_interest: float = 100.0  # per-leg OI floor (exit liquidity)
     max_option_spread_pct: float = 10.0   # per-leg bid-ask spread ceiling
     max_option_positions: int = 3         # distinct underlyings with open options
+    # Premium/size sanity (the 2026-07-23 T blowup: a stale $0.01 bid with no
+    # ask was accepted as a real mid, sized to 900 dead contracts, and rode to
+    # -100%). Floor the cheapest LEG (not the net — a spread's small net can
+    # hide a junk penny leg) and hard-cap the contract count so a mis-estimated
+    # premium can never translate into a thin-book monster order. Both 0=off.
+    min_option_premium: float = 0.10      # per-leg mid floor $/share; sub-floor = deep-OTM/illiquid junk
+    max_option_contracts: int = 50        # hard ceiling on contracts per structure
     # --- R.1 vol-scaled ("ATR-style") dynamic stops ---
     # One fixed stop % is too tight for volatile names (chopped out by normal
     # noise — the exact failure D.1 measured on the old 5% stop) and too loose
@@ -554,6 +561,8 @@ def load_config() -> Config:
             min_option_open_interest=_f("MIN_OPTION_OPEN_INTEREST", 100.0),
             max_option_spread_pct=_f("MAX_OPTION_SPREAD_PCT", 10.0),
             max_option_positions=int(_f("MAX_OPTION_POSITIONS", 3.0)),
+            min_option_premium=_f("MIN_OPTION_PREMIUM", 0.10),
+            max_option_contracts=int(_f("MAX_OPTION_CONTRACTS", 50.0)),
             # R.1 vol-scaled stops: off until the --sweep-stops evidence says
             # otherwise for this account's basket; flip in .env when it does.
             vol_stops_enabled=_flag("VOL_STOPS_ENABLED"),

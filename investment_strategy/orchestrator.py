@@ -2427,9 +2427,11 @@ class Orchestrator:
             log.info("Option proposal for %s ignored: options disabled.", proposal.symbol)
             return
         premium = self.options.estimate_net_premium(proposal)
+        min_leg = self.options.min_leg_premium(proposal)
         liquidity = self.options.leg_liquidity(proposal)
         decision = self.risk.evaluate_option(
             proposal, account, premium, leg_liquidity=liquidity,
+            min_leg_premium=min_leg,
         )
         log.info(
             "OPTION %s %s -> %s: %s | %s",

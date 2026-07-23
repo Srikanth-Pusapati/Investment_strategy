@@ -122,6 +122,18 @@ class OptionsHelper:
             net += mid * leg.ratio if leg.side is Action.BUY else -mid * leg.ratio
         return round(net, 2)
 
+    def min_leg_premium(self, proposal: TradeProposal) -> float:
+        """Smallest per-leg mid (per share) across the structure. The risk gate
+        floors THIS, not the net debit: a defined-risk vertical can have a
+        legitimately small NET, but every leg must still be a real, priced
+        contract — a $0.01 leg is deep-OTM/illiquid junk regardless of the net.
+        Returns 0.0 if any leg has no two-sided quote (already refused upstream
+        by the est_premium<=0 gate)."""
+        mids = [self._mid_price(proposal.symbol, leg) for leg in proposal.option_legs]
+        if not mids or any(m <= 0 for m in mids):
+            return 0.0
+        return round(min(mids), 2)
+
     def leg_liquidity(self, proposal: TradeProposal) -> list[dict]:
         """Per-leg {'symbol', 'oi', 'rel_spread_pct'} context for the risk
         gate's liquidity check. OI comes from the trading API's contract
@@ -182,7 +194,17 @@ class OptionsHelper:
             bid, ask = float(q.bid_price or 0), float(q.ask_price or 0)
             if bid > 0 and ask > 0:
                 return (bid + ask) / 2
-            return ask or bid
+            # One-sided or empty NBBO = no real two-sided market. A leg you
+            # can't get a live bid AND ask on is a leg you can't exit — the
+            # 2026-07-23 T blowup was a stale $0.01 bid with no ask, taken as a
+            # real mid, sized to 900 dead contracts. NEVER fabricate a mid from
+            # one side: return 0.0 so evaluate_option's est_premium<=0 backstop
+            # refuses the leg outright.
+            log.warning(
+                "one-sided/empty NBBO for %s (bid=%.4f ask=%.4f) — no tradeable "
+                "market, treating as no quote", sym, bid, ask,
+            )
+            return 0.0
         except Exception as e:
             log.warning("option quote failed for %s: %s", sym, e)
             return 0.0
