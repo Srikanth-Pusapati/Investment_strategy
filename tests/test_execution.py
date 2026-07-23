@@ -14,6 +14,7 @@ import os
 import sys
 from datetime import datetime, timedelta, timezone
 from types import SimpleNamespace
+from unittest.mock import patch
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -444,9 +445,11 @@ class _AcctTrading:
         return cur
 
 
-def _acct_row(equity, cash):
+def _acct_row(equity, cash, last_equity=None):
     return SimpleNamespace(
-        equity=equity, last_equity=equity, cash=cash, buying_power=cash,
+        equity=equity,
+        last_equity=equity if last_equity is None else last_equity,
+        cash=cash, buying_power=cash,
         pattern_day_trader=False, daytrade_count=0,
     )
 
@@ -517,6 +520,89 @@ def test_get_account_no_positions_is_trivially_consistent():
     assert snap.equity == 2_326.75 and trading.reads == 1
 
 
+# -- get_account: glitched last_equity guard (2026-07-23 fabricated day P&L) -- #
+def test_get_account_last_equity_zero_recovers_on_reread():
+    # First read has the glitch signature (last_equity=0 while equity/cash/
+    # positions all agree) — the re-read carries a real last_equity and must
+    # be the one returned.
+    glitch = (_acct_row(equity=97_326.75, cash=2_326.75, last_equity=0.0),
+              [_raw_pos(mv=95_000.0)])
+    good = (_acct_row(equity=97_326.75, cash=2_326.75, last_equity=96_500.0),
+            [_raw_pos(mv=95_000.0)])
+    trading = _AcctTrading([glitch, good])
+    c = AlpacaClient.__new__(AlpacaClient)
+    c.trading = trading
+    restore = _no_sleep()
+    try:
+        snap = c.get_account()
+    finally:
+        restore()
+    assert snap.last_equity == 96_500.0 and trading.reads == 2
+
+
+def test_get_account_last_equity_persistent_glitch_heals_from_equity_history():
+    # Every read is poisoned -> recover from our own equity_history.jsonl
+    # (the most recent PRIOR-day row), not just zero the number out.
+    glitch = (_acct_row(equity=97_326.75, cash=2_326.75, last_equity=0.0),
+              [_raw_pos(mv=95_000.0)])
+    trading = _AcctTrading([glitch])
+    c = AlpacaClient.__new__(AlpacaClient)
+    c.trading = trading
+    restore = _no_sleep()
+    from investment_strategy.status import EquityHistory
+    with patch.object(EquityHistory, "all", return_value=[
+        {"date": "2026-07-20", "equity": 96_000.0},
+        {"date": "2026-07-22", "equity": 96_800.0},
+    ]):
+        try:
+            snap = c.get_account()
+        finally:
+            restore()
+    assert snap.last_equity == 96_800.0
+    assert trading.reads == 3               # initial read + 2 re-reads
+
+
+def test_get_account_last_equity_ignores_todays_own_row():
+    # A same-day row (e.g. the bug's own corrupted snapshot, already written
+    # before the fix landed) must never be used as "yesterday's" baseline.
+    glitch = (_acct_row(equity=97_326.75, cash=2_326.75, last_equity=0.0),
+              [_raw_pos(mv=95_000.0)])
+    trading = _AcctTrading([glitch])
+    c = AlpacaClient.__new__(AlpacaClient)
+    c.trading = trading
+    restore = _no_sleep()
+    today = datetime.now(timezone.utc).date().isoformat()
+    from investment_strategy.status import EquityHistory
+    with patch.object(EquityHistory, "all", return_value=[
+        {"date": "2026-07-22", "equity": 96_800.0},
+        {"date": today, "equity": 97_326.75},   # corrupted "today" row
+    ]):
+        try:
+            snap = c.get_account()
+        finally:
+            restore()
+    assert snap.last_equity == 96_800.0
+
+
+def test_get_account_last_equity_falls_back_to_current_equity_without_history():
+    # No usable history at all -> fall back to CURRENT equity (day P/L reads
+    # as unknown/0), never a fabricated "you made your whole balance today".
+    glitch = (_acct_row(equity=97_326.75, cash=2_326.75, last_equity=0.0),
+              [_raw_pos(mv=95_000.0)])
+    trading = _AcctTrading([glitch])
+    c = AlpacaClient.__new__(AlpacaClient)
+    c.trading = trading
+    restore = _no_sleep()
+    from investment_strategy.status import EquityHistory
+    with patch.object(EquityHistory, "all", return_value=[]):
+        try:
+            snap = c.get_account()
+        finally:
+            restore()
+    assert snap.last_equity == snap.equity
+    assert snap.day_pl == 0.0
+
+
 def _run_all():
     fns = [v for k, v in sorted(globals().items()) if k.startswith("test_") and callable(v)]
     failed = 0
@@ -539,6 +625,7 @@ if __name__ == "__main__":
 from alpaca.trading.enums import OrderClass as _OC
 from alpaca.trading.enums import OrderSide as _OS
 from alpaca.trading.enums import PositionIntent as _PI
+from alpaca.trading.enums import TimeInForce as _TIF
 from alpaca.trading.requests import OptionLegRequest as _OLR
 
 from investment_strategy.execution.options import (
@@ -597,6 +684,59 @@ def test_two_leg_option_submits_one_mleg_order():
     assert len(req.legs) == 2 and req.qty == 2
 
 
+# -- submit_option_legs: entry-side limit price (2026-07-23 slippage fix) --- #
+# Regression: a long call estimated (mid-quote) at $0.01/share, sized to a
+# $900 cap, went out as a plain MARKET order and filled at $0.03/share — 3x
+# the estimate — a real $2,700 loss instead of the intended $900. Entries now
+# price a DAY limit at the estimate plus a buffer instead of an unbounded
+# market order.
+def test_single_leg_option_entry_uses_buffered_limit_when_estimate_given():
+    c = _opt_client()
+    leg = _OLR(symbol="T260821C00028000", ratio_qty=1, side=_OS.BUY,
+               position_intent=_PI.BUY_TO_OPEN)
+    oid = c.submit_option_legs([leg], qty=900, est_premium_per_share=0.01)
+    assert oid == "opt-oid-1"
+    req = c.trading.submitted[0]
+    # min $-buffer floor applies (20% of $0.01 rounds to nothing at the cent
+    # tick) -> $0.01 + $0.02 floor = $0.03, matching the real incident's fill.
+    assert req.limit_price == 0.03
+    assert req.symbol == "T260821C00028000"
+    assert req.qty == 900
+
+
+def test_single_leg_option_entry_uses_percentage_buffer_above_the_floor():
+    c = _opt_client()
+    leg = _OLR(symbol="AAPL260814P00150000", ratio_qty=1, side=_OS.BUY,
+               position_intent=_PI.BUY_TO_OPEN)
+    oid = c.submit_option_legs([leg], qty=3, est_premium_per_share=1.50)
+    req = c.trading.submitted[0]
+    assert req.limit_price == 1.80   # 1.50 + max(1.50*0.20, 0.02) = 1.80
+
+
+def test_multi_leg_option_entry_uses_buffered_net_limit():
+    c = _opt_client()
+    legs = [
+        _OLR(symbol="AAPL260814P00160000", ratio_qty=1, side=_OS.BUY,
+             position_intent=_PI.BUY_TO_OPEN),
+        _OLR(symbol="AAPL260814P00150000", ratio_qty=1, side=_OS.SELL,
+             position_intent=_PI.SELL_TO_OPEN),
+    ]
+    oid = c.submit_option_legs(legs, qty=2, est_premium_per_share=0.50)
+    req = c.trading.submitted[0]
+    assert req.order_class == _OC.MLEG
+    assert req.limit_price == 0.60    # 0.50 + max(0.50*0.20, 0.02) = 0.60
+
+
+def test_option_entry_falls_back_to_market_without_an_estimate():
+    # No estimate available (e.g. a quote-less leg) -> unchanged legacy path.
+    c = _opt_client()
+    leg = _OLR(symbol="AAPL260814P00150000", ratio_qty=1, side=_OS.BUY,
+               position_intent=_PI.BUY_TO_OPEN)
+    oid = c.submit_option_legs([leg], qty=3)
+    req = c.trading.submitted[0]
+    assert not hasattr(req, "limit_price") or req.limit_price is None
+
+
 def test_parse_occ_round_trips_and_rejects_equities():
     sym = occ_symbol("AAPL", "2026-08-14", 150.0, "put")
     assert sym == "AAPL260814P00150000"
@@ -604,6 +744,103 @@ def test_parse_occ_round_trips_and_rejects_equities():
     assert parse_occ("AAPL") is None
     assert parse_occ("BRK.B") is None
     assert parse_occ("QQQ") is None
+
+
+# -- close_option_leg: DAY-limit fallback when market close has no quote ------ #
+# Regression 2026-07-23: a long call whose mark went to $0 (no live NBBO) got
+# error 40310000 "no available quote for symbol. please reenter with a limit"
+# on every watchdog tick — the identical market close retried every ~30s for
+# 12+ minutes with the position stuck unprotected, because there was no
+# fallback order type.
+class _FakeOptionCloseTrading:
+    """close_position() optionally rejects (simulating the venue's "no quote"
+    error); submit_order() (the DAY-limit fallback) records the request."""
+
+    def __init__(self, close_error=None):
+        self.close_error = close_error
+        self.submitted = []
+
+    def close_position(self, symbol):
+        if self.close_error:
+            raise self.close_error
+        return SimpleNamespace(id="market-close-oid")
+
+    def submit_order(self, req):
+        self.submitted.append(req)
+        return SimpleNamespace(id="limit-fallback-oid")
+
+
+def _opt_position(symbol="T260821C00028000", qty=900.0, current_price=0.0,
+                   avg_entry_price=0.03):
+    return Position(
+        symbol=symbol, qty=qty, avg_entry_price=avg_entry_price,
+        current_price=current_price, market_value=current_price * qty * 100,
+        unrealized_pl=(current_price - avg_entry_price) * qty * 100,
+        unrealized_pl_pct=-100.0 if avg_entry_price else 0.0,
+        asset_class="us_option",
+    )
+
+
+def test_close_option_leg_market_close_succeeds_no_fallback():
+    trading = _FakeOptionCloseTrading()
+    c = AlpacaClient.__new__(AlpacaClient)
+    c.trading = trading
+    oid = c.close_option_leg(_opt_position())
+    assert oid == "market-close-oid"
+    assert trading.submitted == []          # no fallback needed
+
+
+def test_close_option_leg_falls_back_to_day_limit_on_no_quote_rejection():
+    trading = _FakeOptionCloseTrading(close_error=Exception(
+        '{"code":40310000,"message":"order has been rejected due to no '
+        'available quote for symbol. please reenter with a limit"}'
+    ))
+    c = AlpacaClient.__new__(AlpacaClient)
+    c.trading = trading
+    oid = c.close_option_leg(_opt_position(qty=900.0, current_price=0.0,
+                                            avg_entry_price=0.03))
+    assert oid == "limit-fallback-oid"
+    assert len(trading.submitted) == 1
+    req = trading.submitted[0]
+    assert req.symbol == "T260821C00028000"
+    assert req.side == _OS.SELL              # long leg -> SELL to close
+    assert req.qty == 900.0
+    assert req.time_in_force == _TIF.DAY
+    assert req.limit_price == 0.01           # mark is 0 -> floor to the min tick
+
+
+def test_close_option_leg_short_leg_falls_back_to_buy_to_close():
+    trading = _FakeOptionCloseTrading(close_error=Exception("no quote"))
+    c = AlpacaClient.__new__(AlpacaClient)
+    c.trading = trading
+    oid = c.close_option_leg(_opt_position(qty=-5.0, current_price=1.20,
+                                            avg_entry_price=0.80))
+    assert oid == "limit-fallback-oid"
+    req = trading.submitted[0]
+    assert req.side == _OS.BUY               # short leg -> BUY to close
+    assert req.qty == 5.0
+    assert req.limit_price == 1.20           # uses the live mark, not the floor
+
+
+def test_close_option_leg_returns_none_when_fallback_also_fails():
+    class _AlwaysFails:
+        def close_position(self, symbol):
+            raise Exception("no quote")
+
+        def submit_order(self, req):
+            raise Exception("still rejected")
+
+    c = AlpacaClient.__new__(AlpacaClient)
+    c.trading = _AlwaysFails()
+    assert c.close_option_leg(_opt_position()) is None
+
+
+def test_close_option_group_single_leg_uses_close_option_leg_fallback():
+    trading = _FakeOptionCloseTrading(close_error=Exception("no quote"))
+    c = AlpacaClient.__new__(AlpacaClient)
+    c.trading = trading
+    oid = c.close_option_group([_opt_position()])
+    assert oid == "limit-fallback-oid"
 
 
 def _opt_pos(symbol, qty, basis=3.0, price=2.0):

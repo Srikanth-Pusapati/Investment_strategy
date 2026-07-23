@@ -127,6 +127,9 @@ class Orchestrator:
         # Last RH dead-auth latch timestamp we paged for: one page per latch
         # EVENT (not per cycle), and a fresh latch after recovery pages again.
         self._rh_paged_for: float = 0.0
+        # Rotation-guard persistence memory: symbol -> (ET day, loss% at the
+        # day's FIRST veto), feeding the repeated-veto deterioration release.
+        self._rotation_vetoes: dict[str, tuple[str, float]] = {}
         # The watchdog records its own exits (stops/take-profits/flattens) to the
         # ledger so signal attribution sees every close, not just decision sells.
         self.watchdog = Watchdog(
@@ -694,11 +697,43 @@ class Orchestrator:
         except Exception as e:
             log.warning("Nightly post-mortem failed: %s", e)
 
+    def _maybe_run_weekly_autotune(self) -> None:
+        """Fire the deterministic ledger-driven auto-tune report once per ET
+        week, on a market-closed tick that falls on the weekend — clone of
+        _maybe_run_postmortem's once-per-day latch, at week granularity."""
+        if not self.cfg.autotune_enabled:
+            return
+        try:
+            from datetime import datetime
+            from zoneinfo import ZoneInfo
+            now_et = datetime.now(ZoneInfo("America/New_York"))
+            if now_et.weekday() < 5:  # Mon-Fri: wait for the weekend
+                return
+            iso_year, iso_week, _ = now_et.isocalendar()
+            week = f"{iso_year}-W{iso_week:02d}"
+            if week == self.state.get_autotune_done_week():
+                return  # already ran this week
+            log.info("Running weekly auto-tune report for %s …", week)
+            from .autotune import run_autotune
+            result = run_autotune(
+                self.cfg, self.ledger, self.journal,
+                days=self.cfg.autotune_days, min_sample=self.cfg.autotune_min_sample,
+            )
+            # Latch only on success (same lost-run lesson as the post-mortem):
+            # a None result — no data, or a mid-run failure — retries on the
+            # next closed weekend tick instead of being silently skipped for
+            # the rest of the week.
+            if result is not None:
+                self.state.set_autotune_done(week)
+        except Exception as e:
+            log.warning("Weekly auto-tune failed: %s", e)
+
     def run_decision_cycle(self) -> None:
         self._cycle_market_open = self.broker.is_market_open()
         if not self._cycle_market_open:
             log.info("Market closed; skipping decision cycle.")
             self._maybe_run_postmortem()
+            self._maybe_run_weekly_autotune()
             self._stamp_liveness()  # the postmortem's LLM call can run ~2 min
             # Arm the at-the-bell wake-up (see _decision_due; _tick clears it
             # only after the first SUCCESSFUL open-market cycle consumes it).
@@ -837,7 +872,10 @@ class Orchestrator:
         data_health = self._check_robinhood_health()
         # Reflection loop: our realized P&L per entry signal, fed back so Claude can
         # weight by what has actually paid off. Best-effort; never blocks a cycle.
-        lessons = self._lessons()
+        # Split dynamic (per-cycle) from stable (once-a-day) so the latter can
+        # sit in the cached half of the decision prompt (engine._render_stable).
+        lessons = self._attribution_lessons()
+        curated = self._curated_lessons()
 
         # The signal kinds present per symbol at decision time — recorded on each
         # entry so closed round-trips can later be attributed back to their sources.
@@ -876,6 +914,7 @@ class Orchestrator:
             data_health=data_health, composites=composites,
             regime_label=(_reg.label if _reg else ""),
             regime_reason=(_reg.reason if _reg else ""),
+            curated=curated,
         )
         self._stamp_liveness()
         proposals = self._filter_to_slate(proposals, bundles, account)
@@ -1044,22 +1083,25 @@ class Orchestrator:
         except Exception as e:
             log.warning("Could not record equity snapshot: %s", e)
 
-    def _lessons(self) -> str:
-        parts = []
+    def _attribution_lessons(self) -> str:
+        """Per-cycle track-record block (attribution.py) — recomputed every
+        cycle and changes whenever a position closes, so it stays in the
+        decision prompt's DYNAMIC half (see engine._render_dynamic)."""
         try:
-            attr = render_lessons(self.ledger)
-            if attr:
-                parts.append(attr)
+            return render_lessons(self.ledger)
         except Exception as e:
             log.warning("Could not render track-record lessons: %s", e)
+            return ""
+
+    def _curated_lessons(self) -> str:
+        """Nightly post-mortem's curated lessons file — changes at most once a
+        day, so it belongs in the decision prompt's STABLE/cached half (see
+        engine._render_stable), separate from _attribution_lessons above."""
         try:
             from .postmortem import read_curated
-            curated = read_curated(self.cfg.postmortem_max_lessons)
-            if curated:
-                parts.append(curated)
+            return read_curated(self.cfg.postmortem_max_lessons)
         except Exception:
-            pass  # postmortem module may not exist yet; silently skip
-        return "\n\n".join(parts) if parts else ""
+            return ""  # postmortem module may not exist yet; silently skip
 
     def _inject_discovery(
         self, bundles: list[SignalBundle], discovered: list[Candidate]
@@ -1439,8 +1481,12 @@ class Orchestrator:
         model urgently wants out of: buys are halted (kill switch) => nothing to
         fund, so pass everything; a SELL whose OWN conviction is at/above
         rotation_guard_exempt_sell_conviction is a risk-off exit (never vetoed —
-        'never block a legitimate exit' outranks anti-churn); and a missing
-        entry-conviction baseline fails open. Vetoed positions still keep their
+        'never block a legitimate exit' outranks anti-churn); a missing
+        entry-conviction baseline fails open; a loss deeper than
+        rotation_guard_max_loss_pct passes (the guard band is exhausted); and a
+        sell already vetoed today whose loss has deteriorated by
+        rotation_guard_repeat_release_pct since that veto passes (persistent
+        exit intent — SPCX Jul 22 was vetoed at -5.4% and stopped out at -9.8%). Vetoed positions still keep their
         exchange bracket + watchdog stops — the veto holds, it never strands.
         Every guarded loss-sell leaves an auditable ruling (log + journal),
         pass or veto."""
@@ -1477,6 +1523,41 @@ class Orchestrator:
             pos = account.position_for(p.symbol)
             if pos is None or pos.unrealized_pl_pct > -r.rotation_guard_min_loss_pct:
                 kept.append(p)  # not a loss-locking sell
+                continue
+            # Deterioration releases (SPCX Jul 22: vetoed at -5.4/-5.6/-6.6/
+            # -9.3%, then the bracket stop fired at -9.8% — the guard pinned a
+            # sinking position all the way into a WORSE exit). (a) Depth: past
+            # max_loss the guarded band [min_loss, max_loss] is exhausted;
+            # only the stop remains, so the sell passes. (b) Persistence: a
+            # sell already vetoed earlier TODAY whose loss has since worsened
+            # by the release delta is a repeated exit request against a
+            # deteriorating tape — a thesis-break, not lukewarm churn.
+            max_loss = r.rotation_guard_max_loss_pct
+            if (
+                max_loss > r.rotation_guard_min_loss_pct
+                and pos.unrealized_pl_pct <= -max_loss
+            ):
+                log.info(
+                    "Rotation guard: PASS %s at %+.1f%% — loss beyond the "
+                    "%.1f%% guard band; pinning it further only rides into "
+                    "the stop.", p.symbol, pos.unrealized_pl_pct, max_loss,
+                )
+                kept.append(p)
+                continue
+            today = self.state._trading_day()
+            veto_day, veto_loss = self._rotation_vetoes.get(p.symbol, ("", 0.0))
+            release = r.rotation_guard_repeat_release_pct
+            if (
+                release > 0 and veto_day == today
+                and pos.unrealized_pl_pct <= veto_loss - release
+            ):
+                log.info(
+                    "Rotation guard: PASS %s at %+.1f%% — already vetoed "
+                    "today at %+.1f%% and the loss kept deteriorating "
+                    "(persistent exit intent released).",
+                    p.symbol, pos.unrealized_pl_pct, veto_loss,
+                )
+                kept.append(p)
                 continue
             exempt = r.rotation_guard_exempt_sell_conviction
             if exempt > 0 and p.conviction >= exempt:
@@ -1524,6 +1605,12 @@ class Orchestrator:
                 + " — holding instead."
             )
             log.warning("%s", reason)
+            # Persistence baseline: remember today's FIRST veto loss for this
+            # symbol (in-memory; a restart just means one more veto before the
+            # release can fire). Keyed to the ET day so yesterday's veto can't
+            # release today's first sell.
+            if veto_day != today:
+                self._rotation_vetoes[p.symbol] = (today, pos.unrealized_pl_pct)
             self._journal_decision(
                 p.symbol, "sell", "equity", p.conviction, p.target_weight_pct,
                 "rotation_guard", 0.0, reason,
@@ -1639,6 +1726,11 @@ class Orchestrator:
         """Split bundles into (filtered_bundles, buy_excluded_map).
         - Not-held + headroom < min_order → drop entirely (nothing to sell; saves tokens).
         - Held + headroom < min_order → keep for SELL/HOLD, add to buy_excluded.
+        - Not-held + price under the liquidity floor → same as headroom-blocked:
+          the risk gate rejects these unconditionally, yet AMC (~$2.20) was
+          re-proposed and rejected EVERY day Jul 17-22 while topping the
+          composite — a permanent reject must not keep costing prompt tokens
+          and proposal slots.
         Both paths are also captured in buy_excluded so the prompt's "excluded" section
         is complete and the backstop pass can check the full set."""
         r = self.cfg.risk
@@ -1648,6 +1740,21 @@ class Orchestrator:
         filtered: list = []
         for b in bundles:
             headroom, reason = self._buy_headroom_usd(b.symbol, account)
+            px = next(
+                (s.data.get("price") for s in b.signals
+                 if s.kind is SignalKind.TECHNICAL and s.data
+                 and s.data.get("price")),
+                None,
+            )
+            if (
+                headroom >= min_order
+                and px is not None and px < r.min_trade_price_usd
+            ):
+                headroom = 0.0
+                reason = (
+                    f"price ${px:.2f} < ${r.min_trade_price_usd:g} "
+                    "liquidity floor"
+                )
             if headroom < min_order:
                 buy_excluded[b.symbol] = reason or "no buy headroom"
                 if account.position_for(b.symbol) is not None:
@@ -1955,8 +2062,18 @@ class Orchestrator:
         etf = self.cfg.core_etf
         if not etf or self.cfg.target_invested_pct <= 0:
             return
-        if self.risk.kill_switch:
-            return  # new buys halted — don't top up the core either
+        # Regression 2026-07-23: this only checked kill_switch, so a daily-loss
+        # halt, a drawdown halt, an equity-floor HALT LATCH, or a PDT block all
+        # left the core sweep free to buy right through them — confirmed live:
+        # the risk gate correctly rejected buys at "Daily loss 3.70% >= 3.00%"
+        # and one second later the core fill bought $28,155 of QQQ anyway,
+        # forcing an immediate unwind. trading_halted() is the SAME account-wide
+        # check every other new-buy path goes through; the core sweep is a new
+        # buy and must be gated the same way.
+        halted, why = self.risk.trading_halted(account)
+        if halted:
+            log.info("Core fill skipped: %s", why)
+            return
         r = self.cfg.risk
         equity = account.equity
         if equity <= 0:
@@ -2225,10 +2342,33 @@ class Orchestrator:
                         # Nothing was ledgered and nothing must be: a phantom
                         # SELL with no order id is invisible to reconcile and
                         # poisons attribution forever (SPCX 2026-07-16).
+                        # Regression 2026-07-20/23: this used to just log and
+                        # wait for the NEXT hourly cycle to maybe re-propose
+                        # the same sell, with no alert in between — a real
+                        # thesis-break exit (COO) sat unretried for ~26h.
+                        # Every OTHER exit path (watchdog trailing/premium/
+                        # time-stop) retries every ~30s tick and pages on
+                        # failure; queue the same retry here instead, keeping
+                        # the original rationale so a later successful close
+                        # still ledgers with real context.
+                        self.state.queue_decision_sell(
+                            proposal.symbol, proposal.rationale,
+                            proposal.key_signals, composite,
+                        )
                         log.error(
-                            "SELL %s approved but the close FAILED — position "
-                            "stays held and tracked; next cycle re-decides.",
+                            "SELL %s approved but the close FAILED — queued "
+                            "for the watchdog to retry every tick.",
                             proposal.symbol,
+                        )
+                        self.alerter.critical(
+                            f"decision-sell-fail:{proposal.symbol}",
+                            f"{proposal.symbol} SELL approved but close FAILED",
+                            f"The decision engine approved a SELL for "
+                            f"{proposal.symbol} ({decision.reason[:160]}) but "
+                            "the close order did not go through. Queued for "
+                            "the watchdog to retry every "
+                            f"~{self.cfg.monitor_interval_s}s until it "
+                            "succeeds or the position is confirmed gone.",
                         )
                         executed_notional = 0.0
             else:  # buy (approved or resized)
@@ -2309,7 +2449,10 @@ class Orchestrator:
             return
         legs = self.options.build_legs(proposal)
         with self._trade_lock:
-            oid = self.broker.submit_option_legs(legs, qty=int(decision.approved_qty))
+            oid = self.broker.submit_option_legs(
+                legs, qty=int(decision.approved_qty),
+                est_premium_per_share=premium,
+            )
         if oid:
             self.ledger.record(TradeRecord.from_option(
                 decision, premium, oid, entry_signals=signal_kinds or []))

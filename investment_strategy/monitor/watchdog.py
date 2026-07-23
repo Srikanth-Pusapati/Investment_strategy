@@ -123,6 +123,7 @@ class Watchdog:
                 continue
             if trail_ok:
                 self._update_trailing_stop(pos)
+        self._retry_pending_decision_sells({p.symbol: p for p in equities})
         self._check_option_positions(option_rows)
         # Drop tracking for positions that are gone (filled stop/tp/sell). A
         # vanished tracked position means an exchange-side bracket leg (or a
@@ -265,6 +266,47 @@ class Watchdog:
         are ledgered in here with `reason`; the caller records only a "full"
         close and must NOT ledger anything on "failed"."""
         return self._close_hard(pos, reason)
+
+    def _retry_pending_decision_sells(self, by_symbol: dict[str, Position]) -> None:
+        """Retry a decision-driven SELL that failed to execute on an earlier
+        cycle (queued by the orchestrator via state.queue_decision_sell) —
+        the same close_now escalation ladder as any other exit, every tick,
+        until it succeeds or the position is confirmed gone. Regression
+        2026-07-20/23: previously a failed decision-SELL just sat until the
+        next hourly cycle happened to re-propose the same sell, with no page
+        in between; every OTHER exit path already retries + pages."""
+        for symbol, info in self.state.get_pending_decision_sells().items():
+            pos = by_symbol.get(symbol)
+            if pos is None:
+                # Already gone — a different exit path closed it, or a
+                # broker-side fill not yet reconciled. Stop retrying; the
+                # exchange-exit backfill (if any) covers ledgering it.
+                self.state.pop_decision_sell(symbol)
+                continue
+            outcome, oid = self.close_now(pos, "decision")
+            if outcome == "full":
+                self.state.pop_decision_sell(symbol)
+                self.forget(symbol)
+                self._record_exit(
+                    pos, oid, "decision",
+                    rationale=info.get("rationale") or "",
+                    key_signals=info.get("key_signals") or [],
+                    composite_score=info.get("composite_score"),
+                )
+            elif outcome == "partial":
+                pass  # ledgered inside close_now; keep queued, retry next tick
+            else:
+                log.critical(
+                    "Decision-SELL retry FAILED for %s — still queued, will "
+                    "retry again next tick.", symbol,
+                )
+                self._alert(
+                    f"decision-sell-fail:{symbol}",
+                    f"{symbol} SELL still unresolved — close retrying",
+                    f"A decision-driven SELL for {symbol} has failed every "
+                    f"retry since it was queued; still retrying every "
+                    f"~{self.cfg.monitor_interval_s}s.",
+                )
 
     # -- best-effort hard close (1B.5) -------------------------------------- #
     def _close_hard(self, pos: Position, reason: str) -> tuple[str, str | None]:
@@ -604,7 +646,19 @@ class Watchdog:
         """Close every leg of one option structure as a single order, ledger the
         round-trip under the UNDERLYING (pairing it with the entry record so
         attribution scores option trades), and page on failure. Returns True
-        when the close order went in."""
+        when the close order went in (or one is ALREADY resting from a prior
+        tick — see the qty_available check below).
+
+        Regression 2026-07-23: after close_option_leg's DAY-limit fallback got
+        a close order resting at the venue, this loop had no memory of that
+        and re-submitted ANOTHER close next tick. With every contract already
+        reserved by the first order, qty_available was 0 and the SECOND
+        attempt came back "account not eligible to trade uncovered option
+        contracts" — a real API rejection, but a false CRITICAL page, since a
+        working exit was already in flight. qty_available (Alpaca's own
+        reserved-by-open-orders tracking) is the same signal the equity path
+        uses via has_working_exit; a leg whose contracts are already fully
+        reserved is treated as protected, not failed."""
         if under is None:
             occ = parse_occ(group[0].symbol)
             under = occ[0] if occ else group[0].symbol
@@ -613,6 +667,17 @@ class Watchdog:
         if pl_pct is None:
             basis = sum(p.avg_entry_price * p.qty * 100.0 for p in group)
             pl_pct = (pl / basis * 100.0) if basis > 1e-9 else None
+        if all(
+            p.qty_available is not None
+            and abs(p.qty_available) < abs(p.qty) - 1e-9
+            for p in group
+        ):
+            log.info(
+                "Option exit on %s already resting (every leg's contracts are "
+                "reserved by an open order) — skipping a redundant close "
+                "this tick.", under,
+            )
+            return True
         oid = self.broker.close_option_group(group)
         if oid:
             self._record_option_exit(under, group, oid, reason, pl_pct, pl)
@@ -658,10 +723,18 @@ class Watchdog:
         self.state.forget_symbol(symbol)
 
     # -- ledger ------------------------------------------------------------- #
-    def _record_exit(self, pos: Position, oid: str | None, reason: str) -> None:
+    def _record_exit(
+        self, pos: Position, oid: str | None, reason: str, *,
+        rationale: str | None = None, key_signals: list[str] | None = None,
+        composite_score: float | None = None,
+    ) -> None:
         """Log a watchdog-driven close to the ledger so attribution sees the exit.
         The position's unrealized P&L at this instant IS the realized outcome.
-        Best-effort and never raises into the safety loop."""
+        Best-effort and never raises into the safety loop.
+
+        `rationale`/`key_signals`/`composite_score` let a retried DECISION-sell
+        (see _retry_pending_decision_sells) ledger with the original decision's
+        real context instead of the generic "watchdog {reason}" label."""
         # Start the re-entry cooldown clock (churn guard). A scale-out is only a
         # partial exit, but stamping it is harmless: the cooldown applies only
         # when the symbol is no longer held.
@@ -673,9 +746,11 @@ class Watchdog:
             return
         try:
             self.ledger.record(TradeRecord.for_sell(
-                pos.symbol, f"watchdog {reason}", oid, qty=pos.qty,
+                pos.symbol, rationale or f"watchdog {reason}", oid,
+                qty=pos.qty, key_signals=key_signals or [],
                 realized_pl_pct=pos.unrealized_pl_pct, realized_pl=pos.unrealized_pl,
                 exit_reason=reason, exit_price=pos.current_price or None,
+                composite_score=composite_score,
             ))
         except Exception as e:  # never let logging break the watchdog
             log.warning("Ledger exit-record failed for %s: %s", pos.symbol, e)

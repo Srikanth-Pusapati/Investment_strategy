@@ -208,6 +208,30 @@ def test_conviction_floor_allows_real_edge():
     assert d.verdict in (RiskVerdict.APPROVED, RiskVerdict.RESIZED), d.reason
 
 
+def test_new_name_conviction_floor_rejects_fresh_starter():
+    # Jul 17-22: every ~-10% realized loss (MU, SPCX x2) was a FRESH name
+    # opened at 0.45-0.50 conviction. A new name must clear the higher bar.
+    rm = _rm(_limits(min_new_name_conviction=0.5))
+    d = rm.evaluate(_buy("NEWCO", conviction=0.45), _account(), price=100.0,
+                    volatility=0.25)
+    assert d.verdict is RiskVerdict.REJECTED
+    assert "new-position floor" in d.reason
+
+
+def test_new_name_conviction_floor_exempts_topups_and_inert_at_zero():
+    # A HELD name keeps the lower min_conviction floor (it earned its slot).
+    rm = _rm(_limits(min_new_name_conviction=0.5))
+    acct = _account(positions=[_pos("HELD", qty=10, price=100.0)])
+    d = rm.evaluate(_buy("HELD", conviction=0.45), acct, price=100.0,
+                    volatility=0.25)
+    assert d.verdict in (RiskVerdict.APPROVED, RiskVerdict.RESIZED), d.reason
+    # 0 disables the gate entirely.
+    rm2 = _rm(_limits(min_new_name_conviction=0.0))
+    d2 = rm2.evaluate(_buy("NEWCO", conviction=0.45), _account(), price=100.0,
+                      volatility=0.25)
+    assert d2.verdict in (RiskVerdict.APPROVED, RiskVerdict.RESIZED), d2.reason
+
+
 def test_min_order_floor_rejects_dust():
     # Budget below the min order $ -> not worth placing even fractionally.
     rm = _rm(_limits(min_order_usd=50.0, kelly_fraction=0.0, max_position_pct=1.0))

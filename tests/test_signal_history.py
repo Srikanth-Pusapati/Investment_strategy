@@ -230,8 +230,8 @@ def test_engine_renders_annotation_on_signal_line():
     )
     bundles = [_bundle("AAPL", SignalKind.CONGRESS, 0.6)]
     notes = {"AAPL": {SignalKind.CONGRESS.value: "[w=0.23 trend=improving(+0.09/d,4.1d)]"}}
-    text = eng._render(bundles, account, "", [], signal_notes=notes)
+    text = eng._render_dynamic(bundles, account, "", [], signal_notes=notes)
     assert "- [congress] score=+0.60 [w=0.23 trend=improving(+0.09/d,4.1d)] x" in text
     # And without notes the line renders as before.
-    text2 = eng._render(bundles, account, "", [])
+    text2 = eng._render_dynamic(bundles, account, "", [])
     assert "- [congress] score=+0.60 x" in text2

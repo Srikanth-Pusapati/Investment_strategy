@@ -14,9 +14,11 @@ from __future__ import annotations
 import os
 import sys
 from types import SimpleNamespace
+from unittest.mock import MagicMock, patch
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+import investment_strategy.decision.engine as engine_mod
 from investment_strategy.decision.engine import DecisionEngine
 from investment_strategy.models import (
     AccountSnapshot,
@@ -61,7 +63,7 @@ def _bundle(symbol) -> SignalBundle:
 def test_rotation_block_renders_when_book_full():
     eng = _engine(max_open_positions=2)
     acct = _acct([_pos("CVX"), _pos("AAPL")])
-    text = eng._render([_bundle("MU")], acct, "", [])
+    text = eng._render_dynamic([_bundle("MU")], acct, "", [])
     assert "Book FULL (2/2 equity slots)" in text
     assert "ROTATION" in text
     # Trusted guidance must sit OUTSIDE the untrusted region.
@@ -71,7 +73,7 @@ def test_rotation_block_renders_when_book_full():
 def test_rotation_block_absent_when_book_has_room():
     eng = _engine(max_open_positions=3)
     acct = _acct([_pos("CVX"), _pos("AAPL")])
-    text = eng._render([_bundle("MU")], acct, "", [])
+    text = eng._render_dynamic([_bundle("MU")], acct, "", [])
     assert "Book FULL" not in text
     assert "ROTATION" not in text
 
@@ -84,7 +86,7 @@ def test_rotation_block_ignores_option_rows():
         _pos("CVX"),
         _pos("AAPL260821C00200000", asset_class="us_option"),
     ])
-    text = eng._render([_bundle("MU")], acct, "", [])
+    text = eng._render_dynamic([_bundle("MU")], acct, "", [])
     assert "Book FULL" not in text
 
 
@@ -93,7 +95,7 @@ def test_rotation_block_survives_missing_risk_config():
     eng = DecisionEngine.__new__(DecisionEngine)
     eng.cfg = SimpleNamespace()
     acct = _acct([_pos("CVX")])
-    text = eng._render([_bundle("MU")], acct, "", [])
+    text = eng._render_dynamic([_bundle("MU")], acct, "", [])
     assert "Book FULL" not in text
 
 
@@ -103,7 +105,7 @@ def test_held_note_renders_entry_conviction_and_age():
     # model).
     eng = _engine(max_open_positions=5)
     acct = _acct([_pos("CVX")])
-    text = eng._render(
+    text = eng._render_dynamic(
         [_bundle("CVX")], acct, "", [],
         held_notes={"CVX": "entry conviction 0.46, held 1.2d"},
     )
@@ -113,7 +115,7 @@ def test_held_note_renders_entry_conviction_and_age():
 def test_held_tag_unchanged_without_note():
     eng = _engine(max_open_positions=5)
     acct = _acct([_pos("CVX")])
-    text = eng._render([_bundle("CVX")], acct, "", [])
+    text = eng._render_dynamic([_bundle("CVX")], acct, "", [])
     assert "(HELD: 1 sh, +0.0%)" in text
 
 
@@ -123,24 +125,24 @@ def test_data_health_note_renders_in_account_block():
     eng = _engine(max_open_positions=5)
     acct = _acct([])
     note = "Robinhood data unavailable (OAuth expired): external holdings missing."
-    text = eng._render([_bundle("CVX")], acct, "", [], data_health=[note])
+    text = eng._render_dynamic([_bundle("CVX")], acct, "", [], data_health=[note])
     assert f"DATA HEALTH: {note}" in text
     # And absent when not passed — no phantom outage banner.
-    clean = eng._render([_bundle("CVX")], acct, "", [])
+    clean = eng._render_dynamic([_bundle("CVX")], acct, "", [])
     assert "DATA HEALTH" not in clean
 
 
 def test_composite_anchor_renders_under_candidate_header():
     eng = _engine(max_open_positions=5)
     acct = _acct([])
-    text = eng._render(
+    text = eng._render_dynamic(
         [_bundle("CVX")], acct, "", [], composites={"CVX": 0.42},
     )
     lines = text.splitlines()
     idx = lines.index("### CVX")
     assert lines[idx + 1].startswith("Composite signal index: +0.42")
     # No composite for the symbol -> no anchor line.
-    clean = eng._render([_bundle("CVX")], acct, "", [], composites={})
+    clean = eng._render_dynamic([_bundle("CVX")], acct, "", [], composites={})
     assert "Composite signal index" not in clean
 
 
@@ -154,7 +156,7 @@ def test_system_prompt_carries_new_rules():
 def test_downside_block_renders_in_riskoff_with_options():
     eng = _engine(options_enabled=True)
     acct = _acct([_pos("CVX")])
-    text = eng._render(
+    text = eng._render_dynamic(
         [_bundle("MU")], acct, "", [],
         regime_label="risk-off",
         regime_reason="SPY below 200dma (690 vs 700), VIX 32 -> risk-off, size x0.40.",
@@ -168,7 +170,7 @@ def test_downside_block_renders_in_riskoff_with_options():
 def test_downside_block_absent_when_risk_on():
     eng = _engine(options_enabled=True)
     acct = _acct([_pos("CVX")])
-    text = eng._render([_bundle("MU")], acct, "", [], regime_label="risk-on")
+    text = eng._render_dynamic([_bundle("MU")], acct, "", [], regime_label="risk-on")
     assert "MARKET IS RISK-OFF" not in text
 
 
@@ -176,5 +178,130 @@ def test_downside_block_absent_when_options_off():
     # No point steering to puts the risk gate would reject (options disabled).
     eng = _engine(options_enabled=False)
     acct = _acct([_pos("CVX")])
-    text = eng._render([_bundle("MU")], acct, "", [], regime_label="risk-off")
+    text = eng._render_dynamic([_bundle("MU")], acct, "", [], regime_label="risk-off")
     assert "MARKET IS RISK-OFF" not in text
+
+
+# -- prompt caching: stable/dynamic split + cache_control (Jul 22 upgrade #2) -- #
+
+def _decide_engine(options_enabled=False) -> DecisionEngine:
+    eng = DecisionEngine.__new__(DecisionEngine)  # skip API client construction
+    eng.cfg = SimpleNamespace(
+        decision_effort="medium",
+        risk=SimpleNamespace(
+            options_enabled=options_enabled, max_open_positions=5,
+            min_option_dte=7.0, max_option_dte=60.0, max_option_premium_pct=1.0,
+            min_new_name_conviction=0.5, min_conviction=0.2,
+        ),
+    )
+    eng.model = "claude-opus-4-8"
+    return eng
+
+
+def _mock_response(payload='{"proposals": []}'):
+    block = MagicMock()
+    block.type, block.text = "text", payload
+    resp = MagicMock()
+    resp.content = [block]
+    resp.stop_reason = "end_turn"
+    resp.usage = SimpleNamespace(
+        input_tokens=100, output_tokens=10,
+        cache_read_input_tokens=0, cache_creation_input_tokens=0,
+    )
+    return resp
+
+
+def _call_decide(eng, **kwargs):
+    eng.client = MagicMock()
+    eng.client.messages.create.return_value = _mock_response()
+    acct = _acct(kwargs.pop("positions", []))
+    bundles = kwargs.pop("bundles", [_bundle("CVX")])
+    with patch.object(engine_mod, "record_usage"):
+        eng.decide(bundles, acct, **kwargs)
+    return eng.client.messages.create.call_args.kwargs
+
+
+def test_decide_sends_two_block_user_content_with_one_cache_breakpoint():
+    eng = _decide_engine()
+    kwargs = _call_decide(eng, lessons="ATTR-LESSON", curated="CURATED-LESSON")
+    assert isinstance(kwargs["system"], str)   # system stays a plain string — no breakpoint there
+    content = kwargs["messages"][0]["content"]
+    assert isinstance(content, list) and len(content) == 2
+    assert content[0]["cache_control"] == {"type": "ephemeral", "ttl": "1h"}
+    assert "cache_control" not in content[1]
+
+
+def test_stable_block_has_curated_and_risk_contract_not_dynamic_content():
+    eng = _decide_engine()
+    kwargs = _call_decide(
+        eng, lessons="## Track record\nATTR-LESSON-MARKER",
+        curated="## Operating lessons (from your own nightly post-mortems — trusted)\nCURATED-MARKER",
+        today="## Today so far (your own actions this trading day — trusted, not market data)",
+    )
+    stable, dynamic = kwargs["messages"][0]["content"]
+    stable_text, dynamic_text = stable["text"], dynamic["text"]
+    assert "Today's date:" in stable_text
+    assert "CURATED-MARKER" in stable_text
+    assert "## Risk contract" in stable_text
+    assert "<market_data>" not in stable_text
+    assert "ATTR-LESSON-MARKER" not in stable_text
+    assert "Today so far" not in stable_text
+
+
+def test_dynamic_block_carries_everything_else():
+    eng = _decide_engine(options_enabled=True)
+    kwargs = _call_decide(
+        eng, lessons="## Track record\nATTR-LESSON-MARKER",
+        curated="CURATED-MARKER",
+        today="## Today so far (your own actions this trading day — trusted, not market data)",
+        buy_excluded={"AMC": "price $2.20 < $5 liquidity floor"},
+        regime_label="risk-off", regime_reason="SPY below 200dma.",
+        positions=[_pos("CVX") for _ in range(5)],
+    )
+    stable, dynamic = kwargs["messages"][0]["content"]
+    dynamic_text = dynamic["text"]
+    assert "ATTR-LESSON-MARKER" in dynamic_text
+    assert "Today so far" in dynamic_text
+    assert "Buys excluded this cycle" in dynamic_text
+    assert "MARKET IS RISK-OFF" in dynamic_text
+    assert "<market_data>" in dynamic_text
+    assert "Return proposals for the candidates" in dynamic_text
+    # Nothing from the stable block leaks in twice.
+    assert "## Risk contract" not in dynamic_text
+    assert "CURATED-MARKER" not in dynamic_text
+
+
+def test_stable_block_deterministic_across_differing_dynamic_inputs():
+    """The cache breakpoint only pays off if the stable block is byte-identical
+    across a day's cycles — if per-cycle data leaked in, every cycle would be a
+    silent cache miss (a write, never a read)."""
+    eng = _decide_engine()
+    kwargs1 = _call_decide(
+        eng, lessons="LESSON-CALL-1", curated="SAME-CURATED",
+        today="Today block call 1", bundles=[_bundle("CVX")],
+    )
+    kwargs2 = _call_decide(
+        eng, lessons="LESSON-CALL-2 (totally different)", curated="SAME-CURATED",
+        today="Today block call 2, much longer with different content",
+        bundles=[_bundle("AAPL"), _bundle("MSFT")],
+    )
+    stable1 = kwargs1["messages"][0]["content"][0]["text"]
+    stable2 = kwargs2["messages"][0]["content"][0]["text"]
+    assert stable1 == stable2
+
+
+def test_decide_still_returns_proposals_from_dynamic_content():
+    # End-to-end sanity: the split didn't break response parsing.
+    from investment_strategy.models import TradeProposal
+    eng = _decide_engine()
+    eng.client = MagicMock()
+    eng.client.messages.create.return_value = _mock_response(
+        '{"proposals": [{"symbol": "CVX", "action": "buy", "instrument": "equity", '
+        '"conviction": 0.7, "target_weight_pct": 3.0, "rationale": "x"}]}'
+    )
+    acct = _acct([])
+    with patch.object(engine_mod, "record_usage"):
+        proposals = eng.decide([_bundle("CVX")], acct)
+    assert len(proposals) == 1
+    assert isinstance(proposals[0], TradeProposal)
+    assert proposals[0].symbol == "CVX"

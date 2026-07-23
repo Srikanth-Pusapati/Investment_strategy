@@ -44,6 +44,16 @@ class RoundTrip:
     # core fills and pre-tracking records write conviction 0.0, treated as
     # unknown). Feeds the conviction-calibration block.
     conviction: float | None = None
+    # --- episode-entry context (for the weekly auto-tuner) --------------------
+    # The conviction/composite of the buy that OPENED this episode (position going
+    # flat→open), not the mean of remaining lots — a partial scale-out can consume
+    # the opening lot FIFO and leave a top-up's number behind, which would misjudge
+    # a conviction floor. None when the opener carried the 0.0 sentinel (core fills,
+    # pre-tracking) or predated the composite.
+    opening_conviction: float | None = None
+    opening_composite: float | None = None
+    realized_pl: float | None = None  # dollars from the realizing sell (r.realized_pl)
+    exit_ts: str = ""                 # str(ts) of the realizing sell — window filter + veto join
 
 
 @dataclass
@@ -74,6 +84,10 @@ def round_trips(records: list[TradeRecord]) -> list[RoundTrip]:
     # Per symbol, a list of open lots as
     # [remaining_qty, entry_signals, ts_date, conviction-or-None].
     open_by_symbol: dict[str, list[list]] = {}
+    # Per symbol, the (conviction, composite) of the buy that opened the CURRENT
+    # episode (flat -> open) — set once per episode, cleared on full close, so a
+    # later top-up never overwrites the entry's own numbers.
+    episode_open: dict[str, tuple[float | None, float | None]] = {}
     trips: list[RoundTrip] = []
     for r in ordered:
         if r.action == "buy":
@@ -81,6 +95,8 @@ def round_trips(records: list[TradeRecord]) -> list[RoundTrip]:
             # 0.0 means "not recorded" (core fills, pre-tracking rows), not
             # "zero conviction" — store None so calibration skips it.
             conv = r.conviction if (r.conviction or 0.0) > 0 else None
+            if r.symbol not in open_by_symbol or not open_by_symbol[r.symbol]:
+                episode_open[r.symbol] = (conv, r.composite_score)
             open_by_symbol.setdefault(r.symbol, []).append(
                 [float(r.qty or 0.0), list(r.entry_signals), ts_date, conv]
             )
@@ -91,11 +107,14 @@ def round_trips(records: list[TradeRecord]) -> list[RoundTrip]:
                 dates = [d for _, _, d, _c in lots if d]
                 same_day = len(dates) >= 2 and len(set(dates)) == 1
                 convs = [c for _, _, _, c in lots if c is not None]
+                open_conv, open_comp = episode_open.get(r.symbol, (None, None))
                 trips.append(RoundTrip(
                     symbol=r.symbol, pl_pct=r.realized_pl_pct,
                     signals=signals, exit_reason=r.exit_reason,
                     n_lots=len(lots), same_day_repeat=same_day,
                     conviction=sum(convs) / len(convs) if convs else None,
+                    opening_conviction=open_conv, opening_composite=open_comp,
+                    realized_pl=r.realized_pl, exit_ts=str(r.ts) if r.ts else "",
                 ))
             # A partial exit (with a known qty) trims the open lots and keeps the
             # remainder; anything else — or an unknown qty — fully closes.
@@ -103,8 +122,10 @@ def round_trips(records: list[TradeRecord]) -> list[RoundTrip]:
                 _reduce_fifo(lots, float(r.qty))
                 if not lots:
                     open_by_symbol.pop(r.symbol, None)
+                    episode_open.pop(r.symbol, None)
             else:
                 open_by_symbol.pop(r.symbol, None)
+                episode_open.pop(r.symbol, None)
     return trips
 
 

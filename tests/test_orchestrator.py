@@ -180,11 +180,12 @@ def _orch(trim_enabled=True, trim_pct=25.0, state=None,
           thesis_min_score=0.1, core_etf="", target_invested_pct=0.0,
           min_cash_buffer_pct=2.0, max_gross_exposure_pct=100.0,
           kill_switch=False, whole_shares_only=False, core_stop_pct=15.0,
-          core_max_pct=0.0):
+          core_max_pct=0.0, trading_halted=None):
     o = Orchestrator.__new__(Orchestrator)
     o.cfg = SimpleNamespace(
         core_etf=core_etf, target_invested_pct=target_invested_pct,
         core_stop_pct=core_stop_pct, core_max_pct=core_max_pct,
+        monitor_interval_s=30,
         # These reconcile tests assert the LOG output; the enforcing halt
         # behavior has its own suite in test_ops_hardening.py.
         reconcile_halt_enabled=False,
@@ -206,10 +207,23 @@ def _orch(trim_enabled=True, trim_pct=25.0, state=None,
             rotation_loss_guard_enabled=False,
         ),
     )
-    o.risk = SimpleNamespace(kill_switch=kill_switch)
+    # trading_halted mirrors RiskManager.trading_halted()'s (bool, reason)
+    # shape; defaults to kill_switch-only so every pre-existing test (which
+    # only ever set kill_switch) keeps its old semantics unchanged. Pass an
+    # explicit (bool, reason) tuple to simulate a daily-loss/drawdown/halt-
+    # latch/PDT halt distinct from the kill switch.
+    _halted_result = (
+        trading_halted if trading_halted is not None
+        else (kill_switch, "KILL_SWITCH is on — no new positions." if kill_switch else "")
+    )
+    o.risk = SimpleNamespace(
+        kill_switch=kill_switch,
+        trading_halted=lambda account, _r=_halted_result: _r,
+    )
     o.broker = _FakeBroker()
     o.ledger = _FakeLedger()
     o.watchdog = _FakeWatchdog(o.broker)
+    o.alerter = SimpleNamespace(critical=lambda *a, **k: None)
     o.state = state or _state_tmp()
     o._trade_lock = threading.Lock()
     o._pending_oids = []
@@ -490,6 +504,34 @@ def test_core_fill_noop_under_kill_switch():
     acct = _acct(cash=1_000.0)
     o._apply_core_fill(acct)
     assert o.broker.core_buys == []
+
+
+def test_core_fill_noop_under_daily_loss_halt():
+    # Regression 2026-07-23: _apply_core_fill only checked kill_switch, so a
+    # daily-loss halt (or drawdown halt, or HALT LATCH, or PDT block — every
+    # OTHER reason trading_halted() can return True) left the core sweep free
+    # to buy right through it. Confirmed live: the risk gate correctly
+    # rejected buys for "Daily loss 3.70% >= 3.00%" and the core fill bought
+    # $28,155 of QQQ one second later, forcing an immediate unwind.
+    o = _orch(
+        core_etf="QQQ", target_invested_pct=90.0, kill_switch=False,
+        trading_halted=(True, "Daily loss 3.70% >= limit 3.00% — halting new buys."),
+    )
+    acct = _acct(cash=1_000.0)
+    o._apply_core_fill(acct)
+    assert o.broker.core_buys == []
+
+
+def test_core_fill_proceeds_when_not_halted():
+    # Sanity check the fixture itself: an explicit "not halted" result must
+    # still let a normal core fill through (the new gate isn't fail-closed).
+    o = _orch(
+        core_etf="QQQ", target_invested_pct=90.0, kill_switch=False,
+        trading_halted=(False, ""),
+    )
+    acct = _acct(cash=1_000.0)
+    o._apply_core_fill(acct)
+    assert o.broker.core_buys == [("QQQ", 900.0)]
 
 
 def test_core_fill_clamped_to_gross_cap():
@@ -810,6 +852,60 @@ def test_execute_proposals_runs_equity_sells_first():
     assert acct.cash == 500.0                 # capital freed before the buy ran
 
 
+# -- decision-sell close failure: queue for watchdog retry, alert (2026-07-23) - #
+from investment_strategy.models import Action as _Action
+from investment_strategy.models import RiskDecision as _RiskDecision
+from investment_strategy.models import RiskVerdict as _RiskVerdict
+from investment_strategy.models import TradeProposal as _TradeProposal
+
+
+def _sell_prop(symbol, rationale="test rationale", key_signals=None):
+    return _TradeProposal(
+        symbol=symbol, action=_Action.SELL, conviction=0.6,
+        target_weight_pct=0.0, rationale=rationale,
+        key_signals=key_signals or [],
+    )
+
+
+def _held_position(symbol, qty=10.0, price=50.0):
+    return Position(
+        symbol=symbol, qty=qty, avg_entry_price=price, current_price=price,
+        market_value=qty * price, unrealized_pl=-25.0, unrealized_pl_pct=-5.0,
+    )
+
+
+def test_decision_sell_close_failure_queues_retry_and_alerts():
+    # Regression 2026-07-20/23: a failed decision-SELL used to just log and
+    # wait for the next hourly cycle — no retry, no page. It must now queue
+    # for the watchdog (with the original rationale/signals/composite) and
+    # alert immediately, same as every other exit path.
+    o = _orch()
+    held = _held_position("ZTS")
+    o.broker.annualized_vol = lambda s: 0.3
+    o.broker.open_position = lambda s: held
+    o._regime_mult = 1.0
+    prop = _sell_prop("ZTS", rationale="thesis broken",
+                       key_signals=["technical -0.3"])
+    decision = _RiskDecision(
+        proposal=prop, verdict=_RiskVerdict.APPROVED, approved_qty=held.qty,
+        approved_notional=held.market_value, reason="approved sell",
+    )
+    o.risk.evaluate = lambda *a, **k: decision
+    o.watchdog.outcomes = [("failed", None)]
+    alerts = []
+    o.alerter = SimpleNamespace(critical=lambda k, s, b: alerts.append((k, s, b)))
+    acct = _acct(cash=0.0, positions=[held])
+
+    o._handle_equity(prop, acct, [], composite=0.42)
+
+    assert o.ledger.records == []   # nothing ledgered on a failed close
+    pending = o.state.get_pending_decision_sells()
+    assert pending["ZTS"]["rationale"] == "thesis broken"
+    assert pending["ZTS"]["key_signals"] == ["technical -0.3"]
+    assert pending["ZTS"]["composite_score"] == 0.42
+    assert alerts and alerts[0][0] == "decision-sell-fail:ZTS"
+
+
 def test_execute_proposals_budget_split_sees_freed_capital():
     # The fair-share budget split must run AFTER the sells: on a full book the
     # rotation buys' deployable cash IS the sell's freed capital.
@@ -915,10 +1011,12 @@ if __name__ == "__main__":
 # --------------------------------------------------------------------------- #
 # Bearish option path through slate exclusions (the "earn on lows" fix)
 # --------------------------------------------------------------------------- #
-def _slate_orch(options_on=True, headroom=0.0, min_score=0.2):
+def _slate_orch(options_on=True, headroom=0.0, min_score=0.2,
+                min_trade_price=5.0):
     o = Orchestrator.__new__(Orchestrator)
     o.cfg = SimpleNamespace(
-        risk=SimpleNamespace(min_order_usd=1.0, min_order_pct=0.0),
+        risk=SimpleNamespace(min_order_usd=1.0, min_order_pct=0.0,
+                             min_trade_price_usd=min_trade_price),
         screener=SimpleNamespace(min_score=min_score),
     )
     o.options = object() if options_on else None
@@ -954,6 +1052,28 @@ def test_partition_drops_bullish_notheld_when_blocked():
     o = _slate_orch(options_on=True)
     kept, _ = o._partition_slate([_discovery_bundle(score=0.5)], _acct())
     assert kept == []
+
+
+def test_partition_drops_notheld_name_under_liquidity_floor():
+    # AMC (~$2.20) was re-proposed and liquidity-rejected EVERY day Jul 17-22
+    # while topping the composite — a permanently doomed buy must leave the
+    # slate before the prompt, not after the LLM spends a proposal on it.
+    o = _slate_orch(options_on=False, headroom=10_000.0)
+    sigs = [
+        Signal(kind=SignalKind.DISCOVERY, symbol="AMC", summary="scan", score=0.9),
+        Signal(kind=SignalKind.TECHNICAL, symbol="AMC", summary="tech", score=0.2,
+               data={"price": 2.20}),
+    ]
+    kept, excluded = o._partition_slate(
+        [SignalBundle(symbol="AMC", signals=sigs)], _acct()
+    )
+    assert kept == []
+    assert "liquidity floor" in excluded["AMC"]
+    # A missing technical price fails open — the name stays on the slate.
+    o2 = _slate_orch(options_on=False, headroom=10_000.0)
+    kept2, excluded2 = o2._partition_slate([_discovery_bundle(score=0.5)], _acct())
+    assert [b.symbol for b in kept2] == ["XYZ"]
+    assert "XYZ" not in excluded2
 
 
 def test_bearish_lean_falls_back_to_mean_of_scored_signals():
@@ -1026,7 +1146,7 @@ def test_within_close_fence_only_near_the_bell():
 
 def test_closed_tick_arms_the_bell_wakeup():
     o = Orchestrator.__new__(Orchestrator)
-    o.cfg = SimpleNamespace(postmortem_enabled=False)
+    o.cfg = SimpleNamespace(postmortem_enabled=False, autotune_enabled=False)
     bell = datetime.now(timezone.utc) + timedelta(hours=1)
     o.broker = SimpleNamespace(is_market_open=lambda: False,
                                next_market_open=lambda: bell)

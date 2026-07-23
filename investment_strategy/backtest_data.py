@@ -156,15 +156,27 @@ def entries_from_ledger(
 
 
 def crash_overlay(
-    prices: dict[str, list[float]], start: int, daily_pct: float = 2.0,
-    crash_days: int = 70, gap_days: tuple[int, ...] = (5, 25), gap_pct: float = 9.0,
+    prices: dict[str, list[float]], start: int, daily_pct: float = 4.0,
+    crash_days: int = 80,
+    gap_days: tuple[int, ...] = (1, 2, 3, 5, 8, 12, 18), gap_pct: float = 15.0,
 ) -> dict[str, list[float]]:
     """Deterministic market-wide crash grafted onto real closes (D.3): from bar
     `start`, every series glides down `daily_pct`/day for `crash_days` bars, with
     extra `gap_pct` gap-downs on the given crash-relative days (so stops gap
     through instead of filling politely), then stays at the crushed level. Keeps
     the real day-to-day texture — it's a scale factor, not synthetic prices. This
-    is a BRAKE test path, not a return forecast."""
+    is a BRAKE test path, not a return forecast.
+
+    Defaults model a 1987/2008/COVID-scale collapse: a ~-50% slide with limit-down
+    gaps FRONT-LOADED into the first weeks. That front-loading is deliberate and
+    load-bearing — the account-level brakes (daily-loss flatten, equity-floor
+    latch) only exist for a crash the PER-POSITION stops can't front-run. With the
+    stops now tight (vol clamp ~[4,10]%), a gentle grind lets every cohort stop out
+    to cash within a bar or two, so the account brakes never engage and the D.3
+    gate proves nothing. The gaps must land while the book is still FULL and be
+    large enough to gap THROUGH the stops, or this test is vacuous. If you tighten
+    the stops further, re-verify these defaults still drive the brakes (see
+    tests/test_backtest_data.py::test_default_crash_still_engages_account_brakes)."""
     out: dict[str, list[float]] = {}
     for sym, closes in prices.items():
         row = list(closes)

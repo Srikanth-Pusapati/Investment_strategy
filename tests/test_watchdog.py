@@ -599,6 +599,39 @@ def test_option_close_failure_pages_and_keeps_retrying():
     assert state.hours_since_exit("LLY") is None    # nothing recorded as closed
 
 
+def test_option_close_already_resting_skips_redundant_retry_and_no_alert():
+    # Regression 2026-07-23: close_option_leg's DAY-limit fallback got a close
+    # order resting at the venue on an earlier tick; with every contract
+    # already reserved, the watchdog's blind retry re-submitted ANOTHER close
+    # next tick and Alpaca rejected it as an uncovered short — a real API
+    # error, but a false CRITICAL page, since a working exit was already in
+    # flight. qty_available < qty (Alpaca's reserved-by-open-orders tracking)
+    # must read as "already protected," not "failed."
+    state, broker = _state(), _FakeBroker([], option_close_fails=True)
+    alerts = []
+    wd = Watchdog(_cfg(0.0), broker, state=state,
+                  alerter=SimpleNamespace(critical=lambda k, s, b: alerts.append(k)))
+    put = _opt_leg(occ_symbol("LLY", _exp(30), 700, "put"), qty=1, basis=3.0, price=1.0)
+    put.qty_available = 0.0    # fully reserved by an already-resting close order
+    wd._check_option_positions([put])
+    assert alerts == []                          # no false page
+    assert broker.option_groups_closed == []      # no redundant close attempt
+
+
+def test_option_close_attempts_when_only_some_legs_are_resting():
+    # A spread where only ONE leg's contracts are reserved is NOT fully
+    # protected yet — the group must still get a close attempt (one order,
+    # both legs), not be skipped as if it were already fully in flight.
+    state, broker, led = _state(), _FakeBroker([]), _FakeLedger()
+    wd = Watchdog(_cfg(0.0), broker, state=state, ledger=led)
+    exp = _exp(30)
+    long_put = _opt_leg(occ_symbol("AMD", exp, 160, "put"), qty=2, basis=3.0, price=6.5)
+    short_put = _opt_leg(occ_symbol("AMD", exp, 150, "put"), qty=-2, basis=1.0, price=1.5)
+    long_put.qty_available = 0.0   # only this leg is reserved so far
+    wd._check_option_positions([long_put, short_put])
+    assert len(broker.option_groups_closed) == 1
+
+
 def test_check_once_routes_options_away_from_equity_paths():
     # An option row must never hit the equity stop/trail/time paths (they'd
     # call latest_price on an OCC symbol and register bogus clocks).
@@ -682,3 +715,49 @@ def test_watchdog_exit_orders_queued_for_reconcile():
     wd = Watchdog(_cfg(0.0), broker, state=state, ledger=led)
     wd._close_hard(_pos_locked("NU", qty=172.0, avail=0.0), "trail")
     assert ("new-1", "NU") in state.get_pending_orders()
+
+
+# -- decision-sell retry queue (2026-07-20/23: no retry, no alert before) ---- #
+def test_retry_pending_decision_sell_success_ledgers_with_original_context():
+    state, led = _state(), _FakeLedger()
+    state.queue_decision_sell("ZTS", "thesis broken", ["technical -0.3"], 0.42)
+    wd = Watchdog(_cfg(0.0), _FakeBroker([]), state=state, ledger=led)
+    wd.close_now = lambda pos, reason: ("full", "oid-1")
+    wd._retry_pending_decision_sells({"ZTS": _pos("ZTS")})
+    assert state.get_pending_decision_sells() == {}
+    rec = led.records[-1]
+    assert rec.rationale == "thesis broken"
+    assert rec.key_signals == ["technical -0.3"]
+    assert rec.composite_score == 0.42
+    assert rec.exit_reason == "decision"
+
+
+def test_retry_pending_decision_sell_partial_stays_queued():
+    state = _state()
+    state.queue_decision_sell("ZTS", "thesis broken", [], None)
+    wd = Watchdog(_cfg(0.0), _FakeBroker([]), state=state)
+    wd.close_now = lambda pos, reason: ("partial", "oid-1")
+    wd._retry_pending_decision_sells({"ZTS": _pos("ZTS")})
+    assert "ZTS" in state.get_pending_decision_sells()
+
+
+def test_retry_pending_decision_sell_failure_stays_queued_and_alerts():
+    state = _state()
+    state.queue_decision_sell("ZTS", "thesis broken", [], None)
+    alerts = []
+    wd = Watchdog(_cfg(0.0), _FakeBroker([]), state=state,
+                  alerter=SimpleNamespace(critical=lambda k, s, b: alerts.append(k)))
+    wd.close_now = lambda pos, reason: ("failed", None)
+    wd._retry_pending_decision_sells({"ZTS": _pos("ZTS")})
+    assert "ZTS" in state.get_pending_decision_sells()
+    assert alerts == ["decision-sell-fail:ZTS"]
+
+
+def test_retry_pending_decision_sell_drops_when_position_gone():
+    # A different exit path already closed it (or it's a broker-side fill not
+    # yet reconciled) — stop retrying rather than trying to close a phantom.
+    state = _state()
+    state.queue_decision_sell("ZTS", "thesis broken", [], None)
+    wd = Watchdog(_cfg(0.0), _FakeBroker([]), state=state)
+    wd._retry_pending_decision_sells({})
+    assert state.get_pending_decision_sells() == {}

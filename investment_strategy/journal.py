@@ -25,7 +25,10 @@ log = logging.getLogger("journal")
 _ET = ZoneInfo("America/New_York")
 _DECISIONS_DIR = Path("state") / "decisions"
 
-Verdict = Literal["approved", "resized", "rejected", "slate_excluded", "dropped_buy"]
+Verdict = Literal[
+    "approved", "resized", "rejected", "slate_excluded", "dropped_buy",
+    "rotation_guard",
+]
 
 
 def _trading_day(when: datetime | None = None) -> str:

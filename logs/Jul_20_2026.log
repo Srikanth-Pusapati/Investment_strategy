@@ -1,0 +1,1248 @@
+2026-07-20 00:39:09,539 INFO alpaca | Alpaca client ready (mode=paper).
+2026-07-20 00:39:10,493 INFO orchestrator | Discovery-driven mode: trading scanner-found names + holdings.
+2026-07-20 00:39:10,496 INFO orchestrator | Loaded 2 pending order(s) from state to reconcile.
+2026-07-20 00:39:10,499 INFO orchestrator | Starting orchestrator (paper). Kill switch: off. Options: on. Benchmark: QQQ.
+2026-07-20 00:39:10,744 INFO orchestrator | Market closed; skipping decision cycle.
+2026-07-20 00:39:11,074 INFO alpaca | Alpaca client ready (mode=paper).
+2026-07-20 00:39:13,273 INFO dashboard | Wrote dashboard with 58 trades -> dashboard.html
+2026-07-20 01:14:19,107 WARNING orchestrator | DARK GAP (market closed): no loop tick for 3 min (sleep/suspend?) — positions could not move; not paging.
+2026-07-20 01:39:14,518 INFO orchestrator | Market closed; skipping decision cycle.
+2026-07-20 01:39:14,637 INFO alpaca | Alpaca client ready (mode=paper).
+2026-07-20 01:39:16,730 INFO dashboard | Wrote dashboard with 58 trades -> dashboard.html
+2026-07-20 02:39:33,375 INFO orchestrator | Market closed; skipping decision cycle.
+2026-07-20 02:39:33,485 INFO alpaca | Alpaca client ready (mode=paper).
+2026-07-20 02:39:35,972 INFO dashboard | Wrote dashboard with 58 trades -> dashboard.html
+2026-07-20 03:39:51,762 INFO orchestrator | Market closed; skipping decision cycle.
+2026-07-20 03:39:51,901 INFO alpaca | Alpaca client ready (mode=paper).
+2026-07-20 03:39:54,172 INFO dashboard | Wrote dashboard with 58 trades -> dashboard.html
+2026-07-20 04:40:09,744 INFO orchestrator | Market closed; skipping decision cycle.
+2026-07-20 04:40:09,812 INFO alpaca | Alpaca client ready (mode=paper).
+2026-07-20 04:40:12,069 INFO dashboard | Wrote dashboard with 58 trades -> dashboard.html
+2026-07-20 05:40:27,560 INFO orchestrator | Market closed; skipping decision cycle.
+2026-07-20 05:40:27,625 INFO alpaca | Alpaca client ready (mode=paper).
+2026-07-20 05:40:29,905 INFO dashboard | Wrote dashboard with 58 trades -> dashboard.html
+2026-07-20 06:40:46,220 INFO orchestrator | Market closed; skipping decision cycle.
+2026-07-20 06:40:46,312 INFO alpaca | Alpaca client ready (mode=paper).
+2026-07-20 06:40:48,523 INFO dashboard | Wrote dashboard with 58 trades -> dashboard.html
+2026-07-20 07:16:54,001 INFO watchdog | Trailing stop hit on LPLA: peak 4.5% -> now 1.4%. Closing.
+2026-07-20 07:16:54,475 WARNING alpaca | Exit via resting sell 826a91fb-c189-40fb-97c2-a9ef0fce0daa (LPLA): replaced limit -> 318.54 (marketable; new order dba31ba0-cdde-45fd-88b8-6f375f4636b5).
+2026-07-20 07:16:54,536 INFO ledger | Ledger: SELL LPLA qty=25 $8090
+2026-07-20 07:16:54,544 WARNING watchdog | Partial close LPLA (trail): sold 0 available share(s), made 1 resting sell(s) marketable; 25 reserved by open orders — will retry the full close next tick.
+2026-07-20 07:17:25,396 INFO watchdog | Trailing stop hit on LPLA: peak 4.5% -> now 1.4%. Closing.
+2026-07-20 07:17:25,644 WARNING watchdog | Close LPLA (trail): 25 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-20 07:17:56,413 INFO watchdog | Trailing stop hit on LPLA: peak 4.5% -> now 1.4%. Closing.
+2026-07-20 07:41:04,681 INFO orchestrator | Market closed; skipping decision cycle.
+2026-07-20 07:41:04,836 INFO alpaca | Alpaca client ready (mode=paper).
+2026-07-20 07:41:07,039 INFO dashboard | Wrote dashboard with 59 trades -> dashboard.html
+2026-07-20 08:10:42,542 INFO watchdog | Trailing stop hit on PATH: peak 3.3% -> now 0.3%. Closing.
+2026-07-20 08:10:42,936 WARNING alpaca | Exit via resting sell b9011387-6100-440c-a05d-a98af3302f31 (PATH): replaced limit -> 11.91 (marketable; new order 9c28ed36-7752-499b-acbf-c9d24905f050).
+2026-07-20 08:10:42,951 INFO ledger | Ledger: SELL PATH qty=288 $3442
+2026-07-20 08:10:42,957 WARNING watchdog | Partial close PATH (trail): sold 0 available share(s), made 1 resting sell(s) marketable; 288 reserved by open orders — will retry the full close next tick.
+2026-07-20 08:11:13,720 INFO watchdog | Trailing stop hit on PATH: peak 3.3% -> now 0.3%. Closing.
+2026-07-20 08:11:13,879 WARNING watchdog | Close PATH (trail): 288 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-20 08:11:44,653 INFO watchdog | Trailing stop hit on PATH: peak 3.3% -> now 0.3%. Closing.
+2026-07-20 08:12:15,579 INFO watchdog | Trailing stop hit on PATH: peak 3.3% -> now 0.3%. Closing.
+2026-07-20 08:12:46,520 INFO watchdog | Trailing stop hit on PATH: peak 3.3% -> now 0.0%. Closing.
+2026-07-20 08:13:17,491 INFO watchdog | Trailing stop hit on PATH: peak 3.3% -> now 0.0%. Closing.
+2026-07-20 08:14:18,979 INFO watchdog | Trailing stop hit on PATH: peak 3.3% -> now 0.3%. Closing.
+2026-07-20 08:14:49,995 INFO watchdog | Trailing stop hit on PATH: peak 3.3% -> now 0.3%. Closing.
+2026-07-20 08:17:23,825 INFO watchdog | Trailing stop hit on PATH: peak 3.3% -> now 0.3%. Closing.
+2026-07-20 08:17:24,135 WARNING watchdog | Close PATH (trail): 288 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-20 08:17:54,987 INFO watchdog | Trailing stop hit on PATH: peak 3.3% -> now 0.3%. Closing.
+2026-07-20 08:18:25,908 INFO watchdog | Trailing stop hit on PATH: peak 3.3% -> now 0.3%. Closing.
+2026-07-20 08:18:56,752 INFO watchdog | Trailing stop hit on PATH: peak 3.3% -> now 0.3%. Closing.
+2026-07-20 08:19:27,560 INFO watchdog | Trailing stop hit on PATH: peak 3.3% -> now 0.3%. Closing.
+2026-07-20 08:19:58,537 INFO watchdog | Trailing stop hit on PATH: peak 3.3% -> now 0.3%. Closing.
+2026-07-20 08:24:35,430 INFO watchdog | Trailing stop hit on PATH: peak 3.3% -> now 0.3%. Closing.
+2026-07-20 08:24:35,851 WARNING watchdog | Close PATH (trail): 288 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-20 08:25:06,525 INFO watchdog | Trailing stop hit on PATH: peak 3.3% -> now 0.3%. Closing.
+2026-07-20 08:25:37,511 INFO watchdog | Trailing stop hit on PATH: peak 3.3% -> now 0.1%. Closing.
+2026-07-20 08:26:08,474 INFO watchdog | Trailing stop hit on PATH: peak 3.3% -> now -0.1%. Closing.
+2026-07-20 08:26:39,385 INFO watchdog | Trailing stop hit on PATH: peak 3.3% -> now -0.1%. Closing.
+2026-07-20 08:27:10,304 INFO watchdog | Trailing stop hit on PATH: peak 3.3% -> now 0.1%. Closing.
+2026-07-20 08:27:41,245 INFO watchdog | Trailing stop hit on PATH: peak 3.3% -> now 0.1%. Closing.
+2026-07-20 08:28:12,170 INFO watchdog | Trailing stop hit on PATH: peak 3.3% -> now 0.1%. Closing.
+2026-07-20 08:28:43,115 INFO watchdog | Trailing stop hit on PATH: peak 3.3% -> now 0.1%. Closing.
+2026-07-20 08:29:44,735 INFO watchdog | Trailing stop hit on PATH: peak 3.3% -> now 0.2%. Closing.
+2026-07-20 08:29:44,891 WARNING watchdog | Close PATH (trail): 288 reserved share(s) already covered by a resting marketable exit from a prior tick — protected, waiting to fill. Will retry the full close next tick.
+2026-07-20 08:30:20,553 WARNING orchestrator | Order dba31ba0-cdde-45fd-88b8-6f375f4636b5 (LPLA) still new a full cycle later.
+2026-07-20 08:30:22,781 INFO orchestrator | Market regime: SPY above 200dma (747 vs 694), VIX 18 -> risk-on, size x1.00.
+2026-07-20 08:30:23,710 INFO quiver | Quiver live/congresstrading -> 1000 row(s).
+2026-07-20 08:30:25,169 INFO screener | EDGAR Form-4 feed -> 62 filing(s) (scanning up to 100).
+2026-07-20 08:30:50,546 INFO screener | Options-flow most-actives pool -> 40 name(s).
+2026-07-20 08:31:15,492 INFO screener | Robinhood 'Daily movers' -> 20 name(s).
+2026-07-20 08:31:16,902 INFO screener | Robinhood '100 most popular' -> 100 name(s).
+2026-07-20 08:31:17,688 INFO screener | Robinhood scans: none saved (define scans in the RH app to use this leg).
+2026-07-20 08:31:17,692 INFO screener | Discovered 18 candidate(s) from 5 source(s) (295 merged, 275 above min_score, capped to 18).
+2026-07-20 08:31:17,693 INFO screener |   candidate T [congress+options_flow+robinhood] score=+1.56 — Congress: 3 buy / 0 sell filings in last 60d (disclosures lag up to ~45d). | Options flow: 24,325 call / 8,933 put vol (bullish call imbalance +0.46) on a most-active name. | Robinhood 100 Most Popular (retail crowd positioning)
+2026-07-20 08:31:17,696 INFO screener |   candidate SPCX [congress+robinhood] score=+1.10 — Congress: 3 buy / 0 sell filings in last 60d (disclosures lag up to ~45d). | Robinhood 100 Most Popular (retail crowd positioning)
+2026-07-20 08:31:17,698 INFO screener |   candidate HUBB [congress] score=+1.00 — Congress: 7 buy / 0 sell filings in last 60d (disclosures lag up to ~45d).
+2026-07-20 08:31:17,699 INFO screener |   candidate TSCO [congress] score=-1.00 — Congress: 0 buy / 5 sell filings in last 60d (disclosures lag up to ~45d).
+2026-07-20 08:31:17,701 INFO screener |   candidate WAB [congress] score=-1.00 — Congress: 0 buy / 5 sell filings in last 60d (disclosures lag up to ~45d).
+2026-07-20 08:31:17,702 INFO screener |   candidate FFAI [options_flow] score=+0.98 — Options flow: 1,087 call / 8 put vol (bullish call imbalance +0.98) on a most-active name.
+2026-07-20 08:31:17,703 INFO screener |   candidate PLUG [options_flow+robinhood] score=+0.93 — Options flow: 5,113 call / 1,340 put vol (bullish call imbalance +0.58) on a most-active name. | Robinhood 100 Most Popular (retail crowd positioning)
+2026-07-20 08:31:17,705 INFO screener |   candidate UBER [congress+robinhood] score=+0.85 — Congress: 2 buy / 0 sell filings in last 60d (disclosures lag up to ~45d). | Robinhood 100 Most Popular (retail crowd positioning)
+2026-07-20 08:31:17,707 INFO screener |   candidate SNDQ [options_flow] score=+0.83 — Options flow: 9,064 call / 852 put vol (bullish call imbalance +0.83) on a most-active name.
+2026-07-20 08:31:17,708 INFO screener |   candidate LYV [congress] score=-0.75 — Congress: 0 buy / 3 sell filings in last 60d (disclosures lag up to ~45d).
+2026-07-20 08:31:17,709 INFO screener |   candidate INTU [congress] score=-0.75 — Congress: 0 buy / 3 sell filings in last 60d (disclosures lag up to ~45d).
+2026-07-20 08:31:17,710 INFO screener |   candidate ADI [congress] score=-0.75 — Congress: 0 buy / 3 sell filings in last 60d (disclosures lag up to ~45d).
+2026-07-20 08:31:17,711 INFO screener |   candidate PATH [options_flow] score=+0.72 — Options flow: 13,284 call / 2,164 put vol (bullish call imbalance +0.72) on a most-active name.
+2026-07-20 08:31:17,713 INFO screener |   candidate SOFI [options_flow+robinhood] score=+0.69 — Options flow: 149,135 call / 74,364 put vol (bullish call imbalance +0.34) on a most-active name. | Robinhood 100 Most Popular (retail crowd positioning)
+2026-07-20 08:31:17,714 INFO screener |   candidate COE [insider] score=+0.67 — Insider: 2 open-market buy filing(s), 7,966,860 sh (SEC Form 4, last filings feed).
+2026-07-20 08:31:17,715 INFO screener |   candidate SOXS [options_flow] score=+0.62 — Options flow: 34,959 call / 8,258 put vol (bullish call imbalance +0.62) on a most-active name.
+2026-07-20 08:31:17,716 INFO screener |   candidate SQQQ [options_flow] score=+0.60 — Options flow: 50,245 call / 12,439 put vol (bullish call imbalance +0.60) on a most-active name.
+2026-07-20 08:31:17,718 INFO screener |   candidate UNH [congress] score=-0.60 — Congress: 1 buy / 4 sell filings in last 60d (disclosures lag up to ~45d).
+2026-07-20 08:31:44,377 WARNING signals | Finnhub news-sentiment is premium-gated on this key (HTTP 403) — using the VADER fallback for this run.
+2026-07-20 08:31:47,005 INFO quiver | Quiver live/offexchange -> 5461 row(s).
+2026-07-20 08:31:47,513 INFO quiver | Quiver live/govcontractsall -> 20000 row(s).
+2026-07-20 08:34:24,987 INFO signals | options_chain: reading 25 of 29 symbols this cycle (cap).
+2026-07-20 08:34:31,463 INFO signals | Gathered signals for 29/29 symbols (+3 market signals).
+2026-07-20 08:34:33,520 INFO robinhood | Imported 1 Robinhood holding(s) for context (read-only).
+2026-07-20 08:34:33,543 INFO orchestrator | Buy-excluded from slate this cycle: PATH (exited 0.4h ago (cooldown 24h))
+2026-07-20 08:35:13,616 INFO usage | decision call: 24377 in / 2323 out (cache r=0 w=0) ~$0.1800 [claude-opus-4-8]
+2026-07-20 08:35:13,620 INFO decision | Claude returned 3 proposal(s).
+2026-07-20 08:35:13,853 INFO orchestrator | SELL NOK -> approved: Closing existing position. | Weakest holding: composite -0.03 flat, technical deteriorating (RSI 32, MACD bear, decaying trend), 
+2026-07-20 08:35:14,083 WARNING alpaca | Exit via resting sell df90eae2-e64c-4e73-a362-22547899f015 (NOK): replaced limit -> 10.11 (marketable; new order c15603c0-7d73-4478-a049-4e15e07d0e37).
+2026-07-20 08:35:14,091 INFO ledger | Ledger: SELL NOK qty=234 $2415
+2026-07-20 08:35:14,096 WARNING watchdog | Partial close NOK (decision): sold 0 available share(s), made 1 resting sell(s) marketable; 234 reserved by open orders — will retry the full close next tick.
+2026-07-20 08:35:14,102 INFO orchestrator | Cycle budget $11,789 split across 2 buy(s): T $7,073, HUBB $4,266.
+2026-07-20 08:35:15,900 INFO earnings | Robinhood earnings calendar: 0 name(s) reporting within 31d.
+2026-07-20 08:35:17,180 ERROR yfinance | HTTP Error 502: <!DOCTYPE html>
+<html lang="en-us">
+  <head>
+    <meta http-equiv="content-type" content="text/html; charset=UTF-8">
+    <meta charset="utf-8">
+    <title>Yahoo</title>
+    <meta name="viewport" content="width=device-width,initial-scale=1,minimal-ui">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+    <style>
+      html {
+          height: 100%;
+      }
+      body {
+          background: #fafafc url(https://s.yimg.com/nn/img/sad-panda-201402200631.png) 50% 50%;
+          background-size: cover;
+          height: 100%;
+          text-align: center;
+          font: 300 18px "helvetica neue", helvetica, verdana, tahoma, arial, sans-serif;
+          margin: 0;
+      }
+      table {
+          height: 100%;
+          width: 100%;
+          table-layout: fixed;
+          border-collapse: collapse;
+          border-spacing: 0;
+          border: none;
+      }
+      h1 {
+          font-size: 42px;
+          font-weight: 400;
+          color: #400090;
+      }
+      p {
+          color: #1A1A1A;
+      }
+      #message-1 {
+          font-weight: bold;
+          margin: 0;
+      }
+      #message-2 {
+          display: inline-block;
+          *display: inline;
+          zoom: 1;
+          max-width: 17em;
+          _width: 17em;
+      }
+      </style>
+      <script>
+      
+      </script>
+  </head>
+  <body>
+  <!-- status code : 502 -->
+  <!-- Could Not Connect -->
+  <!-- host machine: media-router-api7022.prod.media.ne1.yahoo.com -->
+  <!-- timestamp: 1784554517.095 -->
+  <!-- url: https://query1.finance.yahoo.com/v7/finance/quote?symbols=COO&formatted=false&lang=en-US&region=US&crumb=JLaCeAs.K5G-->
+  <script type="text/javascript">
+    function buildUrl(url, parameters){
+      var qs = [];
+      for(var key in parameters) {
+        var value = parameters[key];
+        qs.push(encodeURIComponent(key) + "=" + encodeURIComponent(value));
+      }
+      url = url + "?" + qs.join('&');
+      return url;
+    }
+
+    function generateBRBMarkup(site) {
+      params.source = 'brb';
+      generateBeaconMarkup(params);
+      var englishHeader = 'Will be right back...';
+      var englishMessage1 = 'Thank you for your patience.';
+      var englishMessage2 = 'Our engineers are working quickly to resolve the issue.';
+      var defaultLogoStyle = '';
+      var siteDataMap = {
+        'default': {
+          logo: 'https://s.yimg.com/rz/p/yahoo_frontpage_en-US_s_f_p_205x58_frontpage.png',
+          logoAlt: 'Yahoo Logo',
+          logoStyle: defaultLogoStyle,
+          header: englishHeader,
+          message1: englishMessage1,
+          message2: englishMessage2
+        }
+      };
+
+      var siteDetails = siteDataMap['default'];
+
+      document.write('<table><tbody><tr><td>');
+      document.write('<div id="content">');
+      document.write('<img src="' + siteDetails['logo'] + '" alt="' + siteDetails['logoAlt'] + '" style="' + siteDetails['logoStyle'] + '">');
+      document.write('<h1 style="margin-top:20px;">' + siteDetails['header'] + '</h1>');
+      document.write('<p id="message-1">' + siteDetails['message1'] + '</p>');
+      document.write('<p id="message-2">' + siteDetails['message2'] + '</p>');
+      document.write('</div>');
+      document.write('</td></tr></tbody></table>');
+    }
+
+    function generateBeaconMarkup(params) {
+        document.write('<img src="' + buildUrl('//geo.yahoo.com/b', params) + '" style="display:none;" width="0px" height="0px"/>');
+        var beacon = new Image();
+        beacon.src = buildUrl('//bcn.fp.yahoo.com/p', params);
+    }
+
+    var hostname = window.location.hostname;
+    var device = 'desktop';
+    var ynet = ('-' === '1');
+    var prid = '4vb1mbhl5s90l';
+    var crid = '4vb1mbhl5s90l';
+    var time = new Date().getTime();
+    var params = {
+        s: '1197757129',
+        t: time,
+        err_url: document.URL,
+        err: '502',
+        test: '-',
+        ats_host: 'media-router-api7022.prod.media.ne1.yahoo.com',
+        prid: prid,
+        crid: crid,
+        message: 'Could Not Connect'
+    };
+
+    if(ynet) {
+        document.write('<div style="height: 5px; background-color: red;"></div>');
+    }
+    generateBRBMarkup(hostname, params);
+
+  </script>
+  <noscript>
+  <table>
+    <tbody>
+      <tr>
+        <td>
+          <div id="englishContent">
+            <h1 style="margin-top:20px;">Will be right back...</h1>
+            <p id="message-1">Thank you for your patience.</p>
+            <p id="message-2">Our engineers are working quickly to resolve the issue.</p>
+          </div>
+        </td>
+      </tr>
+    </tbody>
+  </table>
+  </noscript>
+  </body>
+</html>
+
+2026-07-20 08:35:17,913 ERROR yfinance | HTTP Error 502: <!DOCTYPE html>
+<html lang="en-us">
+  <head>
+    <meta http-equiv="content-type" content="text/html; charset=UTF-8">
+    <meta charset="utf-8">
+    <title>Yahoo</title>
+    <meta name="viewport" content="width=device-width,initial-scale=1,minimal-ui">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+    <style>
+      html {
+          height: 100%;
+      }
+      body {
+          background: #fafafc url(https://s.yimg.com/nn/img/sad-panda-201402200631.png) 50% 50%;
+          background-size: cover;
+          height: 100%;
+          text-align: center;
+          font: 300 18px "helvetica neue", helvetica, verdana, tahoma, arial, sans-serif;
+          margin: 0;
+      }
+      table {
+          height: 100%;
+          width: 100%;
+          table-layout: fixed;
+          border-collapse: collapse;
+          border-spacing: 0;
+          border: none;
+      }
+      h1 {
+          font-size: 42px;
+          font-weight: 400;
+          color: #400090;
+      }
+      p {
+          color: #1A1A1A;
+      }
+      #message-1 {
+          font-weight: bold;
+          margin: 0;
+      }
+      #message-2 {
+          display: inline-block;
+          *display: inline;
+          zoom: 1;
+          max-width: 17em;
+          _width: 17em;
+      }
+      </style>
+      <script>
+      
+      </script>
+  </head>
+  <body>
+  <!-- status code : 502 -->
+  <!-- Could Not Connect -->
+  <!-- host machine: media-router-api7001.prod.media.ne1.yahoo.com -->
+  <!-- timestamp: 1784554517.832 -->
+  <!-- url: https://query1.finance.yahoo.com/v7/finance/quote?symbols=F&formatted=false&lang=en-US&region=US&crumb=JLaCeAs.K5G-->
+  <script type="text/javascript">
+    function buildUrl(url, parameters){
+      var qs = [];
+      for(var key in parameters) {
+        var value = parameters[key];
+        qs.push(encodeURIComponent(key) + "=" + encodeURIComponent(value));
+      }
+      url = url + "?" + qs.join('&');
+      return url;
+    }
+
+    function generateBRBMarkup(site) {
+      params.source = 'brb';
+      generateBeaconMarkup(params);
+      var englishHeader = 'Will be right back...';
+      var englishMessage1 = 'Thank you for your patience.';
+      var englishMessage2 = 'Our engineers are working quickly to resolve the issue.';
+      var defaultLogoStyle = '';
+      var siteDataMap = {
+        'default': {
+          logo: 'https://s.yimg.com/rz/p/yahoo_frontpage_en-US_s_f_p_205x58_frontpage.png',
+          logoAlt: 'Yahoo Logo',
+          logoStyle: defaultLogoStyle,
+          header: englishHeader,
+          message1: englishMessage1,
+          message2: englishMessage2
+        }
+      };
+
+      var siteDetails = siteDataMap['default'];
+
+      document.write('<table><tbody><tr><td>');
+      document.write('<div id="content">');
+      document.write('<img src="' + siteDetails['logo'] + '" alt="' + siteDetails['logoAlt'] + '" style="' + siteDetails['logoStyle'] + '">');
+      document.write('<h1 style="margin-top:20px;">' + siteDetails['header'] + '</h1>');
+      document.write('<p id="message-1">' + siteDetails['message1'] + '</p>');
+      document.write('<p id="message-2">' + siteDetails['message2'] + '</p>');
+      document.write('</div>');
+      document.write('</td></tr></tbody></table>');
+    }
+
+    function generateBeaconMarkup(params) {
+        document.write('<img src="' + buildUrl('//geo.yahoo.com/b', params) + '" style="display:none;" width="0px" height="0px"/>');
+        var beacon = new Image();
+        beacon.src = buildUrl('//bcn.fp.yahoo.com/p', params);
+    }
+
+    var hostname = window.location.hostname;
+    var device = 'desktop';
+    var ynet = ('-' === '1');
+    var prid = '2h4ehh1l5s90l';
+    var crid = '2h4ehh1l5s90l';
+    var time = new Date().getTime();
+    var params = {
+        s: '1197757129',
+        t: time,
+        err_url: document.URL,
+        err: '502',
+        test: '-',
+        ats_host: 'media-router-api7001.prod.media.ne1.yahoo.com',
+        prid: prid,
+        crid: crid,
+        message: 'Could Not Connect'
+    };
+
+    if(ynet) {
+        document.write('<div style="height: 5px; background-color: red;"></div>');
+    }
+    generateBRBMarkup(hostname, params);
+
+  </script>
+  <noscript>
+  <table>
+    <tbody>
+      <tr>
+        <td>
+          <div id="englishContent">
+            <h1 style="margin-top:20px;">Will be right back...</h1>
+            <p id="message-1">Thank you for your patience.</p>
+            <p id="message-2">Our engineers are working quickly to resolve the issue.</p>
+          </div>
+        </td>
+      </tr>
+    </tbody>
+  </table>
+  </noscript>
+  </body>
+</html>
+
+2026-07-20 08:35:39,101 ERROR yfinance | HTTP Error 502: <!DOCTYPE html>
+<html lang="en-us">
+  <head>
+    <meta http-equiv="content-type" content="text/html; charset=UTF-8">
+    <meta charset="utf-8">
+    <title>Yahoo</title>
+    <meta name="viewport" content="width=device-width,initial-scale=1,minimal-ui">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+    <style>
+      html {
+          height: 100%;
+      }
+      body {
+          background: #fafafc url(https://s.yimg.com/nn/img/sad-panda-201402200631.png) 50% 50%;
+          background-size: cover;
+          height: 100%;
+          text-align: center;
+          font: 300 18px "helvetica neue", helvetica, verdana, tahoma, arial, sans-serif;
+          margin: 0;
+      }
+      table {
+          height: 100%;
+          width: 100%;
+          table-layout: fixed;
+          border-collapse: collapse;
+          border-spacing: 0;
+          border: none;
+      }
+      h1 {
+          font-size: 42px;
+          font-weight: 400;
+          color: #400090;
+      }
+      p {
+          color: #1A1A1A;
+      }
+      #message-1 {
+          font-weight: bold;
+          margin: 0;
+      }
+      #message-2 {
+          display: inline-block;
+          *display: inline;
+          zoom: 1;
+          max-width: 17em;
+          _width: 17em;
+      }
+      </style>
+      <script>
+      
+      </script>
+  </head>
+  <body>
+  <!-- status code : 502 -->
+  <!-- Web Server Error -->
+  <!-- host machine: media-router-api7061.prod.media.ne1.yahoo.com -->
+  <!-- timestamp: 1784554538.247 -->
+  <!-- url: https://query1.finance.yahoo.com/v7/finance/quote?symbols=UMH&formatted=false&lang=en-US&region=US&crumb=JLaCeAs.K5G-->
+  <script type="text/javascript">
+    function buildUrl(url, parameters){
+      var qs = [];
+      for(var key in parameters) {
+        var value = parameters[key];
+        qs.push(encodeURIComponent(key) + "=" + encodeURIComponent(value));
+      }
+      url = url + "?" + qs.join('&');
+      return url;
+    }
+
+    function generateBRBMarkup(site) {
+      params.source = 'brb';
+      generateBeaconMarkup(params);
+      var englishHeader = 'Will be right back...';
+      var englishMessage1 = 'Thank you for your patience.';
+      var englishMessage2 = 'Our engineers are working quickly to resolve the issue.';
+      var defaultLogoStyle = '';
+      var siteDataMap = {
+        'default': {
+          logo: 'https://s.yimg.com/rz/p/yahoo_frontpage_en-US_s_f_p_205x58_frontpage.png',
+          logoAlt: 'Yahoo Logo',
+          logoStyle: defaultLogoStyle,
+          header: englishHeader,
+          message1: englishMessage1,
+          message2: englishMessage2
+        }
+      };
+
+      var siteDetails = siteDataMap['default'];
+
+      document.write('<table><tbody><tr><td>');
+      document.write('<div id="content">');
+      document.write('<img src="' + siteDetails['logo'] + '" alt="' + siteDetails['logoAlt'] + '" style="' + siteDetails['logoStyle'] + '">');
+      document.write('<h1 style="margin-top:20px;">' + siteDetails['header'] + '</h1>');
+      document.write('<p id="message-1">' + siteDetails['message1'] + '</p>');
+      document.write('<p id="message-2">' + siteDetails['message2'] + '</p>');
+      document.write('</div>');
+      document.write('</td></tr></tbody></table>');
+    }
+
+    function generateBeaconMarkup(params) {
+        document.write('<img src="' + buildUrl('//geo.yahoo.com/b', params) + '" style="display:none;" width="0px" height="0px"/>');
+        var beacon = new Image();
+        beacon.src = buildUrl('//bcn.fp.yahoo.com/p', params);
+    }
+
+    var hostname = window.location.hostname;
+    var device = 'desktop';
+    var ynet = ('-' === '1');
+    var prid = '37qq8dtl5s91a';
+    var crid = '37qq8dtl5s91a';
+    var time = new Date().getTime();
+    var params = {
+        s: '1197757129',
+        t: time,
+        err_url: document.URL,
+        err: '502',
+        test: '-',
+        ats_host: 'media-router-api7061.prod.media.ne1.yahoo.com',
+        prid: prid,
+        crid: crid,
+        message: 'Web Server Error'
+    };
+
+    if(ynet) {
+        document.write('<div style="height: 5px; background-color: red;"></div>');
+    }
+    generateBRBMarkup(hostname, params);
+
+  </script>
+  <noscript>
+  <table>
+    <tbody>
+      <tr>
+        <td>
+          <div id="englishContent">
+            <h1 style="margin-top:20px;">Will be right back...</h1>
+            <p id="message-1">Thank you for your patience.</p>
+            <p id="message-2">Our engineers are working quickly to resolve the issue.</p>
+          </div>
+        </td>
+      </tr>
+    </tbody>
+  </table>
+  </noscript>
+  </body>
+</html>
+
+2026-07-20 08:35:39,722 ERROR yfinance | HTTP Error 502: <!DOCTYPE html>
+<html lang="en-us">
+  <head>
+    <meta http-equiv="content-type" content="text/html; charset=UTF-8">
+    <meta charset="utf-8">
+    <title>Yahoo</title>
+    <meta name="viewport" content="width=device-width,initial-scale=1,minimal-ui">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+    <style>
+      html {
+          height: 100%;
+      }
+      body {
+          background: #fafafc url(https://s.yimg.com/nn/img/sad-panda-201402200631.png) 50% 50%;
+          background-size: cover;
+          height: 100%;
+          text-align: center;
+          font: 300 18px "helvetica neue", helvetica, verdana, tahoma, arial, sans-serif;
+          margin: 0;
+      }
+      table {
+          height: 100%;
+          width: 100%;
+          table-layout: fixed;
+          border-collapse: collapse;
+          border-spacing: 0;
+          border: none;
+      }
+      h1 {
+          font-size: 42px;
+          font-weight: 400;
+          color: #400090;
+      }
+      p {
+          color: #1A1A1A;
+      }
+      #message-1 {
+          font-weight: bold;
+          margin: 0;
+      }
+      #message-2 {
+          display: inline-block;
+          *display: inline;
+          zoom: 1;
+          max-width: 17em;
+          _width: 17em;
+      }
+      </style>
+      <script>
+      
+      </script>
+  </head>
+  <body>
+  <!-- status code : 502 -->
+  <!-- Could Not Connect -->
+  <!-- host machine: media-router-api7030.prod.media.ne1.yahoo.com -->
+  <!-- timestamp: 1784554539.645 -->
+  <!-- url: https://query1.finance.yahoo.com/v7/finance/quote?symbols=ZTS&formatted=false&lang=en-US&region=US&crumb=JLaCeAs.K5G-->
+  <script type="text/javascript">
+    function buildUrl(url, parameters){
+      var qs = [];
+      for(var key in parameters) {
+        var value = parameters[key];
+        qs.push(encodeURIComponent(key) + "=" + encodeURIComponent(value));
+      }
+      url = url + "?" + qs.join('&');
+      return url;
+    }
+
+    function generateBRBMarkup(site) {
+      params.source = 'brb';
+      generateBeaconMarkup(params);
+      var englishHeader = 'Will be right back...';
+      var englishMessage1 = 'Thank you for your patience.';
+      var englishMessage2 = 'Our engineers are working quickly to resolve the issue.';
+      var defaultLogoStyle = '';
+      var siteDataMap = {
+        'default': {
+          logo: 'https://s.yimg.com/rz/p/yahoo_frontpage_en-US_s_f_p_205x58_frontpage.png',
+          logoAlt: 'Yahoo Logo',
+          logoStyle: defaultLogoStyle,
+          header: englishHeader,
+          message1: englishMessage1,
+          message2: englishMessage2
+        }
+      };
+
+      var siteDetails = siteDataMap['default'];
+
+      document.write('<table><tbody><tr><td>');
+      document.write('<div id="content">');
+      document.write('<img src="' + siteDetails['logo'] + '" alt="' + siteDetails['logoAlt'] + '" style="' + siteDetails['logoStyle'] + '">');
+      document.write('<h1 style="margin-top:20px;">' + siteDetails['header'] + '</h1>');
+      document.write('<p id="message-1">' + siteDetails['message1'] + '</p>');
+      document.write('<p id="message-2">' + siteDetails['message2'] + '</p>');
+      document.write('</div>');
+      document.write('</td></tr></tbody></table>');
+    }
+
+    function generateBeaconMarkup(params) {
+        document.write('<img src="' + buildUrl('//geo.yahoo.com/b', params) + '" style="display:none;" width="0px" height="0px"/>');
+        var beacon = new Image();
+        beacon.src = buildUrl('//bcn.fp.yahoo.com/p', params);
+    }
+
+    var hostname = window.location.hostname;
+    var device = 'desktop';
+    var ynet = ('-' === '1');
+    var prid = '0qkg2ell5s91b';
+    var crid = '0qkg2ell5s91b';
+    var time = new Date().getTime();
+    var params = {
+        s: '1197757129',
+        t: time,
+        err_url: document.URL,
+        err: '502',
+        test: '-',
+        ats_host: 'media-router-api7030.prod.media.ne1.yahoo.com',
+        prid: prid,
+        crid: crid,
+        message: 'Could Not Connect'
+    };
+
+    if(ynet) {
+        document.write('<div style="height: 5px; background-color: red;"></div>');
+    }
+    generateBRBMarkup(hostname, params);
+
+  </script>
+  <noscript>
+  <table>
+    <tbody>
+      <tr>
+        <td>
+          <div id="englishContent">
+            <h1 style="margin-top:20px;">Will be right back...</h1>
+            <p id="message-1">Thank you for your patience.</p>
+            <p id="message-2">Our engineers are working quickly to resolve the issue.</p>
+          </div>
+        </td>
+      </tr>
+    </tbody>
+  </table>
+  </noscript>
+  </body>
+</html>
+
+2026-07-20 08:35:41,110 INFO orchestrator | BUY T -> approved: Sized to 223.478 sh ($4,854) within caps. | Strongest composite on the slate (+1.81) with corroborated smart-money: 6 congressional buys/1 sell,
+2026-07-20 08:35:41,207 WARNING alpaca | T: floored 223.478 sh -> 223 for the exchange bracket; $10.37 of the $4853.94 allocation NOT deployed (stays cash; core sweep / next cycle can redeploy).
+2026-07-20 08:35:41,268 INFO alpaca | BUY market T qty=223.0 notional=None lim=None (order a590ae2a-9f9a-46f1-b2b2-c557447dd471)
+2026-07-20 08:35:41,274 INFO ledger | Ledger: BUY T qty=223 $4839
+2026-07-20 08:35:42,036 ERROR yfinance | HTTP Error 502: <!DOCTYPE html>
+<html lang="en-us">
+  <head>
+    <meta http-equiv="content-type" content="text/html; charset=UTF-8">
+    <meta charset="utf-8">
+    <title>Yahoo</title>
+    <meta name="viewport" content="width=device-width,initial-scale=1,minimal-ui">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+    <style>
+      html {
+          height: 100%;
+      }
+      body {
+          background: #fafafc url(https://s.yimg.com/nn/img/sad-panda-201402200631.png) 50% 50%;
+          background-size: cover;
+          height: 100%;
+          text-align: center;
+          font: 300 18px "helvetica neue", helvetica, verdana, tahoma, arial, sans-serif;
+          margin: 0;
+      }
+      table {
+          height: 100%;
+          width: 100%;
+          table-layout: fixed;
+          border-collapse: collapse;
+          border-spacing: 0;
+          border: none;
+      }
+      h1 {
+          font-size: 42px;
+          font-weight: 400;
+          color: #400090;
+      }
+      p {
+          color: #1A1A1A;
+      }
+      #message-1 {
+          font-weight: bold;
+          margin: 0;
+      }
+      #message-2 {
+          display: inline-block;
+          *display: inline;
+          zoom: 1;
+          max-width: 17em;
+          _width: 17em;
+      }
+      </style>
+      <script>
+      
+      </script>
+  </head>
+  <body>
+  <!-- status code : 502 -->
+  <!-- Could Not Connect -->
+  <!-- host machine: media-router-api7093.prod.media.ne1.yahoo.com -->
+  <!-- timestamp: 1784554541.947 -->
+  <!-- url: https://query1.finance.yahoo.com/v7/finance/quote?symbols=HUBB&formatted=false&lang=en-US&region=US&crumb=JLaCeAs.K5G-->
+  <script type="text/javascript">
+    function buildUrl(url, parameters){
+      var qs = [];
+      for(var key in parameters) {
+        var value = parameters[key];
+        qs.push(encodeURIComponent(key) + "=" + encodeURIComponent(value));
+      }
+      url = url + "?" + qs.join('&');
+      return url;
+    }
+
+    function generateBRBMarkup(site) {
+      params.source = 'brb';
+      generateBeaconMarkup(params);
+      var englishHeader = 'Will be right back...';
+      var englishMessage1 = 'Thank you for your patience.';
+      var englishMessage2 = 'Our engineers are working quickly to resolve the issue.';
+      var defaultLogoStyle = '';
+      var siteDataMap = {
+        'default': {
+          logo: 'https://s.yimg.com/rz/p/yahoo_frontpage_en-US_s_f_p_205x58_frontpage.png',
+          logoAlt: 'Yahoo Logo',
+          logoStyle: defaultLogoStyle,
+          header: englishHeader,
+          message1: englishMessage1,
+          message2: englishMessage2
+        }
+      };
+
+      var siteDetails = siteDataMap['default'];
+
+      document.write('<table><tbody><tr><td>');
+      document.write('<div id="content">');
+      document.write('<img src="' + siteDetails['logo'] + '" alt="' + siteDetails['logoAlt'] + '" style="' + siteDetails['logoStyle'] + '">');
+      document.write('<h1 style="margin-top:20px;">' + siteDetails['header'] + '</h1>');
+      document.write('<p id="message-1">' + siteDetails['message1'] + '</p>');
+      document.write('<p id="message-2">' + siteDetails['message2'] + '</p>');
+      document.write('</div>');
+      document.write('</td></tr></tbody></table>');
+    }
+
+    function generateBeaconMarkup(params) {
+        document.write('<img src="' + buildUrl('//geo.yahoo.com/b', params) + '" style="display:none;" width="0px" height="0px"/>');
+        var beacon = new Image();
+        beacon.src = buildUrl('//bcn.fp.yahoo.com/p', params);
+    }
+
+    var hostname = window.location.hostname;
+    var device = 'desktop';
+    var ynet = ('-' === '1');
+    var prid = '73338adl5s91d';
+    var crid = '73338adl5s91d';
+    var time = new Date().getTime();
+    var params = {
+        s: '1197757129',
+        t: time,
+        err_url: document.URL,
+        err: '502',
+        test: '-',
+        ats_host: 'media-router-api7093.prod.media.ne1.yahoo.com',
+        prid: prid,
+        crid: crid,
+        message: 'Could Not Connect'
+    };
+
+    if(ynet) {
+        document.write('<div style="height: 5px; background-color: red;"></div>');
+    }
+    generateBRBMarkup(hostname, params);
+
+  </script>
+  <noscript>
+  <table>
+    <tbody>
+      <tr>
+        <td>
+          <div id="englishContent">
+            <h1 style="margin-top:20px;">Will be right back...</h1>
+            <p id="message-1">Thank you for your patience.</p>
+            <p id="message-2">Our engineers are working quickly to resolve the issue.</p>
+          </div>
+        </td>
+      </tr>
+    </tbody>
+  </table>
+  </noscript>
+  </body>
+</html>
+
+2026-07-20 08:35:42,215 INFO orchestrator | BUY HUBB -> resized: Sized to 3.97164 sh ($1,942) within caps. Reduced from request. | Composite +1.17: heavy congressional buying (10 buy/0 sell), insider net positive, decent fundamenta
+2026-07-20 08:35:42,265 WARNING alpaca | HUBB: floored 3.97164 sh -> 3 for the exchange bracket; $475.00 of the $1941.58 allocation NOT deployed (stays cash; core sweep / next cycle can redeploy).
+2026-07-20 08:35:42,353 INFO alpaca | BUY market HUBB qty=3.0 notional=None lim=None (order 5ecf2db7-c0a4-4c33-953a-8794cb976074)
+2026-07-20 08:35:42,356 INFO ledger | Ledger: BUY HUBB qty=3 $1467
+2026-07-20 08:35:42,360 INFO orchestrator | Cycle budget not fully deployed: $485.37 dropped by whole-share flooring across this cycle's buys (stays cash; core sweep / next cycle can redeploy).
+2026-07-20 08:35:42,434 INFO alpaca | Alpaca client ready (mode=paper).
+2026-07-20 08:35:44,846 INFO dashboard | Wrote dashboard with 63 trades -> dashboard.html
+2026-07-20 09:30:29,712 INFO orchestrator | Market regime: SPY above 200dma (746 vs 694), VIX 18 -> risk-on, size x1.00.
+2026-07-20 09:30:30,492 INFO quiver | Quiver live/congresstrading -> 1000 row(s).
+2026-07-20 09:30:30,682 INFO screener | EDGAR Form-4 feed -> 57 filing(s) (scanning up to 100).
+2026-07-20 09:30:56,023 INFO screener | Options-flow most-actives pool -> 40 name(s).
+2026-07-20 09:31:20,908 INFO screener | Robinhood 'Daily movers' -> 20 name(s).
+2026-07-20 09:31:22,032 INFO screener | Robinhood '100 most popular' -> 100 name(s).
+2026-07-20 09:31:22,769 INFO screener | Robinhood scans: none saved (define scans in the RH app to use this leg).
+2026-07-20 09:31:22,771 INFO screener | Discovered 18 candidate(s) from 5 source(s) (291 merged, 272 above min_score, capped to 18).
+2026-07-20 09:31:22,773 INFO screener |   candidate ACHR [options_flow+robinhood] score=+1.48 — Options flow: 21,706 call / 1,387 put vol (bullish call imbalance +0.88) on a most-active name. | Robinhood Daily Movers (today's biggest movers — momentum)
+2026-07-20 09:31:22,775 INFO screener |   candidate AMC [options_flow+robinhood] score=+1.25 — Options flow: 79,811 call / 17,010 put vol (bullish call imbalance +0.65) on a most-active name. | Robinhood Daily Movers (today's biggest movers — momentum) | Robinhood 100 Most Popular (retail crowd positioning)
+2026-07-20 09:31:22,777 INFO screener |   candidate SPCX [congress+robinhood] score=+1.10 — Congress: 3 buy / 0 sell filings in last 60d (disclosures lag up to ~45d). | Robinhood 100 Most Popular (retail crowd positioning)
+2026-07-20 09:31:22,778 INFO screener |   candidate IREN [options_flow+robinhood] score=+1.08 — Options flow: 92,893 call / 32,960 put vol (bullish call imbalance +0.48) on a most-active name. | Robinhood Daily Movers (today's biggest movers — momentum)
+2026-07-20 09:31:22,779 INFO screener |   candidate TSCO [congress] score=-1.00 — Congress: 0 buy / 5 sell filings in last 60d (disclosures lag up to ~45d).
+2026-07-20 09:31:22,780 INFO screener |   candidate WAB [congress] score=-1.00 — Congress: 0 buy / 5 sell filings in last 60d (disclosures lag up to ~45d).
+2026-07-20 09:31:22,782 INFO screener |   candidate FFAI [options_flow] score=+1.00 — Options flow: 551 call / 0 put vol (bullish call imbalance +1.00) on a most-active name.
+2026-07-20 09:31:22,783 INFO screener |   candidate UBER [congress+robinhood] score=+0.85 — Congress: 2 buy / 0 sell filings in last 60d (disclosures lag up to ~45d). | Robinhood 100 Most Popular (retail crowd positioning)
+2026-07-20 09:31:22,784 INFO screener |   candidate NU [options_flow] score=+0.76 — Options flow: 3,384 call / 466 put vol (bullish call imbalance +0.76) on a most-active name.
+2026-07-20 09:31:22,785 INFO screener |   candidate LYV [congress] score=-0.75 — Congress: 0 buy / 3 sell filings in last 60d (disclosures lag up to ~45d).
+2026-07-20 09:31:22,786 INFO screener |   candidate INTU [congress] score=-0.75 — Congress: 0 buy / 3 sell filings in last 60d (disclosures lag up to ~45d).
+2026-07-20 09:31:22,787 INFO screener |   candidate ADI [congress] score=-0.75 — Congress: 0 buy / 3 sell filings in last 60d (disclosures lag up to ~45d).
+2026-07-20 09:31:22,788 INFO screener |   candidate NFLX [options_flow+robinhood] score=+0.73 — Options flow: 74,630 call / 33,561 put vol (bullish call imbalance +0.38) on a most-active name. | Robinhood 100 Most Popular (retail crowd positioning)
+2026-07-20 09:31:22,789 INFO screener |   candidate MARA [options_flow] score=+0.69 — Options flow: 50,485 call / 9,162 put vol (bullish call imbalance +0.69) on a most-active name.
+2026-07-20 09:31:22,790 INFO screener |   candidate MUU [options_flow] score=+0.68 — Options flow: 4,248 call / 810 put vol (bullish call imbalance +0.68) on a most-active name.
+2026-07-20 09:31:22,791 INFO screener |   candidate SQQQ [options_flow] score=+0.67 — Options flow: 15,320 call / 3,002 put vol (bullish call imbalance +0.67) on a most-active name.
+2026-07-20 09:31:22,792 INFO screener |   candidate BITO [options_flow] score=+0.67 — Options flow: 835 call / 165 put vol (bullish call imbalance +0.67) on a most-active name.
+2026-07-20 09:31:22,792 INFO screener |   candidate UNH [congress] score=-0.60 — Congress: 1 buy / 4 sell filings in last 60d (disclosures lag up to ~45d).
+2026-07-20 09:31:54,145 WARNING signals | fundamentals.fetch failed: Failed to perform, curl: (28) Operation timed out after 30003 milliseconds with 0 bytes received. See https://curl.se/libcurl/c/libcurl-errors.html first for more details.
+2026-07-20 09:32:02,434 INFO quiver | Quiver live/offexchange -> 5461 row(s).
+2026-07-20 09:32:02,964 INFO quiver | Quiver live/govcontractsall -> 20000 row(s).
+2026-07-20 09:32:47,359 INFO signals | options_chain: reading 25 of 29 symbols this cycle (cap).
+2026-07-20 09:32:54,404 INFO signals | Gathered signals for 29/29 symbols (+3 market signals).
+2026-07-20 09:32:56,605 INFO robinhood | Imported 1 Robinhood holding(s) for context (read-only).
+2026-07-20 09:32:56,613 INFO orchestrator | Buy-excluded from slate this cycle: HUBB (topped up 1.0h ago (next ok in 4h)), T (topped up 1.0h ago (next ok in 4h))
+2026-07-20 09:33:31,728 INFO usage | decision call: 23050 in / 2355 out (cache r=0 w=0) ~$0.1741 [claude-opus-4-8]
+2026-07-20 09:33:31,738 INFO decision | Claude returned 4 proposal(s).
+2026-07-20 09:33:31,740 INFO orchestrator | Cycle budget $13,670 split across 2 buy(s): AMC $8,202, NU $1,814.
+2026-07-20 09:33:33,871 INFO earnings | Robinhood earnings calendar: 0 name(s) reporting within 31d.
+2026-07-20 09:33:38,570 INFO risk | REJECT buy AMC: Price $2.19 below min $5.00 (liquidity guard).
+2026-07-20 09:33:38,578 INFO orchestrator | BUY AMC -> rejected: Price $2.19 below min $5.00 (liquidity guard). | Best-corroborated new name: composite +2.66, uptrend (px>50>200) with bullish MACD, RSI 57 (not exte
+2026-07-20 09:33:39,222 INFO orchestrator | BUY NU -> resized: Sized to 132.104 sh ($1,814) within caps. Reduced from request. | Bullish options positioning (put/call OI 0.21, chain +0.37) plus strong call-flow imbalance (+0.76) 
+2026-07-20 09:33:39,271 WARNING alpaca | NU: floored 132.104 sh -> 132 for the exchange bracket; $1.42 of the $1813.78 allocation NOT deployed (stays cash; core sweep / next cycle can redeploy).
+2026-07-20 09:33:39,328 INFO alpaca | BUY market NU qty=132.0 notional=None lim=None (order 25a2cf2a-55b7-49b8-9602-a98d84123eab)
+2026-07-20 09:33:39,336 INFO ledger | Ledger: BUY NU qty=132 $1812
+2026-07-20 09:33:39,461 INFO orchestrator | HOLD NVDA (no action) | Position +2.7%; technicals mixed-to-bull (MACD bull, RSI 51) but heavy insider selling and bearish c
+2026-07-20 09:33:39,564 INFO orchestrator | HOLD COO (no action) | Underwater -2.7% with off-exchange short pressure (68%, decaying) and MACD bear, but congress/inside
+2026-07-20 09:33:39,569 INFO orchestrator | Cycle budget not fully deployed: $1.42 dropped by whole-share flooring across this cycle's buys (stays cash; core sweep / next cycle can redeploy).
+2026-07-20 09:33:39,634 INFO alpaca | Alpaca client ready (mode=paper).
+2026-07-20 09:33:42,056 INFO dashboard | Wrote dashboard with 64 trades -> dashboard.html
+2026-07-20 10:30:53,542 INFO orchestrator | Market regime: SPY above 200dma (746 vs 694), VIX 18 -> risk-on, size x1.00.
+2026-07-20 10:30:54,249 INFO quiver | Quiver live/congresstrading -> 1000 row(s).
+2026-07-20 10:30:54,661 INFO screener | EDGAR Form-4 feed -> 62 filing(s) (scanning up to 100).
+2026-07-20 10:31:21,769 INFO screener | Options-flow most-actives pool -> 40 name(s).
+2026-07-20 10:31:41,322 INFO screener | Robinhood 'Daily movers' -> 20 name(s).
+2026-07-20 10:31:42,668 INFO screener | Robinhood '100 most popular' -> 100 name(s).
+2026-07-20 10:31:43,547 INFO screener | Robinhood scans: none saved (define scans in the RH app to use this leg).
+2026-07-20 10:31:43,549 INFO screener | Discovered 18 candidate(s) from 5 source(s) (290 merged, 270 above min_score, capped to 18).
+2026-07-20 10:31:43,551 INFO screener |   candidate ACHR [options_flow+robinhood] score=+1.47 — Options flow: 30,551 call / 2,102 put vol (bullish call imbalance +0.87) on a most-active name. | Robinhood Daily Movers (today's biggest movers — momentum)
+2026-07-20 10:31:43,553 INFO screener |   candidate AMC [options_flow+robinhood] score=+1.27 — Options flow: 110,879 call / 21,533 put vol (bullish call imbalance +0.68) on a most-active name. | Robinhood Daily Movers (today's biggest movers — momentum) | Robinhood 100 Most Popular (retail crowd positioning)
+2026-07-20 10:31:43,555 INFO screener |   candidate SPCX [congress+robinhood] score=+1.10 — Congress: 3 buy / 0 sell filings in last 60d (disclosures lag up to ~45d). | Robinhood 100 Most Popular (retail crowd positioning)
+2026-07-20 10:31:43,556 INFO screener |   candidate IREN [options_flow+robinhood] score=+1.03 — Options flow: 118,814 call / 46,760 put vol (bullish call imbalance +0.43) on a most-active name. | Robinhood Daily Movers (today's biggest movers — momentum)
+2026-07-20 10:31:43,557 INFO screener |   candidate TSCO [congress] score=-1.00 — Congress: 0 buy / 5 sell filings in last 60d (disclosures lag up to ~45d).
+2026-07-20 10:31:43,558 INFO screener |   candidate WAB [congress] score=-1.00 — Congress: 0 buy / 5 sell filings in last 60d (disclosures lag up to ~45d).
+2026-07-20 10:31:43,559 INFO screener |   candidate FFAI [options_flow] score=+0.93 — Options flow: 717 call / 28 put vol (bullish call imbalance +0.93) on a most-active name.
+2026-07-20 10:31:43,561 INFO screener |   candidate UBER [congress+robinhood] score=+0.85 — Congress: 2 buy / 0 sell filings in last 60d (disclosures lag up to ~45d). | Robinhood 100 Most Popular (retail crowd positioning)
+2026-07-20 10:31:43,562 INFO screener |   candidate BITO [options_flow] score=+0.77 — Options flow: 1,958 call / 256 put vol (bullish call imbalance +0.77) on a most-active name.
+2026-07-20 10:31:43,563 INFO screener |   candidate LYV [congress] score=-0.75 — Congress: 0 buy / 3 sell filings in last 60d (disclosures lag up to ~45d).
+2026-07-20 10:31:43,564 INFO screener |   candidate INTU [congress] score=-0.75 — Congress: 0 buy / 3 sell filings in last 60d (disclosures lag up to ~45d).
+2026-07-20 10:31:43,565 INFO screener |   candidate ADI [congress] score=-0.75 — Congress: 0 buy / 3 sell filings in last 60d (disclosures lag up to ~45d).
+2026-07-20 10:31:43,566 INFO screener |   candidate NFLX [options_flow+robinhood] score=+0.75 — Options flow: 110,281 call / 47,303 put vol (bullish call imbalance +0.40) on a most-active name. | Robinhood 100 Most Popular (retail crowd positioning)
+2026-07-20 10:31:43,567 INFO screener |   candidate OPEN [options_flow] score=+0.71 — Options flow: 19,554 call / 3,321 put vol (bullish call imbalance +0.71) on a most-active name.
+2026-07-20 10:31:43,569 INFO screener |   candidate SQQQ [options_flow] score=+0.65 — Options flow: 21,913 call / 4,661 put vol (bullish call imbalance +0.65) on a most-active name.
+2026-07-20 10:31:43,570 INFO screener |   candidate PATH [options_flow] score=+0.63 — Options flow: 6,827 call / 1,547 put vol (bullish call imbalance +0.63) on a most-active name.
+2026-07-20 10:31:43,571 INFO screener |   candidate UNH [congress] score=-0.60 — Congress: 1 buy / 4 sell filings in last 60d (disclosures lag up to ~45d).
+2026-07-20 10:31:43,572 INFO screener |   candidate TSLA [congress+robinhood] score=+0.60 — Congress: 1 buy / 0 sell filings in last 60d (disclosures lag up to ~45d). | Robinhood 100 Most Popular (retail crowd positioning)
+2026-07-20 10:32:03,541 INFO quiver | Quiver live/offexchange -> 5461 row(s).
+2026-07-20 10:32:04,104 INFO quiver | Quiver live/govcontractsall -> 20000 row(s).
+2026-07-20 10:32:25,877 INFO signals | options_chain: reading 25 of 30 symbols this cycle (cap).
+2026-07-20 10:32:32,833 INFO signals | Gathered signals for 30/30 symbols (+3 market signals).
+2026-07-20 10:32:35,147 INFO robinhood | Imported 1 Robinhood holding(s) for context (read-only).
+2026-07-20 10:32:35,173 INFO orchestrator | Buy-excluded from slate this cycle: HUBB (topped up 1.9h ago (next ok in 4h)), NU (topped up 1.0h ago (next ok in 4h)), PATH (exited 2.4h ago (cooldown 24h)), T (topped up 1.9h ago (next ok in 4h))
+2026-07-20 10:33:10,147 INFO usage | decision call: 25524 in / 2669 out (cache r=0 w=0) ~$0.1943 [claude-opus-4-8]
+2026-07-20 10:33:10,154 INFO decision | Claude returned 5 proposal(s).
+2026-07-20 10:33:10,157 INFO orchestrator | Cycle budget $11,857 split across 3 buy(s): UBER $2,313, UMH $6,090, BRK.B $3,455.
+2026-07-20 10:33:12,047 INFO earnings | Robinhood earnings calendar: 0 name(s) reporting within 31d.
+2026-07-20 10:33:16,300 INFO orchestrator | BUY UBER -> resized: Sized to 31.7503 sh ($2,313) within caps. Reduced from request. | Positive fundamentals (EBITDA $7B, rev +14.5%, margin 13%), congressional buying (2 buy/0 sell) and 
+2026-07-20 10:33:16,364 WARNING alpaca | UBER: floored 31.7503 sh -> 31 for the exchange bracket; $54.67 of the $2312.69 allocation NOT deployed (stays cash; core sweep / next cycle can redeploy).
+2026-07-20 10:33:16,425 INFO alpaca | BUY market UBER qty=31.0 notional=None lim=None (order 88025f5b-3126-42eb-9827-d8e077a2475b)
+2026-07-20 10:33:16,433 INFO ledger | Ledger: BUY UBER qty=31 $2259
+2026-07-20 10:33:16,672 INFO risk | REJECT buy UMH: Top-up conviction 0.54 shows no new edge over prior entry 0.55 (needs +0.05) — 'adding to a winner' is not a signal.
+2026-07-20 10:33:16,678 INFO orchestrator | BUY UMH -> rejected: Top-up conviction 0.54 shows no new edge over prior entry 0.55 (needs +0.05) — 'adding to a winner' is not a signal. | Strongest composite among holdings (+1.42): uptrend (px>50>200), MACD bull, RSI 56 not extended, sol
+2026-07-20 10:33:17,000 INFO orchestrator | BUY BRK.B -> resized: Sized to 7.03686 sh ($3,455) within caps. Reduced from request. | Defensive quality anchor with positive composite (+0.87): strong fundamentals (EBITDA $118B, margin 
+2026-07-20 10:33:17,107 WARNING alpaca | BRK.B: floored 7.03686 sh -> 7 for the exchange bracket; $18.10 of the $3454.75 allocation NOT deployed (stays cash; core sweep / next cycle can redeploy).
+2026-07-20 10:33:17,178 INFO alpaca | BUY market BRK.B qty=7.0 notional=None lim=None (order e333c696-54db-4453-b294-96ddef8a9602)
+2026-07-20 10:33:17,182 INFO ledger | Ledger: BUY BRK.B qty=7 $3437
+2026-07-20 10:33:17,348 INFO orchestrator | HOLD NVDA (no action) | Elite fundamentals (rev +85%, margin 65%) and position is +2.9%, but heavy insider/Form-4 selling, c
+2026-07-20 10:33:17,506 INFO orchestrator | HOLD NFLX (no action) | Strong fundamentals and bullish flow but RSI 29 oversold within a confirmed downtrend and MACD bear 
+2026-07-20 10:33:17,510 INFO orchestrator | Cycle budget not fully deployed: $72.77 dropped by whole-share flooring across this cycle's buys (stays cash; core sweep / next cycle can redeploy).
+2026-07-20 10:33:17,575 INFO alpaca | Alpaca client ready (mode=paper).
+2026-07-20 10:33:19,878 INFO dashboard | Wrote dashboard with 66 trades -> dashboard.html
+2026-07-20 11:31:02,606 INFO orchestrator | Market regime: SPY above 200dma (746 vs 694), VIX 17 -> risk-on, size x1.00.
+2026-07-20 11:31:03,356 INFO quiver | Quiver live/congresstrading -> 1000 row(s).
+2026-07-20 11:31:03,604 INFO screener | EDGAR Form-4 feed -> 69 filing(s) (scanning up to 100).
+2026-07-20 11:31:34,946 INFO screener | Options-flow most-actives pool -> 40 name(s).
+2026-07-20 11:31:53,303 INFO screener | Robinhood 'Daily movers' -> 20 name(s).
+2026-07-20 11:31:54,992 INFO screener | Robinhood '100 most popular' -> 100 name(s).
+2026-07-20 11:31:55,828 INFO screener | Robinhood scans: none saved (define scans in the RH app to use this leg).
+2026-07-20 11:31:55,830 INFO screener | Discovered 18 candidate(s) from 5 source(s) (288 merged, 269 above min_score, capped to 18).
+2026-07-20 11:31:55,831 INFO screener |   candidate ACHR [options_flow+robinhood] score=+1.43 — Options flow: 63,700 call / 5,891 put vol (bullish call imbalance +0.83) on a most-active name. | Robinhood Daily Movers (today's biggest movers — momentum)
+2026-07-20 11:31:55,832 INFO screener |   candidate AMC [options_flow+robinhood] score=+1.30 — Options flow: 157,372 call / 28,193 put vol (bullish call imbalance +0.70) on a most-active name. | Robinhood Daily Movers (today's biggest movers — momentum) | Robinhood 100 Most Popular (retail crowd positioning)
+2026-07-20 11:31:55,833 INFO screener |   candidate SPCX [congress+robinhood] score=+1.10 — Congress: 3 buy / 0 sell filings in last 60d (disclosures lag up to ~45d). | Robinhood 100 Most Popular (retail crowd positioning)
+2026-07-20 11:31:55,834 INFO screener |   candidate TSCO [congress] score=-1.00 — Congress: 0 buy / 5 sell filings in last 60d (disclosures lag up to ~45d).
+2026-07-20 11:31:55,835 INFO screener |   candidate WAB [congress] score=-1.00 — Congress: 0 buy / 5 sell filings in last 60d (disclosures lag up to ~45d).
+2026-07-20 11:31:55,836 INFO screener |   candidate IREN [options_flow+robinhood] score=+0.98 — Options flow: 144,040 call / 65,318 put vol (bullish call imbalance +0.38) on a most-active name. | Robinhood Daily Movers (today's biggest movers — momentum)
+2026-07-20 11:31:55,837 INFO screener |   candidate FFAI [options_flow] score=+0.93 — Options flow: 1,056 call / 36 put vol (bullish call imbalance +0.93) on a most-active name.
+2026-07-20 11:31:55,838 INFO screener |   candidate BITO [options_flow] score=+0.85 — Options flow: 6,157 call / 505 put vol (bullish call imbalance +0.85) on a most-active name.
+2026-07-20 11:31:55,839 INFO screener |   candidate SOFI [options_flow+robinhood] score=+0.80 — Options flow: 80,454 call / 30,285 put vol (bullish call imbalance +0.45) on a most-active name. | Robinhood 100 Most Popular (retail crowd positioning)
+2026-07-20 11:31:55,840 INFO screener |   candidate JOBY [options_flow] score=+0.77 — Options flow: 7,973 call / 1,060 put vol (bullish call imbalance +0.77) on a most-active name.
+2026-07-20 11:31:55,841 INFO screener |   candidate PATH [options_flow] score=+0.76 — Options flow: 15,603 call / 2,134 put vol (bullish call imbalance +0.76) on a most-active name.
+2026-07-20 11:31:55,842 INFO screener |   candidate LYV [congress] score=-0.75 — Congress: 0 buy / 3 sell filings in last 60d (disclosures lag up to ~45d).
+2026-07-20 11:31:55,843 INFO screener |   candidate INTU [congress] score=-0.75 — Congress: 0 buy / 3 sell filings in last 60d (disclosures lag up to ~45d).
+2026-07-20 11:31:55,844 INFO screener |   candidate ADI [congress] score=-0.75 — Congress: 0 buy / 3 sell filings in last 60d (disclosures lag up to ~45d).
+2026-07-20 11:31:55,845 INFO screener |   candidate NFLX [options_flow+robinhood] score=+0.74 — Options flow: 133,442 call / 58,836 put vol (bullish call imbalance +0.39) on a most-active name. | Robinhood 100 Most Popular (retail crowd positioning)
+2026-07-20 11:31:55,846 INFO screener |   candidate OPEN [options_flow] score=+0.71 — Options flow: 26,426 call / 4,511 put vol (bullish call imbalance +0.71) on a most-active name.
+2026-07-20 11:31:55,847 INFO screener |   candidate ONDS [options_flow] score=+0.63 — Options flow: 39,256 call / 8,794 put vol (bullish call imbalance +0.63) on a most-active name.
+2026-07-20 11:31:55,849 INFO screener |   candidate SQQQ [options_flow] score=+0.63 — Options flow: 25,850 call / 5,799 put vol (bullish call imbalance +0.63) on a most-active name.
+2026-07-20 11:32:12,747 INFO quiver | Quiver live/offexchange -> 5461 row(s).
+2026-07-20 11:32:13,337 INFO quiver | Quiver live/govcontractsall -> 20000 row(s).
+2026-07-20 11:32:43,963 INFO signals | options_chain: reading 25 of 31 symbols this cycle (cap).
+2026-07-20 11:32:50,600 INFO signals | Gathered signals for 31/31 symbols (+3 market signals).
+2026-07-20 11:32:53,277 INFO robinhood | Imported 1 Robinhood holding(s) for context (read-only).
+2026-07-20 11:32:53,282 INFO orchestrator | Buy-excluded from slate this cycle: BRK.B (topped up 1.0h ago (next ok in 4h)), HUBB (topped up 3.0h ago (next ok in 4h)), NU (topped up 2.0h ago (next ok in 4h)), PATH (exited 3.4h ago (cooldown 24h)), T (topped up 3.0h ago (next ok in 4h)) …+1 more
+2026-07-20 11:33:24,782 INFO usage | decision call: 26215 in / 2004 out (cache r=0 w=0) ~$0.1812 [claude-opus-4-8]
+2026-07-20 11:33:24,791 INFO decision | Claude returned 3 proposal(s).
+2026-07-20 11:33:24,795 INFO orchestrator | Cycle budget $6,160 split across 2 buy(s): AMC $3,696, SOFI $1,315.
+2026-07-20 11:33:26,673 INFO earnings | Robinhood earnings calendar: 0 name(s) reporting within 31d.
+2026-07-20 11:33:30,634 INFO risk | REJECT buy AMC: Price $2.35 below min $5.00 (liquidity guard).
+2026-07-20 11:33:30,638 INFO orchestrator | BUY AMC -> rejected: Price $2.35 below min $5.00 (liquidity guard). | Rare full corroboration on a scanner name: technical uptrend (px>50>200, MACD bull, RSI 61), insider
+2026-07-20 11:33:31,211 INFO orchestrator | BUY SOFI -> resized: Sized to 76.0991 sh ($1,315) within caps. Reduced from request. | Bullish options positioning (chain +0.43, put/call OI 0.29, skew flat) and persistent bullish flow (
+2026-07-20 11:33:31,339 WARNING alpaca | SOFI: floored 76.0991 sh -> 76 for the exchange bracket; $1.71 of the $1314.61 allocation NOT deployed (stays cash; core sweep / next cycle can redeploy).
+2026-07-20 11:33:31,407 INFO alpaca | BUY market SOFI qty=76.0 notional=None lim=None (order af20b182-0fc0-4a74-8a4c-37eac394d124)
+2026-07-20 11:33:31,416 INFO ledger | Ledger: BUY SOFI qty=76 $1313
+2026-07-20 11:33:31,525 INFO orchestrator | HOLD NVDA (no action) | Elite fundamentals (65% margin, +85% rev growth) but bearish options positioning (skew +8.1, OI 0.84
+2026-07-20 11:33:31,527 INFO orchestrator | Cycle budget not fully deployed: $1.71 dropped by whole-share flooring across this cycle's buys (stays cash; core sweep / next cycle can redeploy).
+2026-07-20 11:33:31,593 INFO alpaca | Alpaca client ready (mode=paper).
+2026-07-20 11:33:33,880 INFO dashboard | Wrote dashboard with 67 trades -> dashboard.html
+2026-07-20 12:31:14,608 INFO orchestrator | Market regime: SPY above 200dma (744 vs 694), VIX 18 -> risk-on, size x1.00.
+2026-07-20 12:31:15,447 INFO quiver | Quiver live/congresstrading -> 1000 row(s).
+2026-07-20 12:31:15,845 INFO screener | EDGAR Form-4 feed -> 79 filing(s) (scanning up to 100).
+2026-07-20 12:31:41,372 INFO screener | Options-flow most-actives pool -> 40 name(s).
+2026-07-20 12:31:58,163 INFO screener | Robinhood 'Daily movers' -> 20 name(s).
+2026-07-20 12:31:59,185 INFO screener | Robinhood '100 most popular' -> 100 name(s).
+2026-07-20 12:32:00,109 INFO screener | Robinhood scans: none saved (define scans in the RH app to use this leg).
+2026-07-20 12:32:00,113 INFO screener | Discovered 18 candidate(s) from 5 source(s) (286 merged, 267 above min_score, capped to 18).
+2026-07-20 12:32:00,115 INFO screener |   candidate ACHR [options_flow+robinhood] score=+1.35 — Options flow: 79,857 call / 11,558 put vol (bullish call imbalance +0.75) on a most-active name. | Robinhood Daily Movers (today's biggest movers — momentum)
+2026-07-20 12:32:00,119 INFO screener |   candidate AMC [options_flow+robinhood] score=+1.23 — Options flow: 175,766 call / 39,376 put vol (bullish call imbalance +0.63) on a most-active name. | Robinhood Daily Movers (today's biggest movers — momentum) | Robinhood 100 Most Popular (retail crowd positioning)
+2026-07-20 12:32:00,120 INFO screener |   candidate SPCX [congress+robinhood] score=+1.10 — Congress: 3 buy / 0 sell filings in last 60d (disclosures lag up to ~45d). | Robinhood 100 Most Popular (retail crowd positioning)
+2026-07-20 12:32:00,121 INFO screener |   candidate TSCO [congress] score=-1.00 — Congress: 0 buy / 5 sell filings in last 60d (disclosures lag up to ~45d).
+2026-07-20 12:32:00,122 INFO screener |   candidate WAB [congress] score=-1.00 — Congress: 0 buy / 5 sell filings in last 60d (disclosures lag up to ~45d).
+2026-07-20 12:32:00,122 INFO screener |   candidate FFAI [options_flow] score=+0.95 — Options flow: 1,789 call / 41 put vol (bullish call imbalance +0.95) on a most-active name.
+2026-07-20 12:32:00,145 INFO screener |   candidate IREN [options_flow+robinhood] score=+0.94 — Options flow: 161,226 call / 78,677 put vol (bullish call imbalance +0.34) on a most-active name. | Robinhood Daily Movers (today's biggest movers — momentum)
+2026-07-20 12:32:00,161 INFO screener |   candidate BITO [options_flow] score=+0.82 — Options flow: 6,319 call / 632 put vol (bullish call imbalance +0.82) on a most-active name.
+2026-07-20 12:32:00,162 INFO screener |   candidate JOBY [options_flow] score=+0.76 — Options flow: 9,185 call / 1,238 put vol (bullish call imbalance +0.76) on a most-active name.
+2026-07-20 12:32:00,164 INFO screener |   candidate LYV [congress] score=-0.75 — Congress: 0 buy / 3 sell filings in last 60d (disclosures lag up to ~45d).
+2026-07-20 12:32:00,166 INFO screener |   candidate INTU [congress] score=-0.75 — Congress: 0 buy / 3 sell filings in last 60d (disclosures lag up to ~45d).
+2026-07-20 12:32:00,168 INFO screener |   candidate ADI [congress] score=-0.75 — Congress: 0 buy / 3 sell filings in last 60d (disclosures lag up to ~45d).
+2026-07-20 12:32:00,169 INFO screener |   candidate PATH [options_flow] score=+0.75 — Options flow: 18,992 call / 2,721 put vol (bullish call imbalance +0.75) on a most-active name.
+2026-07-20 12:32:00,170 INFO screener |   candidate NFLX [options_flow+robinhood] score=+0.73 — Options flow: 148,619 call / 66,212 put vol (bullish call imbalance +0.38) on a most-active name. | Robinhood 100 Most Popular (retail crowd positioning)
+2026-07-20 12:32:00,170 INFO screener |   candidate OPEN [options_flow] score=+0.72 — Options flow: 32,819 call / 5,430 put vol (bullish call imbalance +0.72) on a most-active name.
+2026-07-20 12:32:00,171 INFO screener |   candidate SQQQ [options_flow] score=+0.69 — Options flow: 37,977 call / 6,940 put vol (bullish call imbalance +0.69) on a most-active name.
+2026-07-20 12:32:00,172 INFO screener |   candidate ONDS [options_flow] score=+0.66 — Options flow: 50,054 call / 10,449 put vol (bullish call imbalance +0.66) on a most-active name.
+2026-07-20 12:32:00,172 INFO screener |   candidate MSTU [options_flow] score=+0.63 — Options flow: 6,668 call / 1,513 put vol (bullish call imbalance +0.63) on a most-active name.
+2026-07-20 12:32:19,170 INFO quiver | Quiver live/offexchange -> 5461 row(s).
+2026-07-20 12:32:19,650 INFO quiver | Quiver live/govcontractsall -> 20000 row(s).
+2026-07-20 12:32:37,211 INFO signals | options_chain: reading 25 of 32 symbols this cycle (cap).
+2026-07-20 12:32:43,511 INFO signals | Gathered signals for 32/32 symbols (+3 market signals).
+2026-07-20 12:32:45,642 INFO robinhood | Imported 1 Robinhood holding(s) for context (read-only).
+2026-07-20 12:32:45,654 INFO orchestrator | Buy-excluded from slate this cycle: BRK.B (topped up 2.0h ago (next ok in 4h)), HUBB (topped up 4.0h ago (next ok in 4h)), NU (topped up 3.0h ago (next ok in 4h)), PATH (exited 4.4h ago (cooldown 24h)), SOFI (topped up 1.0h ago (next ok in 4h)) …+2 more
+2026-07-20 12:33:23,893 INFO usage | decision call: 26817 in / 2403 out (cache r=0 w=0) ~$0.1942 [claude-opus-4-8]
+2026-07-20 12:33:23,907 INFO decision | Claude returned 3 proposal(s).
+2026-07-20 12:33:23,911 INFO orchestrator | Cycle budget $4,852 split across 3 buy(s): UMH $2,385, F $1,224, ZTS $1,243.
+2026-07-20 12:33:25,723 INFO earnings | Robinhood earnings calendar: 0 name(s) reporting within 31d.
+2026-07-20 12:33:30,468 INFO risk | REJECT buy UMH: Top-up conviction 0.57 shows no new edge over prior entry 0.55 (needs +0.05) — 'adding to a winner' is not a signal.
+2026-07-20 12:33:30,478 INFO orchestrator | BUY UMH -> rejected: Top-up conviction 0.57 shows no new edge over prior entry 0.55 (needs +0.05) — 'adding to a winner' is not a signal. | Top-up of strongest non-capped holding: composite +1.41, uptrend (px>50>200) with bullish MACD, insi
+2026-07-20 12:33:30,798 INFO risk | REJECT buy F: Top-up conviction 0.55 shows no new edge over prior entry 0.58 (needs +0.05) — 'adding to a winner' is not a signal.
+2026-07-20 12:33:30,800 INFO orchestrator | BUY F -> rejected: Top-up conviction 0.55 shows no new edge over prior entry 0.58 (needs +0.05) — 'adding to a winner' is not a signal. | Top-up: composite +0.75, MACD bull, insider open-market buying (10,600 sh Form 4 +1.00 w=0.91), $266
+2026-07-20 12:33:31,073 INFO risk | REJECT buy ZTS: Top-up conviction 0.53 shows no new edge over prior entry 0.54 (needs +0.05) — 'adding to a winner' is not a signal.
+2026-07-20 12:33:31,076 INFO orchestrator | BUY ZTS -> rejected: Top-up conviction 0.53 shows no new edge over prior entry 0.54 (needs +0.05) — 'adding to a winner' is not a signal. | Top-up: composite +0.79, insider open-market buying 11,650 sh (Form 4 +1.00 w=0.91), congressional b
+2026-07-20 12:33:31,216 INFO alpaca | Alpaca client ready (mode=paper).
+2026-07-20 12:33:33,452 INFO dashboard | Wrote dashboard with 67 trades -> dashboard.html
+2026-07-20 13:31:44,403 INFO orchestrator | Market regime: SPY above 200dma (744 vs 694), VIX 18 -> risk-on, size x1.00.
+2026-07-20 13:31:45,278 INFO quiver | Quiver live/congresstrading -> 1000 row(s).
+2026-07-20 13:31:45,773 INFO screener | EDGAR Form-4 feed -> 62 filing(s) (scanning up to 100).
+2026-07-20 13:32:11,797 INFO screener | Options-flow most-actives pool -> 40 name(s).
+2026-07-20 13:32:28,214 INFO screener | Robinhood 'Daily movers' -> 20 name(s).
+2026-07-20 13:32:29,369 INFO screener | Robinhood '100 most popular' -> 100 name(s).
+2026-07-20 13:32:30,159 INFO screener | Robinhood scans: none saved (define scans in the RH app to use this leg).
+2026-07-20 13:32:30,161 INFO screener | Discovered 18 candidate(s) from 5 source(s) (286 merged, 267 above min_score, capped to 18).
+2026-07-20 13:32:30,161 INFO screener |   candidate ACHR [options_flow+robinhood] score=+1.37 — Options flow: 102,957 call / 13,167 put vol (bullish call imbalance +0.77) on a most-active name. | Robinhood Daily Movers (today's biggest movers — momentum)
+2026-07-20 13:32:30,163 INFO screener |   candidate AMC [options_flow+robinhood] score=+1.17 — Options flow: 202,289 call / 54,557 put vol (bullish call imbalance +0.57) on a most-active name. | Robinhood Daily Movers (today's biggest movers — momentum) | Robinhood 100 Most Popular (retail crowd positioning)
+2026-07-20 13:32:30,166 INFO screener |   candidate SPCX [congress+robinhood] score=+1.10 — Congress: 3 buy / 0 sell filings in last 60d (disclosures lag up to ~45d). | Robinhood 100 Most Popular (retail crowd positioning)
+2026-07-20 13:32:30,166 INFO screener |   candidate TSCO [congress] score=-1.00 — Congress: 0 buy / 5 sell filings in last 60d (disclosures lag up to ~45d).
+2026-07-20 13:32:30,167 INFO screener |   candidate WAB [congress] score=-1.00 — Congress: 0 buy / 5 sell filings in last 60d (disclosures lag up to ~45d).
+2026-07-20 13:32:30,168 INFO screener |   candidate FFAI [options_flow] score=+0.95 — Options flow: 2,466 call / 57 put vol (bullish call imbalance +0.95) on a most-active name.
+2026-07-20 13:32:30,168 INFO screener |   candidate BITO [options_flow] score=+0.87 — Options flow: 9,632 call / 680 put vol (bullish call imbalance +0.87) on a most-active name.
+2026-07-20 13:32:30,169 INFO screener |   candidate LYV [congress] score=-0.75 — Congress: 0 buy / 3 sell filings in last 60d (disclosures lag up to ~45d).
+2026-07-20 13:32:30,170 INFO screener |   candidate INTU [congress] score=-0.75 — Congress: 0 buy / 3 sell filings in last 60d (disclosures lag up to ~45d).
+2026-07-20 13:32:30,171 INFO screener |   candidate ADI [congress] score=-0.75 — Congress: 0 buy / 3 sell filings in last 60d (disclosures lag up to ~45d).
+2026-07-20 13:32:30,171 INFO screener |   candidate NFLX [options_flow+robinhood] score=+0.74 — Options flow: 169,165 call / 73,676 put vol (bullish call imbalance +0.39) on a most-active name. | Robinhood 100 Most Popular (retail crowd positioning)
+2026-07-20 13:32:30,172 INFO screener |   candidate PATH [options_flow] score=+0.74 — Options flow: 22,029 call / 3,290 put vol (bullish call imbalance +0.74) on a most-active name.
+2026-07-20 13:32:30,173 INFO screener |   candidate OPEN [options_flow] score=+0.73 — Options flow: 37,725 call / 5,948 put vol (bullish call imbalance +0.73) on a most-active name.
+2026-07-20 13:32:30,174 INFO screener |   candidate ONDS [options_flow] score=+0.71 — Options flow: 67,213 call / 11,570 put vol (bullish call imbalance +0.71) on a most-active name.
+2026-07-20 13:32:30,174 INFO screener |   candidate JOBY [options_flow] score=+0.66 — Options flow: 10,912 call / 2,274 put vol (bullish call imbalance +0.66) on a most-active name.
+2026-07-20 13:32:30,175 INFO screener |   candidate MSTU [options_flow] score=+0.65 — Options flow: 8,444 call / 1,797 put vol (bullish call imbalance +0.65) on a most-active name.
+2026-07-20 13:32:30,176 INFO screener |   candidate UNH [congress] score=-0.60 — Congress: 1 buy / 4 sell filings in last 60d (disclosures lag up to ~45d).
+2026-07-20 13:32:30,176 INFO screener |   candidate TSLA [congress+robinhood] score=+0.60 — Congress: 1 buy / 0 sell filings in last 60d (disclosures lag up to ~45d). | Robinhood 100 Most Popular (retail crowd positioning)
+2026-07-20 13:32:48,583 INFO quiver | Quiver live/offexchange -> 5461 row(s).
+2026-07-20 13:32:50,653 INFO quiver | Quiver live/govcontractsall -> 20000 row(s).
+2026-07-20 13:33:09,170 INFO signals | options_chain: reading 25 of 32 symbols this cycle (cap).
+2026-07-20 13:33:16,094 INFO signals | Gathered signals for 32/32 symbols (+3 market signals).
+2026-07-20 13:33:18,471 INFO robinhood | Imported 1 Robinhood holding(s) for context (read-only).
+2026-07-20 13:33:18,479 INFO orchestrator | Buy-excluded from slate this cycle: BRK.B (topped up 3.0h ago (next ok in 4h)), NU (topped up 4.0h ago (next ok in 4h)), PATH (exited 5.4h ago (cooldown 24h)), SOFI (topped up 2.0h ago (next ok in 4h)), UBER (topped up 3.0h ago (next ok in 4h))
+2026-07-20 13:33:56,780 INFO usage | decision call: 27424 in / 2609 out (cache r=0 w=0) ~$0.2023 [claude-opus-4-8]
+2026-07-20 13:33:56,784 INFO decision | Claude returned 5 proposal(s).
+2026-07-20 13:33:56,894 INFO orchestrator | HOLD UMH (no action) | Strongest composite among holds (+1.41): fundamentals solid (margin 44.5%, rev +7.6%), uptrend px>50
+2026-07-20 13:33:57,000 INFO orchestrator | HOLD NVDA (no action) | Elite fundamentals (rev +85%, margin 65%) but options chain bearish (-0.31 decaying, put/call OI 0.8
+2026-07-20 13:33:57,175 INFO orchestrator | HOLD CVX (no action) | Improving technical (RSI 67, MACD bull, uptrend) with steady fundamentals; RSI extended so no add. I
+2026-07-20 13:33:57,309 INFO orchestrator | HOLD BEP (no action) | Weakest-thesis hold: RSI 36, MACD bear, rev -4.2%; only congress buys support it (w=0.23). Retain fo
+2026-07-20 13:33:57,411 INFO orchestrator | HOLD F (no action) | Mixed: insider open-market buying (+1.00), federal contracts $266M, bullish flow, MACD bull, but wea
+2026-07-20 13:33:57,473 INFO alpaca | Alpaca client ready (mode=paper).
+2026-07-20 13:33:59,800 INFO dashboard | Wrote dashboard with 67 trades -> dashboard.html
+2026-07-20 14:34:36,561 WARNING alpaca | closed_sell_orders: transient network error (ConnectionError); retry 1/2.
+2026-07-20 14:34:40,947 INFO orchestrator | Market regime: SPY above 200dma (743 vs 694), VIX 19 -> risk-on, size x1.00.
+2026-07-20 14:34:41,948 INFO quiver | Quiver live/congresstrading -> 1000 row(s).
+2026-07-20 14:34:42,295 INFO screener | EDGAR Form-4 feed -> 58 filing(s) (scanning up to 100).
+2026-07-20 14:34:53,548 CRITICAL orchestrator | DARK GAP: no loop tick for 3 min (sleep/suspend?). Positions were unwatched; reconciling before trading resumes.
+2026-07-20 14:34:54,938 INFO notify | CRITICAL alert emailed to srikanthpusapati1@gmail.com: Bot was dark for 3 min
+2026-07-20 14:35:09,436 INFO screener | Options-flow most-actives pool -> 40 name(s).
+2026-07-20 14:35:59,430 INFO screener | Robinhood 'Daily movers' -> 20 name(s).
+2026-07-20 14:36:00,490 INFO screener | Robinhood '100 most popular' -> 100 name(s).
+2026-07-20 14:36:01,171 INFO screener | Robinhood scans: none saved (define scans in the RH app to use this leg).
+2026-07-20 14:36:01,177 INFO screener | Discovered 18 candidate(s) from 5 source(s) (287 merged, 267 above min_score, capped to 18).
+2026-07-20 14:36:01,178 INFO screener |   candidate ACHR [options_flow+robinhood] score=+1.34 — Options flow: 114,722 call / 17,287 put vol (bullish call imbalance +0.74) on a most-active name. | Robinhood Daily Movers (today's biggest movers — momentum)
+2026-07-20 14:36:01,179 INFO screener |   candidate AMC [options_flow+robinhood] score=+1.16 — Options flow: 219,126 call / 61,161 put vol (bullish call imbalance +0.56) on a most-active name. | Robinhood Daily Movers (today's biggest movers — momentum) | Robinhood 100 Most Popular (retail crowd positioning)
+2026-07-20 14:36:01,180 INFO screener |   candidate SPCX [congress+robinhood] score=+1.10 — Congress: 3 buy / 0 sell filings in last 60d (disclosures lag up to ~45d). | Robinhood 100 Most Popular (retail crowd positioning)
+2026-07-20 14:36:01,181 INFO screener |   candidate TSCO [congress] score=-1.00 — Congress: 0 buy / 5 sell filings in last 60d (disclosures lag up to ~45d).
+2026-07-20 14:36:01,181 INFO screener |   candidate WAB [congress] score=-1.00 — Congress: 0 buy / 5 sell filings in last 60d (disclosures lag up to ~45d).
+2026-07-20 14:36:01,182 INFO screener |   candidate FFAI [options_flow] score=+0.95 — Options flow: 2,582 call / 68 put vol (bullish call imbalance +0.95) on a most-active name.
+2026-07-20 14:36:01,183 INFO screener |   candidate BITO [options_flow] score=+0.86 — Options flow: 9,941 call / 743 put vol (bullish call imbalance +0.86) on a most-active name.
+2026-07-20 14:36:01,184 INFO screener |   candidate LYV [congress] score=-0.75 — Congress: 0 buy / 3 sell filings in last 60d (disclosures lag up to ~45d).
+2026-07-20 14:36:01,185 INFO screener |   candidate INTU [congress] score=-0.75 — Congress: 0 buy / 3 sell filings in last 60d (disclosures lag up to ~45d).
+2026-07-20 14:36:01,185 INFO screener |   candidate ADI [congress] score=-0.75 — Congress: 0 buy / 3 sell filings in last 60d (disclosures lag up to ~45d).
+2026-07-20 14:36:01,186 INFO screener |   candidate OPEN [options_flow] score=+0.72 — Options flow: 40,042 call / 6,563 put vol (bullish call imbalance +0.72) on a most-active name.
+2026-07-20 14:36:01,190 INFO screener |   candidate NFLX [options_flow+robinhood] score=+0.70 — Options flow: 177,777 call / 84,901 put vol (bullish call imbalance +0.35) on a most-active name. | Robinhood 100 Most Popular (retail crowd positioning)
+2026-07-20 14:36:01,191 INFO screener |   candidate PATH [options_flow] score=+0.67 — Options flow: 24,434 call / 4,850 put vol (bullish call imbalance +0.67) on a most-active name.
+2026-07-20 14:36:01,192 INFO screener |   candidate TE [options_flow] score=+0.66 — Options flow: 15,959 call / 3,310 put vol (bullish call imbalance +0.66) on a most-active name.
+2026-07-20 14:36:01,193 INFO screener |   candidate MSTU [options_flow] score=+0.65 — Options flow: 9,212 call / 1,943 put vol (bullish call imbalance +0.65) on a most-active name.
+2026-07-20 14:36:01,194 INFO screener |   candidate JOBY [options_flow] score=+0.65 — Options flow: 12,294 call / 2,601 put vol (bullish call imbalance +0.65) on a most-active name.
+2026-07-20 14:36:01,195 INFO screener |   candidate UNH [congress] score=-0.60 — Congress: 1 buy / 4 sell filings in last 60d (disclosures lag up to ~45d).
+2026-07-20 14:36:01,195 INFO screener |   candidate TSLA [congress+robinhood] score=+0.60 — Congress: 1 buy / 0 sell filings in last 60d (disclosures lag up to ~45d). | Robinhood 100 Most Popular (retail crowd positioning)
+2026-07-20 14:36:21,081 INFO quiver | Quiver live/offexchange -> 5461 row(s).
+2026-07-20 14:36:21,554 INFO quiver | Quiver live/govcontractsall -> 20000 row(s).
+2026-07-20 14:40:53,334 CRITICAL orchestrator | DARK GAP: no loop tick for 5 min (sleep/suspend?). Positions were unwatched; reconciling before trading resumes.
+2026-07-20 14:40:53,395 WARNING alpaca | get_account: transient network error (ConnectionError); retry 1/2.
+2026-07-20 14:46:18,363 CRITICAL orchestrator | DARK GAP: no loop tick for 3 min (sleep/suspend?). Positions were unwatched; reconciling before trading resumes.
+2026-07-20 14:46:18,431 WARNING alpaca | get_account: transient network error (ConnectionError); retry 1/2.
+2026-07-20 14:46:55,085 WARNING orchestrator | Heartbeat withheld: main loop last ticked 152s ago — letting the external monitor page.
+2026-07-20 14:47:25,311 WARNING orchestrator | Heartbeat withheld: main loop last ticked 182s ago — letting the external monitor page.
+2026-07-20 14:57:59,861 CRITICAL orchestrator | DARK GAP: no loop tick for 11 min (sleep/suspend?). Positions were unwatched; reconciling before trading resumes.
+2026-07-20 14:57:59,917 WARNING alpaca | get_account: transient network error (ConnectionError); retry 1/2.
+2026-07-20 14:58:01,725 WARNING orchestrator | Heartbeat withheld: main loop last ticked 214s ago — letting the external monitor page.
+2026-07-20 15:09:14,674 CRITICAL orchestrator | DARK GAP: no loop tick for 11 min (sleep/suspend?). Positions were unwatched; reconciling before trading resumes.
+2026-07-20 15:09:14,775 WARNING alpaca | get_account: transient network error (ConnectionError); retry 1/2.
+2026-07-20 15:09:15,710 WARNING orchestrator | Heartbeat withheld: main loop last ticked 245s ago — letting the external monitor page.
+2026-07-20 15:09:45,994 WARNING orchestrator | Heartbeat withheld: main loop last ticked 276s ago — letting the external monitor page.
+2026-07-20 15:11:25,140 WARNING orchestrator | Heartbeat withheld: main loop last ticked 306s ago — letting the external monitor page.
+2026-07-20 15:11:50,140 INFO signals | options_chain: reading 25 of 32 symbols this cycle (cap).
+2026-07-20 15:28:00,782 WARNING orchestrator | DARK GAP (market closed): no loop tick for 17 min (sleep/suspend?) — positions could not move; not paging.
+2026-07-20 15:28:01,312 WARNING alpaca | get_account: transient network error (ConnectionError); retry 1/2.
+2026-07-20 15:41:17,984 INFO signals | Gathered signals for 32/32 symbols (+3 market signals).
+2026-07-20 15:41:18,328 WARNING benchmark | portfolio history failed: ('Connection aborted.', ConnectionResetError(54, 'Connection reset by peer'))
+2026-07-20 15:41:20,145 INFO robinhood | Imported 1 Robinhood holding(s) for context (read-only).
+2026-07-20 15:41:20,159 INFO orchestrator | Buy-excluded from slate this cycle: PATH (exited 7.5h ago (cooldown 24h))
+2026-07-20 15:41:41,252 WARNING orchestrator | DARK GAP (market closed): no loop tick for 14 min (sleep/suspend?) — positions could not move; not paging.
+2026-07-20 15:41:41,586 INFO usage | decision call: 26898 in / 1581 out (cache r=0 w=0) ~$0.1740 [claude-opus-4-8]
+2026-07-20 15:41:41,590 INFO decision | Claude returned 5 proposal(s).
+2026-07-20 15:41:41,697 INFO orchestrator | HOLD UMH (no action) | Held REIT with strongest composite (+1.41): fundamentals +0.48, uptrend px>50>200, MACD bull, inside
+2026-07-20 15:41:41,811 INFO orchestrator | HOLD BRK.B (no action) | Solid composite +0.85, strong fundamentals ($118B EBITDA, 31% margin), positive news sentiment. Rece
+2026-07-20 15:41:41,915 INFO orchestrator | HOLD T (no action) | Composite +0.77, good fundamentals, congress buying (6 buy/1 sell), bullish options flow +0.63, insi
+2026-07-20 15:41:42,021 INFO orchestrator | HOLD CVX (no action) | Uptrend px>50>200, MACD bull, improving technical, +1.4% in position. Insider selling is a caution b
+2026-07-20 15:41:42,152 INFO orchestrator | HOLD F (no action) | Composite +0.83, insider open-market buying, $266M federal contracts, bullish flow. Weak fundamental
+2026-07-20 15:41:42,221 INFO alpaca | Alpaca client ready (mode=paper).
+2026-07-20 15:41:44,149 INFO dashboard | Wrote dashboard with 67 trades -> dashboard.html
+2026-07-20 16:16:53,498 WARNING orchestrator | DARK GAP (market closed): no loop tick for 35 min (sleep/suspend?) — positions could not move; not paging.
+2026-07-20 16:16:53,972 WARNING alpaca | get_account: transient network error (ConnectionError); retry 1/2.
+2026-07-20 16:31:04,669 WARNING orchestrator | DARK GAP (market closed): no loop tick for 13 min (sleep/suspend?) — positions could not move; not paging.
+2026-07-20 16:31:04,895 WARNING alpaca | get_account: transient network error (ConnectionError); retry 1/2.
+2026-07-20 16:48:00,774 WARNING orchestrator | DARK GAP (market closed): no loop tick for 16 min (sleep/suspend?) — positions could not move; not paging.
+2026-07-20 16:48:03,570 WARNING alpaca | get_account: transient network error (ConnectionError); retry 1/2.
+2026-07-20 16:52:51,555 WARNING orchestrator | DARK GAP (market closed): no loop tick for 5 min (sleep/suspend?) — positions could not move; not paging.
+2026-07-20 16:52:51,628 WARNING alpaca | get_account: transient network error (ConnectionError); retry 1/2.
+2026-07-20 17:08:35,049 WARNING orchestrator | DARK GAP (market closed): no loop tick for 13 min (sleep/suspend?) — positions could not move; not paging.
+2026-07-20 17:08:35,163 WARNING alpaca | get_account: transient network error (ConnectionError); retry 1/2.
+2026-07-20 17:26:30,124 WARNING orchestrator | DARK GAP (market closed): no loop tick for 15 min (sleep/suspend?) — positions could not move; not paging.
+2026-07-20 17:26:30,188 WARNING alpaca | get_account: transient network error (ConnectionError); retry 1/2.
+2026-07-20 17:32:04,502 WARNING alpaca | get_account: transient network error (ConnectionError); retry 2/2.
+2026-07-20 17:32:37,817 WARNING orchestrator | DARK GAP (market closed): no loop tick for 6 min (sleep/suspend?) — positions could not move; not paging.
+2026-07-20 17:34:36,823 WARNING alpaca | get_account: transient network error (ConnectionError); retry 1/2.
+2026-07-20 17:49:37,916 WARNING orchestrator | DARK GAP (market closed): no loop tick for 14 min (sleep/suspend?) — positions could not move; not paging.
+2026-07-20 17:49:38,787 WARNING alpaca | get_account: transient network error (ConnectionError); retry 1/2.
+2026-07-20 18:02:41,566 WARNING orchestrator | DARK GAP (market closed): no loop tick for 11 min (sleep/suspend?) — positions could not move; not paging.
+2026-07-20 18:02:41,616 WARNING alpaca | get_account: transient network error (ConnectionError); retry 1/2.
+2026-07-20 18:06:58,298 WARNING orchestrator | DARK GAP (market closed): no loop tick for 4 min (sleep/suspend?) — positions could not move; not paging.
+2026-07-20 18:06:58,608 WARNING alpaca | get_account: transient network error (ConnectionError); retry 1/2.
+2026-07-20 18:08:57,690 WARNING alpaca | get_account: transient network error (ConnectionError); retry 1/2.
+2026-07-20 18:12:28,597 WARNING alpaca | get_account: transient network error (ConnectionError); retry 1/2.
+2026-07-20 18:18:48,161 WARNING orchestrator | DARK GAP (market closed): no loop tick for 6 min (sleep/suspend?) — positions could not move; not paging.
+2026-07-20 18:18:48,222 WARNING alpaca | get_account: transient network error (ConnectionError); retry 1/2.
+2026-07-20 18:24:27,771 WARNING orchestrator | DARK GAP (market closed): no loop tick for 6 min (sleep/suspend?) — positions could not move; not paging.
+2026-07-20 18:24:27,859 WARNING alpaca | get_account: transient network error (ConnectionError); retry 1/2.
+2026-07-20 18:30:27,496 WARNING orchestrator | DARK GAP (market closed): no loop tick for 5 min (sleep/suspend?) — positions could not move; not paging.
+2026-07-20 18:30:27,582 WARNING alpaca | get_account: transient network error (ConnectionError); retry 1/2.
+2026-07-20 18:33:09,883 WARNING orchestrator | DARK GAP (market closed): no loop tick for 3 min (sleep/suspend?) — positions could not move; not paging.
+2026-07-20 18:33:10,138 WARNING alpaca | get_account: transient network error (ConnectionError); retry 1/2.
+2026-07-20 18:44:44,927 WARNING orchestrator | DARK GAP (market closed): no loop tick for 11 min (sleep/suspend?) — positions could not move; not paging.
+2026-07-20 18:44:45,041 WARNING alpaca | get_account: transient network error (ConnectionError); retry 1/2.
+2026-07-20 18:51:11,192 WARNING orchestrator | DARK GAP (market closed): no loop tick for 6 min (sleep/suspend?) — positions could not move; not paging.
+2026-07-20 18:51:11,293 WARNING alpaca | get_account: transient network error (ConnectionError); retry 1/2.
+2026-07-20 18:56:15,211 WARNING orchestrator | DARK GAP (market closed): no loop tick for 3 min (sleep/suspend?) — positions could not move; not paging.
+2026-07-20 18:56:15,292 WARNING alpaca | get_account: transient network error (ConnectionError); retry 1/2.
+2026-07-20 18:59:52,472 WARNING alpaca | get_account: transient network error (ConnectionError); retry 1/2.
+2026-07-20 19:06:17,945 WARNING orchestrator | DARK GAP (market closed): no loop tick for 6 min (sleep/suspend?) — positions could not move; not paging.
+2026-07-20 19:06:18,120 WARNING alpaca | get_account: transient network error (ConnectionError); retry 1/2.
+2026-07-20 19:17:04,250 WARNING orchestrator | DARK GAP (market closed): no loop tick for 11 min (sleep/suspend?) — positions could not move; not paging.
+2026-07-20 19:17:04,309 WARNING alpaca | get_account: transient network error (ConnectionError); retry 1/2.
+2026-07-20 19:22:56,386 WARNING orchestrator | DARK GAP (market closed): no loop tick for 5 min (sleep/suspend?) — positions could not move; not paging.
+2026-07-20 19:22:56,498 WARNING alpaca | get_account: transient network error (ConnectionError); retry 1/2.
+2026-07-20 19:27:26,921 WARNING orchestrator | DARK GAP (market closed): no loop tick for 3 min (sleep/suspend?) — positions could not move; not paging.
+2026-07-20 19:27:26,995 WARNING alpaca | get_account: transient network error (ConnectionError); retry 1/2.
+2026-07-20 19:34:17,740 WARNING orchestrator | DARK GAP (market closed): no loop tick for 7 min (sleep/suspend?) — positions could not move; not paging.
+2026-07-20 19:34:17,924 WARNING alpaca | get_account: transient network error (ConnectionError); retry 1/2.
+2026-07-20 20:08:37,795 WARNING orchestrator | DARK GAP (market closed): no loop tick for 33 min (sleep/suspend?) — positions could not move; not paging.
+2026-07-20 20:17:54,845 WARNING alpaca | get_account: transient network error (ConnectionError); retry 1/2.
+2026-07-20 20:18:29,885 WARNING orchestrator | DARK GAP (market closed): no loop tick for 10 min (sleep/suspend?) — positions could not move; not paging.
+2026-07-20 20:24:25,499 WARNING orchestrator | DARK GAP (market closed): no loop tick for 6 min (sleep/suspend?) — positions could not move; not paging.
+2026-07-20 20:24:25,585 WARNING alpaca | get_account: transient network error (ConnectionError); retry 1/2.
+2026-07-20 20:31:24,033 WARNING orchestrator | DARK GAP (market closed): no loop tick for 7 min (sleep/suspend?) — positions could not move; not paging.
+2026-07-20 20:31:24,313 WARNING alpaca | get_account: transient network error (ConnectionError); retry 1/2.
+2026-07-20 20:34:49,873 WARNING alpaca | get_account: transient network error (ConnectionError); retry 1/2.
+2026-07-20 20:40:22,096 WARNING orchestrator | DARK GAP (market closed): no loop tick for 3 min (sleep/suspend?) — positions could not move; not paging.
+2026-07-20 20:40:22,187 WARNING alpaca | get_account: transient network error (ConnectionError); retry 1/2.
+2026-07-20 20:47:19,165 WARNING alpaca | get_account: transient network error (ConnectionError); retry 1/2.
+2026-07-20 21:03:11,035 WARNING orchestrator | DARK GAP (market closed): no loop tick for 16 min (sleep/suspend?) — positions could not move; not paging.
+2026-07-20 21:03:11,613 WARNING alpaca | get_account: transient network error (ConnectionError); retry 1/2.
+2026-07-20 21:21:13,867 WARNING orchestrator | DARK GAP (market closed): no loop tick for 17 min (sleep/suspend?) — positions could not move; not paging.
+2026-07-20 21:21:13,950 WARNING alpaca | get_account: transient network error (ConnectionError); retry 1/2.
+2026-07-20 21:26:45,179 WARNING orchestrator | DARK GAP (market closed): no loop tick for 3 min (sleep/suspend?) — positions could not move; not paging.
+2026-07-20 21:26:45,244 WARNING alpaca | get_account: transient network error (ConnectionError); retry 1/2.
+2026-07-20 21:36:13,619 WARNING orchestrator | DARK GAP (market closed): no loop tick for 9 min (sleep/suspend?) — positions could not move; not paging.
+2026-07-20 21:36:13,799 WARNING alpaca | get_account: transient network error (ConnectionError); retry 1/2.
+2026-07-20 22:04:53,324 WARNING orchestrator | DARK GAP (market closed): no loop tick for 29 min (sleep/suspend?) — positions could not move; not paging.
+2026-07-20 22:04:53,457 WARNING alpaca | get_account: transient network error (ConnectionError); retry 1/2.
+2026-07-20 22:12:15,012 WARNING orchestrator | DARK GAP (market closed): no loop tick for 6 min (sleep/suspend?) — positions could not move; not paging.
+2026-07-20 22:12:15,197 WARNING alpaca | get_account: transient network error (ConnectionError); retry 1/2.
+2026-07-20 22:19:21,346 WARNING orchestrator | DARK GAP (market closed): no loop tick for 4 min (sleep/suspend?) — positions could not move; not paging.
+2026-07-20 22:21:28,036 WARNING alpaca | get_account: transient network error (ConnectionError); retry 1/2.
+2026-07-20 22:25:49,629 WARNING orchestrator | DARK GAP (market closed): no loop tick for 4 min (sleep/suspend?) — positions could not move; not paging.
+2026-07-20 22:25:49,700 WARNING alpaca | get_account: transient network error (ConnectionError); retry 1/2.
+2026-07-20 22:34:46,483 WARNING orchestrator | DARK GAP (market closed): no loop tick for 8 min (sleep/suspend?) — positions could not move; not paging.
+2026-07-20 22:34:46,593 WARNING alpaca | get_account: transient network error (ConnectionError); retry 1/2.
+2026-07-20 22:41:25,849 WARNING alpaca | get_account: transient network error (ConnectionError); retry 1/2.
+2026-07-20 22:43:35,487 WARNING alpaca | get_account: transient network error (ConnectionError); retry 1/2.
+2026-07-20 22:43:45,545 INFO orchestrator | Market closed; skipping decision cycle.
+2026-07-20 22:43:45,701 INFO orchestrator | Running nightly post-mortem for 2026-07-20 …
+2026-07-20 22:43:55,193 INFO usage | postmortem call: 3315 in / 459 out (cache r=0 w=0) ~$0.0280 [claude-opus-4-8]
+2026-07-20 22:43:55,208 INFO postmortem | Post-mortem written to state/lessons/2026-07-20.md
+2026-07-20 22:43:55,245 INFO postmortem | Post-mortem lessons: When a single symbol (e.g. T) exceeds ~30% of day's buy dollars, flag and prefer spreading capital across the slate.
+2026-07-20 22:43:55,262 INFO orchestrator | API spend today: $0.03 across 1 calls (3,315 in / 459 out tokens).
+2026-07-20 22:43:55,329 INFO alpaca | Alpaca client ready (mode=paper).
+2026-07-20 22:44:01,812 INFO dashboard | Wrote dashboard with 67 trades -> dashboard.html
+2026-07-20 22:50:52,284 WARNING orchestrator | DARK GAP (market closed): no loop tick for 7 min (sleep/suspend?) — positions could not move; not paging.
+2026-07-20 22:52:43,741 WARNING alpaca | get_account: transient network error (ConnectionError); retry 1/2.
+2026-07-20 23:02:21,057 WARNING orchestrator | DARK GAP (market closed): no loop tick for 8 min (sleep/suspend?) — positions could not move; not paging.
+2026-07-20 23:02:21,298 WARNING alpaca | get_account: transient network error (ConnectionError); retry 1/2.
+2026-07-20 23:24:58,452 WARNING orchestrator | DARK GAP (market closed): no loop tick for 22 min (sleep/suspend?) — positions could not move; not paging.
+2026-07-20 23:24:58,744 WARNING alpaca | get_account: transient network error (ConnectionError); retry 1/2.
+2026-07-20 23:32:39,624 INFO alpaca | Alpaca client ready (mode=paper).
+2026-07-20 23:32:40,076 INFO orchestrator | Discovery-driven mode: trading scanner-found names + holdings.
+2026-07-20 23:32:40,078 INFO orchestrator | Starting orchestrator (paper). Kill switch: off. Options: on. Benchmark: QQQ.
+2026-07-20 23:32:40,381 INFO orchestrator | Market closed; skipping decision cycle.
+2026-07-20 23:32:40,458 INFO alpaca | Alpaca client ready (mode=paper).
+2026-07-20 23:32:42,591 INFO dashboard | Wrote dashboard with 67 trades -> dashboard.html
+2026-07-20 23:45:21,026 WARNING alpaca | get_account: transient network error (ConnectionError); retry 1/2.
+2026-07-20 23:51:46,851 WARNING orchestrator | DARK GAP (market closed): no loop tick for 4 min (sleep/suspend?) — positions could not move; not paging.

@@ -240,6 +240,26 @@ class RiskLimits:
     # slot-freeing rotation — exempt it so a co-occurring unrelated buy can't
     # get a thesis-broken exit vetoed ("never block a legitimate exit"). 0=off.
     rotation_guard_exempt_sell_conviction: float = 0.65
+    # Deterioration releases (SPCX 2026-07-22: the guard vetoed the model's
+    # exit at -5.4% -> -6.6% -> -9.3% and the position rode into its bracket
+    # stop at -9.8%; the guard's job is stopping LUKEWARM loss-locking, not
+    # pinning a sinking position until the stop fires). Two escapes:
+    # (a) depth: a sell losing MORE than this never gets vetoed — past this
+    #     point the "avoided" loss is already worse than the rotation it
+    #     blocked, and only the bracket stop remains. 0 = off.
+    rotation_guard_max_loss_pct: float = 8.0
+    # (b) persistence: a sell the guard ALREADY vetoed earlier the same day is
+    #     released once the loss has deteriorated by at least this many
+    #     percentage points since the first veto — a repeated exit request
+    #     across cycles with a worsening loss is a thesis-break, not churn.
+    #     0 = off.
+    rotation_guard_repeat_release_pct: float = 0.75
+    # New-name conviction floor (Jul 17-22: every ~-10% realized loss — MU
+    # -$441, SPCX -$83, SPCX -$228 — was a FRESH position opened at 0.45-0.50
+    # conviction on lagged/crowd theses; the model itself was sub-coin-flip).
+    # A fresh name must clear this; top-ups keep the lower min_conviction
+    # floor (the position already earned its slot). 0 = off.
+    min_new_name_conviction: float = 0.5
 
 
 @dataclass(frozen=True)
@@ -357,6 +377,13 @@ class Config:
     # and fold its one-line lessons back into the next day's decision prompt.
     postmortem_enabled: bool = True
     postmortem_max_lessons: int = 15
+    # Weekly ledger-driven auto-tune report (Jul 22 upgrade): a deterministic,
+    # no-LLM replay of the ledger + decisions journal against the entry-quality
+    # risk knobs, fired once per ET weekend. Report-only — writes
+    # state/autotune/{iso-week}.md; never changes a knob itself.
+    autotune_enabled: bool = True
+    autotune_days: int = 14
+    autotune_min_sample: int = 5
     # C.4 options-chain positioning signal: per-name ATM IV, put-call IV skew
     # and put/call open-interest lean from Alpaca's option snapshots (the free
     # 'indicative' feed the execution path already uses — no extra key). Feeds
@@ -444,6 +471,9 @@ def load_config() -> Config:
         reconcile_halt_enabled=_flag("RECONCILE_HALT", "on"),
         postmortem_enabled=_flag("POSTMORTEM_ENABLED", "on"),
         postmortem_max_lessons=_i("POSTMORTEM_MAX_LESSONS", 15),
+        autotune_enabled=_flag("AUTOTUNE_ENABLED", "on"),
+        autotune_days=_i("AUTOTUNE_DAYS", 14),
+        autotune_min_sample=_i("AUTOTUNE_MIN_SAMPLE", 5),
         options_chain_signal=_flag("OPTIONS_CHAIN_SIGNAL"),
         options_chain_max_symbols=_i("OPTIONS_CHAIN_MAX_SYMBOLS", 25),
         state_file=os.getenv("STATE_FILE", "state/risk_state.json"),
@@ -546,8 +576,12 @@ def load_config() -> Config:
             min_add_interval_hours=_f("MIN_ADD_INTERVAL_HOURS", 4.0),
             reentry_cooldown_hours=_f("REENTRY_COOLDOWN_HOURS", 24.0),
             reentry_price_guard_enabled=_flag("REENTRY_PRICE_GUARD_ENABLED", "on"),
+            # 0.5 let SPCX re-enter Jul 21 at composite +0.66 (rank ~8 of 30,
+            # all lagged congress/crowd weight) $3.58 ABOVE its Jul 17 exit —
+            # straight to a -9.8% bracket stop. The override should mean "top
+            # decile new edge", not "mildly positive".
             reentry_price_override_composite=_f(
-                "REENTRY_PRICE_OVERRIDE_COMPOSITE", 0.5),
+                "REENTRY_PRICE_OVERRIDE_COMPOSITE", 1.25),
             # Daily concentration brake (see the RiskLimits field notes).
             max_daily_symbol_deploy_pct=_f("MAX_DAILY_SYMBOL_DEPLOY_PCT", 8.0),
             max_daily_buys_per_symbol=_i("MAX_DAILY_BUYS_PER_SYMBOL", 3),
@@ -578,6 +612,11 @@ def load_config() -> Config:
             rotation_guard_exempt_sell_conviction=_f(
                 "ROTATION_GUARD_EXEMPT_SELL_CONVICTION", 0.65
             ),
+            rotation_guard_max_loss_pct=_f("ROTATION_GUARD_MAX_LOSS_PCT", 8.0),
+            rotation_guard_repeat_release_pct=_f(
+                "ROTATION_GUARD_REPEAT_RELEASE_PCT", 0.75
+            ),
+            min_new_name_conviction=_f("MIN_NEW_NAME_CONVICTION", 0.5),
         ),
         screener=ScreenerConfig(
             enabled=_flag("SCREENER_ENABLED", "on"),

@@ -313,6 +313,14 @@ def main() -> int:
         return _sweep_chase(cfg, prices, entries, benchmark, args.lookback)
 
     if not args.sweep:
+        # A ledger buy of the benchmark itself (QQQ is a real CORE holding, not
+        # only the yardstick) must still replay — it was popped out above, so
+        # re-inject its series as a tradable. Otherwise those buys are silently
+        # dropped ("no price history") and the replay understates the actual book
+        # by exactly the core sleeve. Excess is still measured vs QQQ buy-and-hold,
+        # so the number reads as "did the active overlay beat just holding QQQ."
+        if benchmark is not None and bench_sym in _ledger_symbols(args.ledger):
+            prices[bench_sym] = benchmark
         entries = entries_from_ledger(args.ledger, dates, prices)
         if not entries:
             print("Ledger produced no replayable entries in this window.")

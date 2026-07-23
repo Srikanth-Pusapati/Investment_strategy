@@ -34,7 +34,7 @@ from investment_strategy.state import PortfolioState
 
 def _orch(max_open_positions=2, guard_enabled=True, min_loss=4.0, edge=0.10,
           require_comp=False, blend=True, exempt_sell_conv=0.65,
-          ledger_records=None):
+          max_loss=0.0, repeat_release=0.0, ledger_records=None):
     o = Orchestrator.__new__(Orchestrator)
     o.cfg = SimpleNamespace(risk=SimpleNamespace(
         rotation_loss_guard_enabled=guard_enabled,
@@ -42,6 +42,8 @@ def _orch(max_open_positions=2, guard_enabled=True, min_loss=4.0, edge=0.10,
         rotation_min_conviction_edge=edge,
         rotation_require_composite_edge=require_comp,
         rotation_guard_exempt_sell_conviction=exempt_sell_conv,
+        rotation_guard_max_loss_pct=max_loss,
+        rotation_guard_repeat_release_pct=repeat_release,
         max_open_positions=max_open_positions,
         composite_budget_blend=blend,
         min_cash_buffer_pct=0.0,
@@ -53,6 +55,7 @@ def _orch(max_open_positions=2, guard_enabled=True, min_loss=4.0, edge=0.10,
     o.risk = SimpleNamespace(kill_switch=False)
     o.journal_records = []
     o.journal = SimpleNamespace(record=o.journal_records.append)
+    o._rotation_vetoes = {}
     return o
 
 
@@ -216,6 +219,65 @@ def test_composite_edge_optional_leg():
     # Composite edge present -> passes.
     kept = o._apply_rotation_guard(props, acct, {"LOSER": 0.2, "NEW": 0.8})
     assert [p.symbol for p in kept] == ["LOSER", "NEW"]
+
+
+def test_depth_release_passes_sells_beyond_guard_band():
+    # SPCX Jul 22: the guard pinned a sinking position from -5.4% all the way
+    # into its -9.8% bracket stop. Past max_loss the guard band [min, max] is
+    # exhausted — the sell must pass even without a conviction edge.
+    o = _orch(max_loss=8.0)
+    acct = _full_book_setup(o, entry_conv=0.5)      # LOSER at -10%
+    props = [_prop("LOSER", Action.SELL, 0.5), _prop("NEW", Action.BUY, 0.5)]
+    assert o._apply_rotation_guard(props, acct, {}) == props
+    # Inside the band (loss between min 4% and max 8%) the veto still holds.
+    o2 = _orch(max_loss=8.0)
+    o2.state.register_buy("LOSER", conviction=0.5)
+    acct2 = _acct([_pos("LOSER", pl_pct=-6.0), _pos("KEEP", pl_pct=5.0)])
+    kept = o2._apply_rotation_guard(props, acct2, {})
+    assert [p.symbol for p in kept] == ["NEW"]
+
+
+def test_depth_release_inert_at_zero_and_when_below_min():
+    # 0 = off; a max_loss at/below min_loss must not silently disable the veto.
+    for bad_max in (0.0, 3.0):
+        o = _orch(max_loss=bad_max)
+        acct = _full_book_setup(o, entry_conv=0.5)  # LOSER at -10%
+        props = [_prop("LOSER", Action.SELL, 0.5), _prop("NEW", Action.BUY, 0.5)]
+        kept = o._apply_rotation_guard(props, acct, {})
+        assert [p.symbol for p in kept] == ["NEW"]
+
+
+def test_persistence_release_after_repeat_veto_with_deterioration():
+    # First veto records the day's baseline; a later sell with the loss worse
+    # by >= the release delta passes (persistent exit intent, not churn).
+    o = _orch(repeat_release=0.75)
+    o.state.register_buy("LOSER", conviction=0.5)
+    props = [_prop("LOSER", Action.SELL, 0.5), _prop("NEW", Action.BUY, 0.5)]
+    acct1 = _acct([_pos("LOSER", pl_pct=-5.4), _pos("KEEP", pl_pct=5.0)])
+    kept = o._apply_rotation_guard(props, acct1, {})
+    assert [p.symbol for p in kept] == ["NEW"]          # first ask: vetoed
+    acct2 = _acct([_pos("LOSER", pl_pct=-5.6), _pos("KEEP", pl_pct=5.0)])
+    kept = o._apply_rotation_guard(props, acct2, {})
+    assert [p.symbol for p in kept] == ["NEW"]          # -0.2pp: still vetoed
+    acct3 = _acct([_pos("LOSER", pl_pct=-6.5), _pos("KEEP", pl_pct=5.0)])
+    kept = o._apply_rotation_guard(props, acct3, {})
+    assert [p.symbol for p in kept] == ["LOSER", "NEW"]  # -1.1pp: released
+    # Baseline is the FIRST veto's loss, not the latest one's.
+    assert o._rotation_vetoes["LOSER"][1] == -5.4
+
+
+def test_persistence_release_ignores_stale_prior_day_veto():
+    # A veto recorded on an earlier day must not release today's first sell;
+    # it re-vetoes and re-baselines to today.
+    o = _orch(repeat_release=0.75)
+    o.state.register_buy("LOSER", conviction=0.5)
+    o._rotation_vetoes["LOSER"] = ("2020-01-01", -1.0)
+    props = [_prop("LOSER", Action.SELL, 0.5), _prop("NEW", Action.BUY, 0.5)]
+    acct = _acct([_pos("LOSER", pl_pct=-6.0), _pos("KEEP", pl_pct=5.0)])
+    kept = o._apply_rotation_guard(props, acct, {})
+    assert [p.symbol for p in kept] == ["NEW"]           # stale day: vetoed
+    day, loss = o._rotation_vetoes["LOSER"]
+    assert day == o.state._trading_day() and loss == -6.0
 
 
 def test_guard_off_by_knob():

@@ -1,5 +1,5 @@
 # --- Core ---
-anthropic>=0.40.0          # Claude decision engine
+anthropic>=0.112.0         # Claude decision engine (0.112 = installed/known-good for 1h prompt-cache TTL)
 alpaca-py>=0.30.0          # brokerage: orders, positions, market data, news
 python-dotenv>=1.0.0       # load secrets from .env
 pydantic>=2.6.0            # typed models / validation
