@@ -128,6 +128,24 @@ def test_recommendation_suppressed_when_not_one_sided():
     assert sw.recommendation is None
 
 
+def test_recommendation_not_emitted_when_current_value_is_best():
+    """The 2026-W30 blind spot: a HIGH floor already blocking the big losers has
+    the best net of all, so no looser alternative should be recommended. Here
+    0.6 (current) blocks 5 small + 5 big losers (net $3000); 0.5 blocks only the
+    5 small ones (net $500). Recommending 0.5 would surrender protection."""
+    trips = (
+        [_trip(0.45, -100.0) for _ in range(5)]    # small losers, blocked by 0.5 and 0.6
+        + [_trip(0.55, -500.0) for _ in range(5)]  # big losers, blocked only by 0.6
+    )
+    sw = sweep_new_name_floor(
+        trips, [], current=0.6, candidates=(0.5, 0.6), min_sample=5,
+    )
+    assert sw.recommendation is None               # keep 0.6 — the fix in action
+    # And the sweep still SHOWS 0.6 as the higher-net row (report is honest).
+    by_val = {r.value: r.net for r in sw.rows}
+    assert by_val[0.6] > by_val[0.5]
+
+
 # -- re-entry price-override sweep -------------------------------------------- #
 
 def test_reentry_sweep_blocks_none_composite_and_sums():

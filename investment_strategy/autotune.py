@@ -146,6 +146,16 @@ def _load_window(
     return trips, all_records, journal_recs
 
 
+def _current_metric(rows: list[CandidateRow], current: float, attr: str) -> float:
+    """The current value's own metric from the sweep, or 0.0 if it isn't a
+    candidate row. Keeping the current knob is the baseline any recommendation
+    must beat — otherwise the sweep recommends the best ALTERNATIVE even when the
+    current value is already the best of all (the 2026-W30 bug: a 0.6 floor
+    netting $3,796 was told to loosen to a 0.5 netting $422)."""
+    cur = next((r for r in rows if abs(r.value - current) < 1e-9), None)
+    return getattr(cur, attr) if cur is not None else 0.0
+
+
 def _dollar_recommendation(rows: list[CandidateRow], current: float, min_sample: int) -> str | None:
     others = [r for r in rows if abs(r.value - current) > 1e-9]
     if not others:
@@ -155,6 +165,8 @@ def _dollar_recommendation(rows: list[CandidateRow], current: float, min_sample:
         return None
     if best.losses_avoided < 2 * best.winners_missed:
         return None  # not one-sided enough to trust on this little data
+    if best.net <= _current_metric(rows, current, "net"):
+        return None  # keeping the current value is as good or better — no change
     return (
         f"{best.value:g} nets ${best.net:,.0f} (${best.losses_avoided:,.0f} avoided "
         f"vs ${best.winners_missed:,.0f} missed, n={best.n_affected}) vs current "
@@ -169,6 +181,8 @@ def _pp_recommendation(rows: list[CandidateRow], current: float, min_sample: int
     best = max(others, key=lambda r: r.pp_saved)
     if best.n_affected < min_sample or best.pp_saved <= 0:
         return None
+    if best.pp_saved <= _current_metric(rows, current, "pp_saved"):
+        return None  # keeping the current value saves as much or more — no change
     return (
         f"{best.value:g} would have saved {best.pp_saved:+.1f}pp across "
         f"{best.n_affected} veto chain(s) vs current {current:g} — treat as a prior."

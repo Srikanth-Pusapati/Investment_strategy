@@ -280,6 +280,13 @@ class ScreenerConfig:
     min_score: float                 # drop candidates whose |smart-money score| is below this
     options_flow_scan_limit: int     # size of the most-actives pool the flow screener scans
     insider_scan_limit: int          # how many recent EDGAR Form-4 filings the insider screener parses
+    # Downside discovery: guarantee up to `bearish_reserve` slots for the
+    # strongest bearish (negative-score) names so a bull-heavy tape can't crowd
+    # every short setup off the capped slate — but only for names clearing
+    # `bearish_reserve_bar` (a real cluster / strong imbalance), so weak bearish
+    # names are never forced in. reserve=0 → pure |score| ranking (old behavior).
+    bearish_reserve: int = 4
+    bearish_reserve_bar: float = 0.4
 
 
 @dataclass(frozen=True)
@@ -645,6 +652,8 @@ def load_config() -> Config:
             # slice of EDGAR's ~100-filing "latest filings" feed to actually catch a
             # cluster (was wrongly sharing options_flow_scan_limit=40).
             insider_scan_limit=_i("INSIDER_SCAN_LIMIT", 100),
+            bearish_reserve=_i("BEARISH_RESERVE", 4),
+            bearish_reserve_bar=_f("BEARISH_RESERVE_BAR", 0.4),
         ),
         alerts=load_alert_config(os.getenv),
         # Core-satellite fill (Todo 1.6). CORE_ETF unset/"" disables it entirely;

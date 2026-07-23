@@ -88,7 +88,7 @@ class ScreenerAggregator:
             if (c.score >= min_score) or (options_on and c.score <= -min_score)
         ]
         cands.sort(key=lambda c: abs(c.score), reverse=True)
-        capped = cands[: self.cfg.screener.max_candidates]
+        capped = self._cap_with_bearish_reserve(cands, options_on)
 
         log.info(
             "Discovered %d candidate(s) from %d source(s) "
@@ -100,3 +100,38 @@ class ScreenerAggregator:
             log.info("  candidate %s [%s] score=%+.2f — %s",
                      c.symbol, "+".join(c.sources), c.score, c.reason)
         return capped
+
+    def _cap_with_bearish_reserve(
+        self, cands: list[Candidate], options_on: bool
+    ) -> list[Candidate]:
+        """Cap to max_candidates by |score|, but guarantee up to `bearish_reserve`
+        slots for the STRONGEST bearish names clearing `bearish_reserve_bar`, so a
+        bull-heavy tape can't crowd every short setup off the capped slate. `cands`
+        must already be sorted by |score| descending.
+
+        Guardrails: only names past the bar are eligible (a weak bearish name is
+        never forced in); a guaranteed name is never re-capped back out; and when
+        the natural top-N already includes the strong bearish names (the common
+        case) this is a no-op."""
+        max_c = self.cfg.screener.max_candidates
+        if len(cands) <= max_c:
+            return cands[:max_c]
+        reserve = getattr(self.cfg.screener, "bearish_reserve", 0)
+        bar = getattr(self.cfg.screener, "bearish_reserve_bar", 0.4)
+        if reserve <= 0 or not options_on:
+            return cands[:max_c]
+        # cands is |score|-sorted, so the first matches ARE the strongest bearish.
+        guaranteed_idx = [
+            i for i, c in enumerate(cands) if c.score <= -bar
+        ][: min(reserve, max_c)]
+        if not guaranteed_idx:
+            return cands[:max_c]
+        guaranteed = set(guaranteed_idx)
+        picked = list(guaranteed_idx)                 # reserved first — never dropped
+        for i in range(len(cands)):                   # fill the rest by |score|
+            if len(picked) >= max_c:
+                break
+            if i not in guaranteed:
+                picked.append(i)
+        picked.sort(key=lambda i: abs(cands[i].score), reverse=True)
+        return [cands[i] for i in picked]

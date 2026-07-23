@@ -142,6 +142,52 @@ def test_graceful_degradation_one_source_raises():
     assert [c.symbol for c in out] == ["MSFT"]
 
 
+# --- bearish slot reservation (downside can't be crowded off a bull tape) --- #
+def test_bearish_reserve_promotes_strong_short_over_weaker_bull():
+    # cap 3, reserve 1: without reservation the top-3 by |score| are all bulls
+    # (0.9/0.8/0.7) and the strong short (-0.5) is capped out. Reservation keeps it.
+    agg = _agg(_cfg(max_candidates=3, bearish_reserve=1, bearish_reserve_bar=0.4), [
+        _Fake("a", [
+            _cand("BUA", "a", 0.9), _cand("BUB", "a", 0.8),
+            _cand("BUC", "a", 0.7), _cand("BEA", "a", -0.5),
+        ]),
+    ])
+    out = [c.symbol for c in agg.scan()]
+    assert "BEA" in out and len(out) == 3
+    assert out == ["BUA", "BUB", "BEA"]       # weakest bull (BUC) dropped, sorted by |score|
+
+
+def test_bearish_reserve_noop_when_short_already_in_topN():
+    agg = _agg(_cfg(max_candidates=3, bearish_reserve=2, bearish_reserve_bar=0.4), [
+        _Fake("a", [
+            _cand("BUA", "a", 0.9), _cand("BEA", "a", -0.85),
+            _cand("BUB", "a", 0.5), _cand("BUC", "a", 0.4),
+        ]),
+    ])
+    # natural top-3 already includes BEA (|0.85|) — reservation changes nothing.
+    assert [c.symbol for c in agg.scan()] == ["BUA", "BEA", "BUB"]
+
+
+def test_bearish_reserve_never_forces_weak_short():
+    # BEA at -0.3 clears min_score (0.2) but NOT the reserve bar (0.4) -> it is
+    # not guaranteed a slot; the two strong bulls win the cap.
+    agg = _agg(_cfg(max_candidates=2, bearish_reserve=2, bearish_reserve_bar=0.4), [
+        _Fake("a", [
+            _cand("BUA", "a", 0.9), _cand("BUB", "a", 0.8), _cand("BEA", "a", -0.3),
+        ]),
+    ])
+    assert [c.symbol for c in agg.scan()] == ["BUA", "BUB"]
+
+
+def test_bearish_reserve_zero_is_pure_abs_ranking():
+    agg = _agg(_cfg(max_candidates=2, bearish_reserve=0), [
+        _Fake("a", [
+            _cand("BUA", "a", 0.9), _cand("BUB", "a", 0.85), _cand("BEA", "a", -0.5),
+        ]),
+    ])
+    assert [c.symbol for c in agg.scan()] == ["BUA", "BUB"]   # short capped out, reserve off
+
+
 def _run_all():
     fns = [v for k, v in sorted(globals().items()) if k.startswith("test_") and callable(v)]
     failed = 0
