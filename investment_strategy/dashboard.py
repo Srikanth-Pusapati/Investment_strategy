@@ -51,16 +51,19 @@ _AMBER = "#d29922"
 # --------------------------------------------------------------------------- #
 def _live_enrichment(
     symbols: set[str],
-) -> tuple[dict[str, float], Optional[AccountStatus]]:
-    """Best-effort live data via Alpaca: current prices for ledger symbols AND the
-    real account status (equity, P&L, total return). Returns ({}, None) if Alpaca
-    is unavailable so the dashboard still renders the ledger offline."""
+) -> tuple[dict[str, float], Optional[AccountStatus], str]:
+    """Best-effort live data via Alpaca: current prices for ledger symbols, the
+    real account status (equity, P&L, total return), and the trading mode
+    ("paper"/"live") so the account panel doesn't always claim "(live)"
+    regardless of which account it actually read. Returns ({}, None, "") if
+    Alpaca is unavailable so the dashboard still renders the ledger offline."""
     try:
         from .config import load_config
         from .execution import AlpacaClient
         from .status import compute_status
 
-        broker = AlpacaClient(load_config())
+        cfg = load_config()
+        broker = AlpacaClient(cfg)
         prices: dict[str, float] = {}
         for s in symbols:
             px = broker.latest_price(s)
@@ -71,10 +74,10 @@ def _live_enrichment(
         except Exception as e:  # account read shouldn't sink price enrichment
             log.info("Account status unavailable (%s).", e)
             status = None
-        return prices, status
+        return prices, status, cfg.mode.value
     except Exception as e:
         log.info("Live enrichment skipped (%s).", e)
-        return {}, None
+        return {}, None, ""
 
 
 # --------------------------------------------------------------------------- #
@@ -509,7 +512,7 @@ def _round_trips_html(trips: list[dict], rows: list[_Row]) -> str:
     return "".join(blocks)
 
 
-def _account_panel(status: Optional[AccountStatus]) -> str:
+def _account_panel(status: Optional[AccountStatus], mode: str = "") -> str:
     """Cards for the REAL Alpaca account (truth), distinct from the ledger-derived
     'invested' cards below. Omitted entirely when the account can't be read."""
     if status is None:
@@ -534,13 +537,14 @@ def _account_panel(status: Optional[AccountStatus]) -> str:
             f"· net of deposits",
             tone="up" if up else "down",
         ))
-    return ("<h2 class='section'>Account (live)</h2>"
+    label = f"Account ({mode})" if mode else "Account (live Alpaca read)"
+    return (f"<h2 class='section'>{html.escape(label)}</h2>"
             f"<div class='cards'>{''.join(cards)}</div>")
 
 
 def build_html(
     records: list[TradeRecord], prices: dict[str, float],
-    account: Optional[AccountStatus] = None,
+    account: Optional[AccountStatus] = None, mode: str = "",
 ) -> str:
     trips = aggregate_round_trips(records, prices)
     closed_groups = {
@@ -615,7 +619,7 @@ def build_html(
 
     generated = datetime.now(_ET).strftime("%Y-%m-%d %H:%M:%S ET")
     return _PAGE.format(
-        account_panel=_account_panel(account),
+        account_panel=_account_panel(account, mode),
         cards="".join(cards),
         bar=bar,
         area=area,
@@ -722,8 +726,10 @@ def generate(
     ledger = TradeLedger(ledger_path) if ledger_path else TradeLedger()
     # effective(): reconcile corrections applied — no phantom rows (GA-2.5).
     records = ledger.effective()
-    prices, account = _live_enrichment({r.symbol for r in records}) if live else ({}, None)
-    out.write_text(build_html(records, prices, account), encoding="utf-8")
+    prices, account, mode = (
+        _live_enrichment({r.symbol for r in records}) if live else ({}, None, "")
+    )
+    out.write_text(build_html(records, prices, account, mode), encoding="utf-8")
     log.info("Wrote dashboard with %d trades -> %s", len(records), out)
     return out
 

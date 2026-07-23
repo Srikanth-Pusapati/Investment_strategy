@@ -150,27 +150,50 @@ class AlpacaClient:
         cash + position market values, so a poisoned read is detectable:
         re-read, and if the API keeps disagreeing with itself, rebuild equity
         from the parts that DO agree rather than hand the bad number to the
-        risk layer / watchdog."""
+        risk layer / watchdog.
+
+        A SEPARATE glitch (seen 2026-07-23): `last_equity` itself reads back 0
+        even though equity/cash/positions all agree with each other. Nothing
+        above catches this — `_equity_consistent` never looks at last_equity —
+        so day_pl = equity - 0 = equity and day_pl_pct falls into the "no
+        last_equity" 0.00% branch: the dashboard showed "Today's P&L
+        +$94,026 (+0.00%)", claiming the WHOLE account balance as today's
+        gain. Checked and healed independently of the equity check below."""
         snap = self._read_account_once()
         for attempt in (1, 2):
-            if self._equity_consistent(snap):
+            if self._equity_consistent(snap) and self._last_equity_plausible(snap):
                 return snap
             log.warning(
-                "get_account: INCONSISTENT snapshot (equity $%.2f but cash "
-                "$%.2f + positions $%.2f) — re-reading (%d/2).",
-                snap.equity, snap.cash,
-                sum(p.market_value for p in snap.positions), attempt,
+                "get_account: INCONSISTENT snapshot (equity $%.2f vs cash "
+                "$%.2f + positions $%.2f; last_equity $%.2f) — re-reading "
+                "(%d/2).", snap.equity, snap.cash,
+                sum(p.market_value for p in snap.positions), snap.last_equity,
+                attempt,
             )
             time.sleep(0.5 * attempt)
             snap = self._read_account_once()
-        if self._equity_consistent(snap):
-            return snap
-        healed = snap.cash + sum(p.market_value for p in snap.positions)
-        log.error(
-            "get_account: equity STILL inconsistent after re-reads (reported "
-            "$%.2f); substituting cash+positions $%.2f.", snap.equity, healed,
-        )
-        return snap.model_copy(update={"equity": healed})
+        updates: dict = {}
+        if not self._equity_consistent(snap):
+            healed_equity = snap.cash + sum(p.market_value for p in snap.positions)
+            log.error(
+                "get_account: equity STILL inconsistent after re-reads "
+                "(reported $%.2f); substituting cash+positions $%.2f.",
+                snap.equity, healed_equity,
+            )
+            updates["equity"] = healed_equity
+        if not self._last_equity_plausible(snap):
+            current_equity = updates.get("equity", snap.equity)
+            healed_last_equity = self._recover_last_equity(current_equity)
+            log.error(
+                "get_account: last_equity STILL implausible ($%.2f) after "
+                "re-reads; substituting %s.", snap.last_equity,
+                f"${healed_last_equity:,.2f} from the prior day's equity "
+                "snapshot" if healed_last_equity != current_equity
+                else "today's equity (day P/L reads as unknown, not a "
+                "fabricated gain)",
+            )
+            updates["last_equity"] = healed_last_equity
+        return snap.model_copy(update=updates) if updates else snap
 
     def _read_account_once(self) -> AccountSnapshot:
         a = _retry_read(self.trading.get_account, what="get_account")
@@ -199,6 +222,35 @@ class AlpacaClient:
         expected = snap.cash + sum(p.market_value for p in snap.positions)
         denom = max(abs(expected), abs(snap.equity), 1.0)
         return abs(snap.equity - expected) / denom <= 0.03
+
+    @staticmethod
+    def _last_equity_plausible(snap: AccountSnapshot) -> bool:
+        """Alpaca occasionally serves last_equity=0 (seen 2026-07-23) even when
+        equity/cash/positions all agree with each other — a distinct glitch
+        from the equity==cash one above. A real account's prior-close equity
+        is never actually zero (paper accounts fund at $100k; a live account
+        always carries a balance), so <=0 is unambiguously bad data."""
+        return snap.last_equity > 0
+
+    def _recover_last_equity(self, current_equity: float) -> float:
+        """Best-effort fallback when Alpaca's own last_equity is glitched: our
+        own daily equity snapshots (state/equity_history.jsonl, written by
+        status.EquityHistory) already record real prior-day equity for
+        exactly this kind of recovery. Falls back to CURRENT equity (day P/L
+        then reads as unknown/0, not a fabricated gain) if no usable prior-day
+        row exists — never raises."""
+        try:
+            from ..status import EquityHistory
+            today = datetime.now(timezone.utc).date().isoformat()
+            prior = [
+                r for r in EquityHistory().all()
+                if r.get("date") and r["date"] < today and r.get("equity") is not None
+            ]
+            if prior:
+                return float(prior[-1]["equity"])
+        except Exception as e:
+            log.warning("Could not recover last_equity from equity history: %s", e)
+        return current_equity
 
     def account_id(self) -> str:
         """Stable identifier for the connected Alpaca account. It changes if the
@@ -503,16 +555,66 @@ class AlpacaClient:
         log.info("OPTION %d-leg order qty=%d (order %s)", len(legs), qty, placed.id)
         return str(placed.id)
 
+    #: Minimum valid option limit price (Alpaca ticks options in whole cents;
+    #: a SELL-to-close resting at this price is still marketable against any
+    #: live bid, however small, without asking for a literal $0.00 order).
+    _MIN_OPTION_LIMIT = 0.01
+
+    def close_option_leg(self, position: Position) -> Optional[str]:
+        """Close ONE option leg: plain market close first (the common path),
+        falling back to a DAY limit order when Alpaca rejects the market
+        close for having no live quote to route against.
+
+        Seen 2026-07-23: a long call whose mark had gone to $0 (no NBBO) got
+        error 40310000 "order has been rejected due to no available quote
+        for symbol. please reenter with a limit" on every watchdog tick — the
+        SAME market close retried every ~30s for 12+ minutes with the
+        position stuck unprotected, because there was no fallback order type.
+        Options are DAY-only at Alpaca (no GTC), so DAY is the most
+        persistent single order this venue allows; the watchdog's own retry
+        loop still covers a DAY order that doesn't fill before this order
+        expires unfilled at the close."""
+        oid = self.close_position(position.symbol)
+        if oid:
+            return oid
+        side = OrderSide.SELL if position.qty > 0 else OrderSide.BUY
+        # current_price==0 is itself a meaningful reading here (Alpaca marked
+        # this worthless / no bid) — NOT "missing data" to fall back from.
+        # avg_entry_price is what we PAID, unrelated to what it's worth now;
+        # using it would ask 3x+ the going rate for a dead contract and likely
+        # never fill. Floor at the min tick only when the live mark is <= 0.
+        limit = max(round(position.current_price, 2), self._MIN_OPTION_LIMIT)
+        try:
+            order = self.trading.submit_order(LimitOrderRequest(
+                symbol=position.symbol, qty=abs(position.qty), side=side,
+                time_in_force=TimeInForce.DAY, limit_price=limit,
+            ))
+        except Exception as e:
+            log.error(
+                "close_option_leg(%s) limit fallback failed: %s",
+                position.symbol, e,
+            )
+            return None
+        log.warning(
+            "Option leg %s: market close unavailable — resting DAY limit "
+            "%s %g @ %.2f instead.", position.symbol, side.value,
+            abs(position.qty), limit,
+        )
+        return str(order.id)
+
     def close_option_group(self, positions: list[Position]) -> Optional[str]:
         """Close a whole option structure — never gated by the kill switch
-        (closing is risk reduction). One leg -> plain close on the OCC symbol;
-        2+ legs -> ONE closing MLEG order (each leg flipped to its *_TO_CLOSE
-        intent) so a spread never passes through a naked-short intermediate
-        state. Options are DAY-only at Alpaca, so there is no GTC fallback —
-        a failed close is retried by the watchdog next tick."""
+        (closing is risk reduction). One leg -> close_option_leg (market, then
+        a DAY-limit fallback — see its docstring); 2+ legs -> ONE closing MLEG
+        market order (each leg flipped to its *_TO_CLOSE intent) so a spread
+        never passes through a naked-short intermediate state. The MLEG path
+        has no limit-order fallback yet (a net limit across legs needs a
+        per-leg quote, which is exactly what's missing when this fires) — a
+        failed multi-leg close is retried by the watchdog next tick same as
+        before."""
         from .options import build_closing_legs
         if len(positions) == 1:
-            return self.close_position(positions[0].symbol)
+            return self.close_option_leg(positions[0])
         try:
             legs, group_qty = build_closing_legs(positions)
             req = MarketOrderRequest(
