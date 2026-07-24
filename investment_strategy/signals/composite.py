@@ -46,11 +46,17 @@ def perf_weights(
 
     weight = clamp(1.0 + avg_pl_pct / _PERF_SPAN, 0.5, 1.5) once a source has
     `min_trips` closed round-trips; 1.0 (inert) below that. Uses the same
-    reconciled round-trip reconstruction as the prompt's Track record block.
+    reconciled round-trip reconstruction as the prompt's Track record block,
+    on the CITED basis (Jul-24): presence-based stats were bunched within
+    ~0.9pp — every source got the same mild haircut and the weights
+    differentiated nothing — while cited stats spread ~6pp and actually
+    separate earners from bleeders. Report-only cited buckets that aren't
+    SignalKind values ("options_flow", "composite") land in the dict harmlessly:
+    composite_score() looks up by kind.value and never sees them.
     """
     from ..attribution import attribute, round_trips
 
-    stats = attribute(round_trips(ledger.effective()))
+    stats = attribute(round_trips(ledger.effective()), basis="cited")
     out: dict[str, float] = {}
     for kind, s in stats.items():
         if s.trips < min_trips:

@@ -309,7 +309,8 @@ def _attribution_table(records) -> str:
     if not trips:
         return "<p class='empty'>No closed round-trips yet.</p>"
     stats = sorted(
-        attribute(trips).values(), key=lambda s: s.avg_pl_pct, reverse=True,
+        attribute(trips, basis="cited").values(),
+        key=lambda s: s.avg_pl_pct, reverse=True,
     )
     rows = "".join(
         f"<tr><td>{html.escape(s.source)}</td>"
@@ -320,8 +321,11 @@ def _attribution_table(records) -> str:
         for s in stats
     )
     note = (
-        "<p class='mute'>A source with under 2 round-trips in the window is "
-        "INSUFFICIENT (per-source rule, GA-1.1) — small samples, not verdicts.</p>"
+        "<p class='mute'>Cited basis: a trip counts toward a source only when "
+        "the model named it as decisive at entry (falls back to signals present "
+        "when nothing was cited). A source with under 2 round-trips in the "
+        "window is INSUFFICIENT (per-source rule, GA-1.1) — small samples, not "
+        "verdicts.</p>"
     )
     return (
         "<table><thead><tr><th>Signal source</th><th class='num'>Round-trips"

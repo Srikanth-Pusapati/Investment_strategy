@@ -147,6 +147,26 @@ def test_sortino_defined_with_downside():
     assert so is not None and so > 0
 
 
+def test_attribution_table_uses_cited_basis():
+    # Jul-24 prune: the per-source table counts a trip toward a source only
+    # when the model cited it as decisive; ride-along presence must not appear.
+    from investment_strategy.ledger import TradeRecord
+    from investment_strategy.track_record import _attribution_table
+
+    records = []
+    for i in range(2):
+        records.append(TradeRecord(
+            symbol=f"S{i}", action="buy", qty=1.0,
+            entry_signals=["insider", "technical"],
+            key_signals=["insider Form4 +1.00"]))
+        records.append(TradeRecord(
+            symbol=f"S{i}", action="sell", qty=1.0, realized_pl_pct=-5.0))
+    html_out = _attribution_table(records)
+    assert "insider" in html_out
+    assert "technical" not in html_out
+    assert "Cited basis" in html_out       # footnote documents the semantics
+
+
 def _run_all():
     fns = [v for k, v in sorted(globals().items()) if k.startswith("test_") and callable(v)]
     failed = 0
