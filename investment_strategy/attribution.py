@@ -11,14 +11,24 @@ datasets to keep paying for).
 
 Round-trip reconstruction walks the ledger in time order; buys open a position and
 a sell/exit realizes an outcome attributed to the union of the open buys'
-entry_signals. Most closes flatten the whole position, but the regime trim (1B.6)
-and take-profit scale-out (1B.8) are PARTIAL sells: they realize an outcome on a
-slice while the remainder stays open, so a partial exit reduces the open lots FIFO
-by its qty and keeps the rest open (otherwise the remainder's later exit would
-orphan into a signal-less trip). Exchange-side bracket auto-fills — formerly a
-blind spot no code observed — are backfilled into the ledger each cycle (F.1:
-exit_reason bracket_stop / bracket_take / external), so round-trips now cover
-every exit path, not just the decision- and watchdog-driven ones.
+entry_signals. Closes are QTY-AWARE: any sell whose known qty is below the open
+total is a partial close — the regime trim (1B.6), the take-profit scale-out
+(1B.8), and a multi-lot flatten split across separate fill rows (the BRK.B
+2026-07-23 flatten sold 7 sh + 16 sh as two rows; the old reason-based rule
+popped everything on the first row and orphaned the second into a signal-less
+trip) — and reduces the open lots FIFO by its qty, keeping the rest attributed.
+Exchange-side bracket auto-fills — formerly a blind spot no code observed — are
+backfilled into the ledger each cycle (F.1: exit_reason bracket_stop /
+bracket_take / external), so round-trips cover every exit path, not just the
+decision- and watchdog-driven ones.
+
+Two attribution bases (Jul-24 analysis). PRESENCE — every kind in the bundle at
+entry — dilutes: with ~7 kinds present on nearly every entry, all sources
+converge on the book average (presence stats sat bunched within ~0.9pp while the
+same trips' cited stats spread ~6pp). CITED scores only the sources the LLM
+actually NAMED in key_signals when it proposed the trade, parsed by
+`parse_cited`; it is the basis the perf-weight / track-record / subscription
+consumers now use, with a per-trip fallback to presence when nothing was cited.
 """
 from __future__ import annotations
 
@@ -26,10 +36,92 @@ from dataclasses import dataclass, field
 
 from .ledger import TradeLedger, TradeRecord
 
-# Exit reasons that only PARTIALLY close a position (a slice is sold, the rest
-# stays open). Every other close — decision / stop / take / trail / flatten / time
-# / thesis_decay — flattens the whole position.
-_PARTIAL_EXIT_REASONS = {"scale", "regime_trim"}
+# Cited-string -> source-bucket tables for `parse_cited`. The decision LLM
+# consistently prefixes each key_signals citation with its source ("insider
+# Form4 +1.00", "options_chain +0.39"), but the text is free-form, so this is
+# substring matching over curated tables — extend them when unparsed idioms
+# show up in the ledger. Buckets are SignalKind values plus two REPORT-ONLY
+# extras that deliberately aren't kinds: "options_flow" (the flow provider
+# emits under kind=news, but its citations behave differently — Jul-24:
+# flow-cited trips -0.8% vs news-cited -3.0% — so folding them together would
+# launder the news number) and "composite" (the LLM citing the deterministic
+# index itself). Non-kind buckets never collide with a SignalKind value, so
+# composite perf-weight lookups simply never see them.
+#
+# STRONG patterns are the source being NAMED. WEAK patterns are metric/
+# indicator vocabulary that only implies a source ("margin", "RSI", "upgrade").
+# Weak hits count only when a string has no strong hit at all: "news: AI
+# margin windfall earnings surprise" (SMCI 2026-07-22) is a news citation that
+# merely mentions margins — crediting fundamentals for it would be laundering.
+_STRONG_PATTERNS: tuple[tuple[str, str], ...] = (
+    ("options_chain", "options_chain"), ("options chain", "options_chain"),
+    ("option chain", "options_chain"), ("chain positioning", "options_chain"),
+    ("bullish chain", "options_chain"), ("bearish chain", "options_chain"),
+    ("options flow", "options_flow"), ("option flow", "options_flow"),
+    ("options_flow", "options_flow"), ("call flow", "options_flow"),
+    ("put flow", "options_flow"), ("news flow", "options_flow"),
+    ("flow c/p", "options_flow"), ("call imbalance", "options_flow"),
+    ("put imbalance", "options_flow"),
+    ("composite", "composite"),
+    ("govcontract", "govcontracts"), ("gov contract", "govcontracts"),
+    ("government contract", "govcontracts"), ("federal contract", "govcontracts"),
+    ("offexchange", "offexchange"), ("off-exchange", "offexchange"),
+    ("off exchange", "offexchange"), ("dark pool", "offexchange"),
+    ("darkpool", "offexchange"), ("short volume", "offexchange"),
+    ("fundamental", "fundamentals"),
+    ("technical", "technical"),
+    ("insider", "insider"), ("form4", "insider"), ("form 4", "insider"),
+    ("congress", "congress"), ("senate", "congress"),
+    ("news", "news"),
+    ("macro", "macro"),
+    ("discovery", "discovery"), ("scanner", "discovery"),
+)
+_WEAK_PATTERNS: tuple[tuple[str, str], ...] = (
+    ("revenue", "fundamentals"), ("rev +", "fundamentals"),
+    ("rev growth", "fundamentals"), ("eps", "fundamentals"),
+    ("ebitda", "fundamentals"), ("margin", "fundamentals"),
+    ("valuation", "fundamentals"), ("p/e", "fundamentals"),
+    ("earnings", "fundamentals"),
+    ("rsi", "technical"), ("macd", "technical"),
+    ("golden cross", "technical"), ("breakout", "technical"),
+    ("momentum", "technical"), ("trend", "technical"),
+    ("oversold", "technical"), ("overbought", "technical"),
+    ("sentiment", "news"), ("upgrade", "news"), ("downgrade", "news"),
+    ("analyst", "news"), ("headline", "news"), ("catalyst", "news"),
+    ("p/c", "options_chain"), ("put/call", "options_chain"),
+    ("c/p", "options_flow"),
+    ("fomc", "macro"), ("cpi", "macro"),
+    ("screen", "discovery"),
+)
+
+
+def parse_cited(texts: list[str] | None) -> set[str]:
+    """Source buckets named by the LLM's key_signals citations.
+
+    Per string: strong (source-name) hits win outright; weak (metric-word)
+    hits only count when the string named no source at all. Match-ALL among
+    strong hits — "congress+insider net buying" credits both sources. One
+    suppression: when a flow bucket matched, a same-string "news" hit is
+    dropped, because the flow signal emits under the news kind and its
+    kind-prefix ("news options flow C/P +0.76", "news flow +0.61 call
+    imbalance") is an artifact of that, not a second source being cited.
+    """
+    out: set[str] = set()
+    for t in texts or []:
+        low = t.lower()
+        strong = {bucket for pat, bucket in _STRONG_PATTERNS if pat in low}
+        hits = strong or {bucket for pat, bucket in _WEAK_PATTERNS if pat in low}
+        if "options_flow" in hits:
+            hits = hits - {"news"}
+        out |= hits
+    return out
+
+
+# A sell within this RELATIVE fraction of the open total is a full close. Buys
+# ledger requested/estimated qty, sells ledger actual fills; observed deltas on
+# broker-flat closes reach ~2e-3 shares (QQQ core-fill flatten) — far above any
+# absolute dust margin — while genuine partial closes trim >=25% of a position.
+_FULL_CLOSE_REL_TOL = 0.01
 
 
 @dataclass
@@ -54,6 +146,14 @@ class RoundTrip:
     opening_composite: float | None = None
     realized_pl: float | None = None  # dollars from the realizing sell (r.realized_pl)
     exit_ts: str = ""                 # str(ts) of the realizing sell — window filter + veto join
+    # Source buckets the LLM NAMED in key_signals at entry (union across open
+    # lots, parsed by parse_cited). Empty when nothing was cited/parseable —
+    # cited-basis attribution then falls back to `signals`. Appended last so
+    # positional construction of older fields keeps working.
+    cited_signals: list[str] = field(default_factory=list)
+    # "equity" | "option" — from the (symbol, instrument) lot key, so option
+    # wipeouts can be split out of a source's read without re-walking the ledger.
+    instrument: str = "equity"
 
 
 @dataclass
@@ -75,39 +175,74 @@ class SourceStats:
 def round_trips(records: list[TradeRecord]) -> list[RoundTrip]:
     """Reconstruct closed round-trips from ledger records (chronological).
 
-    Only trips whose exit carried a realized P&L are emitted — an exit without an
-    outcome (old records, or a sell we couldn't mark) can't be attributed. A PARTIAL
-    exit (scale-out / regime trim) realizes an outcome on a slice and leaves the
-    remainder open, so it reduces the open lots FIFO rather than flattening them.
+    Only trips whose exit carried a realized P&L AND had open lots to close are
+    emitted. An exit without an outcome (old records, or a sell we couldn't
+    mark) can't be attributed; an exit with NO open lots — a duplicate retry
+    row (the T option flatten of 2026-07-23 was ledgered twice, doubling a
+    -$2,700 loss in every overall stat) or a sell whose buy predates the ledger
+    — used to emit a signal-less trip that polluted the overall numbers while
+    attributing to nothing, and is now skipped.
+
+    Closes are QTY-AWARE: a sell with a known qty below the open total is a
+    partial close (scale-out, regime trim, or a multi-lot flatten split across
+    fill rows) and reduces the open lots FIFO by its qty; a sell whose qty
+    covers the open total — or carries no qty at all — flattens the position.
+    The partial/full boundary is RELATIVE (a sell within 1% of the open total
+    flattens): buy rows ledger the REQUESTED/estimated qty while sell rows
+    ledger the ACTUAL filled qty, and the live ledger's deltas run 1e-5..2e-3
+    shares (JNJ/ORCL decision closes, the QQQ core-fill flatten) — an absolute
+    dust margin left those broker-flat positions open forever as phantom lots.
+    Genuine partials (25-50% trims and scale-outs) sit nowhere near 99%.
+
+    Lots are keyed by (symbol, instrument): option rows ledger under the bare
+    underlying ticker with qty in CONTRACTS (the 2026-07-23 T calls: qty=900
+    alongside equity T rows of 372 shares), so a shared key would compare
+    contracts against shares in the qty arithmetic and union option and equity
+    signals into each other's trips.
     """
     ordered = sorted(records, key=lambda r: r.ts)
-    # Per symbol, a list of open lots as
-    # [remaining_qty, entry_signals, ts_date, conviction-or-None].
-    open_by_symbol: dict[str, list[list]] = {}
-    # Per symbol, the (conviction, composite) of the buy that opened the CURRENT
-    # episode (flat -> open) — set once per episode, cleared on full close, so a
-    # later top-up never overwrites the entry's own numbers.
-    episode_open: dict[str, tuple[float | None, float | None]] = {}
+    # Per (symbol, instrument), a list of open lots as
+    # [remaining_qty, entry_signals, cited_buckets, ts_date, conviction-or-None].
+    open_lots: dict[tuple[str, str], list[list]] = {}
+    # Per (symbol, instrument), the (conviction, composite) of the buy that
+    # opened the CURRENT episode (flat -> open) — set once per episode, cleared
+    # on full close, so a later top-up never overwrites the entry's own numbers.
+    episode_open: dict[tuple[str, str], tuple[float | None, float | None]] = {}
+    # Per (symbol, instrument), the signature of the last processed sell — a
+    # sell row identical in (qty, P&L%, P&L$, reason) to the one before it is a
+    # duplicate retry ledgering (the T option flatten of 2026-07-23 landed
+    # twice, 3h apart), which the no-open-lots skip alone can't catch when the
+    # first sell was PARTIAL and lots remain to double-consume.
+    last_sell_sig: dict[tuple[str, str], tuple] = {}
     trips: list[RoundTrip] = []
     for r in ordered:
+        key = (r.symbol, r.instrument or "equity")
         if r.action == "buy":
+            last_sell_sig.pop(key, None)
             ts_date = str(r.ts)[:10] if r.ts else ""
             # 0.0 means "not recorded" (core fills, pre-tracking rows), not
             # "zero conviction" — store None so calibration skips it.
             conv = r.conviction if (r.conviction or 0.0) > 0 else None
-            if r.symbol not in open_by_symbol or not open_by_symbol[r.symbol]:
-                episode_open[r.symbol] = (conv, r.composite_score)
-            open_by_symbol.setdefault(r.symbol, []).append(
-                [float(r.qty or 0.0), list(r.entry_signals), ts_date, conv]
-            )
+            if not open_lots.get(key):
+                episode_open[key] = (conv, r.composite_score)
+            open_lots.setdefault(key, []).append([
+                float(r.qty or 0.0), list(r.entry_signals),
+                parse_cited(r.key_signals), ts_date, conv,
+            ])
         elif r.action == "sell":
-            lots = open_by_symbol.get(r.symbol, [])
-            if r.realized_pl_pct is not None:
-                signals = sorted({k for _, sigs, _d, _c in lots for k in sigs})
-                dates = [d for _, _, d, _c in lots if d]
+            sig = (float(r.qty or 0.0), r.realized_pl_pct, r.realized_pl,
+                   r.exit_reason)
+            if last_sell_sig.get(key) == sig:
+                continue
+            last_sell_sig[key] = sig
+            lots = open_lots.get(key, [])
+            if r.realized_pl_pct is not None and lots:
+                signals = sorted({k for _q, sigs, _c, _d, _cv in lots for k in sigs})
+                cited = sorted({k for _q, _s, cset, _d, _cv in lots for k in cset})
+                dates = [d for _q, _s, _c, d, _cv in lots if d]
                 same_day = len(dates) >= 2 and len(set(dates)) == 1
-                convs = [c for _, _, _, c in lots if c is not None]
-                open_conv, open_comp = episode_open.get(r.symbol, (None, None))
+                convs = [c for _q, _s, _c, _d, c in lots if c is not None]
+                open_conv, open_comp = episode_open.get(key, (None, None))
                 trips.append(RoundTrip(
                     symbol=r.symbol, pl_pct=r.realized_pl_pct,
                     signals=signals, exit_reason=r.exit_reason,
@@ -115,17 +250,18 @@ def round_trips(records: list[TradeRecord]) -> list[RoundTrip]:
                     conviction=sum(convs) / len(convs) if convs else None,
                     opening_conviction=open_conv, opening_composite=open_comp,
                     realized_pl=r.realized_pl, exit_ts=str(r.ts) if r.ts else "",
+                    cited_signals=cited, instrument=key[1],
                 ))
-            # A partial exit (with a known qty) trims the open lots and keeps the
-            # remainder; anything else — or an unknown qty — fully closes.
-            if r.exit_reason in _PARTIAL_EXIT_REASONS and (r.qty or 0.0) > 0:
-                _reduce_fifo(lots, float(r.qty))
+            qty = float(r.qty or 0.0)
+            open_total = sum(lot[0] for lot in lots)
+            if 0.0 < qty < open_total * (1.0 - _FULL_CLOSE_REL_TOL):
+                _reduce_fifo(lots, qty)
                 if not lots:
-                    open_by_symbol.pop(r.symbol, None)
-                    episode_open.pop(r.symbol, None)
+                    open_lots.pop(key, None)
+                    episode_open.pop(key, None)
             else:
-                open_by_symbol.pop(r.symbol, None)
-                episode_open.pop(r.symbol, None)
+                open_lots.pop(key, None)
+                episode_open.pop(key, None)
     return trips
 
 
@@ -160,8 +296,8 @@ def concentration_lessons(trips: list[RoundTrip], min_trips: int = 3) -> list[st
 
 def _reduce_fifo(lots: list[list], qty: float) -> None:
     """Consume `qty` shares from the front of `lots` (each
-    [remaining_qty, signals, date, conviction]), dropping fully-consumed lots.
-    Mutates `lots` in place."""
+    [remaining_qty, signals, cited, date, conviction]), dropping fully-consumed
+    lots. Mutates `lots` in place."""
     remaining = qty
     while remaining > 1e-9 and lots:
         lot = lots[0]
@@ -279,11 +415,24 @@ def behavior_diagnostics(ledger: TradeLedger, min_trips: int = 3) -> list[str]:
     ]
 
 
-def attribute(trips: list[RoundTrip]) -> dict[str, SourceStats]:
-    """Per-source win-rate and average realized P&L across round-trips."""
+def attribute(
+    trips: list[RoundTrip], basis: str = "present",
+) -> dict[str, SourceStats]:
+    """Per-source win-rate and average realized P&L across round-trips.
+
+    basis="present" scores every kind in the bundle at entry — kept for the
+    citing-vs-presence comparison, but diluted as a ranking (~7 kinds ride
+    every trade, so all sources converge on the book average).
+    basis="cited" scores only the sources the LLM NAMED in key_signals when it
+    made the trade — the sharp basis the perf-weight / track-record /
+    subscription consumers use — falling back per-trip to the presence set when
+    nothing was cited (core fills, pre-tracking rows), so those trips still
+    count somewhere instead of vanishing.
+    """
     stats: dict[str, SourceStats] = {}
     for t in trips:
-        for src in t.signals:
+        srcs = t.signals if basis == "present" else (t.cited_signals or t.signals)
+        for src in srcs:
             s = stats.setdefault(src, SourceStats(source=src))
             s.trips += 1
             s.wins += 1 if t.pl_pct > 0 else 0
@@ -307,7 +456,7 @@ def render_lessons(
     if not trips:
         return ""
     recent = trips[-max_trips:]
-    stats = attribute(recent)
+    stats = attribute(recent, basis="cited")
     ranked = sorted(
         (s for s in stats.values() if s.trips >= min_source_trips),
         key=lambda s: s.avg_pl_pct, reverse=True,
@@ -319,7 +468,7 @@ def render_lessons(
     overall_avg = sum(t.pl_pct for t in recent) / len(recent)
     lines = [
         f"## Track record (last {len(recent)} closed trades; your realized P&L by "
-        "entry signal — trusted, not market data)",
+        "the entry signals you CITED as decisive — trusted, not market data)",
         f"Overall: {overall_win:.0f}% win, {overall_avg:+.1f}% avg per trade.",
     ]
     for s in ranked:

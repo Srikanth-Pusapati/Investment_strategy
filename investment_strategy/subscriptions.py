@@ -109,7 +109,10 @@ def evaluate_subscriptions(
 ) -> list[SubscriptionVerdict]:
     """Score every candidate subscription against the ledger's measured signal
     attribution and apply the pay/don't-pay gate. Sorted by the Todo's ROI rank."""
-    stats = attribute(round_trips(ledger.all()))
+    # effective(): corrections reconciled — same view every other consumer uses.
+    # Cited basis: judge a paid upgrade on the trades where its free signals
+    # were actually DECISIVE, not on every trade they happened to ride along in.
+    stats = attribute(round_trips(ledger.effective()), basis="cited")
     verdicts: list[SubscriptionVerdict] = []
     for sub in sorted(CANDIDATES, key=lambda s: s.rank):
         trips, avg, win_rate = _aggregate(stats, sub.upgrades_sources)

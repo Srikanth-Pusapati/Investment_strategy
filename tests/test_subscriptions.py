@@ -92,6 +92,43 @@ def test_empty_ledger_is_all_insufficient():
     assert {v.recommendation for v in verdicts} == {"INSUFFICIENT DATA"}
 
 
+def test_verdicts_use_cited_basis_not_presence():
+    # Jul-24 prune: a paid upgrade is judged on trades where its free signals
+    # were CITED as decisive. fundamentals rides along in every bundle here but
+    # is never cited — the rank-1 verdict must not count those trips.
+    ledger = _ledger()
+    for i in range(6):
+        ledger.record(TradeRecord(
+            symbol=f"S{i}", action="buy",
+            entry_signals=["fundamentals", "technical"],
+            key_signals=["technical MACD bull"]))
+        ledger.record(TradeRecord(
+            symbol=f"S{i}", action="sell", realized_pl_pct=4.0))
+    verdicts = evaluate_subscriptions(ledger, min_trips=5)
+    v1 = _verdict_for(verdicts, rank=1)          # fundamentals-based candidate
+    assert v1.trips == 0
+    assert v1.recommendation == "INSUFFICIENT DATA"
+    v2 = _verdict_for(verdicts, rank=2)          # technical/discovery candidate
+    assert v2.trips == 6
+    assert v2.recommendation == "SUBSCRIBE"
+
+
+def test_verdicts_respect_ledger_corrections():
+    # effective() switch: a buy fully corrected away (rejected order) must not
+    # produce an attributable round-trip for its source.
+    ledger = _ledger()
+    ledger.record(TradeRecord(
+        symbol="BAD", action="buy", qty=5.0, order_id="oid-bad",
+        entry_signals=["fundamentals"],
+        key_signals=["fundamentals rev +40%"]))
+    ledger.record(TradeRecord(symbol="BAD", action="correct", qty=0.0,
+                              order_id="oid-bad"))
+    ledger.record(TradeRecord(symbol="BAD", action="sell", qty=5.0,
+                              realized_pl_pct=9.0))
+    v = _verdict_for(evaluate_subscriptions(ledger, min_trips=1), rank=1)
+    assert v.trips == 0
+
+
 def _run_all():
     fns = [v for k, v in sorted(globals().items()) if k.startswith("test_") and callable(v)]
     failed = 0
