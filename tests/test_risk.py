@@ -1240,3 +1240,32 @@ def test_option_missing_liquidity_data_fails_open():
                            leg_liquidity=[{"symbol": "X", "oi": None,
                                           "rel_spread_pct": None}])
     assert d.verdict is RiskVerdict.APPROVED
+
+
+# -- R-scaled trailing-stop geometry (Jul-25 calibration) -------------------- #
+def test_trail_geometry_legacy_and_r_scaled():
+    from investment_strategy.risk import trail_geometry
+    # Legacy: both R knobs off -> arm == giveback == the fixed pct.
+    lim = _limits(trail_giveback_pct=3.0)
+    assert trail_geometry(lim, 6.0) == (3.0, 3.0)
+    # Unknown stop -> legacy fixed geometry regardless of the R knobs.
+    lim = _limits(trail_giveback_pct=5.0, trail_arm_r=1.5, trail_giveback_r=0.5)
+    assert trail_geometry(lim, 0.0) == (5.0, 5.0)
+    # R-scaled: giveback = max(5, 0.5x8) = 5; arm = max(5, 1.5x8) = 12.
+    assert trail_geometry(lim, 8.0) == (12.0, 5.0)
+    # Wide stop input CLAMPS to vol_stop_max_pct (10) before scaling:
+    # giveback max(5, 5) = 5, arm max(5, 15) = 15 — never beyond the regime
+    # the --sweep-trail evidence actually measured.
+    assert trail_geometry(lim, 12.0) == (15.0, 5.0)
+    assert trail_geometry(lim, 20.0) == (15.0, 5.0)   # unbounded LLM stop
+
+
+def test_trail_geometry_arm_never_below_giveback():
+    from investment_strategy.risk import trail_geometry
+    # giveback_r dominating with arm_r OFF: the arm must ride UP with the
+    # giveback (arm < giveback would let the trail close positions AT A LOSS).
+    lim = _limits(trail_giveback_pct=3.0, trail_giveback_r=1.0)
+    assert trail_geometry(lim, 8.0) == (8.0, 8.0)
+    # A small arm_r must not pull the arm BELOW the giveback either.
+    lim = _limits(trail_giveback_pct=3.0, trail_arm_r=0.3)
+    assert trail_geometry(lim, 8.0) == (3.0, 3.0)

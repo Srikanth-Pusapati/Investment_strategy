@@ -246,3 +246,29 @@ def _run_all():
 
 if __name__ == "__main__":
     sys.exit(1 if _run_all() else 0)
+
+
+def test_trail_arm_r_defers_micro_banking():
+    # Jul-25: with a 5% stop and arm at 1.5R (=7.5%), a +4% pop that fades must
+    # NOT be trail-closed at ~+1% (the legacy micro-banking); the position rides.
+    prices = {"AAA": [100, 104, 100.5, 100.5, 100.5]}
+    legacy = run_backtest(
+        _limits(trail_giveback_pct=3.0), prices, [EntrySignal(day=0, symbol="AAA")])
+    assert [t.reason for t in legacy.trades] == ["trail"]     # clipped at ~+0.5%
+    armed = run_backtest(
+        _limits(trail_giveback_pct=3.0, trail_arm_r=1.5),
+        prices, [EntrySignal(day=0, symbol="AAA")])
+    assert [t.reason for t in armed.trades] == ["end"]        # never trail-armed
+
+
+def test_trail_giveback_r_widens_room_on_volatile_names():
+    # giveback = max(3, 1.0 x 5% stop) = 5%: a 3.5% pullback off the peak no
+    # longer fires the trail; the legacy fixed 3% would have closed it.
+    prices = {"AAA": [100, 106, 102.5, 102.5, 102.5]}
+    legacy = run_backtest(
+        _limits(trail_giveback_pct=3.0), prices, [EntrySignal(day=0, symbol="AAA")])
+    assert [t.reason for t in legacy.trades] == ["trail"]
+    widened = run_backtest(
+        _limits(trail_giveback_pct=3.0, trail_giveback_r=1.0),
+        prices, [EntrySignal(day=0, symbol="AAA")])
+    assert [t.reason for t in widened.trades] == ["end"]

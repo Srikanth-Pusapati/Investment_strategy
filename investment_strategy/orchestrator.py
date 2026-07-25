@@ -1961,10 +1961,25 @@ class Orchestrator:
                 ))
                 # Keep the in-memory snapshot honest for the rest of the cycle and
                 # re-protect the (now bracket-less) remainder via the watchdog.
+                # PRESERVE the position's real stop/take (and scaled flag) when
+                # one is registered: clobbering a 4%-stop name with the 8%
+                # default doubled its risk AND (post trail_geometry) jumped its
+                # trail arm from 6% to 12%, disarming an armed winner at the
+                # exact moment the trim canceled its bracket. The buy-time
+                # stop_widths note covers whole-share names the exits map never
+                # saw. Defaults remain the last resort.
                 pos.qty = round(pos.qty - sell_qty, 6)
                 pos.market_value = pos.qty * pos.current_price
+                prev = self.state.get_exits(pos.symbol) or {}
+                if (prev.get("stop_pct") or 0.0) > 0:
+                    stop, take = prev["stop_pct"], prev["take_pct"]
+                else:
+                    stop = (self.state.get_stop_width(pos.symbol)
+                            or r.default_stop_loss_pct)
+                    take = r.default_take_profit_pct
                 self.state.register_exits(
-                    pos.symbol, r.default_stop_loss_pct, r.default_take_profit_pct,
+                    pos.symbol, stop, take,
+                    scaled=bool(prev.get("scaled", 0.0)),
                 )
 
     # -- deterministic thesis-decay exit (1B.4b) --------------------------- #
@@ -2411,6 +2426,13 @@ class Orchestrator:
                         self.state.register_exits(
                             proposal.symbol, decision.stop_loss_pct, decision.take_profit_pct,
                         )
+                    # Every buy (bracketed whole-share ones included) records its
+                    # planned stop WIDTH so the R-scaled trail geometry has the
+                    # position's risk unit — `exits` stays fractional-only
+                    # because it doubles as the hard-exit enforcement list.
+                    self.state.register_stop_width(
+                        proposal.symbol, decision.stop_loss_pct,
+                    )
         self._journal_decision(
             proposal.symbol, proposal.action.value, instr,
             proposal.conviction, proposal.target_weight_pct, verdict_str,

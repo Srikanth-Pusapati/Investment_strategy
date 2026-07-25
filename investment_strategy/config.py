@@ -134,6 +134,20 @@ class RiskLimits:
     # watchdog (and the backtest's mirror of it) closes a runner. Previously a
     # hardcoded 3.0 in both places.
     trail_giveback_pct: float = 3.0
+    # --- R-scaled trail geometry (Jul-25 calibration: winners captured a
+    # median 8% of their target and ZERO trips reached 80% of take — the fixed
+    # 3% giveback armed at any +3.1% peak and clipped every runner at ~+1%
+    # while vol-scaled stops risked 5-7%. Payoff 0.56 needs a 64% win rate to
+    # break even.) Both knobs express the trail in units of the position's OWN
+    # planned stop width (R): 0 = off = legacy fixed-% behavior; positions with
+    # no known stop (bracket-carrying whole-share names) always use legacy.
+    # Arm the trail only once peak gain >= this many R (peak has covered its
+    # own risk), so sub-1R pops are governed by stop/take/decision instead of
+    # being micro-banked at +0.x%.
+    trail_arm_r: float = 0.0
+    # Giveback = max(trail_giveback_pct, this x stop width) — volatile names
+    # get proportionally more room, exactly like their stops do.
+    trail_giveback_r: float = 0.0
     # Gate the trailing-stop ratchet + trigger to regular trading hours. Thin
     # pre/post-market prints are unreliable — a bad mark either ratchets the
     # high-water mark to a phantom peak or fires the trail into an
@@ -578,6 +592,8 @@ def load_config() -> Config:
             vol_stop_min_pct=_f("VOL_STOP_MIN_PCT", 4.0),
             vol_stop_max_pct=_f("VOL_STOP_MAX_PCT", 10.0),
             trail_giveback_pct=_f("TRAIL_GIVEBACK_PCT", 3.0),
+            trail_arm_r=_f("TRAIL_ARM_R", 0.0),
+            trail_giveback_r=_f("TRAIL_GIVEBACK_R", 0.0),
             trail_rth_only=_flag("TRAIL_RTH_ONLY", "on"),
             # R.2: 0 disables; 0.85 = "effectively the same trade" line (two
             # normal tech megacaps sit ~0.6-0.8; near-clones sit above 0.85).

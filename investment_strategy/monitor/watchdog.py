@@ -25,6 +25,7 @@ from ..execution.options import parse_occ
 from ..ledger import TradeLedger, TradeRecord
 from ..models import AccountSnapshot, Position
 from ..notify import Alerter
+from ..risk import trail_geometry
 from ..state import PortfolioState
 
 log = logging.getLogger("watchdog")
@@ -477,6 +478,15 @@ class Watchdog:
         )
         # Keep the downside stop, drop the take, and mark scaled -> the remainder is
         # now governed by the trailing stop (which already locks in gains).
+        # Ratchet the high-water mark to the take-crossing gain FIRST: this tick
+        # `continue`s before _update_trailing_stop runs (and pre/post-market
+        # take-crossings never reach it at all under TRAIL_RTH_ONLY), so without
+        # the ratchet the recorded peak can sit BELOW the R-scaled arm and the
+        # remainder would hold no take AND an unarmed trail — unprotected until
+        # the original stop. At the live knobs take (2.5R) > arm (1.5R), so this
+        # ratchet always re-arms the trail for the remainder.
+        self.state.set_high_water(pos.symbol, max(
+            self.state.get_high_water(pos.symbol), pos.unrealized_pl_pct))
         self.state.register_exits(pos.symbol, stop_pct, 0.0, scaled=True)
         self._record_exit(_partial(pos, sell_qty), oid, "scale")
         return True
@@ -538,10 +548,20 @@ class Watchdog:
         peak = max(self.state.get_high_water(pos.symbol), pos.unrealized_pl_pct)
         self.state.set_high_water(pos.symbol, peak)
 
+        # R-scaled geometry (risk.trail_geometry): arm only once the peak has
+        # covered the position's own planned risk, and give volatile names
+        # proportionally more room. get_stop_width prefers the enforced exits
+        # record and falls back to the buy-time stop-width note, so bracketed
+        # whole-share names get the R geometry too; a position with no
+        # recorded stop at all (core fills, pre-existing books) runs the fixed
+        # legacy %.
+        arm, giveback = trail_geometry(
+            self.cfg.risk, self.state.get_stop_width(pos.symbol))
+
         # Only trail once a position has shown a real gain to protect.
-        if peak <= self.trail_giveback_pct:
+        if peak <= arm:
             return
-        if pos.unrealized_pl_pct <= peak - self.trail_giveback_pct:
+        if pos.unrealized_pl_pct <= peak - giveback:
             # Throttled: while the close works through an illiquid book the
             # trigger keeps re-evaluating every tick (PATH 2026-07-20: 24 lines
             # in 19 min). Throttle the announcement, never the close itself.

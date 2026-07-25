@@ -159,6 +159,97 @@ def test_trail_rth_gate_skips_trailing_when_market_closed():
     assert "AAPL" in broker.closed                    # trails once RTH resumes
 
 
+def test_trail_r_scaled_arm_defers_micro_trail():
+    # Jul-25 R-scaled geometry with a registered 8% stop, TRAIL_ARM_R=1.5,
+    # TRAIL_GIVEBACK_R=0.5 -> arm 12%, giveback max(3, 4)=4%. The stop is
+    # chosen so the R-scaled giveback (4) DIFFERS from the 3% floor — this
+    # test must fail if the watchdog reverts to the raw floor.
+    def _acct_at(pl_pct):
+        p = Position(symbol="AAPL", qty=10.0, avg_entry_price=100.0,
+                     current_price=100.0 * (1 + pl_pct / 100.0),
+                     market_value=1000.0 * (1 + pl_pct / 100.0),
+                     unrealized_pl=10.0 * pl_pct, unrealized_pl_pct=pl_pct)
+        return AccountSnapshot(equity=10_000.0, last_equity=10_000.0,
+                               cash=9_000.0, buying_power=9_000.0, positions=[p])
+    state = _state()
+    state.register_exits("AAPL", 8.0, 20.0)
+    broker = _FakeBroker([])
+    cfg = _cfg(0.0)
+    cfg.risk.trail_giveback_pct = 3.0
+    cfg.risk.trail_arm_r = 1.5
+    cfg.risk.trail_giveback_r = 0.5
+    wd = Watchdog(cfg, broker, state=state)
+
+    state.set_high_water("AAPL", 11.0)
+    broker.account = _acct_at(2.0)
+    wd.check_once()
+    assert broker.closed == []          # peak 11 <= arm 12 -> trail not armed
+
+    state.set_high_water("AAPL", 13.0)  # armed (13 > 12)
+    broker.account = _acct_at(9.5)
+    wd.check_once()
+    assert broker.closed == []          # 3.5% off peak < 4% giveback (floor=3
+                                        # would have closed here)
+    broker.account = _acct_at(9.0)
+    wd.check_once()
+    assert "AAPL" in broker.closed      # 4% off peak >= 4% giveback
+
+
+def test_trail_r_geometry_applies_to_bracketed_names_via_stop_width():
+    # Whole-share bracketed buys never touch state.exits — the buy-time
+    # stop-width note must feed the same R geometry (the live book is mostly
+    # bracketed; without this the arm deferral silently no-ops live).
+    state = _state()
+    state.register_stop_width("AAPL", 8.0)         # no exits entry
+    state.set_high_water("AAPL", 11.0)
+    faded = Position(symbol="AAPL", qty=10.0, avg_entry_price=100.0,
+                     current_price=102.0, market_value=1020.0,
+                     unrealized_pl=20.0, unrealized_pl_pct=2.0)
+    broker = _FakeBroker([])
+    broker.account = AccountSnapshot(equity=10_000.0, last_equity=10_000.0,
+                                     cash=9_000.0, buying_power=9_000.0,
+                                     positions=[faded])
+    cfg = _cfg(0.0)
+    cfg.risk.trail_giveback_pct = 3.0
+    cfg.risk.trail_arm_r = 1.5
+    wd = Watchdog(cfg, broker, state=state)
+    wd.check_once()
+    assert broker.closed == []          # arm 12 from the width note, not legacy 3
+
+
+def test_scale_out_ratchets_high_water_so_trail_stays_armed():
+    # The scale-out tick `continue`s before _update_trailing_stop (and RTH
+    # gating can skip the ratchet entirely) — _scale_out itself must ratchet
+    # the peak, or the remainder is left with no take AND an unarmed trail.
+    state = _state()
+    state.register_exits("AAPL", stop_pct=4.0, take_pct=10.0)
+    state.set_high_water("AAPL", 5.0)              # stale pre-takeover peak
+    wd = Watchdog(_cfg(0.0, scale_out_enabled=True, scale_out_pct=50.0),
+                  _FakeBroker([]), state=state)
+    assert wd._enforce_hard_exits(_pos_qty("AAPL", qty=2.0, pl_pct=10.5)) is True
+    assert state.get_high_water("AAPL") == 10.5    # ratcheted past any arm
+
+
+def test_trail_legacy_when_stop_unregistered():
+    # No registered exits (bracket-carrying whole-share position): the R knobs
+    # must not defer the legacy fixed-% trail.
+    state = _state()
+    state.set_high_water("AAPL", 4.0)
+    faded = Position(symbol="AAPL", qty=10.0, avg_entry_price=100.0,
+                     current_price=100.5, market_value=1005.0,
+                     unrealized_pl=5.0, unrealized_pl_pct=0.5)
+    acct = AccountSnapshot(equity=10_000.0, last_equity=10_000.0, cash=9_000.0,
+                           buying_power=9_000.0, positions=[faded])
+    broker = _FakeBroker([])
+    broker.account = acct
+    cfg = _cfg(0.0)
+    cfg.risk.trail_giveback_pct = 3.0
+    cfg.risk.trail_arm_r = 1.5
+    wd = Watchdog(cfg, broker, state=state)
+    wd.check_once()
+    assert "AAPL" in broker.closed                # legacy: peak 4 > 3, gave back 3.5
+
+
 def test_vanished_position_fires_exchange_exit_callback():
     # A tracked position that is no longer live = an exchange bracket leg filled
     # with no code running; the backfill callback must fire immediately.

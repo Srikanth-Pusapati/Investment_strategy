@@ -196,6 +196,71 @@ def _sweep_stops(cfg, prices, entries, benchmark, lookback: int) -> int:
     return 0
 
 
+# --sweep-trail grid (Jul-25 calibration): trailing-stop geometry at the LIVE
+# stop config. The live book's evidence: fixed 3% giveback armed at any +3.1%
+# peak clipped every winner at ~+1% (median target-capture 8%, zero trips at
+# >=80% of take) while vol-scaled stops risked 5-7% — payoff 0.56 needs a 64%
+# win rate. Rows vary (giveback_pct, arm_r, giveback_r); (3, 0, 0) is today.
+_TRAIL_ROWS: tuple[tuple[float, float, float], ...] = (
+    (3.0, 0.0, 0.0),    # live today: fixed 3%, arms at any +3% peak
+    (4.0, 0.0, 0.0),    # wider fixed
+    (5.0, 0.0, 0.0),
+    (3.0, 0.5, 0.5),    # R-scaled: arm at half the risk, give back half
+    (3.0, 1.0, 0.0),    # arm at 1R, fixed 3% giveback
+    (3.0, 1.0, 0.5),    # arm at 1R, give back 0.5R
+    (3.0, 1.0, 0.75),   # arm at 1R, give back 0.75R
+    (3.0, 1.5, 0.5),    # arm late (1.5R), give back 0.5R
+    (5.0, 1.0, 0.5),    # hybrid: wide 5% floor + R-arming
+    (5.0, 1.5, 0.5),    # hybrid: wide 5% floor + late R-arming
+    (4.0, 1.0, 0.5),    # hybrid: 4% floor + R-arming
+)
+
+
+def _sweep_trail(cfg, prices, entries, benchmark, lookback: int) -> int:
+    """Jul-25 evidence pass: same entries, LIVE stop/take knobs, only the
+    trailing-stop geometry varied. The question: does arming the trail at an
+    R-multiple of the position's own risk (and scaling the giveback the same
+    way) stop the micro-banking of winners without giving back too much on
+    real runners? Run at 20 AND 55-day lookbacks before believing a winner."""
+    r = cfg.risk
+    configs = [
+        (
+            f"gb={gb:g}% arm={arm_r:g}R gbr={gb_r:g}R" if (arm_r or gb_r)
+            else f"fixed gb={gb:g}% (legacy)",
+            replace(r, trail_giveback_pct=gb, trail_arm_r=arm_r,
+                    trail_giveback_r=gb_r),
+        )
+        for gb, arm_r, gb_r in _TRAIL_ROWS
+    ]
+    print(f"Trail-geometry sweep: {len(entries)} breakout entries ({lookback}-day "
+          f"highs) x {len(configs)} trail configs (stops: "
+          f"{'vol ' + format(r.vol_stop_mult, 'g') + 'sigma' if r.vol_stops_enabled else 'fixed'}, "
+          f"take rr={r.vol_stop_take_ratio:g}, clamp=[{r.vol_stop_min_pct:g},"
+          f"{r.vol_stop_max_pct:g}]% — held at live values)\n")
+    rows = []
+    for label, limits in configs:
+        res = _run(limits, prices, list(entries), benchmark)
+        rows.append((label, res))
+    rows.sort(key=lambda x: x[1].total_return_pct, reverse=True)
+    print(f"{'trail config':>24} | {'return':>8} {'excess':>8} {'maxDD':>6} "
+          f"{'sharpe':>6} {'PF':>5} {'trades':>6} {'trails':>6} {'avg_trail_pl':>12}")
+    for label, res in rows:
+        excess = (f"{res.excess_return_pct:+8.1f}%"
+                  if res.excess_return_pct is not None else "     n/a")
+        pf = f"{res.profit_factor:5.2f}" if res.profit_factor != float("inf") else "  inf"
+        closed = [t for t in res.trades if t.reason != "end"]
+        trails = [t for t in closed if t.reason == "trail"]
+        avg_trail = (sum(t.pl_pct for t in trails) / len(trails)) if trails else float("nan")
+        print(f"{label:>24} | {res.total_return_pct:+7.1f}% {excess} "
+              f"{res.max_drawdown_pct:5.1f}% {res.sharpe:6.2f} {pf} "
+              f"{len(closed):6d} {len(trails):6d} {avg_trail:+11.2f}%")
+    if rows and rows[0][1].benchmark_return_pct is not None:
+        print(f"\nBenchmark: {rows[0][1].benchmark_return_pct:+.1f}% over the window.")
+    print(f"Live .env today: TRAIL_GIVEBACK_PCT={r.trail_giveback_pct:g} "
+          f"TRAIL_ARM_R={r.trail_arm_r:g} TRAIL_GIVEBACK_R={r.trail_giveback_r:g}")
+    return 0
+
+
 # --sweep-chase grid: the anti-chasing overextension gate (off vs haircut vs
 # block) x RSI leg x ATR-extension leg, on breakout entries — which by
 # construction ARE chases (every entry is a fresh N-day high), so this is the
@@ -259,6 +324,8 @@ def main() -> int:
                     help="R.1 evidence: fixed stop/take vs vol-scaled stops")
     ap.add_argument("--sweep-chase", action="store_true",
                     help="anti-chasing evidence: overextension gate off/haircut/block grid")
+    ap.add_argument("--sweep-trail", action="store_true",
+                    help="trail-geometry evidence: fixed vs R-scaled arm/giveback grid")
     ap.add_argument("--stress", action="store_true",
                     help="D.3 crash-path brake test (guards must engage)")
     ap.add_argument("--lookback", type=int, default=20, help="breakout high lookback")
@@ -266,7 +333,7 @@ def main() -> int:
     args = ap.parse_args()
 
     logging.basicConfig(level="INFO", format="%(message)s")
-    if args.sweep or args.sweep_stops or args.sweep_chase:
+    if args.sweep or args.sweep_stops or args.sweep_chase or args.sweep_trail:
         # Sweeps run thousands of entries through the risk gate; per-entry
         # REJECT lines (conviction floor, halts, liquidity...) drown the result
         # table. The counts that matter are already in each run's summary().
@@ -311,6 +378,12 @@ def main() -> int:
             dates, prices, lookback=args.lookback, benchmark=bench_sym,
         )
         return _sweep_chase(cfg, prices, entries, benchmark, args.lookback)
+
+    if args.sweep_trail:
+        entries = breakout_entries(
+            dates, prices, lookback=args.lookback, benchmark=bench_sym,
+        )
+        return _sweep_trail(cfg, prices, entries, benchmark, args.lookback)
 
     if not args.sweep:
         # A ledger buy of the benchmark itself (QQQ is a real CORE holding, not

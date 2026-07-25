@@ -154,6 +154,11 @@ class RoundTrip:
     # "equity" | "option" — from the (symbol, instrument) lot key, so option
     # wipeouts can be split out of a source's read without re-walking the ledger.
     instrument: str = "equity"
+    # Planned stop width (%) of the buy that OPENED this episode — the risk
+    # unit the exit-discipline read is measured in (a decision-sell at less
+    # than half of this locked a micro-loss before the stop tested the thesis).
+    # None when the opener recorded no stop (core fills, pre-tracking rows).
+    opening_stop_pct: float | None = None
 
 
 @dataclass
@@ -224,7 +229,8 @@ def round_trips(records: list[TradeRecord]) -> list[RoundTrip]:
             # "zero conviction" — store None so calibration skips it.
             conv = r.conviction if (r.conviction or 0.0) > 0 else None
             if not open_lots.get(key):
-                episode_open[key] = (conv, r.composite_score)
+                stop = r.stop_loss_pct if (r.stop_loss_pct or 0.0) > 0 else None
+                episode_open[key] = (conv, r.composite_score, stop)
             open_lots.setdefault(key, []).append([
                 float(r.qty or 0.0), list(r.entry_signals),
                 parse_cited(r.key_signals), ts_date, conv,
@@ -242,7 +248,8 @@ def round_trips(records: list[TradeRecord]) -> list[RoundTrip]:
                 dates = [d for _q, _s, _c, d, _cv in lots if d]
                 same_day = len(dates) >= 2 and len(set(dates)) == 1
                 convs = [c for _q, _s, _c, _d, c in lots if c is not None]
-                open_conv, open_comp = episode_open.get(key, (None, None))
+                open_conv, open_comp, open_stop = episode_open.get(
+                    key, (None, None, None))
                 trips.append(RoundTrip(
                     symbol=r.symbol, pl_pct=r.realized_pl_pct,
                     signals=signals, exit_reason=r.exit_reason,
@@ -251,6 +258,7 @@ def round_trips(records: list[TradeRecord]) -> list[RoundTrip]:
                     opening_conviction=open_conv, opening_composite=open_comp,
                     realized_pl=r.realized_pl, exit_ts=str(r.ts) if r.ts else "",
                     cited_signals=cited, instrument=key[1],
+                    opening_stop_pct=open_stop,
                 ))
             qty = float(r.qty or 0.0)
             open_total = sum(lot[0] for lot in lots)
@@ -488,4 +496,32 @@ def render_lessons(
     if calib:
         lines.append("Conviction calibration (win rate by YOUR stated conviction):")
         lines.extend(calib)
+    bail = exit_discipline_lesson(recent)
+    if bail:
+        lines.append(bail)
     return "\n".join(lines)
+
+
+def exit_discipline_lesson(trips: list[RoundTrip], min_trips: int = 3) -> str:
+    """One line naming the early-bail leak, or "" below `min_trips` samples.
+
+    Jul-25 calibration: 9 of 15 decision-sells exited at LESS than half the
+    planned stop width (avg -1.6%) — micro-losses locked before the stop could
+    test the thesis, while the stops themselves fired exactly as planned
+    (bracket stops at 1.01x width). The deterministic trail geometry was fixed
+    in code; this line targets the half the LLM controls: its own sells.
+    """
+    bails = [
+        t for t in trips
+        if t.exit_reason == "decision" and t.opening_stop_pct
+        and -t.opening_stop_pct * 0.5 < t.pl_pct < 0
+    ]
+    if len(bails) < min_trips:
+        return ""
+    avg = sum(t.pl_pct for t in bails) / len(bails)
+    return (
+        f"Exit discipline: {len(bails)} of your decision-sells bailed at less "
+        f"than HALF the planned stop (avg {avg:+.1f}%) — micro-losses locked "
+        "before the stop could test the thesis. Sell ahead of the stop only on "
+        "a broken thesis or a better use of the slot, not an adverse wiggle."
+    )

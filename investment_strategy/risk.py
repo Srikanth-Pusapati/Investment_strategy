@@ -38,6 +38,47 @@ _PDT_MIN_EQUITY = 25_000.0
 _TRADING_DAYS_SQRT = 252 ** 0.5
 
 
+def trail_geometry(limits, stop_pct: float) -> tuple[float, float]:
+    """(arm_threshold_pct, giveback_pct) for a position's trailing stop.
+
+    The single source of truth shared by the live watchdog and the backtest's
+    mirror of it — the Jul-25 calibration found the fixed 3% giveback armed at
+    any +3.1% peak and clipped every winner at ~+1% while vol-scaled stops
+    risked 5-7% (median winner captured 8% of its target; payoff 0.56 vs the
+    64% breakeven win rate that geometry demands).
+
+    giveback = max(trail_giveback_pct, trail_giveback_r x stop)  — runners on
+    volatile names get proportionally more room, like their stops do.
+    arm      = max(giveback,           trail_arm_r      x stop)  — the trail
+    only starts protecting once the peak has covered the position's own risk.
+
+    `stop_pct` <= 0 (unknown — e.g. a position whose stop was never recorded)
+    or both R knobs at 0 reproduce the legacy fixed-% behavior:
+    arm == giveback == trail_giveback_pct.
+
+    The stop input is CLAMPED to vol_stop_max_pct before scaling: when vol is
+    unknown (fresh listings with <10 bars) the risk layer passes the LLM's
+    proposed stop through unbounded, and a 20% stop would put the arm at 30%
+    — a trail that never arms. The [--sweep-trail] evidence that blessed the
+    R knobs only ever contained vol-clamped stops, so the geometry must not
+    extrapolate beyond that regime.
+    """
+    giveback = limits.trail_giveback_pct
+    arm = giveback
+    if stop_pct and stop_pct > 0:
+        cap = getattr(limits, "vol_stop_max_pct", 0.0)
+        if cap and cap > 0:
+            stop_pct = min(stop_pct, cap)
+        r_gb = getattr(limits, "trail_giveback_r", 0.0)
+        if r_gb > 0:
+            giveback = max(giveback, r_gb * stop_pct)
+            arm = giveback
+        r_arm = getattr(limits, "trail_arm_r", 0.0)
+        if r_arm > 0:
+            arm = max(arm, r_arm * stop_pct)
+    return arm, giveback
+
+
 class RiskManager:
     def __init__(
         self, limits: RiskLimits, kill_switch: bool = False,
