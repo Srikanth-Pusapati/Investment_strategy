@@ -228,6 +228,7 @@ def _orch(trim_enabled=True, trim_pct=25.0, state=None,
     o._trade_lock = threading.Lock()
     o._pending_oids = []
     o._oid_retries = {}
+    o._core_stop_gap = False
     return o
 
 
@@ -247,6 +248,31 @@ def test_regime_trim_sells_slice_on_flip_into_risk_off():
     # Bracket released + remainder re-protected by the watchdog.
     assert set(o.broker.canceled) == {"AAPL", "MSFT"}
     assert o.state.get_exits("AAPL") == {"stop_pct": 5.0, "take_pct": 12.0, "scaled": 0.0}
+
+
+def test_regime_trim_preserves_registered_stop_and_scaled_flag():
+    # Jul-25 review: the trim used to clobber a 4%-stop name with the 8%
+    # default — doubling its risk and (post trail_geometry) jumping the trail
+    # arm from 6% to 12%, disarming an armed winner at the risk-off flip.
+    o = _orch(trim_enabled=True, trim_pct=25.0)
+    o.state.register_exits("AAPL", 4.0, 10.0, scaled=True)
+    acct = _acct(cash=0.0, positions=[_pos("AAPL", 400.0)])
+    acct.positions[0].qty = 4.0
+    o._apply_regime_trim(acct, _regime("risk-off"))
+    ex = o.state.get_exits("AAPL")
+    assert ex["stop_pct"] == 4.0 and ex["take_pct"] == 10.0    # preserved
+    assert ex["scaled"] == 1.0                                  # flag survives
+
+
+def test_regime_trim_uses_stop_width_note_for_bracketed_names():
+    # A whole-share bracketed name has no exits entry, but its buy-time stop
+    # width is recorded — the trim must re-protect at THAT width, not the default.
+    o = _orch(trim_enabled=True, trim_pct=25.0)
+    o.state.register_stop_width("AAPL", 6.5)
+    acct = _acct(cash=0.0, positions=[_pos("AAPL", 400.0)])
+    acct.positions[0].qty = 4.0
+    o._apply_regime_trim(acct, _regime("risk-off"))
+    assert o.state.get_exits("AAPL")["stop_pct"] == 6.5
 
 
 def test_regime_trim_fires_once_not_every_cycle():
@@ -829,7 +855,7 @@ def _rotation_orch():
             Orchestrator._apply_pending_close(account, proposal.symbol)
         return 0.0
 
-    def handle_option(proposal, account, kinds):
+    def handle_option(proposal, account, kinds, tech=None):
         o._calls.append(("option", proposal.symbol, None))
 
     o._handle_equity = handle_equity

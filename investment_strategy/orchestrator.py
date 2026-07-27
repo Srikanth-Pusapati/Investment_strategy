@@ -112,6 +112,20 @@ class Orchestrator:
         # outage blinds the sector cap too (1B.7).
         self.regime = RegimeReader(degraded_mult=cfg.risk.regime_degraded_mult)
         self._regime_mult = 1.0   # set each cycle from the regime read
+        # Long-run direction ("up"/"down"/"") + blended label, set alongside the
+        # multiplier each cycle — they drive the option call/put direction gate.
+        self._regime_trend = ""
+        self._regime_label = ""
+        if (
+            cfg.risk.options_enabled
+            and getattr(cfg.risk, "option_direction_gate", True)
+            and not cfg.risk.regime_filter_enabled
+        ):
+            log.warning(
+                "OPTION_DIRECTION_GATE=on but REGIME_FILTER_ENABLED=off — no "
+                "market trend is ever read, so the option direction gate (and "
+                "the regime-scaled premium cap) is inert."
+            )
         self.engine = DecisionEngine(cfg)
         # One persisted risk-state instance shared by the risk gate and watchdog
         # so peak equity, the drawdown halt, and the halt latch are consistent.
@@ -132,6 +146,10 @@ class Orchestrator:
         self._rotation_vetoes: dict[str, tuple[str, float]] = {}
         # The watchdog records its own exits (stops/take-profits/flattens) to the
         # ledger so signal attribution sees every close, not just decision sells.
+        # A core stop that wash-trade-rejects (entry buy still open) is retried
+        # from the 30s watchdog LOOP (outside its trade-lock hold — see
+        # _watchdog_loop) instead of waiting a full decision cycle.
+        self._core_stop_gap = False
         self.watchdog = Watchdog(
             cfg, self.broker, state=self.state, ledger=self.ledger,
             alerter=self.alerter,
@@ -291,6 +309,11 @@ class Orchestrator:
                 self._maybe_warn_on_battery()
                 with self._trade_lock:
                     self.watchdog.check_once()
+                # OUTSIDE the lock: _ensure_core_stop acquires _trade_lock
+                # itself, and the lock is a plain (non-reentrant) Lock — calling
+                # this from inside check_once would self-deadlock the safety
+                # loop. The get_account read also stays off the trade lock.
+                self._retry_core_stop()
                 self._maybe_heartbeat()
                 self._watchdog_skips = 0   # a clean tick clears the run
             except _TRANSIENT_NET as e:
@@ -761,6 +784,8 @@ class Orchestrator:
         if self.cfg.risk.regime_filter_enabled:
             regime = self.regime.assess()
             self._regime_mult = regime.multiplier
+            self._regime_trend = regime.trend
+            self._regime_label = regime.label
             # A degraded ("unknown") read means we're flying blind on BOTH regime
             # and the sector cap — surface that at WARNING, not INFO (1B.7).
             if regime.label == "unknown":
@@ -769,6 +794,8 @@ class Orchestrator:
                 log.info("Market regime: %s", regime.reason)
         else:
             self._regime_mult = 1.0
+            self._regime_trend = ""
+            self._regime_label = ""
         self._record_equity_snapshot()
         account = self.broker.get_account()
 
@@ -914,6 +941,7 @@ class Orchestrator:
             data_health=data_health, composites=composites,
             regime_label=(_reg.label if _reg else ""),
             regime_reason=(_reg.reason if _reg else ""),
+            regime_trend=(_reg.trend if _reg else ""),
             curated=curated,
         )
         self._stamp_liveness()
@@ -1177,6 +1205,14 @@ class Orchestrator:
         mismatches: list[str] = []
         for oid, symbol in pending:
             status, filled, qty = self.broker.order_fill(oid)
+            # EXIT-side intents (watchdog stops/takes/flattens/option closes)
+            # self-heal: the watchdog resubmits every tick until the position
+            # is gone, and the correction below trues up the ledger. Their
+            # terminal-unfilled outcomes must not escalate to the all-buys
+            # halt — an option DAY close expiring at the bell is a routine
+            # overnight pattern, not a ledger/broker divergence. Entry-side
+            # intents (the GA-2.1 phantom-BUY class) still halt.
+            is_exit = self.state.exit_was_ledgered(symbol, oid)
             if status == "filled":
                 log.info("Order %s (%s) FILLED (%g/%g).", oid, symbol, filled, qty)
                 self._oid_retries.pop(oid, None)
@@ -1196,7 +1232,8 @@ class Orchestrator:
                 # original record so effective() voids a zero-fill intent or
                 # resizes a partial — no more phantom BUY rows.
                 self.ledger.record(TradeRecord.correction(oid, symbol, status, filled, qty))
-                mismatches.append(f"{symbol} {status} ({filled:g}/{qty:g} filled)")
+                if not is_exit:
+                    mismatches.append(f"{symbol} {status} ({filled:g}/{qty:g} filled)")
                 self._oid_retries.pop(oid, None)
             elif qty and 0 < filled < qty:
                 log.warning(
@@ -1206,7 +1243,8 @@ class Orchestrator:
                 # Non-terminal partial: may still fill more, so no correction yet —
                 # re-queue it and let a later reconcile write the final number.
                 self._pending_oids.append((oid, symbol))
-                mismatches.append(f"{symbol} partial {filled:g}/{qty:g}")
+                if not is_exit:
+                    mismatches.append(f"{symbol} partial {filled:g}/{qty:g}")
                 self._oid_retries.pop(oid, None)   # partial is progress, not a stall
             elif status == "unknown":
                 # The broker fetch FAILED (blip/transient) — NOT a confirmation.
@@ -1214,12 +1252,14 @@ class Orchestrator:
                 # dropping here (the old behavior) left a rejected order caught by
                 # a blip with its phantom ledger intent uncorrected forever. Fail
                 # CLOSED: re-queue and re-check next cycle, bounded.
-                if self._requeue_unresolved(oid, symbol, "unreadable"):
+                if self._requeue_unresolved(oid, symbol, "unreadable") and not is_exit:
                     mismatches.append(f"{symbol} unresolved (broker read failed)")
             else:  # still new/accepted/pending_new long after submission — may yet
                 # fill; re-queue (bounded) instead of DROPPING (the exact path an
                 # oid was lost through), and true it up on a later reconcile.
-                if self._requeue_unresolved(oid, symbol, f"still {status}"):
+                # An exit resting unfilled all day (a thin option close) is the
+                # watchdog's problem, not a buy-halt.
+                if self._requeue_unresolved(oid, symbol, f"still {status}") and not is_exit:
                     mismatches.append(f"{symbol} stuck ({status})")
         if self._pending_oids:
             # Re-queued live partials must survive a crash before the cycle's
@@ -1661,7 +1701,10 @@ class Orchestrator:
             self._stamp_liveness()
             kinds = signal_kinds.get(proposal.symbol, [])
             if proposal.instrument is Instrument.OPTION:
-                self._handle_option(proposal, account, kinds)
+                self._handle_option(
+                    proposal, account, kinds,
+                    tech=tech_ctx.get(proposal.symbol),
+                )
             else:
                 undeployed += self._handle_equity(
                     proposal, account, kinds,
@@ -1961,10 +2004,25 @@ class Orchestrator:
                 ))
                 # Keep the in-memory snapshot honest for the rest of the cycle and
                 # re-protect the (now bracket-less) remainder via the watchdog.
+                # PRESERVE the position's real stop/take (and scaled flag) when
+                # one is registered: clobbering a 4%-stop name with the 8%
+                # default doubled its risk AND (post trail_geometry) jumped its
+                # trail arm from 6% to 12%, disarming an armed winner at the
+                # exact moment the trim canceled its bracket. The buy-time
+                # stop_widths note covers whole-share names the exits map never
+                # saw. Defaults remain the last resort.
                 pos.qty = round(pos.qty - sell_qty, 6)
                 pos.market_value = pos.qty * pos.current_price
+                prev = self.state.get_exits(pos.symbol) or {}
+                if (prev.get("stop_pct") or 0.0) > 0:
+                    stop, take = prev["stop_pct"], prev["take_pct"]
+                else:
+                    stop = (self.state.get_stop_width(pos.symbol)
+                            or r.default_stop_loss_pct)
+                    take = r.default_take_profit_pct
                 self.state.register_exits(
-                    pos.symbol, r.default_stop_loss_pct, r.default_take_profit_pct,
+                    pos.symbol, stop, take,
+                    scaled=bool(prev.get("scaled", 0.0)),
                 )
 
     # -- deterministic thesis-decay exit (1B.4b) --------------------------- #
@@ -2191,25 +2249,42 @@ class Orchestrator:
             return
         pos = account.position_for(etf)
         if pos is None or pos.qty < 1 or pos.avg_entry_price <= 0:
+            # Nothing visible to protect — but if the gap is flagged and the
+            # entry BUY is still working, the position simply hasn't landed
+            # yet (the gap was flagged off the cycle snapshot's folded
+            # estimate): keep the retry armed instead of disarming it exactly
+            # when it's needed. open_buy_notional fails open to 0.0 on a
+            # broker blip, so a blip clears the flag and the next decision
+            # cycle heals it (best-effort contract).
+            if self._core_stop_gap and self.broker.open_buy_notional(etf) > 0:
+                return
+            self._core_stop_gap = False
             return
         desired_qty = float(int(pos.qty))
         desired_stop = round(pos.avg_entry_price * (1 - pct / 100.0), 2)
         if desired_stop <= 0:
+            self._core_stop_gap = False
             return
-        existing = self.broker.open_stop_sells(etf)
-        for o in existing:
-            if (
-                abs(o["qty"] - desired_qty) < 1.0
-                and abs(o["stop_price"] - desired_stop) / desired_stop < 0.005
-            ):
-                return  # resting stop is already right — leave it alone
         with self._trade_lock:
+            # Read-check-cancel-submit is ONE atomic step: both the decision
+            # cycle and the watchdog-loop retry come through here, and an
+            # unlocked read would let two callers each see "no resting stop"
+            # and double-submit GTC stops.
+            existing = self.broker.open_stop_sells(etf)
+            for o in existing:
+                if (
+                    abs(o["qty"] - desired_qty) < 1.0
+                    and abs(o["stop_price"] - desired_stop) / desired_stop < 0.005
+                ):
+                    self._core_stop_gap = False
+                    return  # resting stop is already right — leave it alone
             for o in existing:  # stale size/level — replace
                 self.broker.cancel_order(o["id"])
             oid = self.broker.submit(OrderRequest(
                 symbol=etf, side=Action.SELL, order_type=OrderType.STOP,
                 tif=TIF.GTC, qty=desired_qty, stop_price=desired_stop,
             ))
+            self._core_stop_gap = oid is None
         if oid:
             log.info(
                 "Core stop: GTC stop resting for %g %s @ %.2f (%.0f%% under "
@@ -2218,9 +2293,23 @@ class Orchestrator:
             )
         else:
             log.warning(
-                "Core stop for %s could not be placed this cycle; the watchdog "
-                "still guards it. Will retry next cycle.", etf,
+                "Core stop for %s could not be placed (entry buy likely still "
+                "open — wash-trade guard); the watchdog still guards it and "
+                "retries every ~30s tick.", etf,
             )
+
+    def _retry_core_stop(self) -> None:
+        """Watchdog-tick retry for a core stop that couldn't rest (wash-trade
+        reject while the entry buy was still open — Jul 24: $28k of QQQ sat
+        watchdog-only for ~50 min waiting on the next decision cycle). No-op
+        unless _ensure_core_stop flagged a gap, so the healthy path costs
+        nothing per tick."""
+        if not self._core_stop_gap:
+            return
+        try:
+            self._ensure_core_stop(self.broker.get_account())
+        except Exception as e:  # noqa: BLE001 — retry must never break the loop
+            log.warning("Core-stop retry failed: %s", e)
 
     # -- equity path -------------------------------------------------------- #
     def _handle_equity(
@@ -2411,6 +2500,13 @@ class Orchestrator:
                         self.state.register_exits(
                             proposal.symbol, decision.stop_loss_pct, decision.take_profit_pct,
                         )
+                    # Every buy (bracketed whole-share ones included) records its
+                    # planned stop WIDTH so the R-scaled trail geometry has the
+                    # position's risk unit — `exits` stays fractional-only
+                    # because it doubles as the hard-exit enforcement list.
+                    self.state.register_stop_width(
+                        proposal.symbol, decision.stop_loss_pct,
+                    )
         self._journal_decision(
             proposal.symbol, proposal.action.value, instr,
             proposal.conviction, proposal.target_weight_pct, verdict_str,
@@ -2421,7 +2517,8 @@ class Orchestrator:
 
     # -- options path (defined-risk, gated) -------------------------------- #
     def _handle_option(
-        self, proposal: TradeProposal, account, signal_kinds: list[str] | None = None
+        self, proposal: TradeProposal, account,
+        signal_kinds: list[str] | None = None, tech: dict | None = None,
     ) -> None:
         if self.options is None:
             log.info("Option proposal for %s ignored: options disabled.", proposal.symbol)
@@ -2429,9 +2526,21 @@ class Orchestrator:
         premium = self.options.estimate_net_premium(proposal)
         min_leg = self.options.min_leg_premium(proposal)
         liquidity = self.options.leg_liquidity(proposal)
+        # The NAME's own long-run read (its 200dma) from the technical signal
+        # already computed for the anti-chase gate — a single-name breakdown
+        # keeps its put candidacy even when the MARKET trend is up.
+        name_trend = ""
+        if tech:
+            t_price, t_sma200 = tech.get("price"), tech.get("sma200")
+            if t_price and t_sma200:
+                name_trend = "down" if t_price < t_sma200 else "up"
         decision = self.risk.evaluate_option(
             proposal, account, premium, leg_liquidity=liquidity,
             min_leg_premium=min_leg,
+            market_trend=self._regime_trend,
+            regime_label=self._regime_label,
+            regime_multiplier=self._regime_mult,
+            name_trend=name_trend,
         )
         log.info(
             "OPTION %s %s -> %s: %s | %s",

@@ -49,6 +49,7 @@ class DecisionEngine:
         data_health: list[str] | None = None,
         composites: dict[str, float] | None = None,
         regime_label: str = "", regime_reason: str = "",
+        regime_trend: str = "",
         curated: str = "",
     ) -> list[TradeProposal]:
         """Ask Claude for proposals across all candidate symbols at once.
@@ -85,6 +86,7 @@ class DecisionEngine:
             data_health=data_health or [],
             composites=composites or {},
             regime_label=regime_label, regime_reason=regime_reason,
+            regime_trend=regime_trend,
         )
         try:
             resp = self.client.messages.create(
@@ -188,6 +190,7 @@ class DecisionEngine:
         data_health: list[str] | None = None,
         composites: dict[str, float] | None = None,
         regime_label: str = "", regime_reason: str = "",
+        regime_trend: str = "",
     ) -> str:
         # Our own derived data (track-record, today-so-far, exclusions) sits
         # OUTSIDE <market_data> — it's trusted guidance, not third-party text.
@@ -253,6 +256,42 @@ class DecisionEngine:
         # The standing numeric risk contract (trusted guidance) lives in the
         # STABLE block now (_render_stable) — it's invariant per process, so it
         # belongs under the cache breakpoint rather than repeated here.
+        # Market regime + option-direction discipline, rendered EVERY cycle
+        # (before this, the model saw the regime only inside the risk-off
+        # mandate below — in risk-on/neutral it chose calls vs puts blind to
+        # the market backdrop, and the direction gate in risk.py would have
+        # been rejecting proposals the prompt fully sanctioned).
+        if r is not None and regime_label:
+            lines.append(f"## Market regime: {regime_label}")
+            if regime_reason:
+                lines.append(regime_reason)
+            # The trend-up call preference is SUPPRESSED in risk-off: the
+            # mandate block below carries that cycle's put instruction, and
+            # rendering both would tell the model "don't propose puts" and
+            # "PROPOSE a put" in the same prompt (vol-spiked uptrend).
+            if (
+                getattr(r, "options_enabled", False)
+                and regime_trend == "up"
+                and regime_label != "risk-off"
+            ):
+                lines.append(
+                    "Long-run market trend is UP — option debits should be "
+                    "CALL structures (long_call / bull_call_spread). PUTs are "
+                    "auto-rejected by the risk layer unless the NAME itself "
+                    "is breaking down (price below its own 200-day), the put "
+                    "hedges a name this account HOLDS, or the regime reads "
+                    "risk-off; don't spend conviction on puts outside those "
+                    "cases."
+                )
+            elif getattr(r, "options_enabled", False) and regime_trend == "down":
+                lines.append(
+                    "Long-run market trend is DOWN — option debits should be "
+                    "PUT structures (long_put / bear_put_spread) on names with "
+                    "broken theses. Bullish CALL structures are auto-rejected "
+                    "by the risk layer while the trend is down; don't spend "
+                    "conviction proposing them."
+                )
+            lines.append("")
         # RISK-OFF downside mandate: when the market is genuinely turning down
         # (SPY below its 200dma AND elevated VIX -> regime label "risk-off"), a
         # long-only book just loses more slowly. Tell the model to EXPRESS the
@@ -267,8 +306,8 @@ class DecisionEngine:
         ):
             lines += [
                 "## MARKET IS RISK-OFF — express the downside, don't just hold and bleed",
-                (regime_reason or "The regime filter reads risk-off.")
-                + " Your long book loses as prices fall and sizing is already cut.",
+                # The regime line above already carries the reason string.
+                "Your long book loses as prices fall and sizing is already cut.",
                 "PROPOSE a DEFINED-RISK downside play to PROFIT from the decline: a "
                 "long_put or bear_put_spread on the slate name with the most clearly "
                 "BROKEN thesis (price below its moving averages, bearish MACD, "

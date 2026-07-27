@@ -1,0 +1,33 @@
+2026-07-25 00:51:54,560 INFO orchestrator | Market closed; skipping decision cycle.
+2026-07-25 01:43:55,758 INFO orchestrator | Market closed; skipping decision cycle.
+2026-07-25 02:35:57,011 INFO orchestrator | Market closed; skipping decision cycle.
+2026-07-25 03:27:58,097 INFO orchestrator | Market closed; skipping decision cycle.
+2026-07-25 04:19:59,326 INFO orchestrator | Market closed; skipping decision cycle.
+2026-07-25 05:12:00,466 INFO orchestrator | Market closed; skipping decision cycle.
+2026-07-25 06:04:01,724 INFO orchestrator | Market closed; skipping decision cycle.
+2026-07-25 06:56:02,822 INFO orchestrator | Market closed; skipping decision cycle.
+2026-07-25 07:48:04,039 INFO orchestrator | Market closed; skipping decision cycle.
+2026-07-25 08:40:05,286 INFO orchestrator | Market closed; skipping decision cycle.
+2026-07-25 09:32:06,441 INFO orchestrator | Market closed; skipping decision cycle.
+2026-07-25 10:24:07,531 INFO orchestrator | Market closed; skipping decision cycle.
+2026-07-25 11:16:09,010 INFO orchestrator | Market closed; skipping decision cycle.
+2026-07-25 12:02:30,970 INFO alpaca | Alpaca client ready (mode=paper).
+2026-07-25 12:02:31,175 INFO orchestrator | Discovery-driven mode: trading scanner-found names + holdings.
+2026-07-25 12:02:31,176 INFO orchestrator | Loaded 2 pending order(s) from state to reconcile.
+2026-07-25 12:02:31,177 INFO orchestrator | Starting orchestrator (paper). Kill switch: off. Options: on. Benchmark: QQQ.
+2026-07-25 12:02:31,490 INFO orchestrator | Market closed; skipping decision cycle.
+2026-07-25 12:02:31,544 INFO alpaca | Alpaca client ready (mode=paper).
+2026-07-25 12:02:34,064 INFO dashboard | Wrote dashboard with 114 trades -> dashboard.html
+2026-07-25 12:54:35,290 INFO orchestrator | Market closed; skipping decision cycle.
+2026-07-25 13:46:36,513 INFO orchestrator | Market closed; skipping decision cycle.
+2026-07-25 14:38:37,643 INFO orchestrator | Market closed; skipping decision cycle.
+2026-07-25 15:30:38,910 INFO orchestrator | Market closed; skipping decision cycle.
+2026-07-25 16:22:40,027 INFO orchestrator | Market closed; skipping decision cycle.
+2026-07-25 17:14:41,315 INFO orchestrator | Market closed; skipping decision cycle.
+2026-07-25 18:06:42,514 INFO orchestrator | Market closed; skipping decision cycle.
+2026-07-25 18:58:43,716 INFO orchestrator | Market closed; skipping decision cycle.
+2026-07-25 19:50:44,844 INFO orchestrator | Market closed; skipping decision cycle.
+2026-07-25 20:42:45,996 INFO orchestrator | Market closed; skipping decision cycle.
+2026-07-25 21:34:47,101 INFO orchestrator | Market closed; skipping decision cycle.
+2026-07-25 22:26:48,257 INFO orchestrator | Market closed; skipping decision cycle.
+2026-07-25 23:18:49,442 INFO orchestrator | Market closed; skipping decision cycle.

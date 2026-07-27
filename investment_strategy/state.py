@@ -42,6 +42,13 @@ class PortfolioState:
         # which have no exchange-side bracket. The watchdog enforces these. Keyed
         # by symbol: {"stop_pct": float, "take_pct": float}.
         self.exits: dict[str, dict[str, float]] = {}
+        # Planned stop WIDTH (%) of every executed decision buy — bracketed
+        # whole-share names included, unlike `exits` (which doubles as the
+        # watchdog's hard-exit enforcement list and must stay fractional-only
+        # to avoid double-selling against the exchange bracket). Read by the
+        # R-scaled trailing-stop geometry (risk.trail_geometry) as the
+        # position's risk unit; informational, never enforced.
+        self.stop_widths: dict[str, float] = {}
         # First-entry timestamp (ISO) per held symbol — the "hold clock" for the
         # deterministic time-stop that recycles dead/flat capital (1B.4). Set on
         # the opening buy; the watchdog also stamps a first-seen fallback so a
@@ -121,6 +128,9 @@ class PortfolioState:
                     "scaled": float(v.get("scaled", 0.0))}
                 for k, v in d.get("exits", {}).items()
             }
+            self.stop_widths = {
+                k: float(v) for k, v in d.get("stop_widths", {}).items()
+            }
             self.entry_times = {
                 k: str(v) for k, v in d.get("entry_times", {}).items()
             }
@@ -174,6 +184,7 @@ class PortfolioState:
                         "halted_at": self.halted_at,
                         "high_water": self.high_water,
                         "exits": self.exits,
+                        "stop_widths": self.stop_widths,
                         "entry_times": self.entry_times,
                         "last_buy_times": self.last_buy_times,
                         "exit_times": self.exit_times,
@@ -242,6 +253,7 @@ class PortfolioState:
         with self._lock:
             dropped = self.high_water.pop(symbol, None) is not None
             dropped |= self.exits.pop(symbol, None) is not None
+            dropped |= self.stop_widths.pop(symbol, None) is not None
             dropped |= self.entry_times.pop(symbol, None) is not None
             dropped |= self.ledgered_exit_oids.pop(symbol, None) is not None
             if dropped:
@@ -270,6 +282,23 @@ class PortfolioState:
 
     def get_exits(self, symbol: str) -> dict[str, float] | None:
         return self.exits.get(symbol)
+
+    def register_stop_width(self, symbol: str, stop_pct: float) -> None:
+        """Record the planned stop width of an executed buy (any position class)
+        — the risk unit the R-scaled trail geometry reads. Never enforced."""
+        if not stop_pct or stop_pct <= 0:
+            return
+        with self._lock:
+            self.stop_widths[symbol] = float(stop_pct)
+            self._save()
+
+    def get_stop_width(self, symbol: str) -> float:
+        """The registered planned stop width, preferring the enforced `exits`
+        record (kept in sync on trims/scale-outs) over the buy-time note."""
+        ex = self.exits.get(symbol)
+        if ex and ex.get("stop_pct", 0.0) > 0:
+            return float(ex["stop_pct"])
+        return float(self.stop_widths.get(symbol, 0.0))
 
     # -- hold clock for the deterministic time-stop (1B.4) ------------------ #
     def register_entry(self, symbol: str, when: datetime | None = None) -> None:

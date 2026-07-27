@@ -48,6 +48,12 @@ class Regime:
     multiplier: float          # 0.25..1.0 applied to position sizing
     label: str                 # "risk-on" | "neutral" | "risk-off" | "unknown"
     reason: str                # human/LLM-readable one-liner
+    # The LONG-RUN market direction on its own: SPY above/below its 200dma,
+    # BEFORE the label folds it together with the VIX read. The label can say
+    # "risk-off" in a vol-spiked uptrend or "neutral" in a calm downtrend, so
+    # direction-sensitive consumers (the option call/put gate) key on this
+    # field, never on the label. "" = unknown (degraded read).
+    trend: str = ""            # "up" | "down" | ""
 
 
 class RegimeReader:
@@ -124,7 +130,7 @@ class RegimeReader:
             f"SPY {trend} 200dma ({price:.0f} vs {sma:.0f}), VIX {vix:.0f}{term} "
             f"-> {label}, size x{mult:.2f}."
         )
-        return Regime(mult, label, reason)
+        return Regime(mult, label, reason, trend="up" if above else "down")
 
     # -- data (yfinance; keyless) ------------------------------------------ #
     @staticmethod

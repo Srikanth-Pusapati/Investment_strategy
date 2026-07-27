@@ -451,3 +451,40 @@ DONE 2026-07-12:
     switch on/off, restart bot, preflight button, log tail, dashboard
     iframe. Restart/kill/preflight all exercised end-to-end.
   - .env.preview (stale June config) removed. Tests 535 green (+10 ops).
+
+
+In priority order:
+
+Per-signal attribution prune — find which of your 12 signals have positive P&L and which are dragging; kill/down-weight losers, up-weight winners via the composite-floor infra you already built. Highest ROI, zero cost.
+Entry quality — your logs show repeated chase losses on extended names; verify the anti-chase gate is actually binding and hold the line on the new-name conviction floor.
+Stop/target calibration — −3.4% avg at 35% win means either stops too tight (chopped out) or targets too far. Look at the realized-loss distribution.
+Only then re-run subscriptions.py and let it tell you what to buy.
+
+
+The per-signal list you asked for
+First, a correction to the baseline: your ledger had recorded the T option −100% flatten twice. Real book through Jul 23 is 52 trips, −$6,109 (not −$8,809). Of that, −$2,700 (44%) is the single T option trade; equities are −$3,409 at −1.4% avg.
+
+Cited-basis attribution (a trip counts toward a source only when the model named it as decisive at entry — this is what was missing; the old presence-based view credited every trade to all ~7 signals present, which is why everything looked identically bad):
+
+Source	Trips	Win%	Avg P&L (equity-only)	Avg P&L (all)	Verdict
+insider	19	26%	−1.4%	−6.5%	Down-weighted to 0.50x floor
+options_chain	23	39%	−2.1%	−6.3%	Down-weighted to 0.50x floor
+congress	23	30%	−1.3%	−5.6%	Down-weighted to 0.50x floor
+technical	31	48%	−0.7%	−3.9%	0.61x — see note below
+news 
+(as decisive)	9	22%	−2.5%	−2.5%	0.75x
+govcontracts	4	0%	−2.4%	−2.4%	0.76x (tiny sample)
+offexchange	9	22%	−1.7%	−1.7%	0.83x
+fundamentals	36	39%	−1.5%	−1.5%	0.85x — best differentiator
+options_flow	31	32%	−0.9%	−0.9%	0.91x — least bad
+Three insights the diluted view was hiding:
+
+Insider/congress/options_chain are your bleeders, and the T option wipeout cited all three. Equity-only they're merely mediocre (−1.3 to −2.1%); the option trade is what craters them. The signal→instrument combination is the killer, not just the signal.
+Fundamentals citation is your most informative marker: trades where the model cited fundamentals average +9.5pp better than trades where fundamentals was present but not cited. Congress and insider show the opposite (−4.4pp and −5.0pp) — when the model leans on them, results get worse.
+Technical wins 50% but still loses money (−0.7% avg, wins small / losses big) — that's your Q1 item 3 (stop/target calibration), now with data behind it.
+Subscriptions verdict (re-run under the sharp basis): all three candidates still KEEP MEASURING — fundamentals −1.5%/36 trips, Polygon-family −3.8%/37, Quiver tier-up −4.3%/36. No source has positive edge to amplify yet; pay for nothing.
+
+What the prune actually does now
+The composite perf-weights went from a meaningless flat band (0.62–0.69 for everything) to a real spread: insider/congress/options_chain clamped at the 0.50 floor, options_flow/fundamentals near 0.9. The decision prompt's track-record block and the subscriptions report both now show cited stats. This feeds every future cycle automatically.
+
+The adversarial review (16 agents) caught 12 real issues in my first draft — all fixed: a phantom-lot regression (buys ledger requested qty, sells ledger actual fills), option-contracts-vs-equity-shares commingling under one ticker, duplicate-retry double-counting, and citation-parser gaps confirmed against your real ledger strings. 794 tests pass; the replayed walk's open positions now exactly match your broker book.

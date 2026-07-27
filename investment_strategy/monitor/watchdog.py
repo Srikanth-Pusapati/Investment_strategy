@@ -25,6 +25,7 @@ from ..execution.options import parse_occ
 from ..ledger import TradeLedger, TradeRecord
 from ..models import AccountSnapshot, Position
 from ..notify import Alerter
+from ..risk import trail_geometry
 from ..state import PortfolioState
 
 log = logging.getLogger("watchdog")
@@ -74,6 +75,10 @@ class Watchdog:
         #: for a single ticker (BIIB, 2026-07-15: 318x) without saying
         #: anything new. Throttled below, not silenced (see _log_waiting_throttled).
         self._last_wait_log: dict[str, datetime] = {}
+        #: one-shot latch for the "day-loss breach but market CLOSED" note, so
+        #: the deferral logs once per closed session instead of every 30s tick
+        #: (Jul 23: 1,301 EMERGENCY lines; Jul 24: 228 more until 01:56).
+        self._flatten_deferred_noted = False
 
     def _alert(self, key: str, subject: str, body: str) -> None:
         """Page a human, if an alerter is wired. The event is already logged at
@@ -188,7 +193,37 @@ class Watchdog:
     def _emergency_flatten(self, account: AccountSnapshot) -> bool:
         loss_pct = -account.day_pl_pct
         if loss_pct < self.cfg.risk.max_daily_loss_pct:
+            self._flatten_deferred_noted = False
             return False
+        # A CLOSED market gets ONE flatten pass, not one per 30s tick: the
+        # first pass rests the exits at the venue (marketable-limit closes
+        # work the reopen even if this process dies overnight); every repeat
+        # was pure spam — nothing new can fill, DAY closes expire at the bell
+        # and re-fire each tick (Jul 23: 1,301 EMERGENCY lines; Jul 24: 228
+        # more past midnight, where a stale Alpaca last_equity made
+        # YESTERDAY'S loss read as today's until ~02:00). The latch resets
+        # when the loss clears or the market reopens; a clock-read failure
+        # fails toward protection (flatten as if open).
+        try:
+            market_open = self.broker.is_market_open()
+        except Exception as e:  # noqa: BLE001 — never break the safety loop
+            log.debug("emergency-flatten clock read failed (%s); proceeding.", e)
+            market_open = True
+        if not market_open:
+            if self._flatten_deferred_noted:
+                return False  # exits already rested on the first closed tick
+            self._flatten_deferred_noted = True
+            log.warning(
+                "Day loss %.2f%% >= limit %.2f%% with the market CLOSED — "
+                "resting the exits ONCE at the venue (they work the reopen "
+                "without this process), then staying quiet until the open. "
+                "After midnight this reading is yesterday's session until "
+                "the broker rolls last_equity.",
+                loss_pct, self.cfg.risk.max_daily_loss_pct,
+            )
+            self._flatten_all(account, "DAILY LOSS")
+            return True
+        self._flatten_deferred_noted = False
         log.error(
             "EMERGENCY: day loss %.2f%% >= limit %.2f%%. Flattening all positions.",
             loss_pct, self.cfg.risk.max_daily_loss_pct,
@@ -477,6 +512,15 @@ class Watchdog:
         )
         # Keep the downside stop, drop the take, and mark scaled -> the remainder is
         # now governed by the trailing stop (which already locks in gains).
+        # Ratchet the high-water mark to the take-crossing gain FIRST: this tick
+        # `continue`s before _update_trailing_stop runs (and pre/post-market
+        # take-crossings never reach it at all under TRAIL_RTH_ONLY), so without
+        # the ratchet the recorded peak can sit BELOW the R-scaled arm and the
+        # remainder would hold no take AND an unarmed trail — unprotected until
+        # the original stop. At the live knobs take (2.5R) > arm (1.5R), so this
+        # ratchet always re-arms the trail for the remainder.
+        self.state.set_high_water(pos.symbol, max(
+            self.state.get_high_water(pos.symbol), pos.unrealized_pl_pct))
         self.state.register_exits(pos.symbol, stop_pct, 0.0, scaled=True)
         self._record_exit(_partial(pos, sell_qty), oid, "scale")
         return True
@@ -538,10 +582,20 @@ class Watchdog:
         peak = max(self.state.get_high_water(pos.symbol), pos.unrealized_pl_pct)
         self.state.set_high_water(pos.symbol, peak)
 
+        # R-scaled geometry (risk.trail_geometry): arm only once the peak has
+        # covered the position's own planned risk, and give volatile names
+        # proportionally more room. get_stop_width prefers the enforced exits
+        # record and falls back to the buy-time stop-width note, so bracketed
+        # whole-share names get the R geometry too; a position with no
+        # recorded stop at all (core fills, pre-existing books) runs the fixed
+        # legacy %.
+        arm, giveback = trail_geometry(
+            self.cfg.risk, self.state.get_stop_width(pos.symbol))
+
         # Only trail once a position has shown a real gain to protect.
-        if peak <= self.trail_giveback_pct:
+        if peak <= arm:
             return
-        if pos.unrealized_pl_pct <= peak - self.trail_giveback_pct:
+        if pos.unrealized_pl_pct <= peak - giveback:
             # Throttled: while the close works through an illiquid book the
             # trigger keeps re-evaluating every tick (PATH 2026-07-20: 24 lines
             # in 19 min). Throttle the announcement, never the close itself.
@@ -717,6 +771,24 @@ class Watchdog:
             ))
         except Exception as e:  # never let logging break the watchdog
             log.warning("Ledger option-exit record failed for %s: %s", under, e)
+        if not oid:
+            return
+        try:
+            # Queue the close for the orchestrator's reconcile pass, exactly
+            # like equity exits (_record_exit). Without this, an option close
+            # was ledgered at SUBMIT and never followed: a DAY close that
+            # expired at the bell kept its phantom exit row forever, the
+            # resubmit added a second one (the archived T book shows the loss
+            # double-counted that way), and the eventual FILL produced no log
+            # line — the Jul-24 postmortem read "no closed positions" off a
+            # ledger that had missed a real close. note_exit_ledgered marks
+            # the oid as EXIT-side so an expired DAY close gets its ledger
+            # correction WITHOUT tripping the reconcile buy-halt (the
+            # watchdog's resubmit loop owns the recovery).
+            self.state.add_pending_order(oid, under)
+            self.state.note_exit_ledgered(under, oid)
+        except Exception as e:  # bookkeeping must never break the safety loop
+            log.warning("Option-exit order bookkeeping failed for %s: %s", under, e)
 
     def forget(self, symbol: str) -> None:
         """Drop trailing state when a position is gone (filled stop/tp)."""

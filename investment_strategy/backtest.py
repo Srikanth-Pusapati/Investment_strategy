@@ -39,7 +39,7 @@ from .models import (
     RiskVerdict,
     TradeProposal,
 )
-from .risk import RiskManager
+from .risk import RiskManager, trail_geometry
 from .state import PortfolioState
 
 log = logging.getLogger("backtest")
@@ -443,10 +443,11 @@ class BacktestEngine:
             trades.append(self._closed(pos, exit_px, day, "time"))
             return pos.qty * exit_px, True
 
-        # Trailing stop: give back at most trail_giveback_pct of the peak gain
-        # (the same knob Watchdog.trail_giveback_pct runs live).
-        giveback = self.limits.trail_giveback_pct
-        if pos.peak_pl_pct > giveback and pl_pct <= pos.peak_pl_pct - giveback:
+        # Trailing stop: R-scaled geometry shared with the live watchdog
+        # (risk.trail_geometry) — arm at trail_arm_r x stop, give back
+        # max(trail_giveback_pct, trail_giveback_r x stop) of the peak gain.
+        arm, giveback = trail_geometry(self.limits, pos.stop_pct)
+        if pos.peak_pl_pct > arm and pl_pct <= pos.peak_pl_pct - giveback:
             trades.append(self._closed(pos, exit_px, day, "trail"))
             return pos.qty * exit_px, True
 

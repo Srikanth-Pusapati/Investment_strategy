@@ -566,6 +566,59 @@ def test_perf_weights_use_cited_basis():
     assert "fundamentals" not in w
 
 
+# -- exit-discipline lesson (Jul-25 stop/target calibration) ----------------- #
+def test_opening_stop_pct_carried_and_none_when_unset():
+    recs = [
+        TradeRecord(symbol="A", action="buy", qty=1.0, stop_loss_pct=6.0, ts=_T0),
+        _sell("A", -2.0, 1, qty=1.0),
+        _buy("B", ["technical"], 2),          # helper sets no stop -> None
+        _sell("B", 1.0, 3),
+    ]
+    trips = round_trips(recs)
+    assert trips[0].opening_stop_pct == 6.0
+    assert trips[1].opening_stop_pct is None
+
+
+def test_exit_discipline_lesson_flags_early_bails():
+    from investment_strategy.attribution import exit_discipline_lesson
+    recs = []
+    for i, pl in enumerate((-1.0, -1.5, -2.0)):   # all < half the 6% stop
+        recs.append(TradeRecord(symbol=f"E{i}", action="buy", qty=1.0,
+                                stop_loss_pct=6.0, ts=_T0 + timedelta(hours=2 * i)))
+        recs.append(_sell(f"E{i}", pl, 2 * i + 1, reason="decision", qty=1.0))
+    trips = round_trips(recs)
+    line = exit_discipline_lesson(trips)
+    assert "3 of your decision-sells" in line
+    assert "-1.5%" in line                        # the average
+
+
+def test_exit_discipline_boundaries_exact_half_and_profits_excluded():
+    from investment_strategy.attribution import exit_discipline_lesson
+    recs = []
+    # Exactly HALF the stop is NOT an early bail (strict bound) ...
+    for i in range(3):
+        recs.append(TradeRecord(symbol=f"H{i}", action="buy", qty=1.0,
+                                stop_loss_pct=6.0, ts=_T0 + timedelta(hours=4 * i)))
+        recs.append(_sell(f"H{i}", -3.0, 4 * i + 1, reason="decision", qty=1.0))
+    # ... and PROFITABLE decision-sells never count as bails.
+    for i in range(3):
+        recs.append(TradeRecord(symbol=f"P{i}", action="buy", qty=1.0,
+                                stop_loss_pct=6.0,
+                                ts=_T0 + timedelta(hours=4 * i + 2)))
+        recs.append(_sell(f"P{i}", +2.0, 4 * i + 3, reason="decision", qty=1.0))
+    assert exit_discipline_lesson(round_trips(recs)) == ""
+
+
+def test_exit_discipline_suppressed_below_min_and_for_real_stops():
+    from investment_strategy.attribution import exit_discipline_lesson
+    # A decision-sell near the FULL stop width is not an early bail.
+    recs = [
+        TradeRecord(symbol="A", action="buy", qty=1.0, stop_loss_pct=6.0, ts=_T0),
+        _sell("A", -5.5, 1, reason="decision", qty=1.0),
+    ]
+    assert exit_discipline_lesson(round_trips(recs)) == ""
+
+
 def _run_all():
     fns = [v for k, v in sorted(globals().items()) if k.startswith("test_") and callable(v)]
     failed = 0
