@@ -332,7 +332,7 @@ class Config:
     finnhub_api_key: str
     quiver_api_key: str
     fred_api_key: str
-    polygon_api_key: str    # unused: options-flow reads Alpaca now; kept as the paid-upgrade hook
+    polygon_api_key: str    # Options Starter plan: options-flow reads Polygon snapshot (OI + volume)
     sec_user_agent: str
 
     # Read-only Robinhood via official Agentic Trading MCP (context only).

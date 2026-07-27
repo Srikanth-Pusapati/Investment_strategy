@@ -1,18 +1,22 @@
 """Options-flow signal — unusual options activity as a smart-money tell.
 
 Large directional options bets (especially short-dated, high-premium sweeps) are
-how institutions express conviction with leverage. We approximate "unusual" as
-the call/put day-volume imbalance across the near-dated chain, read from
-Alpaca's free indicative option snapshots — the same feed the execution path
-and the options_chain signal already pull, so no extra vendor or key.
+how institutions express conviction with leverage. Two backends behind one
+interface, picked by key availability:
 
-(This originally read Polygon's options snapshot, whose free tier returns 403
-on every call — the signal was silently dead from day one. Reads now go through
-per-cycle failure accounting so a gated/broken feed surfaces as a WARNING
-instead of a quiet stream of zero candidates.)
+- POLYGON (preferred; needs POLYGON_API_KEY on the Options Starter plan,
+  unlocked 2026-07-27): v3 options snapshot carries per-contract day volume AND
+  open interest, so besides the call/put imbalance we get the true unusualness
+  tell — volume running ahead of OI means NEW positioning today, volume far
+  below OI is churn in existing positions. 15-min delayed, irrelevant at our
+  hourly cadence.
+- ALPACA fallback (free indicative snapshots): call/put dailyBar-volume
+  imbalance only; no OI, so no freshness read. This is the same coarse proxy
+  that carried the signal while Polygon's free tier 403'd every call.
 
-This is a coarse proxy. A dedicated flow feed (Unusual Whales, CBOE) gives true
-sweep/block detection; wire it here behind the same interface to upgrade.
+Reads go through per-cycle failure accounting so a gated/broken feed surfaces
+as a WARNING instead of a quiet stream of zero candidates (the lesson from the
+original Polygon-free-tier era, when this signal was silently dead).
 """
 from __future__ import annotations
 
@@ -34,6 +38,17 @@ _MAX_DTE = 45          # near-dated chain only — where conviction flow cluster
 _PAGE_LIMIT = 1000     # API max per page
 _MAX_PAGES = 4         # 4k contracts inside 45 DTE covers any liquid chain
 
+_POLY_SNAPSHOT = "https://api.polygon.io/v3/snapshot/options/{underlying}"
+_POLY_PAGE_LIMIT = 250   # Polygon's max per page
+_POLY_MAX_PAGES = 8      # 2k contracts inside 45 DTE; Starter has unlimited calls
+# Vol/OI conviction shading: volume above OI = new positioning (boost), volume
+# far below OI = churn in stale inventory (damp). Deliberately mild — the
+# imbalance stays the signal, OI only shades conviction.
+_FRESH_VOL_OI = 1.0
+_STALE_VOL_OI = 0.25
+_FRESH_BOOST = 1.2
+_STALE_DAMP = 0.85
+
 
 class OptionsFlowProvider(SignalProvider):
     name = "options_flow"
@@ -43,10 +58,16 @@ class OptionsFlowProvider(SignalProvider):
         self._get = requests.get   # injectable for tests
         self._probes = 0                              # chain reads this cycle
         self._failures: list[tuple[str, str]] = []    # (symbol, reason)
+        self._detail: dict[str, dict] = {}            # per-symbol OI extras (Polygon)
+
+    @property
+    def _polygon_key(self) -> str:
+        return getattr(self.cfg, "polygon_api_key", "") or ""
 
     @property
     def enabled(self) -> bool:
-        return bool(self.cfg.alpaca_api_key and self.cfg.alpaca_secret_key)
+        return bool(self._polygon_key) or bool(
+            self.cfg.alpaca_api_key and self.cfg.alpaca_secret_key)
 
     def fetch(self, symbols: list[str]) -> list[Signal]:
         self.begin_cycle()
@@ -61,14 +82,28 @@ class OptionsFlowProvider(SignalProvider):
                 continue
             # Put/call imbalance -> directional lean. Heavy call volume = bullish.
             score = round((call_vol - put_vol) / total, 3)
+            detail = self._detail.get(symbol)
+            oi_txt = ""
+            if detail and detail.get("vol_oi") is not None:
+                vol_oi = detail["vol_oi"]
+                if vol_oi >= _FRESH_VOL_OI:
+                    score = round(max(-1.0, min(1.0, score * _FRESH_BOOST)), 3)
+                    oi_txt = f", vol {vol_oi:.1f}x OI (fresh positioning)"
+                elif vol_oi < _STALE_VOL_OI:
+                    score = round(score * _STALE_DAMP, 3)
+                    oi_txt = f", vol {vol_oi:.2f}x OI (mostly existing inventory)"
+                else:
+                    oi_txt = f", vol {vol_oi:.2f}x OI"
             signals.append(Signal(
                 kind=SignalKind.NEWS,  # treated as a near-term catalyst/flow signal
                 symbol=symbol,
                 summary=f"Options flow: {call_vol:,} call vol / {put_vol:,} put vol "
-                        f"(C/P imbalance {score:+.2f}).",
+                        f"(C/P imbalance {score:+.2f}{oi_txt}).",
                 score=score,
-                source="alpaca-options-flow",
-                data={"call_volume": call_vol, "put_volume": put_vol},
+                source="polygon-options-flow" if detail is not None
+                       else "alpaca-options-flow",
+                data={"call_volume": call_vol, "put_volume": put_vol,
+                      **({"vol_oi": detail["vol_oi"]} if detail else {})},
             ))
         self.log_failures("signal")
         return signals
@@ -82,6 +117,7 @@ class OptionsFlowProvider(SignalProvider):
     def begin_cycle(self) -> None:
         self._probes = 0
         self._failures.clear()
+        self._detail.clear()
 
     def log_failures(self, context: str) -> None:
         if not self._failures:
@@ -98,6 +134,60 @@ class OptionsFlowProvider(SignalProvider):
         log.debug("options flow read failed for %s: %s", symbol, reason)
 
     def _call_put_volume(self, underlying: str) -> tuple[int, int] | None:
+        """(call_volume, put_volume) across the near-dated chain, or None on a
+        failed read. Dispatches to the richest backend the keys allow; both
+        share the same failure accounting. The Polygon path also stashes OI
+        detail in self._detail for conviction shading in fetch()."""
+        if self._polygon_key:
+            return self._polygon_volume(underlying)
+        return self._alpaca_volume(underlying)
+
+    def _polygon_volume(self, underlying: str) -> tuple[int, int] | None:
+        """Sum day volume and open interest per side from Polygon's v3 options
+        snapshot (15-min delayed on Starter). Vol/OI across the whole near-dated
+        chain lands in self._detail — volume outrunning OI is the unusualness
+        tell the Alpaca proxy can't see."""
+        self._probes += 1
+        url = _POLY_SNAPSHOT.format(underlying=underlying)
+        params: dict = {
+            "limit": _POLY_PAGE_LIMIT,
+            "expiration_date.lte":
+                (date.today() + timedelta(days=_MAX_DTE)).isoformat(),
+        }
+        headers = {"Authorization": f"Bearer {self._polygon_key}"}
+        vol = {"call": 0, "put": 0}
+        oi = {"call": 0, "put": 0}
+        try:
+            for _ in range(_POLY_MAX_PAGES):
+                r = self._get(url, params=params, headers=headers, timeout=20)
+                if r.status_code != 200:
+                    self._note_failure(
+                        underlying, f"HTTP {r.status_code}: {r.text[:120]}")
+                    return None
+                body = r.json()
+                for row in body.get("results") or []:
+                    side = ((row.get("details") or {}).get("contract_type")
+                            or "").lower()
+                    if side not in vol:
+                        continue
+                    vol[side] += int((row.get("day") or {}).get("volume") or 0)
+                    oi[side] += int(row.get("open_interest") or 0)
+                next_url = body.get("next_url")
+                if not next_url:
+                    break
+                url, params = next_url, {}   # cursor URL carries the query
+        except Exception as e:
+            self._note_failure(underlying, repr(e))
+            return None
+
+        total_vol, total_oi = sum(vol.values()), sum(oi.values())
+        self._detail[underlying] = {
+            "call_oi": oi["call"], "put_oi": oi["put"],
+            "vol_oi": round(total_vol / total_oi, 3) if total_oi > 0 else None,
+        }
+        return vol["call"], vol["put"]
+
+    def _alpaca_volume(self, underlying: str) -> tuple[int, int] | None:
         """(call_volume, put_volume) summed over the latest traded session of
         the near-dated chain, or None on a failed read. dailyBar is each
         contract's LAST traded bar — an illiquid contract can carry a days-old

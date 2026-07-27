@@ -24,8 +24,9 @@ from investment_strategy.execution.options import occ_symbol
 from investment_strategy.signals.options_flow import OptionsFlowProvider
 
 
-def _cfg(key="k", secret="s"):
-    return SimpleNamespace(alpaca_api_key=key, alpaca_secret_key=secret)
+def _cfg(key="k", secret="s", polygon=""):
+    return SimpleNamespace(alpaca_api_key=key, alpaca_secret_key=secret,
+                           polygon_api_key=polygon)
 
 
 class _Resp:
@@ -157,6 +158,93 @@ def test_enabled_requires_alpaca_keys():
     assert OptionsFlowProvider(_cfg()).enabled
     assert not OptionsFlowProvider(_cfg(key="")).enabled
     assert not OptionsFlowProvider(_cfg(secret="")).enabled
+
+
+# --------------------------------------------------------------------------- #
+# Polygon backend (Options Starter plan, wired 2026-07-27)
+# --------------------------------------------------------------------------- #
+def _poly_row(side, vol, oi):
+    return {"details": {"contract_type": side}, "day": {"volume": vol},
+            "open_interest": oi}
+
+
+def _poly_provider(pages):
+    p = OptionsFlowProvider(_cfg(polygon="pk"))
+    calls = []
+
+    def fake_get(url, params=None, headers=None, timeout=None):
+        calls.append((url, dict(params or {})))
+        page = pages[min(len(calls) - 1, len(pages) - 1)]
+        return page if isinstance(page, _Resp) else _Resp(body=page)
+
+    p._get = fake_get
+    return p, calls
+
+
+def test_polygon_key_selects_polygon_backend():
+    p, calls = _poly_provider([{"results": [_poly_row("call", 300, 400),
+                                            _poly_row("put", 100, 400)]}])
+    sigs = p.fetch(["AAPL"])
+    assert calls[0][0].startswith("https://api.polygon.io/")
+    assert len(sigs) == 1
+    assert sigs[0].source == "polygon-options-flow"
+    assert sigs[0].data["call_volume"] == 300
+    assert sigs[0].data["put_volume"] == 100
+
+
+def test_polygon_fresh_positioning_boosts_score():
+    # vol 400 vs OI 150 -> vol/OI > 1 -> new positioning; 0.5 base * 1.2 = 0.6.
+    p, _ = _poly_provider([{"results": [_poly_row("call", 300, 100),
+                                        _poly_row("put", 100, 50)]}])
+    s = p.fetch(["AAPL"])[0]
+    assert s.score == 0.6
+    assert "fresh positioning" in s.summary
+    assert s.data["vol_oi"] == round(400 / 150, 3)
+
+
+def test_polygon_stale_inventory_damps_score():
+    # vol 150 vs OI 2000 -> churn in existing inventory; 0.333 base * 0.85.
+    p, _ = _poly_provider([{"results": [_poly_row("call", 100, 1000),
+                                        _poly_row("put", 50, 1000)]}])
+    s = p.fetch(["AAPL"])[0]
+    assert s.score == round(round(50 / 150, 3) * 0.85, 3)
+    assert "existing inventory" in s.summary
+
+
+def test_polygon_midrange_vol_oi_leaves_score_untouched():
+    # vol 200 vs OI 400 -> 0.5x: neither fresh nor stale; base imbalance kept.
+    p, _ = _poly_provider([{"results": [_poly_row("call", 150, 300),
+                                        _poly_row("put", 50, 100)]}])
+    s = p.fetch(["AAPL"])[0]
+    assert s.score == 0.5
+    assert "vol 0.50x OI" in s.summary
+
+
+def test_polygon_pagination_follows_next_url():
+    p, calls = _poly_provider([
+        {"results": [_poly_row("call", 150, 100)],
+         "next_url": "https://api.polygon.io/v3/snapshot/options/AAPL?cursor=c2"},
+        {"results": [_poly_row("put", 50, 100)]},
+    ])
+    assert p._call_put_volume("AAPL") == (150, 50)
+    assert len(calls) == 2
+    assert "cursor=c2" in calls[1][0]
+    assert calls[1][1] == {}                    # cursor URL carries the query
+
+
+def test_polygon_failure_surfaces_in_cycle_warning():
+    p, _ = _poly_provider([_Resp(status=403, text="NOT_AUTHORIZED")])
+    h, logger = _capture_signals_log()
+    try:
+        assert p.fetch(["AAPL"]) == []
+        warnings = [r for r in h.records if r.levelno == logging.WARNING]
+        assert len(warnings) == 1 and "403" in warnings[0].getMessage()
+    finally:
+        logger.removeHandler(h)
+
+
+def test_polygon_enabled_without_alpaca_keys():
+    assert OptionsFlowProvider(_cfg(key="", secret="", polygon="pk")).enabled
 
 
 def test_screener_brackets_flow_failures():
