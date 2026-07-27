@@ -51,6 +51,7 @@ KIND_LAG_DAYS: dict[SignalKind, float] = {
     SignalKind.INSIDER: 2.0,
     SignalKind.GOVCONTRACTS: 7.0,
     SignalKind.CONGRESS: 30.0,
+    SignalKind.LOBBYING: 45.0,
 }
 
 # A source whose event is one half-life old carries half the timing weight.

@@ -21,6 +21,7 @@ from datetime import date, timedelta
 
 from investment_strategy.screener.wallstreetbets_feed import WallStreetBetsScreener
 from investment_strategy.signals.govcontracts import GovContractsProvider
+from investment_strategy.signals.lobbying import LobbyingProvider
 from investment_strategy.signals.offexchange import OffExchangeProvider
 
 
@@ -192,6 +193,79 @@ def test_govcontracts_ignores_unwanted_symbols():
     feed = [{"Ticker": "ZZZ", "Date": _recent(), "Amount": 5_000_000}]
     prov = GovContractsProvider(_cfg(), _FakeQuiver({"govcontractsall": feed}))
     assert prov.fetch(["LMT"]) == []
+
+
+# --------------------------------------------------------------------------- #
+# Lobbying signal (bullish-only, context; heavy lag discount lives in history.py)
+# --------------------------------------------------------------------------- #
+def test_lobbying_real_live_schema_row():
+    # Exact key set from live/lobbying (verified 2026-07-27); Amount is a string,
+    # Issue is a newline-separated list whose FIRST line becomes prompt context.
+    feed = [{"Date": _recent(), "Amount": "50000.0", "Client": "OCCIDENTAL PETROLEUM",
+             "Issue": "Taxation/Internal Revenue Code \nEnergy/Nuclear",
+             "Specific_Issue": "45Q tax credit", "Registrant": "X", "Ticker": "OXY"}]
+    prov = LobbyingProvider(_cfg(), _FakeQuiver({"lobbying": feed}))
+    sig = prov.fetch(["OXY"])[0]
+    assert sig.score > 0 and sig.data["filings"] == 1
+    assert sig.data["total_usd"] == 50_000.0
+    assert "Taxation/Internal Revenue Code" in sig.summary
+    assert "Energy/Nuclear" not in sig.summary   # only the first issue line
+
+
+def test_lobbying_bullish_only_and_capped():
+    feed = [{"Ticker": "META", "Date": _recent(), "Amount": 10_000_000, "Issue": "Tech"}]
+    prov = LobbyingProvider(_cfg(), _FakeQuiver({"lobbying": feed}))
+    sig = prov.fetch(["META"])[0]
+    assert sig.score == 0.25                    # full lean at >=$2M, never above cap
+
+
+def test_lobbying_more_dollars_score_higher():
+    small = [{"Ticker": "A", "Date": _recent(), "Amount": 20_000}]
+    big = [{"Ticker": "A", "Date": _recent(), "Amount": 1_000_000}]
+    p_s = LobbyingProvider(_cfg(), _FakeQuiver({"lobbying": small}))
+    p_b = LobbyingProvider(_cfg(), _FakeQuiver({"lobbying": big}))
+    assert p_b.fetch(["A"])[0].score > p_s.fetch(["A"])[0].score
+
+
+def test_lobbying_zero_amount_filing_still_signals_with_floor():
+    # "0.0" amounts are real (spend withheld); the filing still carries the ISSUE
+    # context to the prompt at a tiny floor score.
+    feed = [{"Ticker": "WEN", "Date": _recent(), "Amount": "0.0",
+             "Issue": "Small Business \nAgriculture"}]
+    prov = LobbyingProvider(_cfg(), _FakeQuiver({"lobbying": feed}))
+    sig = prov.fetch(["WEN"])[0]
+    assert sig.score == 0.05 and sig.data["total_usd"] == 0.0
+    assert "Small Business" in sig.summary
+
+
+def test_lobbying_keeps_issue_of_largest_filing():
+    feed = [
+        {"Ticker": "OXY", "Date": _recent(), "Amount": 10_000, "Issue": "Minor"},
+        {"Ticker": "OXY", "Date": _recent(), "Amount": 500_000, "Issue": "Energy"},
+        {"Ticker": "OXY", "Date": _recent(), "Amount": 5_000, "Issue": "Tiny"},
+    ]
+    prov = LobbyingProvider(_cfg(), _FakeQuiver({"lobbying": feed}))
+    sig = prov.fetch(["OXY"])[0]
+    assert "top issue: Energy" in sig.summary
+    assert sig.data["filings"] == 3 and sig.data["total_usd"] == 515_000.0
+
+
+def test_lobbying_ignores_old_and_unwanted_rows():
+    feed = [
+        {"Ticker": "OXY", "Date": _old(), "Amount": 900_000, "Issue": "Stale"},
+        {"Ticker": "ZZZ", "Date": _recent(), "Amount": 900_000, "Issue": "Other"},
+    ]
+    prov = LobbyingProvider(_cfg(), _FakeQuiver({"lobbying": feed}))
+    assert prov.fetch(["OXY"]) == []            # outside 90d lookback; ZZZ unwanted
+
+
+def test_lobbying_lag_weight_is_heavily_discounted():
+    # The composite must treat lobbying as ~45d-stale corroboration (w ~0.11),
+    # even staler than congress (0.23) — the 2026-07-27 lesson, applied from birth.
+    from investment_strategy.models import SignalKind
+    from investment_strategy.signals.history import lag_weight
+    assert lag_weight(SignalKind.LOBBYING) < lag_weight(SignalKind.CONGRESS)
+    assert abs(lag_weight(SignalKind.LOBBYING) - 0.11) < 1e-9
 
 
 # --------------------------------------------------------------------------- #

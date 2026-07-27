@@ -183,12 +183,12 @@ class DecisionEngine:
         # buys" as the thesis lead, stopped out -4% five hours later). STOCK Act
         # data is stale by construction — it may support a thesis, never BE one.
         lines += [
-            "- Congressional-trading data lags up to ~45 days and is weak "
-            "corroboration ONLY. Never lead a buy thesis with congress buying: "
+            "- Congressional-trading and lobbying data lag up to ~45 days and "
+            "are weak corroboration ONLY. Never lead a buy thesis with either: "
             "a BUY needs a FRESH anchor — a technical setup, fundamentals, or "
-            "live flow — that would justify it even with the congress line "
-            "deleted. If the rationale's strongest signal is congress, the "
-            "correct action is HOLD.",
+            "live flow — that would justify it even with the congress/lobbying "
+            "lines deleted. If the rationale's strongest signal is congress or "
+            "lobbying, the correct action is HOLD.",
         ]
         return "\n".join(lines)
 
