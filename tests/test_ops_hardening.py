@@ -33,6 +33,7 @@ class _FillBroker:
 class _FakeState:
     def __init__(self):
         self.pending = []
+        self.exit_oids = set()   # (symbol, oid) pairs marked exit-side
 
     def set_pending_orders(self, oids):
         self.pending = list(oids)
@@ -50,6 +51,12 @@ class _FakeState:
             if oid not in seen:
                 self.pending.append((oid, sym))
                 seen.add(oid)
+
+    def note_exit_ledgered(self, symbol, oid):
+        self.exit_oids.add((symbol, oid))
+
+    def exit_was_ledgered(self, symbol, oid):
+        return (symbol, oid) in self.exit_oids
 
 
 class _FakeLedger:
@@ -404,3 +411,30 @@ def test_first_decision_due_even_on_fresh_boot(monkeypatch):
     o._last_decision_at = 1_000_000.0 - 100.0
     monkeypatch.setattr(orch_mod.time, "time", lambda: 1_000_000.0 + 7200.0)
     assert o._decision_due() is True
+
+
+# -- exit-side intents never trip the buy halt (Jul 27) ------------------------ #
+def test_expired_exit_order_writes_correction_without_halting():
+    # An option DAY close expiring at the bell is a routine overnight pattern
+    # the watchdog resubmits itself; it must true up the ledger (correction)
+    # WITHOUT the all-buys kill switch or a page.
+    o = _orch({"x1": ("expired", 0.0, 900.0)})
+    o._pending_oids = [("x1", "T")]
+    o.state.note_exit_ledgered("T", "x1")
+    o._reconcile_fills()
+    assert len(o.ledger.records) == 1                       # correction written
+    assert o.ledger.records[0].action == "correct"
+    assert o.risk.kill_switch is False                      # no halt
+    assert not os.path.exists(o.cfg.kill_switch_file)
+    assert o.alerter.calls == []                            # no page
+
+
+def test_expired_entry_order_still_halts():
+    # The GA-2.1 phantom-BUY class keeps its teeth: entry-side divergence
+    # halts and pages exactly as before.
+    o = _orch({"b1": ("expired", 0.0, 5.0)})
+    o._pending_oids = [("b1", "QQQ")]
+    o._reconcile_fills()
+    assert o.risk.kill_switch is True
+    assert os.path.exists(o.cfg.kill_switch_file)
+    os.remove(o.cfg.kill_switch_file)

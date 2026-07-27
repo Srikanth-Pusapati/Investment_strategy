@@ -305,3 +305,93 @@ def test_decide_still_returns_proposals_from_dynamic_content():
     assert len(proposals) == 1
     assert isinstance(proposals[0], TradeProposal)
     assert proposals[0].symbol == "CVX"
+
+
+# -- market regime line + option direction discipline (calls up / puts down) -- #
+def test_regime_line_renders_every_cycle_with_direction_rule_up():
+    eng = _engine(options_enabled=True)
+    acct = _acct([_pos("CVX")])
+    text = eng._render_dynamic(
+        [_bundle("MU")], acct, "", [],
+        regime_label="risk-on",
+        regime_reason="SPY above 200dma (700 vs 650), VIX 15 -> risk-on, size x1.00.",
+        regime_trend="up",
+    )
+    assert "## Market regime: risk-on" in text
+    assert "SPY above 200dma" in text
+    assert "CALL structures" in text and "auto-rejected" in text
+    # Trusted guidance sits OUTSIDE the untrusted region.
+    assert text.index("## Market regime") < text.index("<market_data>")
+
+
+def test_regime_line_direction_rule_down():
+    eng = _engine(options_enabled=True)
+    acct = _acct([_pos("CVX")])
+    text = eng._render_dynamic(
+        [_bundle("MU")], acct, "", [],
+        regime_label="neutral",
+        regime_reason="SPY below 200dma (620 vs 650), VIX 15 -> neutral, size x0.50.",
+        regime_trend="down",
+    )
+    assert "## Market regime: neutral" in text
+    assert "PUT structures" in text
+    assert "CALL structures are auto-rejected" in text.replace(
+        "Bullish CALL structures are auto-rejected", "CALL structures are auto-rejected")
+
+
+def test_regime_line_present_without_direction_rule_when_options_off():
+    eng = _engine(options_enabled=False)
+    acct = _acct([_pos("CVX")])
+    text = eng._render_dynamic(
+        [_bundle("MU")], acct, "", [],
+        regime_label="risk-on", regime_reason="reason here", regime_trend="up",
+    )
+    assert "## Market regime: risk-on" in text
+    assert "CALL structures" not in text
+
+
+def test_regime_line_absent_when_filter_disabled():
+    # Filter off => orchestrator passes empty label; nothing renders.
+    eng = _engine(options_enabled=True)
+    acct = _acct([_pos("CVX")])
+    text = eng._render_dynamic([_bundle("MU")], acct, "", [])
+    assert "## Market regime" not in text
+
+
+def test_riskoff_mandate_still_renders_alongside_regime_line():
+    eng = _engine(options_enabled=True)
+    acct = _acct([_pos("CVX")])
+    text = eng._render_dynamic(
+        [_bundle("MU")], acct, "", [],
+        regime_label="risk-off",
+        regime_reason="SPY below 200dma (620 vs 650), VIX 32 -> risk-off, size x0.40.",
+        regime_trend="down",
+    )
+    assert "## Market regime: risk-off" in text
+    assert "MARKET IS RISK-OFF" in text
+    assert "long_put or bear_put_spread" in text
+
+
+def test_system_prompt_carries_option_direction_rule():
+    from investment_strategy.decision.prompts import SYSTEM_PROMPT
+    assert "OPTION DIRECTION" in SYSTEM_PROMPT
+    assert "LONG-RUN market trend" in SYSTEM_PROMPT
+    assert "AUTO-REJECTS" in SYSTEM_PROMPT
+
+
+def test_trend_up_call_line_suppressed_in_riskoff_vol_spike():
+    # Vol-spiked uptrend (trend=up + label=risk-off): the risk-off mandate
+    # carries the cycle's put instruction — rendering the trend-up "don't
+    # propose puts" line beside "PROPOSE a long_put" would contradict it.
+    eng = _engine(options_enabled=True)
+    acct = _acct([_pos("CVX")])
+    text = eng._render_dynamic(
+        [_bundle("MU")], acct, "", [],
+        regime_label="risk-off",
+        regime_reason="SPY above 200dma (700 vs 650), VIX 34 -> risk-off, size x0.40.",
+        regime_trend="up",
+    )
+    assert "MARKET IS RISK-OFF" in text
+    assert "long_put or bear_put_spread" in text
+    assert "don't spend conviction on puts" not in text
+    assert "CALL structures (long_call / bull_call_spread)" not in text

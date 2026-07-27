@@ -132,3 +132,31 @@ def _run_all():
 
 if __name__ == "__main__":
     sys.exit(1 if _run_all() else 0)
+
+
+# -- long-run trend field (drives the option call/put direction gate) -------- #
+def test_trend_up_exposed_independently_of_label():
+    r = _FakeRegime(_UPTREND, vix=15.0).assess()
+    assert r.trend == "up"
+
+
+def test_trend_down_even_when_label_reads_neutral():
+    # Calm-VIX downtrend: label blends to "neutral" (0.5) but the LONG-RUN
+    # direction is down — the direction gate must see "down" here.
+    r = _FakeRegime(_DOWNTREND, vix=15.0).assess()
+    assert r.label == "neutral"
+    assert r.trend == "down"
+
+
+def test_trend_up_survives_a_vol_spike_riskoff_label():
+    # VIX>=30 inside an uptrend: label says risk-off (vol alone), but the
+    # 200dma trend is still up — trend and label must not be conflated.
+    r = _FakeRegime(_UPTREND, vix=35.0).assess()
+    assert r.label == "risk-off"
+    assert r.trend == "up"
+
+
+def test_trend_empty_on_degraded_read():
+    r = _FakeRegime([], vix=None).assess()
+    assert r.label == "unknown"
+    assert r.trend == ""

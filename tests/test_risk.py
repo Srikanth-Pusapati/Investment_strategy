@@ -1269,3 +1269,188 @@ def test_trail_geometry_arm_never_below_giveback():
     # A small arm_r must not pull the arm BELOW the giveback either.
     lim = _limits(trail_giveback_pct=3.0, trail_arm_r=0.3)
     assert trail_geometry(lim, 8.0) == (3.0, 3.0)
+
+
+# --------------------------------------------------------------------------- #
+# Option direction gate — calls WITH the long-run trend, puts against it
+# --------------------------------------------------------------------------- #
+def _long_put(symbol="AAPL"):
+    return TradeProposal(
+        symbol=symbol, action=Action.BUY, conviction=1.0, target_weight_pct=2.0,
+        rationale="opt", instrument=Instrument.OPTION,
+        option_strategy=OptionStrategy.LONG_PUT,
+        option_legs=[OptionLeg(expiry=_opt_exp(30), strike=180, right="put",
+                               side=Action.BUY)],
+    )
+
+
+def _long_call(symbol="AAPL"):
+    return TradeProposal(
+        symbol=symbol, action=Action.BUY, conviction=1.0, target_weight_pct=2.0,
+        rationale="opt", instrument=Instrument.OPTION,
+        option_strategy=OptionStrategy.LONG_CALL,
+        option_legs=[OptionLeg(expiry=_opt_exp(30), strike=200, right="call",
+                               side=Action.BUY)],
+    )
+
+
+def test_put_rejected_in_longrun_uptrend():
+    rm = _rm(_limits(options_enabled=True))
+    d = rm.evaluate_option(_long_put(), _account(), est_premium_per_contract=2.0,
+                           market_trend="up", regime_label="risk-on")
+    assert d.verdict is RiskVerdict.REJECTED
+    assert "UP" in d.reason and "theta" in d.reason.lower()
+
+
+def test_call_rejected_in_longrun_downtrend():
+    rm = _rm(_limits(options_enabled=True))
+    d = rm.evaluate_option(_long_call(), _account(), est_premium_per_contract=2.0,
+                           market_trend="down", regime_label="neutral")
+    assert d.verdict is RiskVerdict.REJECTED
+    assert "DOWN" in d.reason
+
+
+def test_call_approved_in_uptrend_put_approved_in_downtrend():
+    rm = _rm(_limits(options_enabled=True))
+    up = rm.evaluate_option(_long_call(), _account(), est_premium_per_contract=2.0,
+                            market_trend="up", regime_label="risk-on")
+    down = rm.evaluate_option(_long_put(), _account(), est_premium_per_contract=2.0,
+                              market_trend="down", regime_label="neutral")
+    assert up.verdict is RiskVerdict.APPROVED, up.reason
+    assert down.verdict is RiskVerdict.APPROVED, down.reason
+
+
+def test_put_allowed_in_uptrend_when_regime_riskoff():
+    # Vol-spiked uptrend: the risk-off put mandate ASKS for puts — the gate
+    # must never fight its own mandate.
+    rm = _rm(_limits(options_enabled=True))
+    d = rm.evaluate_option(_long_put(), _account(), est_premium_per_contract=2.0,
+                           market_trend="up", regime_label="risk-off")
+    assert d.verdict is RiskVerdict.APPROVED, d.reason
+
+
+def test_put_allowed_in_uptrend_as_hedge_on_held_name():
+    rm = _rm(_limits(options_enabled=True))
+    acct = _account(positions=[_pos("AAPL", qty=100.0)])
+    d = rm.evaluate_option(_long_put("AAPL"), acct, est_premium_per_contract=2.0,
+                           market_trend="up", regime_label="risk-on")
+    assert d.verdict is RiskVerdict.APPROVED, d.reason
+
+
+def test_put_on_unheld_name_still_rejected_when_other_names_held():
+    rm = _rm(_limits(options_enabled=True))
+    acct = _account(positions=[_pos("MSFT", qty=100.0)])
+    d = rm.evaluate_option(_long_put("AAPL"), acct, est_premium_per_contract=2.0,
+                           market_trend="up", regime_label="risk-on")
+    assert d.verdict is RiskVerdict.REJECTED
+
+
+def test_unknown_trend_passes_direction_gate():
+    # Act only on data we have — a degraded regime read must not block options
+    # outright (the degraded multiplier already shrinks the premium budget).
+    rm = _rm(_limits(options_enabled=True))
+    d = rm.evaluate_option(_long_put(), _account(), est_premium_per_contract=2.0,
+                           market_trend="", regime_label="unknown",
+                           regime_multiplier=0.5)
+    assert d.verdict is RiskVerdict.APPROVED, d.reason
+
+
+def test_direction_gate_off_restores_old_behavior():
+    rm = _rm(_limits(options_enabled=True, option_direction_gate=False))
+    d = rm.evaluate_option(_long_put(), _account(), est_premium_per_contract=2.0,
+                           market_trend="up", regime_label="risk-on")
+    assert d.verdict is RiskVerdict.APPROVED, d.reason
+
+
+def test_mixed_call_put_legs_rejected():
+    # A mixed-rights structure is always refused: the defined-risk check
+    # catches the 1-long+1-short case first (the short is an uncovered short
+    # of the OTHER right), and the direction gate's own mixed-rights branch
+    # backstops any shape that slips past it (gate order is not a contract).
+    rm = _rm(_limits(options_enabled=True))
+    p = TradeProposal(
+        symbol="AAPL", action=Action.BUY, conviction=1.0, target_weight_pct=2.0,
+        rationale="opt", instrument=Instrument.OPTION,
+        option_strategy=OptionStrategy.BEAR_PUT_SPREAD,
+        option_legs=[
+            OptionLeg(expiry=_opt_exp(30), strike=180, right="put", side=Action.BUY),
+            OptionLeg(expiry=_opt_exp(30), strike=210, right="call", side=Action.SELL),
+        ],
+    )
+    d = rm.evaluate_option(p, _account(), est_premium_per_contract=2.0,
+                           market_trend="up", regime_label="risk-on")
+    assert d.verdict is RiskVerdict.REJECTED
+    ok, why = rm._direction_fits_market(p, _account(), "up", "risk-on")
+    assert not ok and "mixed" in why.lower()
+
+
+def test_direction_derived_from_legs_not_declared_strategy():
+    # A "bear_put_spread" built from CALL legs is really a bullish call spread
+    # — the gate must judge the LEGS (what actually trades), so in a DOWN
+    # trend this is rejected as a bullish structure despite its bearish name.
+    rm = _rm(_limits(options_enabled=True))
+    p = TradeProposal(
+        symbol="AAPL", action=Action.BUY, conviction=1.0, target_weight_pct=2.0,
+        rationale="opt", instrument=Instrument.OPTION,
+        option_strategy=OptionStrategy.BEAR_PUT_SPREAD,
+        option_legs=[
+            OptionLeg(expiry=_opt_exp(30), strike=200, right="call", side=Action.BUY),
+            OptionLeg(expiry=_opt_exp(30), strike=210, right="call", side=Action.SELL),
+        ],
+    )
+    d = rm.evaluate_option(p, _account(), est_premium_per_contract=2.0,
+                           market_trend="down", regime_label="neutral")
+    assert d.verdict is RiskVerdict.REJECTED
+    assert "DOWN" in d.reason
+
+
+# -- regime-scaled option premium budget -------------------------------------- #
+def test_option_premium_cap_scales_with_regime_multiplier():
+    rm = _rm(_limits(options_enabled=True, max_option_premium_pct=1.0))
+    p = _long_call()
+    # 1% of 100k = $1000; x0.4 regime -> $400 budget; $2/share = $200/contract
+    # -> 2 contracts instead of 5.
+    d = rm.evaluate_option(p, _account(), est_premium_per_contract=2.0,
+                           market_trend="up", regime_label="risk-off",
+                           regime_multiplier=0.4)
+    assert d.verdict is RiskVerdict.APPROVED, d.reason
+    assert d.approved_qty == 2
+    assert d.approved_notional == 400.0
+
+
+def test_option_premium_cap_unscaled_when_regime_filter_off():
+    rm = _rm(_limits(options_enabled=True, max_option_premium_pct=1.0,
+                     regime_filter_enabled=False))
+    d = rm.evaluate_option(_long_call(), _account(), est_premium_per_contract=2.0,
+                           regime_multiplier=0.4)
+    assert d.verdict is RiskVerdict.APPROVED
+    assert d.approved_qty == 5
+
+
+def test_put_allowed_in_uptrend_when_name_in_own_breakdown():
+    # The insider-sell / bearish-slate pipeline shorts single-name breakdowns
+    # in any tape: a name below its OWN 200dma keeps its put candidacy even
+    # while the MARKET trend is up.
+    rm = _rm(_limits(options_enabled=True))
+    d = rm.evaluate_option(_long_put(), _account(), est_premium_per_contract=2.0,
+                           market_trend="up", regime_label="risk-on",
+                           name_trend="down")
+    assert d.verdict is RiskVerdict.APPROVED, d.reason
+
+
+def test_put_rejected_in_uptrend_when_name_also_trending_up():
+    rm = _rm(_limits(options_enabled=True))
+    d = rm.evaluate_option(_long_put(), _account(), est_premium_per_contract=2.0,
+                           market_trend="up", regime_label="risk-on",
+                           name_trend="up")
+    assert d.verdict is RiskVerdict.REJECTED
+
+
+def test_call_in_downtrend_rejected_even_if_name_trending_up():
+    # The single-name carve-out is puts-only: calls in a down market are
+    # blocked with no exceptions (the user's mandate).
+    rm = _rm(_limits(options_enabled=True))
+    d = rm.evaluate_option(_long_call(), _account(), est_premium_per_contract=2.0,
+                           market_trend="down", regime_label="neutral",
+                           name_trend="up")
+    assert d.verdict is RiskVerdict.REJECTED

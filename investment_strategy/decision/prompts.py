@@ -113,6 +113,15 @@ vertical legs on ONE expiry. If the options_chain signal shows a HIGH ATM IV, \
 prefer a spread (the short leg offsets the rich premium); modest IV favors a \
 single long leg. Do not propose stop/take levels for options — exits are \
 managed deterministically (premium stop/take and a forced close near expiry).
+- OPTION DIRECTION: when a "## Market regime" block is present, option debits \
+follow the LONG-RUN market trend it reports: calls belong in an up market (SPY \
+above its 200-day), puts in a down market or a risk-off tape. A put bought \
+into a long-run uptrend bleeds theta against the tape and the risk layer \
+AUTO-REJECTS it (exceptions: the NAME itself trades below its own 200-day — a \
+single-name breakdown keeps its put candidacy in any tape — or the put hedges \
+a name this account holds, or the regime is risk-off); a call into a \
+down-trending market is auto-rejected with no exceptions. Counter-trend \
+conviction on a name belongs in HOLD/SELL decisions, not option debits.
 - The options_chain signal is a POSITIONING read from the live option chain: \
 ATM implied volatility (how much movement is priced in), put-call IV skew \
 (puts bid over calls = downside being paid up for), and the put/call \

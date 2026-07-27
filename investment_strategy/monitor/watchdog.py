@@ -75,6 +75,10 @@ class Watchdog:
         #: for a single ticker (BIIB, 2026-07-15: 318x) without saying
         #: anything new. Throttled below, not silenced (see _log_waiting_throttled).
         self._last_wait_log: dict[str, datetime] = {}
+        #: one-shot latch for the "day-loss breach but market CLOSED" note, so
+        #: the deferral logs once per closed session instead of every 30s tick
+        #: (Jul 23: 1,301 EMERGENCY lines; Jul 24: 228 more until 01:56).
+        self._flatten_deferred_noted = False
 
     def _alert(self, key: str, subject: str, body: str) -> None:
         """Page a human, if an alerter is wired. The event is already logged at
@@ -189,7 +193,37 @@ class Watchdog:
     def _emergency_flatten(self, account: AccountSnapshot) -> bool:
         loss_pct = -account.day_pl_pct
         if loss_pct < self.cfg.risk.max_daily_loss_pct:
+            self._flatten_deferred_noted = False
             return False
+        # A CLOSED market gets ONE flatten pass, not one per 30s tick: the
+        # first pass rests the exits at the venue (marketable-limit closes
+        # work the reopen even if this process dies overnight); every repeat
+        # was pure spam — nothing new can fill, DAY closes expire at the bell
+        # and re-fire each tick (Jul 23: 1,301 EMERGENCY lines; Jul 24: 228
+        # more past midnight, where a stale Alpaca last_equity made
+        # YESTERDAY'S loss read as today's until ~02:00). The latch resets
+        # when the loss clears or the market reopens; a clock-read failure
+        # fails toward protection (flatten as if open).
+        try:
+            market_open = self.broker.is_market_open()
+        except Exception as e:  # noqa: BLE001 — never break the safety loop
+            log.debug("emergency-flatten clock read failed (%s); proceeding.", e)
+            market_open = True
+        if not market_open:
+            if self._flatten_deferred_noted:
+                return False  # exits already rested on the first closed tick
+            self._flatten_deferred_noted = True
+            log.warning(
+                "Day loss %.2f%% >= limit %.2f%% with the market CLOSED — "
+                "resting the exits ONCE at the venue (they work the reopen "
+                "without this process), then staying quiet until the open. "
+                "After midnight this reading is yesterday's session until "
+                "the broker rolls last_equity.",
+                loss_pct, self.cfg.risk.max_daily_loss_pct,
+            )
+            self._flatten_all(account, "DAILY LOSS")
+            return True
+        self._flatten_deferred_noted = False
         log.error(
             "EMERGENCY: day loss %.2f%% >= limit %.2f%%. Flattening all positions.",
             loss_pct, self.cfg.risk.max_daily_loss_pct,
@@ -737,6 +771,24 @@ class Watchdog:
             ))
         except Exception as e:  # never let logging break the watchdog
             log.warning("Ledger option-exit record failed for %s: %s", under, e)
+        if not oid:
+            return
+        try:
+            # Queue the close for the orchestrator's reconcile pass, exactly
+            # like equity exits (_record_exit). Without this, an option close
+            # was ledgered at SUBMIT and never followed: a DAY close that
+            # expired at the bell kept its phantom exit row forever, the
+            # resubmit added a second one (the archived T book shows the loss
+            # double-counted that way), and the eventual FILL produced no log
+            # line — the Jul-24 postmortem read "no closed positions" off a
+            # ledger that had missed a real close. note_exit_ledgered marks
+            # the oid as EXIT-side so an expired DAY close gets its ledger
+            # correction WITHOUT tripping the reconcile buy-halt (the
+            # watchdog's resubmit loop owns the recovery).
+            self.state.add_pending_order(oid, under)
+            self.state.note_exit_ledgered(under, oid)
+        except Exception as e:  # bookkeeping must never break the safety loop
+            log.warning("Option-exit order bookkeeping failed for %s: %s", under, e)
 
     def forget(self, symbol: str) -> None:
         """Drop trailing state when a position is gone (filled stop/tp)."""

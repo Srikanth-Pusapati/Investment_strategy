@@ -728,6 +728,10 @@ class RiskManager:
         est_premium_per_contract: float,
         leg_liquidity: list[dict] | None = None,
         min_leg_premium: float | None = None,
+        market_trend: str = "",
+        regime_label: str = "",
+        regime_multiplier: float = 1.0,
+        name_trend: str = "",
     ) -> RiskDecision:
         """Size a defined-risk options play by capped DEBIT. Max loss on a long
         option / debit spread is the premium paid, so we bound that premium to a
@@ -735,7 +739,17 @@ class RiskManager:
 
         `leg_liquidity` is per-leg {'symbol', 'oi', 'rel_spread_pct'} context
         from OptionsHelper.leg_liquidity — optional, and None FIELDS fail open
-        (the est_premium<=0 gate already refuses quote-less legs)."""
+        (the est_premium<=0 gate already refuses quote-less legs).
+
+        `market_trend` is the regime's LONG-RUN direction read ("up"/"down"/
+        "" = unknown) and `regime_label` its blended label — together they
+        drive the direction gate (calls with the tape, puts against it).
+        `name_trend` is the UNDERLYING's own long-run read (price vs its
+        200dma from the technical signal) — a single-name breakdown keeps its
+        put candidacy even in a bull tape. `regime_multiplier` scales the
+        premium budget the same way it already scales equity sizing, so
+        option risk also shrinks when the market turns; all four default to
+        inert values for legacy callers."""
         if not self.limits.options_enabled:
             return self._reject(proposal, "Options trading disabled (OPTIONS_ENABLED=off).")
         # Same account-wide gate as equity buys: halt latch, kill switch, daily
@@ -759,6 +773,11 @@ class RiskManager:
         if not ok:
             return self._reject(proposal, why)
         ok, why = self._legs_dte_sane(proposal)
+        if not ok:
+            return self._reject(proposal, why)
+        ok, why = self._direction_fits_market(
+            proposal, account, market_trend, regime_label, name_trend,
+        )
         if not ok:
             return self._reject(proposal, why)
         ok, why = self._under_option_position_cap(proposal, account)
@@ -789,6 +808,12 @@ class RiskManager:
 
         equity = account.equity
         cap = equity * (self.limits.max_option_premium_pct / 100.0)
+        # Regime-scaled premium budget: equity sizing already shrinks with the
+        # regime multiplier (see evaluate); before this, option debits sized
+        # identically in risk-on and risk-off. Scale the equity-derived cap
+        # only — the model's own max_premium_usd stays an absolute ceiling.
+        if self.limits.regime_filter_enabled:
+            cap *= max(0.0, min(1.0, regime_multiplier))
         if proposal.max_premium_usd is not None:
             cap = min(cap, proposal.max_premium_usd)
 
@@ -819,6 +844,72 @@ class RiskManager:
             approved_notional=spent,
             reason=f"{contracts} contract(s), ${spent:,.0f} debit (cap ${cap:,.0f}).",
         )
+
+    # -- option direction vs long-run market trend --------------------------- #
+    def _direction_fits_market(
+        self, proposal: TradeProposal, account: AccountSnapshot,
+        market_trend: str, regime_label: str, name_trend: str = "",
+    ) -> tuple[bool, str]:
+        """Option debits must trade WITH the long-run market trend (SPY vs its
+        200dma): calls in an up market, puts in a down market. A put bought
+        into a long-run uptrend bleeds theta against the tape; a call into a
+        downtrend fights it — either way the debit pays for a fight the odds
+        are against. Direction comes from the LEGS' rights, never the declared
+        strategy name (the shape check doesn't verify a "bear_put_spread"
+        actually uses puts — legs are what trade).
+
+        Carve-outs for bearish structures in an up market: (a) the regime
+        label reads risk-off (a vol spike inside an uptrend — the risk-off put
+        mandate ASKS for puts; its own gate must not fight it), (b) the put
+        hedges a HELD equity position in the same name (insurance, not
+        counter-trend speculation), and (c) the NAME's own long-run trend is
+        broken (`name_trend` "down": price below its 200dma) — the insider-
+        sell / bearish-slate pipeline exists to short single-name breakdowns,
+        which happen in bull tapes too. Unknown trend ("") passes — act only
+        on data we have; the degraded regime multiplier already shrinks the
+        premium budget."""
+        if not getattr(self.limits, "option_direction_gate", True):
+            return True, ""
+        if market_trend not in ("up", "down"):
+            return True, ""
+        rights = {
+            "c" if leg.right.lower().startswith("c") else "p"
+            for leg in proposal.option_legs
+        }
+        if rights == {"c", "p"}:
+            # No approved defined-risk shape mixes rights — and a mixed
+            # structure has no single direction to check.
+            return False, (
+                "Mixed call/put legs match no approved defined-risk shape "
+                "(long_call, long_put, bull_call_spread, bear_put_spread)."
+            )
+        bullish = rights == {"c"}
+        if market_trend == "down" and bullish:
+            return False, (
+                "Long-run market trend is DOWN (SPY below its 200dma) — "
+                "bullish call structures fight the tape and are blocked "
+                "(OPTION_DIRECTION_GATE). Express upside conviction as an "
+                "equity BUY if the name earns it."
+            )
+        if market_trend == "up" and not bullish:
+            if regime_label == "risk-off":
+                return True, ""  # vol-spiked uptrend: the put mandate rules
+            if name_trend == "down":
+                return True, ""  # single-name breakdown keeps its put candidacy
+            holds_equity = any(
+                not p.is_option and p.symbol == proposal.symbol and p.qty > 0
+                for p in account.positions
+            )
+            if holds_equity:
+                return True, ""  # protective put on a held name = insurance
+            return False, (
+                "Long-run market trend is UP (SPY above its 200dma) and this "
+                "name is not in its own breakdown — puts into an uptrend "
+                "bleed theta and are blocked (OPTION_DIRECTION_GATE) unless "
+                "the name trades below its 200dma, the put hedges a held "
+                "position, or the regime turns risk-off."
+            )
+        return True, ""
 
     # -- option expiry sanity ------------------------------------------------ #
     def _legs_dte_sane(self, proposal: TradeProposal) -> tuple[bool, str]:

@@ -852,3 +852,105 @@ def test_retry_pending_decision_sell_drops_when_position_gone():
     wd = Watchdog(_cfg(0.0), _FakeBroker([]), state=state)
     wd._retry_pending_decision_sells({})
     assert state.get_pending_decision_sells() == {}
+
+
+# -- day-loss emergency flatten: market-closed deferral ----------------------- #
+def _losing_acct():
+    # -4% on the day, worse than the 3% limit in _cfg().
+    return AccountSnapshot(equity=96_000.0, last_equity=100_000.0, cash=0.0,
+                           buying_power=0.0, positions=[_pos("AAPL")])
+
+
+def test_emergency_flatten_closed_market_is_one_shot():
+    # Jul 23/24 regression: the day-loss flatten looped every 30s all night
+    # (and past midnight on a stale last_equity) — 1,500+ EMERGENCY lines.
+    # Closed market => flatten ONCE (the exits rest at the venue and work the
+    # reopen even if this process dies), then stay quiet until the open.
+    broker = _FakeBroker([])
+    broker.market_open = False
+    wd = Watchdog(_cfg(0.0), broker, state=_state())
+    assert wd._emergency_flatten(_losing_acct()) is True
+    assert broker.closed == ["AAPL"]              # exits rested on tick one
+    assert wd._flatten_deferred_noted is True     # the once-per-session latch
+    assert wd._emergency_flatten(_losing_acct()) is False   # tick two: quiet
+    assert broker.closed == ["AAPL"]              # no repeat submission
+
+
+def test_emergency_flatten_fires_when_market_open():
+    broker = _FakeBroker([])
+    broker.market_open = True
+    wd = Watchdog(_cfg(0.0), broker, state=_state())
+    assert wd._emergency_flatten(_losing_acct()) is True
+    assert broker.closed == ["AAPL"]
+
+
+def test_emergency_open_market_keeps_per_tick_retries():
+    # The one-shot latch is a CLOSED-market throttle only: with the market
+    # open, every tick may retry (a failed close must be re-attempted in 30s).
+    broker = _FakeBroker([])
+    broker.market_open = True
+    wd = Watchdog(_cfg(0.0), broker, state=_state())
+    wd._emergency_flatten(_losing_acct())
+    wd._emergency_flatten(_losing_acct())
+    assert broker.closed == ["AAPL", "AAPL"]
+
+
+def test_emergency_latch_resets_when_loss_clears():
+    broker = _FakeBroker([])
+    broker.market_open = False
+    wd = Watchdog(_cfg(0.0), broker, state=_state())
+    wd._emergency_flatten(_losing_acct())
+    assert wd._flatten_deferred_noted is True
+    ok = AccountSnapshot(equity=100_000.0, last_equity=100_000.0, cash=0.0,
+                         buying_power=0.0, positions=[])
+    assert wd._emergency_flatten(ok) is False
+    assert wd._flatten_deferred_noted is False    # next closed-session breach re-arms
+
+
+def test_emergency_flatten_proceeds_when_clock_read_fails():
+    # Fail toward protection: a clock error must not suppress the flatten.
+    class _NoClockBroker(_FakeBroker):
+        def is_market_open(self):
+            raise RuntimeError("clock down")
+    broker = _NoClockBroker([])
+    wd = Watchdog(_cfg(0.0), broker, state=_state())
+    assert wd._emergency_flatten(_losing_acct()) is True
+    assert broker.closed == ["AAPL"]
+
+
+# -- option close orders join the reconcile queue ------------------------------ #
+def test_option_exit_queues_close_order_for_reconcile():
+    # The Jul-24 gap: an option close was ledgered at SUBMIT and never
+    # followed — an expired DAY close kept a phantom exit row and the real
+    # fill was invisible (postmortem read "no closed positions"). The close
+    # oid must land in the persisted pending queue the reconcile pass drains.
+    state, broker, led = _state(), _FakeBroker([]), _FakeLedger()
+    wd = Watchdog(_cfg(0.0), broker, state=state, ledger=led)
+    put = _opt_leg(occ_symbol("LLY", _exp(30), 700, "put"), qty=2, basis=3.0,
+                   price=1.2)                                  # -60% premium stop
+    wd._check_option_positions([put])
+    assert broker.option_groups_closed == [[put.symbol]]
+    assert ("opt-close-1", "LLY") in state.get_pending_orders()
+
+
+def test_option_exit_failure_queues_nothing():
+    state, broker = _state(), _FakeBroker([], option_close_fails=True)
+    wd = Watchdog(_cfg(0.0), broker, state=state,
+                  alerter=SimpleNamespace(critical=lambda k, s, b: None))
+    put = _opt_leg(occ_symbol("LLY", _exp(30), 700, "put"), qty=1, basis=3.0,
+                   price=1.0)
+    wd._check_option_positions([put])
+    assert state.get_pending_orders() == []
+
+
+# -- option exits are marked exit-side for the reconcile halt guard ------------ #
+def test_option_exit_marks_oid_as_exit_ledgered():
+    # exit_was_ledgered is how _reconcile_fills knows an expired DAY close is
+    # a self-healing exit (correction only), not a phantom-BUY divergence
+    # (halt + page).
+    state, broker, led = _state(), _FakeBroker([]), _FakeLedger()
+    wd = Watchdog(_cfg(0.0), broker, state=state, ledger=led)
+    put = _opt_leg(occ_symbol("LLY", _exp(30), 700, "put"), qty=2, basis=3.0,
+                   price=1.2)
+    wd._check_option_positions([put])
+    assert state.exit_was_ledgered("LLY", "opt-close-1")

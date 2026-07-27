@@ -228,6 +228,7 @@ def _orch(trim_enabled=True, trim_pct=25.0, state=None,
     o._trade_lock = threading.Lock()
     o._pending_oids = []
     o._oid_retries = {}
+    o._core_stop_gap = False
     return o
 
 
@@ -854,7 +855,7 @@ def _rotation_orch():
             Orchestrator._apply_pending_close(account, proposal.symbol)
         return 0.0
 
-    def handle_option(proposal, account, kinds):
+    def handle_option(proposal, account, kinds, tech=None):
         o._calls.append(("option", proposal.symbol, None))
 
     o._handle_equity = handle_equity

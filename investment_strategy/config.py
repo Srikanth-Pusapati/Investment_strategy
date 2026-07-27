@@ -110,6 +110,17 @@ class RiskLimits:
     # premium can never translate into a thin-book monster order. Both 0=off.
     min_option_premium: float = 0.10      # per-leg mid floor $/share; sub-floor = deep-OTM/illiquid junk
     max_option_contracts: int = 50        # hard ceiling on contracts per structure
+    # Direction discipline: option debits must trade WITH the long-run market
+    # trend (SPY vs 200dma) — calls in an up market, puts in a down market.
+    # Puts in an uptrend bleed theta against the tape (the Jul-13..23 trial
+    # held zero puts through risk-on precisely because the prompt said so;
+    # this makes it deterministic and adds the symmetric call block). Carve-
+    # outs: puts on a name in its OWN 200dma breakdown (the bearish-slate
+    # pipeline shorts single names in any tape), puts that HEDGE a held
+    # equity, and puts when the regime label reads risk-off (the put mandate
+    # must never be fought by its own gate). Inert unless
+    # regime_filter_enabled — the trend is only read under that flag.
+    option_direction_gate: bool = True    # OPTION_DIRECTION_GATE (on/off)
     # --- R.1 vol-scaled ("ATR-style") dynamic stops ---
     # One fixed stop % is too tight for volatile names (chopped out by normal
     # noise — the exact failure D.1 measured on the old 5% stop) and too loose
@@ -584,6 +595,7 @@ def load_config() -> Config:
             max_option_positions=int(_f("MAX_OPTION_POSITIONS", 3.0)),
             min_option_premium=_f("MIN_OPTION_PREMIUM", 0.10),
             max_option_contracts=int(_f("MAX_OPTION_CONTRACTS", 50.0)),
+            option_direction_gate=_flag("OPTION_DIRECTION_GATE", "on"),
             # R.1 vol-scaled stops: off until the --sweep-stops evidence says
             # otherwise for this account's basket; flip in .env when it does.
             vol_stops_enabled=_flag("VOL_STOPS_ENABLED"),
