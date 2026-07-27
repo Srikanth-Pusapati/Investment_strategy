@@ -179,6 +179,17 @@ class DecisionEngine:
             lines += [curated, ""]
         if r is not None:
             lines += self._risk_contract(r)
+        # Signal discipline (2026-07-27 reset day: BEP bought on "congress 7/0
+        # buys" as the thesis lead, stopped out -4% five hours later). STOCK Act
+        # data is stale by construction — it may support a thesis, never BE one.
+        lines += [
+            "- Congressional-trading data lags up to ~45 days and is weak "
+            "corroboration ONLY. Never lead a buy thesis with congress buying: "
+            "a BUY needs a FRESH anchor — a technical setup, fundamentals, or "
+            "live flow — that would justify it even with the congress line "
+            "deleted. If the rationale's strongest signal is congress, the "
+            "correct action is HOLD.",
+        ]
         return "\n".join(lines)
 
     def _render_dynamic(

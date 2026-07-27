@@ -180,11 +180,12 @@ def _orch(trim_enabled=True, trim_pct=25.0, state=None,
           thesis_min_score=0.1, core_etf="", target_invested_pct=0.0,
           min_cash_buffer_pct=2.0, max_gross_exposure_pct=100.0,
           kill_switch=False, whole_shares_only=False, core_stop_pct=15.0,
-          core_max_pct=0.0, trading_halted=None):
+          core_max_pct=0.0, core_fill_max_pct=0.0, trading_halted=None):
     o = Orchestrator.__new__(Orchestrator)
     o.cfg = SimpleNamespace(
         core_etf=core_etf, target_invested_pct=target_invested_pct,
         core_stop_pct=core_stop_pct, core_max_pct=core_max_pct,
+        core_fill_max_pct=core_fill_max_pct,
         monitor_interval_s=30,
         # These reconcile tests assert the LOG output; the enforcing halt
         # behavior has its own suite in test_ops_hardening.py.
@@ -509,6 +510,25 @@ def test_core_fill_capped_by_core_max_pct():
     acct = _acct(cash=750.0, positions=[_pos("QQQ", 250.0)])
     o._apply_core_fill(acct)
     assert o.broker.core_buys == [("QQQ", 50.0)]
+
+
+def test_core_fill_dca_throttle_caps_per_cycle_buy():
+    # Reset-day regression 2026-07-27: the sweep bought the WHOLE gap ($300k,
+    # 30% of the fresh book) at one print two minutes after the open. With
+    # CORE_FILL_MAX_PCT=5 the same $900 gap fills $50 (5% of $1000) per cycle.
+    o = _orch(core_etf="QQQ", target_invested_pct=90.0, min_cash_buffer_pct=2.0,
+              core_fill_max_pct=5.0)
+    acct = _acct(cash=1_000.0)
+    o._apply_core_fill(acct)
+    assert o.broker.core_buys == [("QQQ", 50.0)]
+
+
+def test_core_fill_dca_throttle_off_when_zero():
+    o = _orch(core_etf="QQQ", target_invested_pct=90.0, min_cash_buffer_pct=2.0,
+              core_fill_max_pct=0.0)
+    acct = _acct(cash=1_000.0)
+    o._apply_core_fill(acct)
+    assert o.broker.core_buys == [("QQQ", 900.0)]
 
 
 def test_core_fill_skips_when_core_at_ceiling():

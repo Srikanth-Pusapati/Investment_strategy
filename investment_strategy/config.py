@@ -379,6 +379,12 @@ class Config:
     # trim an existing overweight (that stays a manual/decision action to avoid
     # the pending-cancel wedge on the resting GTC stop). 0 = no ceiling.
     core_max_pct: float = 30.0
+    # Per-CYCLE ceiling on the core BUY as a % of equity — a DCA throttle. On
+    # reset day 2026-07-27 the sweep bought $300k of QQQ (30% of the fresh
+    # book) two minutes after the open of a down day, -$3.4k by the close and
+    # ~44% of the day's loss. Spreading the fill across cycles averages the
+    # entry instead of concentrating it at one print. 0 = no throttle.
+    core_fill_max_pct: float = 5.0
     # GA-2.3: standalone GTC stop protecting the CORE position at the exchange,
     # this % under its average basis (the core accumulates via notional buys and
     # previously had NO exchange-side stop — watchdog-only). Covers the whole-
@@ -689,6 +695,7 @@ def load_config() -> Config:
         core_etf=os.getenv("CORE_ETF", "").strip().upper(),
         target_invested_pct=_f("TARGET_INVESTED_PCT", 0.0),
         core_max_pct=_f("CORE_MAX_PCT", 30.0),
+        core_fill_max_pct=_f("CORE_FILL_MAX_PCT", 5.0),
         core_stop_pct=_f("CORE_STOP_PCT", 15.0),
         track_record_file=os.getenv("TRACK_RECORD_FILE", "").strip(),
     )
