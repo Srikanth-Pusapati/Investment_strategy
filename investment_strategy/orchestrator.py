@@ -2165,7 +2165,13 @@ class Orchestrator:
                     etf, core_max_pct,
                 )
                 return
-        notional = round(min(gap, spendable, core_room), 2)
+        # Per-cycle DCA throttle (CORE_FILL_MAX_PCT): never buy the whole gap at
+        # one print — reset day 2026-07-27 swept $300k of QQQ (30% of the fresh
+        # book) two minutes after the open and ate ~44% of the day's loss.
+        # Spreading the fill across cycles averages the entry.
+        per_cycle = getattr(self.cfg, "core_fill_max_pct", 0.0)
+        cycle_cap = equity * (per_cycle / 100.0) if per_cycle > 0 else float("inf")
+        notional = round(min(gap, spendable, core_room, cycle_cap), 2)
         # Same dust guard as satellite buys: a $98k book topping the core up by
         # $5 every cycle pays spread for nothing (min order scales with equity).
         min_fill = max(r.min_order_usd, equity * (r.min_order_pct / 100.0), 1.0)

@@ -11,7 +11,8 @@ from __future__ import annotations
 import logging
 
 from ..config import Config
-from ..models import Candidate, is_valid_ticker
+from ..models import Candidate, SignalKind, is_valid_ticker
+from ..signals.history import lag_weight
 from ..signals.quiver_client import QuiverClient
 from .base import Screener
 from .congress_feed import CongressFeedScreener
@@ -35,6 +36,26 @@ _REGISTRY: dict[str, type[Screener]] = {
 # Quiver-backed screeners take the shared client so they reuse the signal layer's
 # cached live-feed pull instead of fetching it a second time.
 _QUIVER_SCREENERS: set[type[Screener]] = {CongressFeedScreener, WallStreetBetsScreener}
+
+# Freshness discount applied to each screener's score at merge time, using the
+# same lag half-life as the composite (signals/history.py). STOCK Act congress
+# disclosures lag up to ~45 days and Form 4 ~2 business days; live sources
+# (options flow, Robinhood crowd, WSB chatter) keep full weight. Without this
+# a congress-only cluster ranked the slate's top AND laundered into the
+# composite at FULL weight via the DISCOVERY kind — the lag discount the
+# composite applies to the `congress` signal never touched the screener score
+# it rode in on (BEP 2026-07-27: bought on "congress 7/0", composite +1.66
+# mostly discovery, stopped out -4.0% five hours later).
+_SOURCE_LAG_KIND: dict[str, SignalKind] = {
+    "congress": SignalKind.CONGRESS,
+    "insider": SignalKind.INSIDER,
+}
+
+
+def _source_weight(name: str) -> float:
+    kind = _SOURCE_LAG_KIND.get(name)
+    w = lag_weight(kind) if kind is not None else None
+    return w if w is not None else 1.0
 
 
 class ScreenerAggregator:
@@ -62,6 +83,7 @@ class ScreenerAggregator:
         # to the top.
         merged: dict[str, Candidate] = {}
         for s in self.screeners:
+            src_w = _source_weight(s.name)
             for cand in s.safe_scan():
                 sym = cand.symbol.upper()
                 if not is_valid_ticker(sym):
@@ -69,13 +91,16 @@ class ScreenerAggregator:
                     continue
                 if sym in exclude:
                     continue
+                score = round(cand.score * src_w, 3)
                 existing = merged.get(sym)
                 if existing is None:
-                    merged[sym] = cand.model_copy(update={"symbol": sym})
+                    merged[sym] = cand.model_copy(
+                        update={"symbol": sym, "score": score}
+                    )
                 else:
                     existing.sources = list(dict.fromkeys(existing.sources + cand.sources))
                     existing.reason = f"{existing.reason} | {cand.reason}"
-                    existing.score += cand.score
+                    existing.score += score
 
         # Drop weak signals, rank by conviction (|score|), cap the slate. A
         # bearish lean on a name we DON'T hold is only actionable via a long put;

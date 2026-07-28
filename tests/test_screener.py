@@ -77,16 +77,42 @@ def test_candidate_to_signal_is_discovery():
 
 
 def test_dedup_merges_sources_and_sums_scores():
+    # Live sources (weight 1.0) so this pins pure merge mechanics.
     agg = _agg(_cfg(), [
-        _Fake("congress", [_cand("NVDA", "congress", 0.3)]),
-        _Fake("insider", [_cand("NVDA", "insider", 0.5)]),
+        _Fake("options_flow", [_cand("NVDA", "options_flow", 0.3)]),
+        _Fake("robinhood", [_cand("NVDA", "robinhood", 0.5)]),
     ])
     out = agg.scan()
     assert len(out) == 1
     nvda = out[0]
     assert nvda.symbol == "NVDA"
-    assert set(nvda.sources) == {"congress", "insider"}
+    assert set(nvda.sources) == {"options_flow", "robinhood"}
     assert abs(nvda.score - 0.8) < 1e-9      # corroboration accumulates
+
+
+def test_lagged_sources_discounted_at_merge():
+    # STOCK Act disclosures lag ~30d typical -> weight 0.23; Form 4 ~2 business
+    # days -> 0.91; live flow keeps 1.0. A congress-only "perfect" cluster must
+    # NOT outrank a live-flow name (BEP reset-day regression 2026-07-27).
+    agg = _agg(_cfg(), [
+        _Fake("congress", [_cand("BEP", "congress", 1.0)]),
+        _Fake("insider", [_cand("ZTS", "insider", 1.0)]),
+        _Fake("options_flow", [_cand("SOFI", "options_flow", 0.6)]),
+    ])
+    out = {c.symbol: c.score for c in agg.scan()}
+    assert abs(out["BEP"] - 0.23) < 1e-9
+    assert abs(out["ZTS"] - 0.91) < 1e-9
+    assert abs(out["SOFI"] - 0.6) < 1e-9
+    ranked = [c.symbol for c in agg.scan()]
+    assert ranked.index("SOFI") < ranked.index("BEP")
+
+
+def test_weak_congress_only_name_drops_below_min_score():
+    # 2 buys / 1 sell -> raw 0.167… never mind; a modest congress lean (0.6)
+    # lands at 0.14 after the freshness discount — below the 0.2 floor, so a
+    # congress-only trickle no longer spends a slate slot.
+    agg = _agg(_cfg(), [_Fake("congress", [_cand("MU", "congress", 0.6)])])
+    assert agg.scan() == []
 
 
 def test_exclude_drops_watchlist_and_held():

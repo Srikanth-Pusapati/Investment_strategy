@@ -13,6 +13,7 @@ from .congress import CongressProvider
 from .fundamentals import FundamentalsProvider
 from .govcontracts import GovContractsProvider
 from .insider import InsiderProvider
+from .lobbying import LobbyingProvider
 from .insider_edgar import EdgarInsiderProvider
 from .macro import MacroProvider
 from .news import NewsProvider
@@ -37,6 +38,7 @@ class SignalAggregator:
             CongressProvider(cfg, self.quiver),  # congressional trades (Quiver; if key)
             OffExchangeProvider(cfg, self.quiver),  # dark-pool short vol (Quiver; ~1d lag)
             GovContractsProvider(cfg, self.quiver),  # federal contract awards (Quiver; catalyst)
+            LobbyingProvider(cfg, self.quiver),   # LDA lobbying spend (Quiver; ~45d lag, context)
             InsiderProvider(cfg),         # Form 4 insider via Finnhub (if key)
             EdgarInsiderProvider(cfg),    # Form 4 insider via SEC EDGAR (free; no key)
             OptionsFlowProvider(cfg),     # unusual options activity
