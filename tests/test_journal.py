@@ -127,6 +127,34 @@ def test_render_today_dropped_buy_appears():
     assert "excluded" in block.lower()
 
 
+def test_render_today_overext_reject_tagged_as_call_candidate():
+    """Overextension/earnings rejections are EQUITY-only gates; with options
+    on, the block must explicitly re-offer those names as capped-debit call
+    candidates (the Jul-28 finding: the model read 'Overextended: rejected' as
+    the thesis dying and never pivoted to the exempt option vehicle)."""
+    j = DecisionJournal(base_dir=_tmpdir())
+    j.record(_rec("FIRY", "rejected", 0.0,
+                  reason="Overextended: RSI 73 and 3.4xATR above the 20d SMA"))
+    j.record(_rec("RGEN", "rejected", 0.0,
+                  reason="Earnings in 0d (<= 3d blackout) — no new buy."))
+    j.record(_rec("SANM", "rejected", 0.0,
+                  reason="Fresh-name conviction 0.55 below the new-position floor"))
+    block = j.render_today(equity=100_000.0, options_on=True)
+    assert "long_call/bull_call_spread" in block
+    assert "FIRY" in block and "RGEN" in block
+    # Conviction-floor rejections are NOT equity-only gates — no option carve-out.
+    tag_line = next(l for l in block.splitlines() if "long_call" in l)
+    assert "SANM" not in tag_line
+
+
+def test_render_today_no_call_tag_when_options_off():
+    j = DecisionJournal(base_dir=_tmpdir())
+    j.record(_rec("FIRY", "rejected", 0.0,
+                  reason="Overextended: RSI 73 and 3.4xATR above the 20d SMA"))
+    block = j.render_today(equity=100_000.0, options_on=False)
+    assert "long_call" not in block
+
+
 def test_render_today_line_cap():
     """The block should not explode to an arbitrary number of lines."""
     j = DecisionJournal(base_dir=_tmpdir())

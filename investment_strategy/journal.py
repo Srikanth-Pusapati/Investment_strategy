@@ -132,11 +132,18 @@ class DecisionJournal:
         except Exception:
             return False
 
-    def render_today(self, equity: float, when: datetime | None = None) -> str:
+    def render_today(
+        self, equity: float, when: datetime | None = None,
+        options_on: bool = False,
+    ) -> str:
         """A token-bounded 'Today so far' block for the decision prompt.
 
         Aggregates per-symbol so the block stays short even on a busy day;
-        sorts by total approved $ desc; caps at 15 lines."""
+        sorts by total approved $ desc; caps at 15 lines. `options_on` adds a
+        call-candidate tag to rejections from the EQUITY-only gates
+        (overextension / earnings blackout) — without it the model reads
+        "Overextended: rejected" as the THESIS being rejected and never pivots
+        to the defined-risk option vehicle those gates deliberately exempt."""
         recs = self.today(when)
         if not recs:
             return ""
@@ -202,6 +209,25 @@ class DecisionJournal:
                 for sym, n in list(rejected_count.items())[:4]
             ]
             lines.append("Rejected today: " + ", ".join(rej_parts))
+            if options_on:
+                # These reason strings only ever come from the equity buy path
+                # (risk._evaluate_buy); evaluate_option has neither gate.
+                call_cands = sorted(
+                    sym for sym in rejected_count
+                    if rejected_reason.get(sym, "").startswith(
+                        ("Overextended", "Earnings in")
+                    )
+                )
+                if call_cands:
+                    lines.append(
+                        "Of those, " + ", ".join(call_cands[:6]) + " fell to "
+                        "EQUITY-only gates (overextension / earnings blackout) "
+                        "— option debits are exempt. If the bullish thesis "
+                        "still holds at high conviction, propose a capped-debit "
+                        "long_call/bull_call_spread instead (max loss = the "
+                        "premium, no stop to gap through; direction/DTE/"
+                        "liquidity gates still apply)."
+                    )
 
         if guard_vetoed:
             veto_parts = [

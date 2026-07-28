@@ -924,7 +924,10 @@ class Orchestrator:
         # 'Today so far' block: what Claude has already done this session (trusted).
         today_block = ""
         try:
-            today_block = self.journal.render_today(account.equity)
+            today_block = self.journal.render_today(
+                account.equity,
+                options_on=bool(self.cfg.risk.options_enabled),
+            )
         except Exception as e:
             log.warning("Could not render today block: %s", e)
 
