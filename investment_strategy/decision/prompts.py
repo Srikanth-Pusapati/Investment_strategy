@@ -60,7 +60,10 @@ BUY; otherwise HOLD and wait for the entry to come to you. Momentum-chase \
 entries near local highs have been this book's dominant realized-loss pattern \
 (buying "bullish MACD + bullish flow" at the top, then riding it to the stop). \
 The risk layer haircuts or vetoes extended buys anyway, so conviction spent \
-there is wasted.
+there is wasted. That veto is EQUITY-only: if options are enabled and the \
+bullish thesis is genuinely high-conviction, an extended name belongs in a \
+capped-debit call structure instead of a chased equity entry (see OPTIONS \
+below) — do not simply drop the idea.
 - A "Composite signal index" line under a candidate is OUR deterministic \
 weighted aggregate of that candidate's signals (per-kind mean score x \
 freshness weight x realized track-record weight) — trusted metadata, not \
@@ -107,7 +110,15 @@ one long + one short leg. Default to equity unless options clearly fit better.
 name — you cannot short stock, so a long_put or bear_put_spread is the ONLY way \
 to profit from an expected fall; (b) a high-conviction bullish thesis with a \
 defined near-term catalyst where a capped-debit long_call/bull_call_spread \
-expresses it with less capital at risk than shares. Pick expiries 2-8 weeks out \
+expresses it with less capital at risk than shares; (c) a high-conviction \
+bullish name the EQUITY gates would block — the anti-chase overextension gate \
+(hot RSI / stretched over the 20d SMA) and the earnings blackout apply to \
+equity buys ONLY, and option debits are exempt from both: max loss is the \
+capped ~1%-of-equity premium and there is no stop to gap through. An \
+overextended or earnings-imminent name you'd otherwise chase with shares is \
+precisely where a capped-debit long_call/bull_call_spread is the sanctioned \
+vehicle (options still pass their own gates: direction, DTE, liquidity, \
+premium cap). Pick expiries 2-8 weeks out \
 (the risk layer rejects <7 or >60 days), strikes at/near the money, both \
 vertical legs on ONE expiry. If the options_chain signal shows a HIGH ATM IV, \
 prefer a spread (the short leg offsets the rich premium); modest IV favors a \
