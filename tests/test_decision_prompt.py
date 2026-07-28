@@ -395,3 +395,69 @@ def test_trend_up_call_line_suppressed_in_riskoff_vol_spike():
     assert "long_put or bear_put_spread" in text
     assert "don't spend conviction on puts" not in text
     assert "CALL structures (long_call / bull_call_spread)" not in text
+
+
+# -- same-cycle option fallback (Jul 28) ------------------------------------- #
+
+_FALLBACK_CALL = (
+    '{"proposals": [{"symbol": "FIRY", "action": "buy", "instrument": "option", '
+    '"conviction": 0.65, "target_weight_pct": 0, "stop_loss_pct": null, '
+    '"take_profit_pct": null, "rationale": "call fallback", "key_signals": [], '
+    '"option_strategy": "long_call", "option_legs": [{"expiry": "2026-08-21", '
+    '"strike": 30, "right": "call", "side": "buy", "ratio": 1}], '
+    '"max_premium_usd": 5000}]}'
+)
+
+
+def _call_fallback(eng, payload, symbol="FIRY", **kwargs):
+    eng.client = MagicMock()
+    eng.client.messages.create.return_value = _mock_response(payload)
+    with patch.object(engine_mod, "record_usage"):
+        return eng.decide_option_fallback(
+            _bundle(symbol), _acct([]), 0.60,
+            "Overextended: RSI 73 and 3.4xATR above the 20d SMA", **kwargs,
+        )
+
+
+def test_option_fallback_returns_call_structure():
+    eng = _decide_engine(options_enabled=True)
+    p = _call_fallback(eng, _FALLBACK_CALL)
+    assert p is not None
+    assert p.symbol == "FIRY"
+    assert p.option_strategy.value == "long_call"
+
+
+def test_option_fallback_none_on_hold():
+    eng = _decide_engine(options_enabled=True)
+    hold = (
+        '{"proposals": [{"symbol": "FIRY", "action": "hold", "instrument": "equity", '
+        '"conviction": 0.5, "target_weight_pct": 0, "stop_loss_pct": null, '
+        '"take_profit_pct": null, "rationale": "not enough edge", "key_signals": [], '
+        '"option_strategy": null, "option_legs": [], "max_premium_usd": null}]}'
+    )
+    assert _call_fallback(eng, hold) is None
+
+
+def test_option_fallback_rejects_equity_and_put_pivots():
+    """The fallback is bullish-and-option-only: an equity re-propose would die
+    at the same gate, and a put contradicts the (bullish) rejected thesis."""
+    eng = _decide_engine(options_enabled=True)
+    equity = _FALLBACK_CALL.replace('"instrument": "option"', '"instrument": "equity"')
+    assert _call_fallback(eng, equity) is None
+    put = _FALLBACK_CALL.replace('"long_call"', '"long_put"').replace(
+        '"right": "call"', '"right": "put"')
+    assert _call_fallback(eng, put) is None
+
+
+def test_option_fallback_prompt_scoped_and_cache_reuses_stable_block():
+    eng = _decide_engine(options_enabled=True)
+    _call_fallback(eng, _FALLBACK_CALL, curated="SAME-CURATED")
+    fb_kwargs = eng.client.messages.create.call_args.kwargs
+    stable, dynamic = fb_kwargs["messages"][0]["content"]
+    assert stable["cache_control"] == {"type": "ephemeral", "ttl": "1h"}
+    assert "OPTION FALLBACK" in dynamic["text"]
+    assert "Overextended: RSI 73" in dynamic["text"]
+    assert "long_call or bull_call_spread" in dynamic["text"]
+    # Byte-identical stable block vs the main decide() call -> cache READ.
+    main_kwargs = _call_decide(eng, curated="SAME-CURATED")
+    assert stable["text"] == main_kwargs["messages"][0]["content"][0]["text"]

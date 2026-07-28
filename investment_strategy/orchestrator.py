@@ -116,6 +116,9 @@ class Orchestrator:
         # multiplier each cycle — they drive the option call/put direction gate.
         self._regime_trend = ""
         self._regime_label = ""
+        # Buys rejected at EQUITY-only gates this cycle, queued for the scoped
+        # same-cycle option fallback (reset each _execute_proposals pass).
+        self._option_fallbacks: list[tuple[TradeProposal, str]] = []
         if (
             cfg.risk.options_enabled
             and getattr(cfg.risk, "option_direction_gate", True)
@@ -988,7 +991,7 @@ class Orchestrator:
             proposals = kept_sells
         undeployed = self._execute_proposals(
             proposals, account, signal_kinds, tech_ctx=tech_ctx,
-            composites=composites,
+            composites=composites, bundles=bundles,
         )
         if undeployed >= 1.0:
             # Whole-share bracket flooring drops each buy's sub-share remainder
@@ -1666,6 +1669,7 @@ class Orchestrator:
         self, proposals, account, signal_kinds,
         tech_ctx: dict[str, dict] | None = None,
         composites: dict[str, float] | None = None,
+        bundles: list | None = None,
     ) -> float:
         """Execute the cycle's proposals, equity SELLs first. Returns the $
         dropped by whole-share flooring across the cycle's buys.
@@ -1678,6 +1682,7 @@ class Orchestrator:
         order the model listed them in. The budget split runs AFTER the sells
         for the same reason: on a full book, the rotation buy's deployable
         cash IS the freed capital."""
+        self._option_fallbacks = []
         if not proposals:
             log.info("No actionable proposals this cycle.")
             return 0.0
@@ -1715,7 +1720,43 @@ class Orchestrator:
                     tech=tech_ctx.get(proposal.symbol),
                     composite=composites.get(proposal.symbol),
                 )
+        self._run_option_fallbacks(account, signal_kinds, tech_ctx, bundles)
         return undeployed
+
+    def _run_option_fallbacks(
+        self, account, signal_kinds, tech_ctx: dict[str, dict],
+        bundles: list | None,
+    ) -> None:
+        """Consume the cycle's equity-gate rejections (overextension /
+        earnings blackout) as scoped option-fallback decisions — capped at 2
+        extra LLM calls per cycle, highest conviction first. Each approved
+        structure flows through the normal _handle_option path (premium cap,
+        direction/DTE/liquidity gates, journal, ledger)."""
+        queue, self._option_fallbacks = self._option_fallbacks, []
+        if not queue or self.options is None or not bundles:
+            return
+        if not self.broker.is_market_open():
+            return  # same reasoning as the post-LLM close fence
+        by_symbol = {b.symbol: b for b in bundles}
+        queue.sort(key=lambda pr: -pr[0].conviction)
+        for proposal, reason in queue[:2]:
+            bundle = by_symbol.get(proposal.symbol)
+            if bundle is None:
+                continue
+            self._stamp_liveness()
+            opt = self.engine.decide_option_fallback(
+                bundle, account, proposal.conviction, reason,
+                price=self.broker.latest_price(proposal.symbol),
+                regime_label=self._regime_label,
+                regime_reason="",
+                curated=self._curated_lessons(),
+            )
+            if opt is None:
+                continue
+            self._handle_option(
+                opt, account, signal_kinds.get(proposal.symbol, []),
+                tech=tech_ctx.get(proposal.symbol),
+            )
 
     # -- prompt-time buy-headroom / slate filtering (A2) --------------------- #
     def _buy_headroom_usd(self, symbol: str, account) -> tuple[float, str]:
@@ -2379,6 +2420,20 @@ class Orchestrator:
                 0.0,
                 decision.reason, proposal.rationale[:120] if proposal.rationale else "",
             )
+            # Same-cycle option fallback (Jul 28): a buy that died at an
+            # EQUITY-only gate (overextension / earnings blackout) is the
+            # sanctioned capped-debit call setup — evaluate_option exempts
+            # both gates. Queue it for a scoped follow-up decision AFTER the
+            # main proposal loop; next-cycle journal memory alone never
+            # converted (slate rotates, idea decays, model picks fresh names).
+            # Calls trade WITH the tape only, so skip in a down-trend market.
+            if (
+                is_buy
+                and self.options is not None
+                and self._regime_trend != "down"
+                and decision.reason.startswith(("Overextended", "Earnings in"))
+            ):
+                self._option_fallbacks.append((proposal, decision.reason))
             return 0.0
         dropped_notional = 0.0
         # Journaled dollars: sells keep the approved figure; buys are journaled

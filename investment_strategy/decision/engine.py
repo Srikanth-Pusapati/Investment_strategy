@@ -147,6 +147,107 @@ class DecisionEngine:
         text = next((b.text for b in resp.content if b.type == "text"), "")
         return self._parse(text)
 
+    def decide_option_fallback(
+        self, bundle: SignalBundle, account: AccountSnapshot,
+        prior_conviction: float, reject_reason: str,
+        price: float | None = None,
+        regime_label: str = "", regime_reason: str = "",
+        curated: str = "",
+    ) -> TradeProposal | None:
+        """Same-cycle single-symbol follow-up after an equity BUY died at an
+        EQUITY-only risk gate (overextension / earnings blackout) — the gates
+        evaluate_option deliberately exempts. The main-call prompt teaches this
+        pivot, but next-cycle memory rarely converts: the slate rotates, the
+        idea decays, and the model spends conviction on fresh unblocked names
+        instead. Asking WHILE the conviction is live is what converts.
+
+        Scoped hard: the model may return ONE capped-debit bullish call
+        structure for this symbol, or HOLD. Returns None on HOLD, decline,
+        parse failure, or API error (fail-quiet — the fallback is a bonus
+        path, never a cycle blocker). Reuses the cached stable block, so the
+        marginal cost is the small dynamic text + output."""
+        lines = [
+            "## OPTION FALLBACK — single-symbol follow-up (trusted)",
+            f"Earlier THIS cycle you proposed an equity BUY of {bundle.symbol} "
+            f"at conviction {prior_conviction:.2f}. The risk layer rejected it: "
+            f'"{reject_reason}"',
+            "That is an EQUITY-only gate; defined-risk option debits are "
+            "exempt (max loss is the capped premium, no stop to gap through). "
+            "Decide ONE of:",
+            "- A BUY with instrument=\"option\": exactly one capped-debit "
+            "bullish structure (long_call or bull_call_spread), expiry 2-8 "
+            "weeks out, strikes at/near the money"
+            + (f" (latest price ${price:,.2f})" if price else "")
+            + ", both legs on ONE expiry — ONLY if the bullish thesis "
+            "genuinely clears a high-conviction bar on the evidence below.",
+            "- action=\"hold\": if it does not. Chasing with a debit is still "
+            "chasing — premium spent on a topping name is risk, not safety. "
+            "A high ATM IV on the options_chain line favors the spread over "
+            "the single leg. Do NOT propose equity or puts here.",
+        ]
+        if regime_label:
+            lines.append(f"## Market regime: {regime_label}")
+            if regime_reason:
+                lines.append(regime_reason)
+        lines.append("<market_data>")
+        lines.append(f"### {bundle.symbol}")
+        for s in bundle.signals:
+            score = f" score={s.score:+.2f}" if s.score is not None else ""
+            lines.append(f"- [{s.kind.value}]{score} {self._safe(s.summary)[:240]}")
+        lines.append("</market_data>")
+        lines.append(
+            f"Return at most ONE proposal, for {bundle.symbol} only."
+        )
+        try:
+            resp = self.client.messages.create(
+                model=self.model,
+                max_tokens=8000,
+                thinking={"type": "adaptive"},
+                system=SYSTEM_PROMPT,
+                output_config={
+                    "effort": self.cfg.decision_effort,
+                    "format": {"type": "json_schema", "schema": PROPOSALS_SCHEMA},
+                },
+                messages=[{
+                    "role": "user",
+                    "content": [
+                        {
+                            # Byte-identical to decide()'s stable block -> this
+                            # call READS the cache the main call just wrote.
+                            "type": "text",
+                            "text": self._render_stable(curated),
+                            "cache_control": {"type": "ephemeral", "ttl": "1h"},
+                        },
+                        {"type": "text", "text": "\n".join(lines)},
+                    ],
+                }],
+            )
+        except anthropic.APIError as e:
+            log.warning("Option-fallback call for %s failed: %s", bundle.symbol, e)
+            return None
+        record_usage(resp, self.model, "option_fallback")
+        if resp.stop_reason in ("refusal", "max_tokens"):
+            log.warning(
+                "Option-fallback for %s unusable (stop_reason=%s).",
+                bundle.symbol, resp.stop_reason,
+            )
+            return None
+        text = next((b.text for b in resp.content if b.type == "text"), "")
+        for p in self._parse(text):
+            if (
+                p.symbol == bundle.symbol
+                and p.action.value == "buy"
+                and getattr(p.instrument, "value", str(p.instrument)) == "option"
+                and p.option_strategy is not None
+                and p.option_strategy.value in ("long_call", "bull_call_spread")
+            ):
+                return p
+        log.info(
+            "Option fallback for %s: model declined (HOLD) — conviction did "
+            "not clear the bar as an option either.", bundle.symbol,
+        )
+        return None
+
     # -- prompt rendering --------------------------------------------------- #
     def _render_stable(self, curated: str = "") -> str:
         """The cache-eligible prefix: content that's byte-identical across a
