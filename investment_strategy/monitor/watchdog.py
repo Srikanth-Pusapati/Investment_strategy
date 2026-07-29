@@ -117,6 +117,7 @@ class Watchdog:
                 trail_ok = True
 
         live = {p.symbol for p in equities}
+        core_etf = getattr(self.cfg, "core_etf", "")
         for pos in equities:
             # Hard stop/take first — fractional positions have no exchange bracket,
             # so this loop is their ONLY hard-exit enforcement.
@@ -126,7 +127,21 @@ class Watchdog:
             # stalled position isn't held indefinitely (1B.4).
             if self._enforce_time_stop(pos):
                 continue
-            if trail_ok:
+            # The core ETF is exempt from the trailing stop for the same reason
+            # it's exempt from the time-stop: it's a permanent diversified
+            # allocation, not a thesis trade. A +5% run followed by an ordinary
+            # 5% giveback would otherwise dump the ENTIRE core in one close
+            # (Jul 29 audit: high_water QQQ=0.96 showed the trail live on it).
+            # Its protection is the GTC core stop, the equity floor, the daily-
+            # loss flatten, and the falling-tape core-defense trim. The
+            # exemption requires the GTC stop to actually be configured
+            # (CORE_STOP_PCT > 0) — with it off, the trail stays the core's
+            # only position-level guard and must keep running.
+            core_exempt = (
+                core_etf and pos.symbol == core_etf
+                and getattr(self.cfg, "core_stop_pct", 0.0) > 0
+            )
+            if trail_ok and not core_exempt:
                 self._update_trailing_stop(pos)
         self._retry_pending_decision_sells({p.symbol: p for p in equities})
         self._check_option_positions(option_rows)
@@ -136,8 +151,19 @@ class Watchdog:
         # backfill NOW instead of waiting for the next hourly decision cycle
         # (SOFI 2026-07-16: broker stop filled, ledger/cooldown blind ~1h).
         vanished = False
-        for sym in set(self.state.high_water) | set(self.state.exits):
-            if sym not in live:
+        # Key the sweep on EVERY per-symbol tracking map, not just high_water/
+        # exits: a position that entered and crashed inside one watchdog tick
+        # has entry_times/stop_widths but no high-water mark yet, and would
+        # stay stranded forever. Symbols with an order still pending (a buy
+        # submitted seconds ago that hasn't filled into a position row) are
+        # skipped — wiping their fresh clocks would reset the hold age.
+        pending_syms = {sym for _oid, sym in self.state.get_pending_orders()}
+        tracked = (
+            set(self.state.high_water) | set(self.state.exits)
+            | set(self.state.entry_times) | set(self.state.stop_widths)
+        )
+        for sym in tracked:
+            if sym not in live and sym not in pending_syms:
                 self.state.forget_symbol(sym)
                 vanished = True
         if vanished and self._on_exchange_exit is not None:
@@ -756,7 +782,9 @@ class Watchdog:
     ) -> None:
         """Best-effort bookkeeping for an option close — mirrors _record_exit."""
         try:
-            self.state.register_exit(under)  # re-entry cooldown on the NAME
+            # Re-entry cooldown + loss streak on the NAME (an option trip that
+            # burned premium counts against the same underlying's record).
+            self.state.register_exit(under, pl_pct=pl_pct)
         except Exception as e:
             log.warning("Exit-clock stamp failed for %s: %s", under, e)
         if self.ledger is None:
@@ -809,9 +837,14 @@ class Watchdog:
         real context instead of the generic "watchdog {reason}" label."""
         # Start the re-entry cooldown clock (churn guard). A scale-out is only a
         # partial exit, but stamping it is harmless: the cooldown applies only
-        # when the symbol is no longer held.
+        # when the symbol is no longer held. The exit mark feeds the price-aware
+        # re-entry guard; the P&L feeds the loss-streak scorecard (scale-outs
+        # are winners by construction, so they only ever CLEAR a streak).
         try:
-            self.state.register_exit(pos.symbol)
+            self.state.register_exit(
+                pos.symbol, price=pos.current_price or None,
+                pl_pct=pos.unrealized_pl_pct,
+            )
         except Exception as e:
             log.warning("Exit-clock stamp failed for %s: %s", pos.symbol, e)
         if self.ledger is None:

@@ -51,6 +51,8 @@ class DecisionEngine:
         regime_label: str = "", regime_reason: str = "",
         regime_trend: str = "",
         curated: str = "",
+        hedge_symbol: str = "", hedge_price: float | None = None,
+        hedge_reason: str = "",
     ) -> list[TradeProposal]:
         """Ask Claude for proposals across all candidate symbols at once.
 
@@ -73,6 +75,10 @@ class DecisionEngine:
         `composites` (symbol -> score) is OUR deterministic weighted signal
         index (score x freshness-lag x realized track record) — a numeric
         prior the model's conviction should not wildly contradict unstated.
+        `hedge_symbol`/`hedge_price`/`hedge_reason` (set only when the
+        deterministic falling-market read fired and options are on) sanction
+        ONE defined-risk index put so the book can PROFIT from a decline
+        instead of only bleeding through it.
         """
         if not bundles:
             return []
@@ -87,6 +93,8 @@ class DecisionEngine:
             composites=composites or {},
             regime_label=regime_label, regime_reason=regime_reason,
             regime_trend=regime_trend,
+            hedge_symbol=hedge_symbol, hedge_price=hedge_price,
+            hedge_reason=hedge_reason,
         )
         try:
             resp = self.client.messages.create(
@@ -147,6 +155,107 @@ class DecisionEngine:
         text = next((b.text for b in resp.content if b.type == "text"), "")
         return self._parse(text)
 
+    def decide_option_fallback(
+        self, bundle: SignalBundle, account: AccountSnapshot,
+        prior_conviction: float, reject_reason: str,
+        price: float | None = None,
+        regime_label: str = "", regime_reason: str = "",
+        curated: str = "",
+    ) -> TradeProposal | None:
+        """Same-cycle single-symbol follow-up after an equity BUY died at an
+        EQUITY-only risk gate (overextension / earnings blackout) — the gates
+        evaluate_option deliberately exempts. The main-call prompt teaches this
+        pivot, but next-cycle memory rarely converts: the slate rotates, the
+        idea decays, and the model spends conviction on fresh unblocked names
+        instead. Asking WHILE the conviction is live is what converts.
+
+        Scoped hard: the model may return ONE capped-debit bullish call
+        structure for this symbol, or HOLD. Returns None on HOLD, decline,
+        parse failure, or API error (fail-quiet — the fallback is a bonus
+        path, never a cycle blocker). Reuses the cached stable block, so the
+        marginal cost is the small dynamic text + output."""
+        lines = [
+            "## OPTION FALLBACK — single-symbol follow-up (trusted)",
+            f"Earlier THIS cycle you proposed an equity BUY of {bundle.symbol} "
+            f"at conviction {prior_conviction:.2f}. The risk layer rejected it: "
+            f'"{reject_reason}"',
+            "That is an EQUITY-only gate; defined-risk option debits are "
+            "exempt (max loss is the capped premium, no stop to gap through). "
+            "Decide ONE of:",
+            "- A BUY with instrument=\"option\": exactly one capped-debit "
+            "bullish structure (long_call or bull_call_spread), expiry 2-8 "
+            "weeks out, strikes at/near the money"
+            + (f" (latest price ${price:,.2f})" if price else "")
+            + ", both legs on ONE expiry — ONLY if the bullish thesis "
+            "genuinely clears a high-conviction bar on the evidence below.",
+            "- action=\"hold\": if it does not. Chasing with a debit is still "
+            "chasing — premium spent on a topping name is risk, not safety. "
+            "A high ATM IV on the options_chain line favors the spread over "
+            "the single leg. Do NOT propose equity or puts here.",
+        ]
+        if regime_label:
+            lines.append(f"## Market regime: {regime_label}")
+            if regime_reason:
+                lines.append(regime_reason)
+        lines.append("<market_data>")
+        lines.append(f"### {bundle.symbol}")
+        for s in bundle.signals:
+            score = f" score={s.score:+.2f}" if s.score is not None else ""
+            lines.append(f"- [{s.kind.value}]{score} {self._safe(s.summary)[:240]}")
+        lines.append("</market_data>")
+        lines.append(
+            f"Return at most ONE proposal, for {bundle.symbol} only."
+        )
+        try:
+            resp = self.client.messages.create(
+                model=self.model,
+                max_tokens=8000,
+                thinking={"type": "adaptive"},
+                system=SYSTEM_PROMPT,
+                output_config={
+                    "effort": self.cfg.decision_effort,
+                    "format": {"type": "json_schema", "schema": PROPOSALS_SCHEMA},
+                },
+                messages=[{
+                    "role": "user",
+                    "content": [
+                        {
+                            # Byte-identical to decide()'s stable block -> this
+                            # call READS the cache the main call just wrote.
+                            "type": "text",
+                            "text": self._render_stable(curated),
+                            "cache_control": {"type": "ephemeral", "ttl": "1h"},
+                        },
+                        {"type": "text", "text": "\n".join(lines)},
+                    ],
+                }],
+            )
+        except anthropic.APIError as e:
+            log.warning("Option-fallback call for %s failed: %s", bundle.symbol, e)
+            return None
+        record_usage(resp, self.model, "option_fallback")
+        if resp.stop_reason in ("refusal", "max_tokens"):
+            log.warning(
+                "Option-fallback for %s unusable (stop_reason=%s).",
+                bundle.symbol, resp.stop_reason,
+            )
+            return None
+        text = next((b.text for b in resp.content if b.type == "text"), "")
+        for p in self._parse(text):
+            if (
+                p.symbol == bundle.symbol
+                and p.action.value == "buy"
+                and getattr(p.instrument, "value", str(p.instrument)) == "option"
+                and p.option_strategy is not None
+                and p.option_strategy.value in ("long_call", "bull_call_spread")
+            ):
+                return p
+        log.info(
+            "Option fallback for %s: model declined (HOLD) — conviction did "
+            "not clear the bar as an option either.", bundle.symbol,
+        )
+        return None
+
     # -- prompt rendering --------------------------------------------------- #
     def _render_stable(self, curated: str = "") -> str:
         """The cache-eligible prefix: content that's byte-identical across a
@@ -202,6 +311,8 @@ class DecisionEngine:
         composites: dict[str, float] | None = None,
         regime_label: str = "", regime_reason: str = "",
         regime_trend: str = "",
+        hedge_symbol: str = "", hedge_price: float | None = None,
+        hedge_reason: str = "",
     ) -> str:
         # Our own derived data (track-record, today-so-far, exclusions) sits
         # OUTSIDE <market_data> — it's trusted guidance, not third-party text.
@@ -326,6 +437,38 @@ class DecisionEngine:
                 "the ONLY way to make money as the market falls. Keep it defined-risk "
                 "and within the options premium budget. If NO slate name has a "
                 "genuinely bearish, corroborated setup, don't force one.",
+                "",
+            ]
+        # Falling-market INDEX hedge (Jul 29): the risk-off mandate above needs
+        # the slow 200dma/VIX regime to fully flip, and it only targets single
+        # names. This block fires on the FAST falling read (intraday benchmark
+        # drop / long-run downtrend) and sanctions ONE defined-risk put on the
+        # INDEX itself — the direct way to profit from a market-wide fall and
+        # insure the core (which this account holds, so the direction gate
+        # reads it as a hedge, not counter-trend speculation).
+        if (
+            hedge_symbol
+            and r is not None
+            and getattr(r, "options_enabled", False)
+        ):
+            lines.append(
+                f"## MARKET FALLING — a defined-risk INDEX PUT on "
+                f"{hedge_symbol} is sanctioned"
+            )
+            if hedge_reason:
+                lines.append(f"Deterministic read: {hedge_reason}.")
+            lines += [
+                f"You MAY propose ONE long_put or bear_put_spread on "
+                f"{hedge_symbol}"
+                + (f" (latest price ${hedge_price:,.2f})" if hedge_price else "")
+                + ", expiry 2-8 weeks out, strikes at/near the money, within "
+                "the options premium budget. It PROFITS from a continued "
+                "decline and insures the index core this account holds. "
+                "Propose it when the decline shows continuation risk "
+                "(follow-through, vol term structure, breadth of the move); "
+                "SKIP it when today's drop reads as ordinary noise — an index "
+                "put bought on every red day just bleeds premium. High ATM IV "
+                "favors the spread over the single leg.",
                 "",
             ]
         # All third-party text lives inside <market_data> so the system prompt can
@@ -470,6 +613,21 @@ class DecisionEngine:
             out.append(
                 f"- One options play risks at most {pct(r.max_option_premium_pct)} of "
                 "equity as net debit."
+            )
+        if getattr(r, "options_enabled", False) and (
+            getattr(r, "max_option_spread_pct", 0)
+            or getattr(r, "min_option_open_interest", 0)
+        ):
+            # Jul 29: F's spread died at this gate and the model could not
+            # know why — the cap was enforced but never stated, so conviction
+            # kept flowing into un-executable strikes.
+            out.append(
+                f"- Every option LEG must be liquid: open interest ≥ "
+                f"{getattr(r, 'min_option_open_interest', 0):g} and bid-ask "
+                f"spread ≤ {getattr(r, 'max_option_spread_pct', 0):g}% of mid. "
+                "Prefer high-OI, near-the-money strikes at round-number "
+                "levels; a thin or wide-spread leg is auto-rejected however "
+                "good the thesis."
             )
         if not out:
             return []

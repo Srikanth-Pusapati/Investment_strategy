@@ -50,6 +50,15 @@ class TechnicalProvider(SignalProvider):
             # far price sits above its 20d mean, in % and in ATR multiples.
             ext_pct = ((price / sma20 - 1.0) * 100.0) if sma20 else None
             ext_atr = ((price - sma20) / atr) if (sma20 and atr) else None
+            # Gap-day inputs (Jul 29 VRRM): the prior daily close, and the ATR
+            # computed WITHOUT today's (possibly partial, possibly gapping)
+            # bar — a +28% gap bar inflates its own ATR denominator ~41% and
+            # deflates the extension read below the extreme-block threshold.
+            prev_close = closes[-2] if len(closes) >= 2 else None
+            atr_prior = self._atr(highs[:-1], lows[:-1], closes[:-1], 14)
+            ext_atr_prior = (
+                ((price - sma20) / atr_prior) if (sma20 and atr_prior) else None
+            )
 
             score = self._score(rsi, hist_val, price, sma50, sma200)
             summary = self._summary(rsi, macd, macd_signal, price, sma50, sma200)
@@ -72,6 +81,10 @@ class TechnicalProvider(SignalProvider):
                     "atr14": round(atr, 3) if atr else None,
                     "ext_pct_sma20": round(ext_pct, 2) if ext_pct is not None else None,
                     "ext_atr": round(ext_atr, 2) if ext_atr is not None else None,
+                    "prev_close": round(prev_close, 2) if prev_close else None,
+                    "ext_atr_prior": (
+                        round(ext_atr_prior, 2) if ext_atr_prior is not None else None
+                    ),
                 },
             ))
         return signals

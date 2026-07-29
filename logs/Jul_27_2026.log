@@ -1,0 +1,729 @@
+2026-07-27 00:05:28,459 ERROR orchestrator | Watchdog tick failed; continuing.
+Traceback (most recent call last):
+  File "/Users/spusapati/Personal/Investment_stratergy/investment_strategy/orchestrator.py", line 293, in _watchdog_loop
+    self.watchdog.check_once()
+    ~~~~~~~~~~~~~~~~~~~~~~~~^^
+  File "/Users/spusapati/Personal/Investment_stratergy/investment_strategy/monitor/watchdog.py", line 87, in check_once
+    account = self.broker.get_account()
+  File "/Users/spusapati/Personal/Investment_stratergy/investment_strategy/execution/alpaca_client.py", line 162, in get_account
+    snap = self._read_account_once()
+  File "/Users/spusapati/Personal/Investment_stratergy/investment_strategy/execution/alpaca_client.py", line 199, in _read_account_once
+    a = _retry_read(self.trading.get_account, what="get_account")
+  File "/Users/spusapati/Personal/Investment_stratergy/investment_strategy/execution/alpaca_client.py", line 117, in _retry_read
+    return fn()
+  File "/Users/spusapati/Personal/Investment_stratergy/.venv/lib/python3.13/site-packages/alpaca/trading/client.py", line 479, in get_account
+    return TradeAccount(**response)
+  File "/Users/spusapati/Personal/Investment_stratergy/.venv/lib/python3.13/site-packages/pydantic/main.py", line 263, in __init__
+    validated_self = self.__pydantic_validator__.validate_python(data, self_instance=self)
+pydantic_core._pydantic_core.ValidationError: 1 validation error for TradeAccount
+status
+  Input should be 'ACCOUNT_CLOSED', 'ACCOUNT_UPDATED', 'ACTION_REQUIRED', 'ACTIVE', 'AML_REVIEW', 'APPROVAL_PENDING', 'APPROVED', 'DISABLED', 'DISABLE_PENDING', 'EDITED', 'INACTIVE', 'KYC_SUBMITTED', 'LIMITED', 'ONBOARDING', 'PAPER_ONLY', 'REAPPROVAL_PENDING', 'REJECTED', 'RESUBMITTED', 'SIGNED_UP', 'SUBMISSION_FAILED' or 'SUBMITTED' [type=enum, input_value='ACCOUNT_CLOSED_PENDING', input_type=str]
+    For further information visit https://errors.pydantic.dev/2.13/v/enum
+2026-07-27 00:05:58,974 ERROR orchestrator | Watchdog tick failed; continuing.
+Traceback (most recent call last):
+  File "/Users/spusapati/Personal/Investment_stratergy/investment_strategy/orchestrator.py", line 293, in _watchdog_loop
+    self.watchdog.check_once()
+    ~~~~~~~~~~~~~~~~~~~~~~~~^^
+  File "/Users/spusapati/Personal/Investment_stratergy/investment_strategy/monitor/watchdog.py", line 87, in check_once
+    account = self.broker.get_account()
+  File "/Users/spusapati/Personal/Investment_stratergy/investment_strategy/execution/alpaca_client.py", line 162, in get_account
+    snap = self._read_account_once()
+  File "/Users/spusapati/Personal/Investment_stratergy/investment_strategy/execution/alpaca_client.py", line 199, in _read_account_once
+    a = _retry_read(self.trading.get_account, what="get_account")
+  File "/Users/spusapati/Personal/Investment_stratergy/investment_strategy/execution/alpaca_client.py", line 117, in _retry_read
+    return fn()
+  File "/Users/spusapati/Personal/Investment_stratergy/.venv/lib/python3.13/site-packages/alpaca/trading/client.py", line 479, in get_account
+    return TradeAccount(**response)
+  File "/Users/spusapati/Personal/Investment_stratergy/.venv/lib/python3.13/site-packages/pydantic/main.py", line 263, in __init__
+    validated_self = self.__pydantic_validator__.validate_python(data, self_instance=self)
+pydantic_core._pydantic_core.ValidationError: 1 validation error for TradeAccount
+status
+  Input should be 'ACCOUNT_CLOSED', 'ACCOUNT_UPDATED', 'ACTION_REQUIRED', 'ACTIVE', 'AML_REVIEW', 'APPROVAL_PENDING', 'APPROVED', 'DISABLED', 'DISABLE_PENDING', 'EDITED', 'INACTIVE', 'KYC_SUBMITTED', 'LIMITED', 'ONBOARDING', 'PAPER_ONLY', 'REAPPROVAL_PENDING', 'REJECTED', 'RESUBMITTED', 'SIGNED_UP', 'SUBMISSION_FAILED' or 'SUBMITTED' [type=enum, input_value='ACCOUNT_CLOSED_PENDING', input_type=str]
+    For further information visit https://errors.pydantic.dev/2.13/v/enum
+2026-07-27 00:06:29,203 ERROR orchestrator | Watchdog tick failed; continuing.
+Traceback (most recent call last):
+  File "/Users/spusapati/Personal/Investment_stratergy/investment_strategy/orchestrator.py", line 293, in _watchdog_loop
+    self.watchdog.check_once()
+    ~~~~~~~~~~~~~~~~~~~~~~~~^^
+  File "/Users/spusapati/Personal/Investment_stratergy/investment_strategy/monitor/watchdog.py", line 87, in check_once
+    account = self.broker.get_account()
+  File "/Users/spusapati/Personal/Investment_stratergy/investment_strategy/execution/alpaca_client.py", line 162, in get_account
+    snap = self._read_account_once()
+  File "/Users/spusapati/Personal/Investment_stratergy/investment_strategy/execution/alpaca_client.py", line 199, in _read_account_once
+    a = _retry_read(self.trading.get_account, what="get_account")
+  File "/Users/spusapati/Personal/Investment_stratergy/investment_strategy/execution/alpaca_client.py", line 117, in _retry_read
+    return fn()
+  File "/Users/spusapati/Personal/Investment_stratergy/.venv/lib/python3.13/site-packages/alpaca/trading/client.py", line 479, in get_account
+    return TradeAccount(**response)
+  File "/Users/spusapati/Personal/Investment_stratergy/.venv/lib/python3.13/site-packages/pydantic/main.py", line 263, in __init__
+    validated_self = self.__pydantic_validator__.validate_python(data, self_instance=self)
+pydantic_core._pydantic_core.ValidationError: 1 validation error for TradeAccount
+status
+  Input should be 'ACCOUNT_CLOSED', 'ACCOUNT_UPDATED', 'ACTION_REQUIRED', 'ACTIVE', 'AML_REVIEW', 'APPROVAL_PENDING', 'APPROVED', 'DISABLED', 'DISABLE_PENDING', 'EDITED', 'INACTIVE', 'KYC_SUBMITTED', 'LIMITED', 'ONBOARDING', 'PAPER_ONLY', 'REAPPROVAL_PENDING', 'REJECTED', 'RESUBMITTED', 'SIGNED_UP', 'SUBMISSION_FAILED' or 'SUBMITTED' [type=enum, input_value='ACCOUNT_CLOSED_PENDING', input_type=str]
+    For further information visit https://errors.pydantic.dev/2.13/v/enum
+2026-07-27 00:06:59,348 ERROR orchestrator | Watchdog tick failed; continuing.
+Traceback (most recent call last):
+  File "/Users/spusapati/Personal/Investment_stratergy/investment_strategy/orchestrator.py", line 293, in _watchdog_loop
+    self.watchdog.check_once()
+    ~~~~~~~~~~~~~~~~~~~~~~~~^^
+  File "/Users/spusapati/Personal/Investment_stratergy/investment_strategy/monitor/watchdog.py", line 87, in check_once
+    account = self.broker.get_account()
+  File "/Users/spusapati/Personal/Investment_stratergy/investment_strategy/execution/alpaca_client.py", line 162, in get_account
+    snap = self._read_account_once()
+  File "/Users/spusapati/Personal/Investment_stratergy/investment_strategy/execution/alpaca_client.py", line 199, in _read_account_once
+    a = _retry_read(self.trading.get_account, what="get_account")
+  File "/Users/spusapati/Personal/Investment_stratergy/investment_strategy/execution/alpaca_client.py", line 117, in _retry_read
+    return fn()
+  File "/Users/spusapati/Personal/Investment_stratergy/.venv/lib/python3.13/site-packages/alpaca/trading/client.py", line 479, in get_account
+    return TradeAccount(**response)
+  File "/Users/spusapati/Personal/Investment_stratergy/.venv/lib/python3.13/site-packages/pydantic/main.py", line 263, in __init__
+    validated_self = self.__pydantic_validator__.validate_python(data, self_instance=self)
+pydantic_core._pydantic_core.ValidationError: 1 validation error for TradeAccount
+status
+  Input should be 'ACCOUNT_CLOSED', 'ACCOUNT_UPDATED', 'ACTION_REQUIRED', 'ACTIVE', 'AML_REVIEW', 'APPROVAL_PENDING', 'APPROVED', 'DISABLED', 'DISABLE_PENDING', 'EDITED', 'INACTIVE', 'KYC_SUBMITTED', 'LIMITED', 'ONBOARDING', 'PAPER_ONLY', 'REAPPROVAL_PENDING', 'REJECTED', 'RESUBMITTED', 'SIGNED_UP', 'SUBMISSION_FAILED' or 'SUBMITTED' [type=enum, input_value='ACCOUNT_CLOSED_PENDING', input_type=str]
+    For further information visit https://errors.pydantic.dev/2.13/v/enum
+2026-07-27 00:07:29,534 ERROR orchestrator | Watchdog tick failed; continuing.
+Traceback (most recent call last):
+  File "/Users/spusapati/Personal/Investment_stratergy/investment_strategy/orchestrator.py", line 293, in _watchdog_loop
+    self.watchdog.check_once()
+    ~~~~~~~~~~~~~~~~~~~~~~~~^^
+  File "/Users/spusapati/Personal/Investment_stratergy/investment_strategy/monitor/watchdog.py", line 87, in check_once
+    account = self.broker.get_account()
+  File "/Users/spusapati/Personal/Investment_stratergy/investment_strategy/execution/alpaca_client.py", line 162, in get_account
+    snap = self._read_account_once()
+  File "/Users/spusapati/Personal/Investment_stratergy/investment_strategy/execution/alpaca_client.py", line 199, in _read_account_once
+    a = _retry_read(self.trading.get_account, what="get_account")
+  File "/Users/spusapati/Personal/Investment_stratergy/investment_strategy/execution/alpaca_client.py", line 117, in _retry_read
+    return fn()
+  File "/Users/spusapati/Personal/Investment_stratergy/.venv/lib/python3.13/site-packages/alpaca/trading/client.py", line 479, in get_account
+    return TradeAccount(**response)
+  File "/Users/spusapati/Personal/Investment_stratergy/.venv/lib/python3.13/site-packages/pydantic/main.py", line 263, in __init__
+    validated_self = self.__pydantic_validator__.validate_python(data, self_instance=self)
+pydantic_core._pydantic_core.ValidationError: 1 validation error for TradeAccount
+status
+  Input should be 'ACCOUNT_CLOSED', 'ACCOUNT_UPDATED', 'ACTION_REQUIRED', 'ACTIVE', 'AML_REVIEW', 'APPROVAL_PENDING', 'APPROVED', 'DISABLED', 'DISABLE_PENDING', 'EDITED', 'INACTIVE', 'KYC_SUBMITTED', 'LIMITED', 'ONBOARDING', 'PAPER_ONLY', 'REAPPROVAL_PENDING', 'REJECTED', 'RESUBMITTED', 'SIGNED_UP', 'SUBMISSION_FAILED' or 'SUBMITTED' [type=enum, input_value='ACCOUNT_CLOSED_PENDING', input_type=str]
+    For further information visit https://errors.pydantic.dev/2.13/v/enum
+2026-07-27 00:07:59,655 ERROR orchestrator | Watchdog tick failed; continuing.
+Traceback (most recent call last):
+  File "/Users/spusapati/Personal/Investment_stratergy/investment_strategy/orchestrator.py", line 293, in _watchdog_loop
+    self.watchdog.check_once()
+    ~~~~~~~~~~~~~~~~~~~~~~~~^^
+  File "/Users/spusapati/Personal/Investment_stratergy/investment_strategy/monitor/watchdog.py", line 87, in check_once
+    account = self.broker.get_account()
+  File "/Users/spusapati/Personal/Investment_stratergy/investment_strategy/execution/alpaca_client.py", line 162, in get_account
+    snap = self._read_account_once()
+  File "/Users/spusapati/Personal/Investment_stratergy/investment_strategy/execution/alpaca_client.py", line 199, in _read_account_once
+    a = _retry_read(self.trading.get_account, what="get_account")
+  File "/Users/spusapati/Personal/Investment_stratergy/investment_strategy/execution/alpaca_client.py", line 117, in _retry_read
+    return fn()
+  File "/Users/spusapati/Personal/Investment_stratergy/.venv/lib/python3.13/site-packages/alpaca/trading/client.py", line 479, in get_account
+    return TradeAccount(**response)
+  File "/Users/spusapati/Personal/Investment_stratergy/.venv/lib/python3.13/site-packages/pydantic/main.py", line 263, in __init__
+    validated_self = self.__pydantic_validator__.validate_python(data, self_instance=self)
+pydantic_core._pydantic_core.ValidationError: 1 validation error for TradeAccount
+status
+  Input should be 'ACCOUNT_CLOSED', 'ACCOUNT_UPDATED', 'ACTION_REQUIRED', 'ACTIVE', 'AML_REVIEW', 'APPROVAL_PENDING', 'APPROVED', 'DISABLED', 'DISABLE_PENDING', 'EDITED', 'INACTIVE', 'KYC_SUBMITTED', 'LIMITED', 'ONBOARDING', 'PAPER_ONLY', 'REAPPROVAL_PENDING', 'REJECTED', 'RESUBMITTED', 'SIGNED_UP', 'SUBMISSION_FAILED' or 'SUBMITTED' [type=enum, input_value='ACCOUNT_CLOSED_PENDING', input_type=str]
+    For further information visit https://errors.pydantic.dev/2.13/v/enum
+2026-07-27 00:08:29,840 ERROR orchestrator | Watchdog tick failed; continuing.
+Traceback (most recent call last):
+  File "/Users/spusapati/Personal/Investment_stratergy/investment_strategy/orchestrator.py", line 293, in _watchdog_loop
+    self.watchdog.check_once()
+    ~~~~~~~~~~~~~~~~~~~~~~~~^^
+  File "/Users/spusapati/Personal/Investment_stratergy/investment_strategy/monitor/watchdog.py", line 87, in check_once
+    account = self.broker.get_account()
+  File "/Users/spusapati/Personal/Investment_stratergy/investment_strategy/execution/alpaca_client.py", line 162, in get_account
+    snap = self._read_account_once()
+  File "/Users/spusapati/Personal/Investment_stratergy/investment_strategy/execution/alpaca_client.py", line 199, in _read_account_once
+    a = _retry_read(self.trading.get_account, what="get_account")
+  File "/Users/spusapati/Personal/Investment_stratergy/investment_strategy/execution/alpaca_client.py", line 117, in _retry_read
+    return fn()
+  File "/Users/spusapati/Personal/Investment_stratergy/.venv/lib/python3.13/site-packages/alpaca/trading/client.py", line 479, in get_account
+    return TradeAccount(**response)
+  File "/Users/spusapati/Personal/Investment_stratergy/.venv/lib/python3.13/site-packages/pydantic/main.py", line 263, in __init__
+    validated_self = self.__pydantic_validator__.validate_python(data, self_instance=self)
+pydantic_core._pydantic_core.ValidationError: 1 validation error for TradeAccount
+status
+  Input should be 'ACCOUNT_CLOSED', 'ACCOUNT_UPDATED', 'ACTION_REQUIRED', 'ACTIVE', 'AML_REVIEW', 'APPROVAL_PENDING', 'APPROVED', 'DISABLED', 'DISABLE_PENDING', 'EDITED', 'INACTIVE', 'KYC_SUBMITTED', 'LIMITED', 'ONBOARDING', 'PAPER_ONLY', 'REAPPROVAL_PENDING', 'REJECTED', 'RESUBMITTED', 'SIGNED_UP', 'SUBMISSION_FAILED' or 'SUBMITTED' [type=enum, input_value='ACCOUNT_CLOSED_PENDING', input_type=str]
+    For further information visit https://errors.pydantic.dev/2.13/v/enum
+2026-07-27 00:08:57,918 INFO alpaca | Alpaca client ready (mode=paper).
+2026-07-27 00:08:58,299 INFO orchestrator | Discovery-driven mode: trading scanner-found names + holdings.
+2026-07-27 00:08:58,301 INFO orchestrator | Starting orchestrator (paper). Kill switch: off. Options: on. Benchmark: QQQ.
+2026-07-27 00:08:58,620 INFO orchestrator | Market closed; skipping decision cycle.
+2026-07-27 00:08:58,678 INFO alpaca | Alpaca client ready (mode=paper).
+2026-07-27 00:08:58,931 INFO dashboard | Wrote dashboard with 0 trades -> dashboard.html
+2026-07-27 01:01:08,372 INFO orchestrator | Market closed; skipping decision cycle.
+2026-07-27 01:14:21,510 INFO alpaca | Alpaca client ready (mode=paper).
+2026-07-27 01:14:21,762 INFO orchestrator | Discovery-driven mode: trading scanner-found names + holdings.
+2026-07-27 01:14:21,763 INFO orchestrator | Starting orchestrator (paper). Kill switch: off. Options: on. Benchmark: QQQ.
+2026-07-27 01:14:22,094 INFO orchestrator | Market closed; skipping decision cycle.
+2026-07-27 01:14:22,161 INFO alpaca | Alpaca client ready (mode=paper).
+2026-07-27 01:14:22,541 INFO dashboard | Wrote dashboard with 0 trades -> dashboard.html
+2026-07-27 02:06:39,507 INFO orchestrator | Market closed; skipping decision cycle.
+2026-07-27 02:58:52,863 INFO orchestrator | Market closed; skipping decision cycle.
+2026-07-27 03:51:07,943 INFO orchestrator | Market closed; skipping decision cycle.
+2026-07-27 04:43:22,032 INFO orchestrator | Market closed; skipping decision cycle.
+2026-07-27 05:35:35,128 INFO orchestrator | Market closed; skipping decision cycle.
+2026-07-27 06:27:48,713 INFO orchestrator | Market closed; skipping decision cycle.
+2026-07-27 07:20:02,233 INFO orchestrator | Market closed; skipping decision cycle.
+2026-07-27 08:12:15,271 INFO orchestrator | Market closed; skipping decision cycle.
+2026-07-27 08:30:21,782 INFO orchestrator | Market regime: SPY above 200dma (745 vs 696), VIX 18, VIX3M 21 (contango) -> risk-on, size x1.00.
+2026-07-27 08:30:22,587 INFO quiver | Quiver live/congresstrading -> 1000 row(s).
+2026-07-27 08:30:22,815 INFO screener | EDGAR Form-4 feed -> 61 filing(s) (scanning up to 100).
+2026-07-27 08:30:47,840 INFO screener | Options-flow most-actives pool -> 40 name(s).
+2026-07-27 08:31:10,289 INFO screener | Robinhood 'Daily movers' -> 20 name(s).
+2026-07-27 08:31:11,651 INFO screener | Robinhood '100 most popular' -> 100 name(s).
+2026-07-27 08:31:12,470 INFO screener | Robinhood scans: none saved (define scans in the RH app to use this leg).
+2026-07-27 08:31:12,471 INFO screener | Discovered 18 candidate(s) from 5 source(s) (290 merged, 272 above min_score, capped to 18).
+2026-07-27 08:31:12,472 INFO screener |   candidate T [congress+options_flow+robinhood] score=+1.78 — Congress: 3 buy / 0 sell filings in last 60d (disclosures lag up to ~45d). | Options flow: 41,455 call / 7,938 put vol (bullish call imbalance +0.68) on a most-active name. | Robinhood 100 Most Popular (retail crowd positioning)
+2026-07-27 08:31:12,477 INFO screener |   candidate SPCX [congress+options_flow+robinhood] score=+1.71 — Congress: 4 buy / 0 sell filings in last 60d (disclosures lag up to ~45d). | Options flow: 350,145 call / 162,998 put vol (bullish call imbalance +0.36) on a most-active name. | Robinhood 100 Most Popular (retail crowd positioning)
+2026-07-27 08:31:12,479 INFO screener |   candidate LVWR [options_flow+robinhood] score=+1.10 — Options flow: 5,013 call / 1,675 put vol (bullish call imbalance +0.50) on a most-active name. | Robinhood Daily Movers (today's biggest movers — momentum)
+2026-07-27 08:31:12,480 INFO screener |   candidate SPGI [congress] score=-1.00 — Congress: 0 buy / 5 sell filings in last 60d (disclosures lag up to ~45d).
+2026-07-27 08:31:12,481 INFO screener |   candidate WAB [congress] score=-1.00 — Congress: 0 buy / 5 sell filings in last 60d (disclosures lag up to ~45d).
+2026-07-27 08:31:12,482 INFO screener |   candidate HUBB [congress] score=+1.00 — Congress: 6 buy / 0 sell filings in last 60d (disclosures lag up to ~45d).
+2026-07-27 08:31:12,483 INFO screener |   candidate BEP [congress] score=+1.00 — Congress: 7 buy / 0 sell filings in last 60d (disclosures lag up to ~45d).
+2026-07-27 08:31:12,484 INFO screener |   candidate UBER [congress+robinhood] score=+0.85 — Congress: 2 buy / 0 sell filings in last 60d (disclosures lag up to ~45d). | Robinhood 100 Most Popular (retail crowd positioning)
+2026-07-27 08:31:12,485 INFO screener |   candidate F [options_flow+robinhood] score=+0.85 — Options flow: 15,916 call / 5,301 put vol (bullish call imbalance +0.50) on a most-active name. | Robinhood 100 Most Popular (retail crowd positioning)
+2026-07-27 08:31:12,486 INFO screener |   candidate PATH [options_flow] score=+0.78 — Options flow: 16,012 call / 1,972 put vol (bullish call imbalance +0.78) on a most-active name.
+2026-07-27 08:31:12,487 INFO screener |   candidate ADI [congress] score=-0.75 — Congress: 0 buy / 3 sell filings in last 60d (disclosures lag up to ~45d).
+2026-07-27 08:31:12,488 INFO screener |   candidate LYV [congress] score=-0.75 — Congress: 0 buy / 3 sell filings in last 60d (disclosures lag up to ~45d).
+2026-07-27 08:31:12,489 INFO screener |   candidate ZTS [congress] score=+0.75 — Congress: 3 buy / 0 sell filings in last 60d (disclosures lag up to ~45d).
+2026-07-27 08:31:12,490 INFO screener |   candidate BITO [options_flow] score=+0.74 — Options flow: 8,165 call / 1,203 put vol (bullish call imbalance +0.74) on a most-active name.
+2026-07-27 08:31:12,490 INFO screener |   candidate RIG [options_flow] score=+0.74 — Options flow: 6,063 call / 918 put vol (bullish call imbalance +0.74) on a most-active name.
+2026-07-27 08:31:12,491 INFO screener |   candidate SOFI [options_flow+robinhood] score=+0.71 — Options flow: 95,135 call / 44,443 put vol (bullish call imbalance +0.36) on a most-active name. | Robinhood 100 Most Popular (retail crowd positioning)
+2026-07-27 08:31:12,492 INFO screener |   candidate SQQQ [options_flow] score=+0.64 — Options flow: 33,565 call / 7,410 put vol (bullish call imbalance +0.64) on a most-active name.
+2026-07-27 08:31:12,493 INFO screener |   candidate NU [options_flow] score=+0.62 — Options flow: 11,050 call / 2,546 put vol (bullish call imbalance +0.62) on a most-active name.
+2026-07-27 08:31:31,771 WARNING signals | Finnhub news-sentiment is premium-gated on this key (HTTP 403) — using the VADER fallback for this run.
+2026-07-27 08:31:33,097 INFO quiver | Quiver live/offexchange -> 5481 row(s).
+2026-07-27 08:31:33,990 INFO quiver | Quiver live/govcontractsall -> 20000 row(s).
+2026-07-27 08:33:09,536 INFO signals | Gathered signals for 18/18 symbols (+3 market signals).
+2026-07-27 08:33:09,577 INFO orchestrator | Composite index (18 scored, top: T +3.15, F +2.46, SQQQ +2.15, HUBB +2.05, LVWR +1.70, BEP +1.66, RIG +1.50, PATH +1.16).
+2026-07-27 08:33:11,935 INFO robinhood | Imported 1 Robinhood holding(s) for context (read-only).
+2026-07-27 08:33:11,945 INFO orchestrator | Buy-excluded from slate this cycle: LVWR (price $1.62 < $5 liquidity floor)
+2026-07-27 08:33:53,147 INFO usage | decision call: 13047 in / 2934 out (cache r=0 w=5903) ~$0.1976 [claude-opus-4-8]
+2026-07-27 08:33:53,151 INFO decision | Claude returned 6 proposal(s).
+2026-07-27 08:33:53,199 INFO orchestrator | Cycle budget $980,000 split across 4 buy(s): T $353,739, F $251,878, HUBB $209,899, BEP $164,484.
+2026-07-27 08:33:54,866 INFO earnings | Robinhood earnings calendar: 4287 name(s) reporting within 31d.
+2026-07-27 08:33:55,282 INFO risk | REJECT buy T: Overextended: RSI 70 and 3.6xATR above the 20d SMA — chasing a local top; wait for a pullback or base.
+2026-07-27 08:33:55,287 INFO orchestrator | BUY T -> rejected: Overextended: RSI 70 and 3.6xATR above the 20d SMA — chasing a local top; wait for a pullback or base. | Highest composite (+3.15). Solid fundamentals (EBITDA $44.9B, 35.3% margin), congressional buying (6
+2026-07-27 08:33:55,776 INFO risk | REJECT buy F: Earnings in 1d (<= 3d blackout) — gap risk dwarfs the stop; no new buy.
+2026-07-27 08:33:55,780 INFO orchestrator | BUY F -> rejected: Earnings in 1d (<= 3d blackout) — gap risk dwarfs the stop; no new buy. | Composite +2.46. Uptrend px>50>200, MACD bull, RSI 60; corroborated by insider open-market buying (1
+2026-07-27 08:33:56,196 INFO risk | REJECT buy HUBB: Earnings in 1d (<= 3d blackout) — gap risk dwarfs the stop; no new buy.
+2026-07-27 08:33:56,201 INFO orchestrator | BUY HUBB -> rejected: Earnings in 1d (<= 3d blackout) — gap risk dwarfs the stop; no new buy. | Composite +2.05. Congressional buying 6/0, insider net buying, solid fundamentals (24.5% margin, +11
+2026-07-27 08:33:56,721 INFO orchestrator | BUY BEP -> resized: Sized to 2416.19 sh ($80,000) within caps. Reduced from request. | Composite +1.66, driven by heavy congressional buying (7/0). Fundamentals decent margin 48.7% but re
+2026-07-27 08:33:56,773 WARNING alpaca | BEP: floored 2416.19 sh -> 2416 for the exchange bracket; $6.24 of the $80000.00 allocation NOT deployed (stays cash; core sweep / next cycle can redeploy).
+2026-07-27 08:33:56,834 INFO alpaca | BUY market BEP qty=2416.0 notional=None lim=None (order 46d175d0-e660-4135-b77d-8af2db1bf0e9)
+2026-07-27 08:33:56,840 INFO ledger | Ledger: BUY BEP qty=2416 $79994
+2026-07-27 08:33:57,078 INFO orchestrator | HOLD RIG (no action) | Composite +1.50 with good fundamentals (37.8% margin, +19.3% rev) and bullish call flow +0.74, but i
+2026-07-27 08:33:57,250 INFO orchestrator | HOLD ZTS (no action) | Congress and insider buying are positive, but downtrend (px<50<200) and sharply bearish, decaying op
+2026-07-27 08:33:57,253 INFO orchestrator | Cycle budget not fully deployed: $6.24 dropped by whole-share flooring across this cycle's buys (stays cash; core sweep / next cycle can redeploy).
+2026-07-27 08:33:57,415 INFO alpaca | BUY market QQQ qty=None notional=300000.0 lim=None (order 839ea340-1d57-41eb-af6e-0d989a311831)
+2026-07-27 08:33:57,420 INFO orchestrator | Core fill: bought $300000 of QQQ (invested 8% -> ~38%, target 75%).
+2026-07-27 08:33:57,423 INFO ledger | Ledger: BUY QQQ qty=435.145 $300000
+2026-07-27 08:34:15,311 ERROR alpaca | submit(QQQ) failed: {"code":40310000,"existing_order_id":"839ea340-1d57-41eb-af6e-0d989a311831","message":"potential wash trade detected. use complex orders","reject_reason":"opposite side market/stop order exists"}
+2026-07-27 08:34:15,321 WARNING orchestrator | Core stop for QQQ could not be placed (entry buy likely still open — wash-trade guard); the watchdog still guards it and retries every ~30s tick.
+2026-07-27 08:34:15,327 INFO alpaca | Alpaca client ready (mode=paper).
+2026-07-27 08:34:15,927 INFO dashboard | Wrote dashboard with 2 trades -> dashboard.html
+2026-07-27 08:34:54,296 ERROR alpaca | submit(QQQ) failed: {"code":40310000,"existing_order_id":"839ea340-1d57-41eb-af6e-0d989a311831","message":"potential wash trade detected. use complex orders","reject_reason":"opposite side market/stop order exists"}
+2026-07-27 08:34:54,306 WARNING orchestrator | Core stop for QQQ could not be placed (entry buy likely still open — wash-trade guard); the watchdog still guards it and retries every ~30s tick.
+2026-07-27 08:35:25,421 ERROR alpaca | submit(QQQ) failed: {"code":40310000,"existing_order_id":"839ea340-1d57-41eb-af6e-0d989a311831","message":"potential wash trade detected. use complex orders","reject_reason":"opposite side market/stop order exists"}
+2026-07-27 08:35:25,430 WARNING orchestrator | Core stop for QQQ could not be placed (entry buy likely still open — wash-trade guard); the watchdog still guards it and retries every ~30s tick.
+2026-07-27 08:35:56,540 INFO alpaca | SELL stop QQQ qty=434.0 notional=None lim=None (order 6e1aae46-0f8d-4e3e-9a98-caf0b89e287b)
+2026-07-27 08:35:56,544 INFO orchestrator | Core stop: GTC stop resting for 434 QQQ @ 586.59 (15% under basis 690.11).
+2026-07-27 09:22:28,588 INFO orchestrator | Order 46d175d0-e660-4135-b77d-8af2db1bf0e9 (BEP) FILLED (2416/2416).
+2026-07-27 09:22:28,645 INFO orchestrator | Order 839ea340-1d57-41eb-af6e-0d989a311831 (QQQ) FILLED (434.716/0).
+2026-07-27 09:22:29,388 INFO orchestrator | Market regime: SPY above 200dma (741 vs 696), VIX 19, VIX3M 20 (contango) -> risk-on, size x1.00.
+2026-07-27 09:22:30,604 INFO quiver | Quiver live/congresstrading -> 1000 row(s).
+2026-07-27 09:22:30,864 INFO screener | EDGAR Form-4 feed -> 62 filing(s) (scanning up to 100).
+2026-07-27 09:22:55,099 INFO screener | Options-flow most-actives pool -> 40 name(s).
+2026-07-27 09:23:14,709 INFO screener | Robinhood 'Daily movers' -> 20 name(s).
+2026-07-27 09:23:15,886 INFO screener | Robinhood '100 most popular' -> 100 name(s).
+2026-07-27 09:23:16,768 INFO screener | Robinhood scans: none saved (define scans in the RH app to use this leg).
+2026-07-27 09:23:16,770 INFO screener | Discovered 18 candidate(s) from 5 source(s) (285 merged, 267 above min_score, capped to 18).
+2026-07-27 09:23:16,771 INFO screener |   candidate QBTS [options_flow+robinhood] score=+1.38 — Options flow: 21,665 call / 2,664 put vol (bullish call imbalance +0.78) on a most-active name. | Robinhood Daily Movers (today's biggest movers — momentum) | Robinhood 100 Most Popular (retail crowd positioning)
+2026-07-27 09:23:16,773 INFO screener |   candidate SPCX [congress+robinhood] score=+1.35 — Congress: 4 buy / 0 sell filings in last 60d (disclosures lag up to ~45d). | Robinhood 100 Most Popular (retail crowd positioning)
+2026-07-27 09:23:16,775 INFO screener |   candidate T [congress+robinhood] score=+1.10 — Congress: 3 buy / 0 sell filings in last 60d (disclosures lag up to ~45d). | Robinhood 100 Most Popular (retail crowd positioning)
+2026-07-27 09:23:16,776 INFO screener |   candidate LVWR [options_flow+robinhood] score=+1.00 — Options flow: 1,605 call / 680 put vol (bullish call imbalance +0.41) on a most-active name. | Robinhood Daily Movers (today's biggest movers — momentum)
+2026-07-27 09:23:16,777 INFO screener |   candidate SPGI [congress] score=-1.00 — Congress: 0 buy / 5 sell filings in last 60d (disclosures lag up to ~45d).
+2026-07-27 09:23:16,778 INFO screener |   candidate WAB [congress] score=-1.00 — Congress: 0 buy / 5 sell filings in last 60d (disclosures lag up to ~45d).
+2026-07-27 09:23:16,779 INFO screener |   candidate HUBB [congress] score=+1.00 — Congress: 6 buy / 0 sell filings in last 60d (disclosures lag up to ~45d).
+2026-07-27 09:23:16,780 INFO screener |   candidate SOFI [options_flow+robinhood] score=+0.86 — Options flow: 62,091 call / 20,050 put vol (bullish call imbalance +0.51) on a most-active name. | Robinhood 100 Most Popular (retail crowd positioning)
+2026-07-27 09:23:16,782 INFO screener |   candidate UBER [congress+robinhood] score=+0.85 — Congress: 2 buy / 0 sell filings in last 60d (disclosures lag up to ~45d). | Robinhood 100 Most Popular (retail crowd positioning)
+2026-07-27 09:23:16,783 INFO screener |   candidate ENTX [options_flow] score=-0.80 — Options flow: 19 call / 170 put vol (bearish put imbalance -0.80) on a most-active name.
+2026-07-27 09:23:16,784 INFO screener |   candidate BMNR [options_flow] score=+0.78 — Options flow: 40,651 call / 5,034 put vol (bullish call imbalance +0.78) on a most-active name.
+2026-07-27 09:23:16,785 INFO screener |   candidate ADI [congress] score=-0.75 — Congress: 0 buy / 3 sell filings in last 60d (disclosures lag up to ~45d).
+2026-07-27 09:23:16,786 INFO screener |   candidate ZTS [congress] score=+0.75 — Congress: 3 buy / 0 sell filings in last 60d (disclosures lag up to ~45d).
+2026-07-27 09:23:16,787 INFO screener |   candidate LYV [congress] score=-0.75 — Congress: 0 buy / 3 sell filings in last 60d (disclosures lag up to ~45d).
+2026-07-27 09:23:16,787 INFO screener |   candidate SNXX [options_flow] score=+0.67 — Options flow: 10,469 call / 2,087 put vol (bullish call imbalance +0.67) on a most-active name.
+2026-07-27 09:23:16,789 INFO screener |   candidate SOXS [options_flow] score=+0.62 — Options flow: 9,722 call / 2,268 put vol (bullish call imbalance +0.62) on a most-active name.
+2026-07-27 09:23:16,790 INFO screener |   candidate CVX [congress+robinhood] score=+0.60 — Congress: 1 buy / 0 sell filings in last 60d (disclosures lag up to ~45d). | Robinhood 100 Most Popular (retail crowd positioning)
+2026-07-27 09:23:16,791 INFO screener |   candidate MU [congress+robinhood] score=+0.60 — Congress: 2 buy / 1 sell filings in last 60d (disclosures lag up to ~45d). | Robinhood 100 Most Popular (retail crowd positioning)
+2026-07-27 09:23:28,141 INFO quiver | Quiver live/offexchange -> 5481 row(s).
+2026-07-27 09:23:29,225 INFO quiver | Quiver live/govcontractsall -> 20000 row(s).
+2026-07-27 09:24:09,336 INFO signals | Gathered signals for 19/19 symbols (+3 market signals).
+2026-07-27 09:24:09,381 INFO orchestrator | Composite index (19 scored, top: ZTS +2.42, T +2.32, BMNR +2.08, HUBB +2.06, LVWR +1.86, CVX +1.26, SNXX +0.92, SOXS +0.90).
+2026-07-27 09:24:12,073 INFO robinhood | Imported 1 Robinhood holding(s) for context (read-only).
+2026-07-27 09:24:12,078 INFO orchestrator | Buy-excluded from slate this cycle: BEP (topped up 0.8h ago (next ok in 4h)), ENTX (price $3.60 < $5 liquidity floor), LVWR (price $2.66 < $5 liquidity floor)
+2026-07-27 09:24:46,407 INFO usage | decision call: 13478 in / 2280 out (cache r=5903 w=0) ~$0.1273 [claude-opus-4-8]
+2026-07-27 09:24:46,416 INFO decision | Claude returned 2 proposal(s).
+2026-07-27 09:24:46,470 INFO orchestrator | Cycle budget $599,549 split across 2 buy(s): ZTS $359,730, CVX $192,998.
+2026-07-27 09:24:48,055 INFO earnings | Robinhood earnings calendar: 4287 name(s) reporting within 31d.
+2026-07-27 09:24:49,205 INFO orchestrator | BUY ZTS -> resized: Sized to 1032.91 sh ($79,617) within caps. Reduced from request. | Highest composite on the slate (+2.42) with a genuinely corroborated multi-signal setup: SEC Form 4 
+2026-07-27 09:24:49,257 WARNING alpaca | ZTS: floored 1032.91 sh -> 1032 for the exchange bracket; $70.40 of the $79616.96 allocation NOT deployed (stays cash; core sweep / next cycle can redeploy).
+2026-07-27 09:24:49,316 INFO alpaca | BUY market ZTS qty=1032.0 notional=None lim=None (order f5fc0e7a-69b2-4bbd-8820-9597ebe61b36)
+2026-07-27 09:24:49,324 INFO ledger | Ledger: BUY ZTS qty=1032 $79547
+2026-07-27 09:24:49,898 INFO orchestrator | BUY CVX -> resized: Sized to 415.646 sh ($79,617) within caps. Reduced from request. | Composite +1.26 with confirmed uptrend (px>50>200), MACD bull, RSI 64 (elevated but not flagged exte
+2026-07-27 09:24:49,949 WARNING alpaca | CVX: floored 415.646 sh -> 415 for the exchange bracket; $123.68 of the $79616.96 allocation NOT deployed (stays cash; core sweep / next cycle can redeploy).
+2026-07-27 09:24:50,094 INFO alpaca | BUY market CVX qty=415.0 notional=None lim=None (order 7188f590-d416-4e6c-94b2-0f3d8e552f2c)
+2026-07-27 09:24:50,099 INFO ledger | Ledger: BUY CVX qty=415 $79472
+2026-07-27 09:24:50,107 INFO orchestrator | Cycle budget not fully deployed: $194.08 dropped by whole-share flooring across this cycle's buys (stays cash; core sweep / next cycle can redeploy).
+2026-07-27 09:24:50,324 INFO alpaca | BUY market QQQ qty=None notional=1639.34 lim=None (order 14f09b19-1254-4582-908f-aa41619cea85)
+2026-07-27 09:24:50,329 INFO orchestrator | Core fill: bought $1639 of QQQ (invested 54% -> ~54%, target 75%).
+2026-07-27 09:24:50,332 INFO ledger | Ledger: BUY QQQ qty=2.40528 $1639
+2026-07-27 09:24:51,766 INFO alpaca | SELL stop QQQ qty=437.0 notional=None lim=None (order 59733d62-8212-4737-8308-bc8a40272c54)
+2026-07-27 09:24:51,770 INFO orchestrator | Core stop: GTC stop resting for 437 QQQ @ 586.59 (15% under basis 690.11).
+2026-07-27 09:24:51,775 INFO alpaca | Alpaca client ready (mode=paper).
+2026-07-27 09:24:52,451 INFO dashboard | Wrote dashboard with 5 trades -> dashboard.html
+2026-07-27 10:07:36,809 CRITICAL orchestrator | On BATTERY during market hours — clamshell/battery sleep will blind the bot (caffeinate cannot prevent it). Plug in AC or move to the always-on host (ops/).
+2026-07-27 10:07:38,763 INFO notify | CRITICAL alert emailed to srikanthpusapati1@gmail.com: Bot on battery during market hours
+2026-07-27 10:14:35,487 INFO orchestrator | Order f5fc0e7a-69b2-4bbd-8820-9597ebe61b36 (ZTS) FILLED (1032/1032).
+2026-07-27 10:14:35,544 INFO orchestrator | Order 7188f590-d416-4e6c-94b2-0f3d8e552f2c (CVX) FILLED (415/415).
+2026-07-27 10:14:35,599 INFO orchestrator | Order 14f09b19-1254-4582-908f-aa41619cea85 (QQQ) FILLED (2.40498/0).
+2026-07-27 10:14:36,553 INFO orchestrator | Market regime: SPY above 200dma (740 vs 696), VIX 19, VIX3M 20 (contango) -> risk-on, size x1.00.
+2026-07-27 10:14:37,197 INFO quiver | Quiver live/congresstrading -> 1000 row(s).
+2026-07-27 10:14:37,378 INFO screener | EDGAR Form-4 feed -> 60 filing(s) (scanning up to 100).
+2026-07-27 10:15:03,747 INFO screener | Options-flow most-actives pool -> 40 name(s).
+2026-07-27 10:15:46,198 WARNING signals | options-flow (screener): 1 of 40 chain read(s) failed — first: MSTU (ReadTimeout(ReadTimeoutError("HTTPSConnectionPool(host='data.alpaca.markets', port=443): Read timed out. (read timeout=20)"))). Flow read degraded this cycle.
+2026-07-27 10:15:48,850 INFO screener | Robinhood 'Daily movers' -> 20 name(s).
+2026-07-27 10:15:50,093 INFO screener | Robinhood '100 most popular' -> 100 name(s).
+2026-07-27 10:15:50,952 INFO screener | Robinhood scans: none saved (define scans in the RH app to use this leg).
+2026-07-27 10:15:50,954 INFO screener | Discovered 18 candidate(s) from 5 source(s) (280 merged, 263 above min_score, capped to 18).
+2026-07-27 10:15:50,955 INFO screener |   candidate SPCX [congress+robinhood] score=+1.35 — Congress: 4 buy / 0 sell filings in last 60d (disclosures lag up to ~45d). | Robinhood 100 Most Popular (retail crowd positioning)
+2026-07-27 10:15:50,957 INFO screener |   candidate QBTS [options_flow+robinhood] score=+1.24 — Options flow: 30,705 call / 6,730 put vol (bullish call imbalance +0.64) on a most-active name. | Robinhood Daily Movers (today's biggest movers — momentum) | Robinhood 100 Most Popular (retail crowd positioning)
+2026-07-27 10:15:50,959 INFO screener |   candidate T [congress+robinhood] score=+1.10 — Congress: 3 buy / 0 sell filings in last 60d (disclosures lag up to ~45d). | Robinhood 100 Most Popular (retail crowd positioning)
+2026-07-27 10:15:50,961 INFO screener |   candidate SPGI [congress] score=-1.00 — Congress: 0 buy / 5 sell filings in last 60d (disclosures lag up to ~45d).
+2026-07-27 10:15:50,962 INFO screener |   candidate WAB [congress] score=-1.00 — Congress: 0 buy / 5 sell filings in last 60d (disclosures lag up to ~45d).
+2026-07-27 10:15:50,963 INFO screener |   candidate HUBB [congress] score=+1.00 — Congress: 6 buy / 0 sell filings in last 60d (disclosures lag up to ~45d).
+2026-07-27 10:15:50,964 INFO screener |   candidate SOFI [options_flow+robinhood] score=+0.87 — Options flow: 86,574 call / 27,484 put vol (bullish call imbalance +0.52) on a most-active name. | Robinhood 100 Most Popular (retail crowd positioning)
+2026-07-27 10:15:50,966 INFO screener |   candidate UBER [congress+robinhood] score=+0.85 — Congress: 2 buy / 0 sell filings in last 60d (disclosures lag up to ~45d). | Robinhood 100 Most Popular (retail crowd positioning)
+2026-07-27 10:15:50,967 INFO screener |   candidate ADI [congress] score=-0.75 — Congress: 0 buy / 3 sell filings in last 60d (disclosures lag up to ~45d).
+2026-07-27 10:15:50,968 INFO screener |   candidate LYV [congress] score=-0.75 — Congress: 0 buy / 3 sell filings in last 60d (disclosures lag up to ~45d).
+2026-07-27 10:15:50,969 INFO screener |   candidate BMNR [options_flow] score=+0.73 — Options flow: 65,735 call / 10,299 put vol (bullish call imbalance +0.73) on a most-active name.
+2026-07-27 10:15:50,970 INFO screener |   candidate OTLK [options_flow] score=+0.69 — Options flow: 6,025 call / 1,090 put vol (bullish call imbalance +0.69) on a most-active name.
+2026-07-27 10:15:50,971 INFO screener |   candidate AAL [options_flow+robinhood] score=+0.68 — Options flow: 20,631 call / 10,346 put vol (bullish call imbalance +0.33) on a most-active name. | Robinhood 100 Most Popular (retail crowd positioning)
+2026-07-27 10:15:50,973 INFO screener |   candidate F [options_flow+robinhood] score=+0.66 — Options flow: 17,448 call / 9,279 put vol (bullish call imbalance +0.31) on a most-active name. | Robinhood 100 Most Popular (retail crowd positioning)
+2026-07-27 10:15:50,974 INFO screener |   candidate MU [congress+robinhood] score=+0.60 — Congress: 2 buy / 1 sell filings in last 60d (disclosures lag up to ~45d). | Robinhood 100 Most Popular (retail crowd positioning)
+2026-07-27 10:15:50,975 INFO screener |   candidate BRK.B [congress+robinhood] score=+0.60 — Congress: 1 buy / 0 sell filings in last 60d (disclosures lag up to ~45d). | Robinhood 100 Most Popular (retail crowd positioning)
+2026-07-27 10:15:50,976 INFO screener |   candidate UNH [congress] score=-0.60 — Congress: 1 buy / 4 sell filings in last 60d (disclosures lag up to ~45d).
+2026-07-27 10:15:50,977 INFO screener |   candidate COST [congress+robinhood] score=+0.60 — Congress: 1 buy / 0 sell filings in last 60d (disclosures lag up to ~45d). | Robinhood 100 Most Popular (retail crowd positioning)
+2026-07-27 10:16:04,582 INFO quiver | Quiver live/offexchange -> 5481 row(s).
+2026-07-27 10:16:06,315 INFO quiver | Quiver live/govcontractsall -> 20000 row(s).
+2026-07-27 10:16:45,567 INFO signals | Gathered signals for 21/21 symbols (+3 market signals).
+2026-07-27 10:16:45,662 INFO orchestrator | Composite index (21 scored, top: T +2.33, F +2.32, BRK.B +2.11, HUBB +2.03, BMNR +1.91, OTLK +1.66, ZTS +1.56, BEP +0.64).
+2026-07-27 10:16:48,079 INFO robinhood | Imported 1 Robinhood holding(s) for context (read-only).
+2026-07-27 10:16:48,089 INFO orchestrator | Buy-excluded from slate this cycle: BEP (topped up 1.7h ago (next ok in 4h)), CVX (topped up 0.9h ago (next ok in 4h)), OTLK (price $1.15 < $5 liquidity floor), ZTS (topped up 0.9h ago (next ok in 4h))
+2026-07-27 10:17:23,702 INFO usage | decision call: 16211 in / 2158 out (cache r=5903 w=0) ~$0.1380 [claude-opus-4-8]
+2026-07-27 10:17:23,710 INFO decision | Claude returned 4 proposal(s).
+2026-07-27 10:17:25,572 INFO earnings | Robinhood earnings calendar: 4287 name(s) reporting within 31d.
+2026-07-27 10:17:27,235 INFO orchestrator | BUY BRK.B -> resized: Sized to 160.04 sh ($79,509) within caps. Reduced from request. | Cleanest corroborated new name on the slate: composite +2.11, strong fundamentals (EBITDA $118B, 31.
+2026-07-27 10:17:27,342 WARNING alpaca | BRK.B: floored 160.04 sh -> 160 for the exchange bracket; $19.68 of the $79509.28 allocation NOT deployed (stays cash; core sweep / next cycle can redeploy).
+2026-07-27 10:17:27,400 INFO alpaca | BUY market BRK.B qty=160.0 notional=None lim=None (order a8303cff-9bfc-4b88-9510-c64f20d39846)
+2026-07-27 10:17:27,406 INFO ledger | Ledger: BUY BRK.B qty=160 $79490
+2026-07-27 10:17:27,518 INFO orchestrator | HOLD ZTS (no action) | Held at cap (topped up <1h ago). Thesis intact: highest composite on slate with corroborated insider
+2026-07-27 10:17:27,622 INFO orchestrator | HOLD CVX (no action) | Held at cap. Confirmed uptrend (px>50>200), MACD bull, RSI 64 elevated but not flashing, bullish opt
+2026-07-27 10:17:27,766 INFO orchestrator | HOLD BEP (no action) | Held at cap. Heavy congressional buying (7/0), decent 48.7% margin, MACD bull. Down -2.9% but thesis
+2026-07-27 10:17:27,769 INFO orchestrator | Cycle budget not fully deployed: $19.68 dropped by whole-share flooring across this cycle's buys (stays cash; core sweep / next cycle can redeploy).
+2026-07-27 10:17:28,014 INFO alpaca | BUY market QQQ qty=None notional=659.44 lim=None (order ec3fced0-bbfe-47d6-b16a-51ecf3a07546)
+2026-07-27 10:17:28,016 INFO orchestrator | Core fill: bought $659 of QQQ (invested 62% -> ~62%, target 75%).
+2026-07-27 10:17:28,018 INFO ledger | Ledger: BUY QQQ qty=0.970735 $659
+2026-07-27 10:17:28,222 INFO alpaca | SELL stop QQQ qty=438.0 notional=None lim=None (order 6589c000-c7e4-4da8-a52f-26531670500f)
+2026-07-27 10:17:28,225 INFO orchestrator | Core stop: GTC stop resting for 438 QQQ @ 586.55 (15% under basis 690.06).
+2026-07-27 10:17:28,232 INFO alpaca | Alpaca client ready (mode=paper).
+2026-07-27 10:17:29,024 INFO dashboard | Wrote dashboard with 7 trades -> dashboard.html
+2026-07-27 10:37:53,689 CRITICAL orchestrator | On BATTERY during market hours — clamshell/battery sleep will blind the bot (caffeinate cannot prevent it). Plug in AC or move to the always-on host (ops/).
+2026-07-27 10:37:54,900 INFO notify | CRITICAL alert emailed to srikanthpusapati1@gmail.com: Bot on battery during market hours
+2026-07-27 11:06:38,901 INFO orchestrator | Order a8303cff-9bfc-4b88-9510-c64f20d39846 (BRK.B) FILLED (160/160).
+2026-07-27 11:06:39,050 INFO orchestrator | Order ec3fced0-bbfe-47d6-b16a-51ecf3a07546 (QQQ) FILLED (0.970818/0).
+2026-07-27 11:06:39,979 INFO orchestrator | Market regime: SPY above 200dma (738 vs 696), VIX 19, VIX3M 21 (contango) -> risk-on, size x1.00.
+2026-07-27 11:06:40,863 INFO quiver | Quiver live/congresstrading -> 1000 row(s).
+2026-07-27 11:06:41,154 INFO screener | EDGAR Form-4 feed -> 55 filing(s) (scanning up to 100).
+2026-07-27 11:07:06,134 INFO screener | Options-flow most-actives pool -> 40 name(s).
+2026-07-27 11:07:23,172 INFO screener | Robinhood 'Daily movers' -> 20 name(s).
+2026-07-27 11:07:24,438 INFO screener | Robinhood '100 most popular' -> 100 name(s).
+2026-07-27 11:07:25,270 INFO screener | Robinhood scans: none saved (define scans in the RH app to use this leg).
+2026-07-27 11:07:25,272 INFO screener | Discovered 18 candidate(s) from 5 source(s) (285 merged, 268 above min_score, capped to 18).
+2026-07-27 11:07:25,273 INFO screener |   candidate SPCX [congress+robinhood] score=+1.35 — Congress: 4 buy / 0 sell filings in last 60d (disclosures lag up to ~45d). | Robinhood 100 Most Popular (retail crowd positioning)
+2026-07-27 11:07:25,274 INFO screener |   candidate QBTS [options_flow+robinhood] score=+1.18 — Options flow: 35,788 call / 9,428 put vol (bullish call imbalance +0.58) on a most-active name. | Robinhood Daily Movers (today's biggest movers — momentum) | Robinhood 100 Most Popular (retail crowd positioning)
+2026-07-27 11:07:25,277 INFO screener |   candidate T [congress+robinhood] score=+1.10 — Congress: 3 buy / 0 sell filings in last 60d (disclosures lag up to ~45d). | Robinhood 100 Most Popular (retail crowd positioning)
+2026-07-27 11:07:25,278 INFO screener |   candidate SPGI [congress] score=-1.00 — Congress: 0 buy / 5 sell filings in last 60d (disclosures lag up to ~45d).
+2026-07-27 11:07:25,280 INFO screener |   candidate WAB [congress] score=-1.00 — Congress: 0 buy / 5 sell filings in last 60d (disclosures lag up to ~45d).
+2026-07-27 11:07:25,281 INFO screener |   candidate HUBB [congress] score=+1.00 — Congress: 6 buy / 0 sell filings in last 60d (disclosures lag up to ~45d).
+2026-07-27 11:07:25,282 INFO screener |   candidate PLUG [options_flow+robinhood] score=+0.98 — Options flow: 5,864 call / 1,310 put vol (bullish call imbalance +0.64) on a most-active name. | Robinhood 100 Most Popular (retail crowd positioning)
+2026-07-27 11:07:25,283 INFO screener |   candidate SOFI [options_flow+robinhood] score=+0.88 — Options flow: 101,788 call / 31,456 put vol (bullish call imbalance +0.53) on a most-active name. | Robinhood 100 Most Popular (retail crowd positioning)
+2026-07-27 11:07:25,285 INFO screener |   candidate UBER [congress+robinhood] score=+0.85 — Congress: 2 buy / 0 sell filings in last 60d (disclosures lag up to ~45d). | Robinhood 100 Most Popular (retail crowd positioning)
+2026-07-27 11:07:25,286 INFO screener |   candidate ADI [congress] score=-0.75 — Congress: 0 buy / 3 sell filings in last 60d (disclosures lag up to ~45d).
+2026-07-27 11:07:25,287 INFO screener |   candidate LYV [congress] score=-0.75 — Congress: 0 buy / 3 sell filings in last 60d (disclosures lag up to ~45d).
+2026-07-27 11:07:25,288 INFO screener |   candidate NU [options_flow] score=+0.72 — Options flow: 23,476 call / 3,760 put vol (bullish call imbalance +0.72) on a most-active name.
+2026-07-27 11:07:25,289 INFO screener |   candidate OTLK [options_flow] score=+0.71 — Options flow: 6,549 call / 1,112 put vol (bullish call imbalance +0.71) on a most-active name.
+2026-07-27 11:07:25,290 INFO screener |   candidate BMNR [options_flow] score=+0.68 — Options flow: 72,818 call / 13,775 put vol (bullish call imbalance +0.68) on a most-active name.
+2026-07-27 11:07:25,291 INFO screener |   candidate MU [congress+robinhood] score=+0.60 — Congress: 2 buy / 1 sell filings in last 60d (disclosures lag up to ~45d). | Robinhood 100 Most Popular (retail crowd positioning)
+2026-07-27 11:07:25,292 INFO screener |   candidate UNH [congress] score=-0.60 — Congress: 1 buy / 4 sell filings in last 60d (disclosures lag up to ~45d).
+2026-07-27 11:07:25,293 INFO screener |   candidate COST [congress+robinhood] score=+0.60 — Congress: 1 buy / 0 sell filings in last 60d (disclosures lag up to ~45d). | Robinhood 100 Most Popular (retail crowd positioning)
+2026-07-27 11:07:25,294 INFO screener |   candidate GOOG [congress+robinhood] score=+0.60 — Congress: 2 buy / 1 sell filings in last 60d (disclosures lag up to ~45d). | Robinhood 100 Most Popular (retail crowd positioning)
+2026-07-27 11:07:39,089 INFO quiver | Quiver live/offexchange -> 5481 row(s).
+2026-07-27 11:07:39,585 INFO quiver | Quiver live/govcontractsall -> 20000 row(s).
+2026-07-27 11:08:15,621 INFO signals | Gathered signals for 22/22 symbols (+3 market signals).
+2026-07-27 11:08:15,675 INFO orchestrator | Composite index (22 scored, top: T +2.40, HUBB +1.92, BMNR +1.86, BRK.B +1.53, OTLK +1.29, ZTS +1.10, SPGI +0.70, BEP +0.63).
+2026-07-27 11:08:17,690 INFO robinhood | Imported 1 Robinhood holding(s) for context (read-only).
+2026-07-27 11:08:17,694 INFO orchestrator | Buy-excluded from slate this cycle: BEP (topped up 2.6h ago (next ok in 4h)), BRK.B (topped up 0.8h ago (next ok in 4h)), CVX (topped up 1.7h ago (next ok in 4h)), OTLK (price $1.14 < $5 liquidity floor), PLUG (price $2.07 < $5 liquidity floor) …+1 more
+2026-07-27 11:08:47,085 INFO usage | decision call: 15986 in / 1856 out (cache r=5903 w=0) ~$0.1293 [claude-opus-4-8]
+2026-07-27 11:08:47,092 INFO decision | Claude returned 1 proposal(s).
+2026-07-27 11:08:48,956 INFO earnings | Robinhood earnings calendar: 4289 name(s) reporting within 31d.
+2026-07-27 11:08:50,987 INFO orchestrator | BUY GOOG -> approved: Sized to 241.413 sh ($79,380) within caps. | Strongest new-name fundamentals on the slate (EBITDA $173B, margin 38.8%, rev growth +24.2%, low D/E
+2026-07-27 11:08:51,052 WARNING alpaca | GOOG: floored 241.413 sh -> 241 for the exchange bracket; $135.90 of the $79380.33 allocation NOT deployed (stays cash; core sweep / next cycle can redeploy).
+2026-07-27 11:08:51,167 INFO alpaca | BUY market GOOG qty=241.0 notional=None lim=None (order 3d11a0c7-cf9f-4e65-90ab-7c04084a682e)
+2026-07-27 11:08:51,175 INFO ledger | Ledger: BUY GOOG qty=241 $79238
+2026-07-27 11:08:51,182 INFO orchestrator | Cycle budget not fully deployed: $135.90 dropped by whole-share flooring across this cycle's buys (stays cash; core sweep / next cycle can redeploy).
+2026-07-27 11:08:51,185 INFO orchestrator | Core fill skipped: QQQ already at/above the 30% ceiling.
+2026-07-27 11:08:51,243 INFO alpaca | Alpaca client ready (mode=paper).
+2026-07-27 11:08:52,004 INFO dashboard | Wrote dashboard with 8 trades -> dashboard.html
+2026-07-27 11:59:04,913 INFO orchestrator | Order 3d11a0c7-cf9f-4e65-90ab-7c04084a682e (GOOG) FILLED (241/241).
+2026-07-27 11:59:05,990 INFO orchestrator | Market regime: SPY above 200dma (737 vs 696), VIX 19, VIX3M 21 (contango) -> risk-on, size x1.00.
+2026-07-27 11:59:06,882 INFO quiver | Quiver live/congresstrading -> 1000 row(s).
+2026-07-27 11:59:07,109 INFO screener | EDGAR Form-4 feed -> 60 filing(s) (scanning up to 100).
+2026-07-27 11:59:30,556 INFO screener | Options-flow most-actives pool -> 40 name(s).
+2026-07-27 11:59:46,927 INFO screener | Robinhood 'Daily movers' -> 20 name(s).
+2026-07-27 11:59:48,074 INFO screener | Robinhood '100 most popular' -> 100 name(s).
+2026-07-27 11:59:48,966 INFO screener | Robinhood scans: none saved (define scans in the RH app to use this leg).
+2026-07-27 11:59:48,969 INFO screener | Discovered 18 candidate(s) from 5 source(s) (282 merged, 265 above min_score, capped to 18).
+2026-07-27 11:59:48,970 INFO screener |   candidate SPCX [congress+robinhood] score=+1.35 — Congress: 4 buy / 0 sell filings in last 60d (disclosures lag up to ~45d). | Robinhood 100 Most Popular (retail crowd positioning)
+2026-07-27 11:59:48,972 INFO screener |   candidate QBTS [options_flow+robinhood] score=+1.18 — Options flow: 37,824 call / 10,189 put vol (bullish call imbalance +0.58) on a most-active name. | Robinhood Daily Movers (today's biggest movers — momentum) | Robinhood 100 Most Popular (retail crowd positioning)
+2026-07-27 11:59:48,974 INFO screener |   candidate T [congress+robinhood] score=+1.10 — Congress: 3 buy / 0 sell filings in last 60d (disclosures lag up to ~45d). | Robinhood 100 Most Popular (retail crowd positioning)
+2026-07-27 11:59:48,975 INFO screener |   candidate PLUG [options_flow+robinhood] score=+1.07 — Options flow: 8,664 call / 1,429 put vol (bullish call imbalance +0.72) on a most-active name. | Robinhood 100 Most Popular (retail crowd positioning)
+2026-07-27 11:59:48,977 INFO screener |   candidate SPGI [congress] score=-1.00 — Congress: 0 buy / 5 sell filings in last 60d (disclosures lag up to ~45d).
+2026-07-27 11:59:48,978 INFO screener |   candidate WAB [congress] score=-1.00 — Congress: 0 buy / 5 sell filings in last 60d (disclosures lag up to ~45d).
+2026-07-27 11:59:48,979 INFO screener |   candidate HUBB [congress] score=+1.00 — Congress: 6 buy / 0 sell filings in last 60d (disclosures lag up to ~45d).
+2026-07-27 11:59:48,980 INFO screener |   candidate SOFI [options_flow+robinhood] score=+0.86 — Options flow: 112,862 call / 36,431 put vol (bullish call imbalance +0.51) on a most-active name. | Robinhood 100 Most Popular (retail crowd positioning)
+2026-07-27 11:59:48,982 INFO screener |   candidate UBER [congress+robinhood] score=+0.85 — Congress: 2 buy / 0 sell filings in last 60d (disclosures lag up to ~45d). | Robinhood 100 Most Popular (retail crowd positioning)
+2026-07-27 11:59:48,983 INFO screener |   candidate PATH [options_flow] score=+0.80 — Options flow: 21,005 call / 2,367 put vol (bullish call imbalance +0.80) on a most-active name.
+2026-07-27 11:59:48,984 INFO screener |   candidate ADI [congress] score=-0.75 — Congress: 0 buy / 3 sell filings in last 60d (disclosures lag up to ~45d).
+2026-07-27 11:59:48,985 INFO screener |   candidate LYV [congress] score=-0.75 — Congress: 0 buy / 3 sell filings in last 60d (disclosures lag up to ~45d).
+2026-07-27 11:59:48,986 INFO screener |   candidate NU [options_flow] score=+0.71 — Options flow: 24,620 call / 4,097 put vol (bullish call imbalance +0.71) on a most-active name.
+2026-07-27 11:59:48,987 INFO screener |   candidate BMNR [options_flow] score=+0.66 — Options flow: 80,077 call / 16,176 put vol (bullish call imbalance +0.66) on a most-active name.
+2026-07-27 11:59:48,989 INFO screener |   candidate AAL [options_flow+robinhood] score=+0.66 — Options flow: 29,224 call / 15,303 put vol (bullish call imbalance +0.31) on a most-active name. | Robinhood 100 Most Popular (retail crowd positioning)
+2026-07-27 11:59:48,990 INFO screener |   candidate MU [congress+robinhood] score=+0.60 — Congress: 2 buy / 1 sell filings in last 60d (disclosures lag up to ~45d). | Robinhood 100 Most Popular (retail crowd positioning)
+2026-07-27 11:59:48,991 INFO screener |   candidate UNH [congress] score=-0.60 — Congress: 1 buy / 4 sell filings in last 60d (disclosures lag up to ~45d).
+2026-07-27 11:59:48,992 INFO screener |   candidate COST [congress+robinhood] score=+0.60 — Congress: 1 buy / 0 sell filings in last 60d (disclosures lag up to ~45d). | Robinhood 100 Most Popular (retail crowd positioning)
+2026-07-27 12:00:01,398 INFO quiver | Quiver live/offexchange -> 0 row(s).
+2026-07-27 12:00:04,017 INFO quiver | Quiver live/govcontractsall -> 20000 row(s).
+2026-07-27 12:00:43,533 INFO signals | Gathered signals for 23/23 symbols (+3 market signals).
+2026-07-27 12:00:43,580 INFO orchestrator | Composite index (23 scored, top: T +2.34, BMNR +2.01, HUBB +1.85, BRK.B +1.48, PATH +1.09, ZTS +1.09, PLUG +0.79, BEP +0.63).
+2026-07-27 12:00:45,793 INFO robinhood | Imported 1 Robinhood holding(s) for context (read-only).
+2026-07-27 12:00:45,797 INFO orchestrator | Buy-excluded from slate this cycle: BEP (topped up 3.4h ago (next ok in 4h)), BRK.B (topped up 1.7h ago (next ok in 4h)), CVX (topped up 2.6h ago (next ok in 4h)), GOOG (topped up 0.9h ago (next ok in 4h)), PLUG (price $2.04 < $5 liquidity floor) …+1 more
+2026-07-27 12:01:30,214 INFO usage | decision call: 16124 in / 2814 out (cache r=5903 w=0) ~$0.1539 [claude-opus-4-8]
+2026-07-27 12:01:30,226 INFO decision | Claude returned 1 proposal(s).
+2026-07-27 12:01:32,133 INFO earnings | Robinhood earnings calendar: 4290 name(s) reporting within 31d.
+2026-07-27 12:01:34,431 INFO risk | REJECT buy SPGI: Earnings in 1d (<= 3d blackout) — gap risk dwarfs the stop; no new buy.
+2026-07-27 12:01:34,437 INFO orchestrator | BUY SPGI -> rejected: Earnings in 1d (<= 3d blackout) — gap risk dwarfs the stop; no new buy. | Cleanest new-name setup on an otherwise weak slate: strong fundamentals (EBITDA $7.9B, margin 50.1%,
+2026-07-27 12:01:34,443 INFO orchestrator | Core fill skipped: QQQ already at/above the 30% ceiling.
+2026-07-27 12:01:34,502 INFO alpaca | Alpaca client ready (mode=paper).
+2026-07-27 12:01:35,353 INFO dashboard | Wrote dashboard with 8 trades -> dashboard.html
+2026-07-27 12:51:17,592 INFO orchestrator | Market regime: SPY above 200dma (737 vs 696), VIX 19, VIX3M 21 (contango) -> risk-on, size x1.00.
+2026-07-27 12:51:18,536 INFO quiver | Quiver live/congresstrading -> 1000 row(s).
+2026-07-27 12:51:18,886 INFO screener | EDGAR Form-4 feed -> 62 filing(s) (scanning up to 100).
+2026-07-27 12:51:45,077 INFO screener | Options-flow most-actives pool -> 40 name(s).
+2026-07-27 12:52:02,587 INFO screener | Robinhood 'Daily movers' -> 20 name(s).
+2026-07-27 12:52:03,916 INFO screener | Robinhood '100 most popular' -> 100 name(s).
+2026-07-27 12:52:04,712 INFO screener | Robinhood scans: none saved (define scans in the RH app to use this leg).
+2026-07-27 12:52:04,713 INFO screener | Discovered 18 candidate(s) from 5 source(s) (282 merged, 265 above min_score, capped to 18).
+2026-07-27 12:52:04,714 INFO screener |   candidate SPCX [congress+robinhood] score=+1.35 — Congress: 4 buy / 0 sell filings in last 60d (disclosures lag up to ~45d). | Robinhood 100 Most Popular (retail crowd positioning)
+2026-07-27 12:52:04,716 INFO screener |   candidate QBTS [options_flow+robinhood] score=+1.17 — Options flow: 40,155 call / 11,050 put vol (bullish call imbalance +0.57) on a most-active name. | Robinhood Daily Movers (today's biggest movers — momentum) | Robinhood 100 Most Popular (retail crowd positioning)
+2026-07-27 12:52:04,717 INFO screener |   candidate T [congress+robinhood] score=+1.10 — Congress: 3 buy / 0 sell filings in last 60d (disclosures lag up to ~45d). | Robinhood 100 Most Popular (retail crowd positioning)
+2026-07-27 12:52:04,718 INFO screener |   candidate PLUG [options_flow+robinhood] score=+1.05 — Options flow: 9,532 call / 1,682 put vol (bullish call imbalance +0.70) on a most-active name. | Robinhood 100 Most Popular (retail crowd positioning)
+2026-07-27 12:52:04,720 INFO screener |   candidate SPGI [congress] score=-1.00 — Congress: 0 buy / 5 sell filings in last 60d (disclosures lag up to ~45d).
+2026-07-27 12:52:04,721 INFO screener |   candidate WAB [congress] score=-1.00 — Congress: 0 buy / 5 sell filings in last 60d (disclosures lag up to ~45d).
+2026-07-27 12:52:04,722 INFO screener |   candidate HUBB [congress] score=+1.00 — Congress: 6 buy / 0 sell filings in last 60d (disclosures lag up to ~45d).
+2026-07-27 12:52:04,723 INFO screener |   candidate SOFI [options_flow+robinhood] score=+0.86 — Options flow: 121,901 call / 39,360 put vol (bullish call imbalance +0.51) on a most-active name. | Robinhood 100 Most Popular (retail crowd positioning)
+2026-07-27 12:52:04,724 INFO screener |   candidate UBER [congress+robinhood] score=+0.85 — Congress: 2 buy / 0 sell filings in last 60d (disclosures lag up to ~45d). | Robinhood 100 Most Popular (retail crowd positioning)
+2026-07-27 12:52:04,726 INFO screener |   candidate PATH [options_flow] score=+0.79 — Options flow: 22,809 call / 2,659 put vol (bullish call imbalance +0.79) on a most-active name.
+2026-07-27 12:52:04,727 INFO screener |   candidate ADI [congress] score=-0.75 — Congress: 0 buy / 3 sell filings in last 60d (disclosures lag up to ~45d).
+2026-07-27 12:52:04,728 INFO screener |   candidate LYV [congress] score=-0.75 — Congress: 0 buy / 3 sell filings in last 60d (disclosures lag up to ~45d).
+2026-07-27 12:52:04,728 INFO screener |   candidate NU [options_flow] score=+0.70 — Options flow: 25,186 call / 4,484 put vol (bullish call imbalance +0.70) on a most-active name.
+2026-07-27 12:52:04,729 INFO screener |   candidate BMNR [options_flow] score=+0.66 — Options flow: 83,007 call / 17,264 put vol (bullish call imbalance +0.66) on a most-active name.
+2026-07-27 12:52:04,730 INFO screener |   candidate MU [congress+robinhood] score=+0.60 — Congress: 2 buy / 1 sell filings in last 60d (disclosures lag up to ~45d). | Robinhood 100 Most Popular (retail crowd positioning)
+2026-07-27 12:52:04,731 INFO screener |   candidate UNH [congress] score=-0.60 — Congress: 1 buy / 4 sell filings in last 60d (disclosures lag up to ~45d).
+2026-07-27 12:52:04,732 INFO screener |   candidate COST [congress+robinhood] score=+0.60 — Congress: 1 buy / 0 sell filings in last 60d (disclosures lag up to ~45d). | Robinhood 100 Most Popular (retail crowd positioning)
+2026-07-27 12:52:04,733 INFO screener |   candidate TSLA [congress+robinhood] score=+0.60 — Congress: 1 buy / 0 sell filings in last 60d (disclosures lag up to ~45d). | Robinhood 100 Most Popular (retail crowd positioning)
+2026-07-27 12:52:17,912 INFO quiver | Quiver live/offexchange -> 5481 row(s).
+2026-07-27 12:52:18,315 INFO quiver | Quiver live/govcontractsall -> 20000 row(s).
+2026-07-27 12:52:40,627 INFO signals | Gathered signals for 23/23 symbols (+3 market signals).
+2026-07-27 12:52:40,681 INFO orchestrator | Composite index (23 scored, top: T +2.41, BMNR +1.80, HUBB +1.80, BRK.B +1.51, PATH +1.17, ZTS +1.17, SPGI +0.69, BEP +0.60).
+2026-07-27 12:52:42,932 INFO robinhood | Imported 1 Robinhood holding(s) for context (read-only).
+2026-07-27 12:52:42,936 INFO orchestrator | Buy-excluded from slate this cycle: BEP (daily ceiling $79,231 nearly exhausted ($0 headroom)), BRK.B (topped up 2.6h ago (next ok in 4h)), CVX (topped up 3.5h ago (next ok in 4h)), GOOG (topped up 1.7h ago (next ok in 4h)), PLUG (price $2.06 < $5 liquidity floor) …+1 more
+2026-07-27 12:53:07,727 INFO usage | decision call: 17727 in / 1864 out (cache r=5903 w=0) ~$0.1382 [claude-opus-4-8]
+2026-07-27 12:53:07,733 INFO decision | Claude returned 5 proposal(s).
+2026-07-27 12:53:07,926 INFO orchestrator | HOLD BRK.B (no action) | Held; strong fundamentals (EBITDA $118B, margin 31.4%), congress buying 5/0, bullish OI lean. Equity
+2026-07-27 12:53:08,148 INFO orchestrator | HOLD ZTS (no action) | Held; corroborated multi-signal setup — insider open-market buying (+1.00), congress 3/0, MACD bull 
+2026-07-27 12:53:08,254 INFO orchestrator | HOLD CVX (no action) | Held; confirmed uptrend (px>50>200), MACD bull, bullish call flow +0.45, but heavy insider selling c
+2026-07-27 12:53:08,392 INFO orchestrator | HOLD GOOG (no action) | Held; strongest fundamentals (EBITDA $173B, margin 38.8%, rev +24.2%) and bullish call flow +0.51, b
+2026-07-27 12:53:08,555 INFO orchestrator | HOLD BEP (no action) | Held; heavy congressional buying (7/0), decent margin 48.7%, MACD bull turning but negative rev grow
+2026-07-27 12:53:08,558 INFO orchestrator | Core fill skipped: QQQ already at/above the 30% ceiling.
+2026-07-27 12:53:08,614 INFO alpaca | Alpaca client ready (mode=paper).
+2026-07-27 12:53:09,401 INFO dashboard | Wrote dashboard with 8 trades -> dashboard.html
+2026-07-27 13:41:42,810 INFO ledger | Ledger: SELL BEP qty=2416 $76805
+2026-07-27 13:41:42,851 INFO orchestrator | Backfilled exchange exit: BEP 2416 sh @ 31.79 (stop -> bracket_stop, -4.0%).
+2026-07-27 13:43:22,816 INFO orchestrator | Market regime: SPY above 200dma (737 vs 696), VIX 19, VIX3M 21 (contango) -> risk-on, size x1.00.
+2026-07-27 13:43:23,420 INFO quiver | Quiver live/congresstrading -> 1000 row(s).
+2026-07-27 13:43:23,602 INFO screener | EDGAR Form-4 feed -> 65 filing(s) (scanning up to 100).
+2026-07-27 13:43:51,276 INFO screener | Options-flow most-actives pool -> 40 name(s).
+2026-07-27 13:44:07,905 INFO screener | Robinhood 'Daily movers' -> 20 name(s).
+2026-07-27 13:44:09,289 INFO screener | Robinhood '100 most popular' -> 100 name(s).
+2026-07-27 13:44:11,339 INFO screener | Robinhood scans: none saved (define scans in the RH app to use this leg).
+2026-07-27 13:44:11,362 INFO screener | Discovered 18 candidate(s) from 5 source(s) (284 merged, 266 above min_score, capped to 18).
+2026-07-27 13:44:11,364 INFO screener |   candidate SPCX [congress+robinhood] score=+1.35 — Congress: 4 buy / 0 sell filings in last 60d (disclosures lag up to ~45d). | Robinhood 100 Most Popular (retail crowd positioning)
+2026-07-27 13:44:11,366 INFO screener |   candidate T [congress+robinhood] score=+1.10 — Congress: 3 buy / 0 sell filings in last 60d (disclosures lag up to ~45d). | Robinhood 100 Most Popular (retail crowd positioning)
+2026-07-27 13:44:11,368 INFO screener |   candidate PLUG [options_flow+robinhood] score=+1.05 — Options flow: 10,512 call / 1,855 put vol (bullish call imbalance +0.70) on a most-active name. | Robinhood 100 Most Popular (retail crowd positioning)
+2026-07-27 13:44:11,372 INFO screener |   candidate SPGI [congress] score=-1.00 — Congress: 0 buy / 5 sell filings in last 60d (disclosures lag up to ~45d).
+2026-07-27 13:44:11,373 INFO screener |   candidate WAB [congress] score=-1.00 — Congress: 0 buy / 5 sell filings in last 60d (disclosures lag up to ~45d).
+2026-07-27 13:44:11,375 INFO screener |   candidate HUBB [congress] score=+1.00 — Congress: 6 buy / 0 sell filings in last 60d (disclosures lag up to ~45d).
+2026-07-27 13:44:11,377 INFO screener |   candidate BEP [congress] score=+1.00 — Congress: 7 buy / 0 sell filings in last 60d (disclosures lag up to ~45d).
+2026-07-27 13:44:11,379 INFO screener |   candidate SOFI [options_flow+robinhood] score=+0.86 — Options flow: 130,523 call / 42,781 put vol (bullish call imbalance +0.51) on a most-active name. | Robinhood 100 Most Popular (retail crowd positioning)
+2026-07-27 13:44:11,381 INFO screener |   candidate UBER [congress+robinhood] score=+0.85 — Congress: 2 buy / 0 sell filings in last 60d (disclosures lag up to ~45d). | Robinhood 100 Most Popular (retail crowd positioning)
+2026-07-27 13:44:11,383 INFO screener |   candidate PATH [options_flow] score=+0.79 — Options flow: 25,422 call / 2,949 put vol (bullish call imbalance +0.79) on a most-active name.
+2026-07-27 13:44:11,384 INFO screener |   candidate ADI [congress] score=-0.75 — Congress: 0 buy / 3 sell filings in last 60d (disclosures lag up to ~45d).
+2026-07-27 13:44:11,385 INFO screener |   candidate LYV [congress] score=-0.75 — Congress: 0 buy / 3 sell filings in last 60d (disclosures lag up to ~45d).
+2026-07-27 13:44:11,385 INFO screener |   candidate NU [options_flow] score=+0.69 — Options flow: 26,019 call / 4,835 put vol (bullish call imbalance +0.69) on a most-active name.
+2026-07-27 13:44:11,386 INFO screener |   candidate BMNR [options_flow] score=+0.64 — Options flow: 88,705 call / 19,660 put vol (bullish call imbalance +0.64) on a most-active name.
+2026-07-27 13:44:11,386 INFO screener |   candidate MU [congress+robinhood] score=+0.60 — Congress: 2 buy / 1 sell filings in last 60d (disclosures lag up to ~45d). | Robinhood 100 Most Popular (retail crowd positioning)
+2026-07-27 13:44:11,387 INFO screener |   candidate UNH [congress] score=-0.60 — Congress: 1 buy / 4 sell filings in last 60d (disclosures lag up to ~45d).
+2026-07-27 13:44:11,387 INFO screener |   candidate COST [congress+robinhood] score=+0.60 — Congress: 1 buy / 0 sell filings in last 60d (disclosures lag up to ~45d). | Robinhood 100 Most Popular (retail crowd positioning)
+2026-07-27 13:44:11,388 INFO screener |   candidate TSLA [congress+robinhood] score=+0.60 — Congress: 1 buy / 0 sell filings in last 60d (disclosures lag up to ~45d). | Robinhood 100 Most Popular (retail crowd positioning)
+2026-07-27 13:44:27,274 INFO quiver | Quiver live/offexchange -> 5481 row(s).
+2026-07-27 13:44:28,029 INFO quiver | Quiver live/govcontractsall -> 20000 row(s).
+2026-07-27 13:44:47,984 INFO signals | Gathered signals for 22/22 symbols (+3 market signals).
+2026-07-27 13:44:48,035 INFO orchestrator | Composite index (22 scored, top: T +2.40, BMNR +1.82, HUBB +1.78, BEP +1.62, BRK.B +1.52, ZTS +1.30, PATH +1.13, SPGI +0.73).
+2026-07-27 13:44:50,139 INFO robinhood | Imported 1 Robinhood holding(s) for context (read-only).
+2026-07-27 13:44:50,142 INFO orchestrator | Buy-excluded from slate this cycle: BEP (exited 0.1h ago (cooldown 24h)), BRK.B (topped up 3.5h ago (next ok in 4h)), CVX (daily ceiling $79,248 nearly exhausted ($0 headroom)), GOOG (topped up 2.6h ago (next ok in 4h)), PLUG (price $2.05 < $5 liquidity floor) …+1 more
+2026-07-27 13:45:34,301 INFO usage | decision call: 16655 in / 2964 out (cache r=5903 w=0) ~$0.1603 [claude-opus-4-8]
+2026-07-27 13:45:34,309 INFO decision | Claude returned 4 proposal(s).
+2026-07-27 13:45:36,093 INFO earnings | Robinhood earnings calendar: 4290 name(s) reporting within 31d.
+2026-07-27 13:45:38,073 INFO orchestrator | BUY NU -> approved: Sized to 4106.1 sh ($59,436) within caps. | Corroborated bullish setup on a risk-on fintech: strong rev growth +43.7%, MACD bull with RSI 63 (no
+2026-07-27 13:45:38,165 WARNING alpaca | NU: floored 4106.1 sh -> 4106 for the exchange bracket; $1.51 of the $59435.86 allocation NOT deployed (stays cash; core sweep / next cycle can redeploy).
+2026-07-27 13:45:38,264 INFO alpaca | BUY market NU qty=4106.0 notional=None lim=None (order 20e758cb-5449-41dd-8bef-71655410e4e6)
+2026-07-27 13:45:38,267 INFO ledger | Ledger: BUY NU qty=4106 $59434
+2026-07-27 13:45:38,452 INFO orchestrator | HOLD BRK.B (no action) | Held at cap (topped up 3.5h ago). Composite +1.52 still supportive (fundamentals EBITDA $118B, congr
+2026-07-27 13:45:38,573 INFO orchestrator | HOLD CVX (no action) | Held; daily ceiling exhausted so no equity add. Thesis intact: confirmed uptrend px>50>200, MACD bul
+2026-07-27 13:45:38,694 INFO orchestrator | HOLD ZTS (no action) | Held; daily ceiling exhausted. Best corroborated setup on slate: composite +1.30, insider open-marke
+2026-07-27 13:45:38,699 INFO orchestrator | Cycle budget not fully deployed: $1.51 dropped by whole-share flooring across this cycle's buys (stays cash; core sweep / next cycle can redeploy).
+2026-07-27 13:45:38,702 INFO orchestrator | Core fill skipped: QQQ already at/above the 30% ceiling.
+2026-07-27 13:45:38,762 INFO alpaca | Alpaca client ready (mode=paper).
+2026-07-27 13:45:39,781 INFO dashboard | Wrote dashboard with 10 trades -> dashboard.html
+2026-07-27 14:35:51,596 INFO orchestrator | Order 20e758cb-5449-41dd-8bef-71655410e4e6 (NU) FILLED (4106/4106).
+2026-07-27 14:35:52,483 INFO orchestrator | Market regime: SPY above 200dma (740 vs 696), VIX 19, VIX3M 20 (contango) -> risk-on, size x1.00.
+2026-07-27 14:35:53,073 INFO quiver | Quiver live/congresstrading -> 1000 row(s).
+2026-07-27 14:35:53,433 INFO screener | EDGAR Form-4 feed -> 70 filing(s) (scanning up to 100).
+2026-07-27 14:36:22,773 INFO screener | Options-flow most-actives pool -> 40 name(s).
+2026-07-27 14:36:39,353 INFO screener | Robinhood 'Daily movers' -> 20 name(s).
+2026-07-27 14:36:40,658 INFO screener | Robinhood '100 most popular' -> 100 name(s).
+2026-07-27 14:36:41,492 INFO screener | Robinhood scans: none saved (define scans in the RH app to use this leg).
+2026-07-27 14:36:41,493 INFO screener | Discovered 18 candidate(s) from 5 source(s) (281 merged, 263 above min_score, capped to 18).
+2026-07-27 14:36:41,495 INFO screener |   candidate WAB [congress+insider] score=-1.60 — Congress: 0 buy / 5 sell filings in last 60d (disclosures lag up to ~45d). | Insider: 3 open-market SELL filing(s), 11,100 sh — bearish cluster (SEC Form 4, last filings feed).
+2026-07-27 14:36:41,497 INFO screener |   candidate SPCX [congress+robinhood] score=+1.35 — Congress: 4 buy / 0 sell filings in last 60d (disclosures lag up to ~45d). | Robinhood 100 Most Popular (retail crowd positioning)
+2026-07-27 14:36:41,498 INFO screener |   candidate BMNR [options_flow+robinhood] score=+1.22 — Options flow: 104,692 call / 24,524 put vol (bullish call imbalance +0.62) on a most-active name. | Robinhood Daily Movers (today's biggest movers — momentum)
+2026-07-27 14:36:41,500 INFO screener |   candidate T [congress+robinhood] score=+1.10 — Congress: 3 buy / 0 sell filings in last 60d (disclosures lag up to ~45d). | Robinhood 100 Most Popular (retail crowd positioning)
+2026-07-27 14:36:41,501 INFO screener |   candidate PLUG [options_flow+robinhood] score=+1.06 — Options flow: 12,333 call / 2,080 put vol (bullish call imbalance +0.71) on a most-active name. | Robinhood 100 Most Popular (retail crowd positioning)
+2026-07-27 14:36:41,502 INFO screener |   candidate SPGI [congress] score=-1.00 — Congress: 0 buy / 5 sell filings in last 60d (disclosures lag up to ~45d).
+2026-07-27 14:36:41,503 INFO screener |   candidate HUBB [congress] score=+1.00 — Congress: 6 buy / 0 sell filings in last 60d (disclosures lag up to ~45d).
+2026-07-27 14:36:41,504 INFO screener |   candidate BEP [congress] score=+1.00 — Congress: 7 buy / 0 sell filings in last 60d (disclosures lag up to ~45d).
+2026-07-27 14:36:41,505 INFO screener |   candidate AMC [options_flow+robinhood] score=+0.99 — Options flow: 40,003 call / 8,647 put vol (bullish call imbalance +0.65) on a most-active name. | Robinhood 100 Most Popular (retail crowd positioning)
+2026-07-27 14:36:41,506 INFO screener |   candidate SOFI [options_flow+robinhood] score=+0.85 — Options flow: 138,821 call / 46,093 put vol (bullish call imbalance +0.50) on a most-active name. | Robinhood 100 Most Popular (retail crowd positioning)
+2026-07-27 14:36:41,507 INFO screener |   candidate UBER [congress+robinhood] score=+0.85 — Congress: 2 buy / 0 sell filings in last 60d (disclosures lag up to ~45d). | Robinhood 100 Most Popular (retail crowd positioning)
+2026-07-27 14:36:41,509 INFO screener |   candidate PATH [options_flow] score=+0.79 — Options flow: 26,714 call / 3,117 put vol (bullish call imbalance +0.79) on a most-active name.
+2026-07-27 14:36:41,510 INFO screener |   candidate ADI [congress] score=-0.75 — Congress: 0 buy / 3 sell filings in last 60d (disclosures lag up to ~45d).
+2026-07-27 14:36:41,510 INFO screener |   candidate LYV [congress] score=-0.75 — Congress: 0 buy / 3 sell filings in last 60d (disclosures lag up to ~45d).
+2026-07-27 14:36:41,511 INFO screener |   candidate MU [congress+robinhood] score=+0.60 — Congress: 2 buy / 1 sell filings in last 60d (disclosures lag up to ~45d). | Robinhood 100 Most Popular (retail crowd positioning)
+2026-07-27 14:36:41,512 INFO screener |   candidate UNH [congress] score=-0.60 — Congress: 1 buy / 4 sell filings in last 60d (disclosures lag up to ~45d).
+2026-07-27 14:36:41,513 INFO screener |   candidate COST [congress+robinhood] score=+0.60 — Congress: 1 buy / 0 sell filings in last 60d (disclosures lag up to ~45d). | Robinhood 100 Most Popular (retail crowd positioning)
+2026-07-27 14:36:41,514 INFO screener |   candidate TSLA [congress+robinhood] score=+0.60 — Congress: 1 buy / 0 sell filings in last 60d (disclosures lag up to ~45d). | Robinhood 100 Most Popular (retail crowd positioning)
+2026-07-27 14:36:55,750 INFO quiver | Quiver live/offexchange -> 5481 row(s).
+2026-07-27 14:36:56,686 INFO quiver | Quiver live/govcontractsall -> 20000 row(s).
+2026-07-27 14:38:24,800 INFO signals | Gathered signals for 23/23 symbols (+3 market signals).
+2026-07-27 14:38:24,850 INFO orchestrator | Composite index (23 scored, top: AMC +3.78, HUBB +2.66, BMNR +2.51, T +2.49, BEP +1.63, BRK.B +1.51, ZTS +1.29, PATH +1.17).
+2026-07-27 14:38:27,425 INFO robinhood | Imported 1 Robinhood holding(s) for context (read-only).
+2026-07-27 14:38:27,429 INFO orchestrator | Buy-excluded from slate this cycle: AMC (price $2.44 < $5 liquidity floor), BEP (exited 1.0h ago (cooldown 24h)), BRK.B (daily ceiling $79,382 nearly exhausted ($0 headroom)), CVX (daily ceiling $79,382 nearly exhausted ($0 headroom)), GOOG (topped up 3.5h ago (next ok in 4h)) …+3 more
+2026-07-27 14:39:06,836 INFO usage | decision call: 16878 in / 3007 out (cache r=5903 w=0) ~$0.1625 [claude-opus-4-8]
+2026-07-27 14:39:06,845 INFO decision | Claude returned 6 proposal(s).
+2026-07-27 14:39:07,000 INFO orchestrator | HOLD HUBB (no action) | Strongest clean new-name thesis (composite +2.66: 10 congress buys/0 sells, uptrend px>50>200, MACD 
+2026-07-27 14:39:07,168 INFO orchestrator | HOLD BRK.B (no action) | Held 0.2d, -0.3%. Composite +1.51, solid fundamentals (EBITDA $118B, margin 31.4%), congress buying,
+2026-07-27 14:39:07,290 INFO orchestrator | HOLD CVX (no action) | Held 0.2d, -0.6%. Confirmed uptrend px>50>200, MACD bull, RSI 61, bullish options flow +0.43 and OI 
+2026-07-27 14:39:07,395 INFO orchestrator | HOLD GOOG (no action) | Held 0.1d. Best fundamentals on slate (EBITDA $173B, margin 38.8%, rev growth +24.2%) and bullish ca
+2026-07-27 14:39:07,515 INFO orchestrator | HOLD NU (no action) | Held 0.0d, +0.3%. Strong rev growth +43.7%, MACD bull RSI 63, very bullish call flow +0.69 and bulli
+2026-07-27 14:39:07,690 INFO orchestrator | HOLD ZTS (no action) | Held 0.2d. Highest-quality corroborated setup: composite +1.29, inflection-bullish technical, MACD b
+2026-07-27 14:39:07,696 INFO orchestrator | Core fill skipped: QQQ already at/above the 30% ceiling.
+2026-07-27 14:39:07,762 INFO alpaca | Alpaca client ready (mode=paper).
+2026-07-27 14:39:08,518 INFO dashboard | Wrote dashboard with 10 trades -> dashboard.html
+2026-07-27 15:28:20,600 INFO orchestrator | Market closed; skipping decision cycle.
+2026-07-27 15:28:20,634 INFO orchestrator | Running nightly post-mortem for 2026-07-27 …
+2026-07-27 15:28:34,672 INFO usage | postmortem call: 4085 in / 590 out (cache r=0 w=0) ~$0.0352 [claude-opus-4-8]
+2026-07-27 15:28:34,684 INFO postmortem | Post-mortem written to state/lessons/2026-07-27.md
+2026-07-27 15:28:34,714 INFO postmortem | Post-mortem lessons: Do not top up a fresh position repeatedly before its thesis is confirmed by price — hold initial size until it works.
+2026-07-27 15:28:34,723 INFO orchestrator | API spend today: $1.24 across 9 calls (130,191 in / 20,467 out tokens).
+2026-07-27 15:28:34,802 INFO alpaca | Alpaca client ready (mode=paper).
+2026-07-27 15:28:35,682 INFO dashboard | Wrote dashboard with 10 trades -> dashboard.html
+2026-07-27 16:04:38,950 INFO alpaca | Alpaca client ready (mode=paper).
+2026-07-27 16:04:39,164 INFO orchestrator | Discovery-driven mode: trading scanner-found names + holdings.
+2026-07-27 16:04:39,165 INFO orchestrator | Starting orchestrator (paper). Kill switch: off. Options: on. Benchmark: QQQ.
+2026-07-27 16:04:39,490 INFO orchestrator | Market closed; skipping decision cycle.
+2026-07-27 16:04:39,544 INFO alpaca | Alpaca client ready (mode=paper).
+2026-07-27 16:04:40,311 INFO dashboard | Wrote dashboard with 10 trades -> dashboard.html
+2026-07-27 16:56:41,545 INFO orchestrator | Market closed; skipping decision cycle.
+2026-07-27 17:31:47,192 INFO alpaca | Alpaca client ready (mode=paper).
+2026-07-27 17:31:47,407 INFO orchestrator | Discovery-driven mode: trading scanner-found names + holdings.
+2026-07-27 17:31:47,408 INFO orchestrator | Starting orchestrator (paper). Kill switch: off. Options: on. Benchmark: QQQ.
+2026-07-27 17:31:47,814 INFO orchestrator | Market closed; skipping decision cycle.
+2026-07-27 17:31:47,867 INFO alpaca | Alpaca client ready (mode=paper).
+2026-07-27 17:31:48,693 INFO dashboard | Wrote dashboard with 10 trades -> dashboard.html
+2026-07-27 18:23:50,139 INFO orchestrator | Market closed; skipping decision cycle.
+2026-07-27 18:32:35,077 INFO alpaca | Alpaca client ready (mode=paper).
+2026-07-27 18:32:35,289 INFO orchestrator | Discovery-driven mode: trading scanner-found names + holdings.
+2026-07-27 18:32:35,289 INFO orchestrator | Starting orchestrator (paper). Kill switch: off. Options: on. Benchmark: QQQ.
+2026-07-27 18:32:35,533 INFO orchestrator | Market closed; skipping decision cycle.
+2026-07-27 18:32:35,682 INFO alpaca | Alpaca client ready (mode=paper).
+2026-07-27 18:32:36,465 INFO dashboard | Wrote dashboard with 10 trades -> dashboard.html
+2026-07-27 19:24:37,801 INFO orchestrator | Market closed; skipping decision cycle.
+2026-07-27 20:16:38,987 INFO orchestrator | Market closed; skipping decision cycle.
+2026-07-27 21:08:40,386 INFO orchestrator | Market closed; skipping decision cycle.
+2026-07-27 22:00:41,697 INFO orchestrator | Market closed; skipping decision cycle.
+2026-07-27 22:52:42,973 INFO orchestrator | Market closed; skipping decision cycle.
+2026-07-27 23:37:56,599 ERROR orchestrator | Watchdog tick failed; continuing.
+Traceback (most recent call last):
+  File "/Users/spusapati/Personal/Investment_stratergy/investment_strategy/orchestrator.py", line 311, in _watchdog_loop
+    self.watchdog.check_once()
+    ~~~~~~~~~~~~~~~~~~~~~~~~^^
+  File "/Users/spusapati/Personal/Investment_stratergy/investment_strategy/monitor/watchdog.py", line 91, in check_once
+    account = self.broker.get_account()
+  File "/Users/spusapati/Personal/Investment_stratergy/investment_strategy/execution/alpaca_client.py", line 162, in get_account
+    snap = self._read_account_once()
+  File "/Users/spusapati/Personal/Investment_stratergy/investment_strategy/execution/alpaca_client.py", line 199, in _read_account_once
+    a = _retry_read(self.trading.get_account, what="get_account")
+  File "/Users/spusapati/Personal/Investment_stratergy/investment_strategy/execution/alpaca_client.py", line 117, in _retry_read
+    return fn()
+  File "/Users/spusapati/Personal/Investment_stratergy/.venv/lib/python3.13/site-packages/alpaca/trading/client.py", line 479, in get_account
+    return TradeAccount(**response)
+  File "/Users/spusapati/Personal/Investment_stratergy/.venv/lib/python3.13/site-packages/pydantic/main.py", line 263, in __init__
+    validated_self = self.__pydantic_validator__.validate_python(data, self_instance=self)
+pydantic_core._pydantic_core.ValidationError: 1 validation error for TradeAccount
+status
+  Input should be 'ACCOUNT_CLOSED', 'ACCOUNT_UPDATED', 'ACTION_REQUIRED', 'ACTIVE', 'AML_REVIEW', 'APPROVAL_PENDING', 'APPROVED', 'DISABLED', 'DISABLE_PENDING', 'EDITED', 'INACTIVE', 'KYC_SUBMITTED', 'LIMITED', 'ONBOARDING', 'PAPER_ONLY', 'REAPPROVAL_PENDING', 'REJECTED', 'RESUBMITTED', 'SIGNED_UP', 'SUBMISSION_FAILED' or 'SUBMITTED' [type=enum, input_value='ACCOUNT_CLOSED_PENDING', input_type=str]
+    For further information visit https://errors.pydantic.dev/2.13/v/enum
+2026-07-27 23:38:27,194 ERROR orchestrator | Watchdog tick failed; continuing.
+Traceback (most recent call last):
+  File "/Users/spusapati/Personal/Investment_stratergy/investment_strategy/orchestrator.py", line 311, in _watchdog_loop
+    self.watchdog.check_once()
+    ~~~~~~~~~~~~~~~~~~~~~~~~^^
+  File "/Users/spusapati/Personal/Investment_stratergy/investment_strategy/monitor/watchdog.py", line 91, in check_once
+    account = self.broker.get_account()
+  File "/Users/spusapati/Personal/Investment_stratergy/investment_strategy/execution/alpaca_client.py", line 162, in get_account
+    snap = self._read_account_once()
+  File "/Users/spusapati/Personal/Investment_stratergy/investment_strategy/execution/alpaca_client.py", line 199, in _read_account_once
+    a = _retry_read(self.trading.get_account, what="get_account")
+  File "/Users/spusapati/Personal/Investment_stratergy/investment_strategy/execution/alpaca_client.py", line 117, in _retry_read
+    return fn()
+  File "/Users/spusapati/Personal/Investment_stratergy/.venv/lib/python3.13/site-packages/alpaca/trading/client.py", line 479, in get_account
+    return TradeAccount(**response)
+  File "/Users/spusapati/Personal/Investment_stratergy/.venv/lib/python3.13/site-packages/pydantic/main.py", line 263, in __init__
+    validated_self = self.__pydantic_validator__.validate_python(data, self_instance=self)
+pydantic_core._pydantic_core.ValidationError: 1 validation error for TradeAccount
+status
+  Input should be 'ACCOUNT_CLOSED', 'ACCOUNT_UPDATED', 'ACTION_REQUIRED', 'ACTIVE', 'AML_REVIEW', 'APPROVAL_PENDING', 'APPROVED', 'DISABLED', 'DISABLE_PENDING', 'EDITED', 'INACTIVE', 'KYC_SUBMITTED', 'LIMITED', 'ONBOARDING', 'PAPER_ONLY', 'REAPPROVAL_PENDING', 'REJECTED', 'RESUBMITTED', 'SIGNED_UP', 'SUBMISSION_FAILED' or 'SUBMITTED' [type=enum, input_value='ACCOUNT_CLOSED_PENDING', input_type=str]
+    For further information visit https://errors.pydantic.dev/2.13/v/enum
+2026-07-27 23:38:57,378 ERROR orchestrator | Watchdog tick failed; continuing.
+Traceback (most recent call last):
+  File "/Users/spusapati/Personal/Investment_stratergy/investment_strategy/orchestrator.py", line 311, in _watchdog_loop
+    self.watchdog.check_once()
+    ~~~~~~~~~~~~~~~~~~~~~~~~^^
+  File "/Users/spusapati/Personal/Investment_stratergy/investment_strategy/monitor/watchdog.py", line 91, in check_once
+    account = self.broker.get_account()
+  File "/Users/spusapati/Personal/Investment_stratergy/investment_strategy/execution/alpaca_client.py", line 162, in get_account
+    snap = self._read_account_once()
+  File "/Users/spusapati/Personal/Investment_stratergy/investment_strategy/execution/alpaca_client.py", line 199, in _read_account_once
+    a = _retry_read(self.trading.get_account, what="get_account")
+  File "/Users/spusapati/Personal/Investment_stratergy/investment_strategy/execution/alpaca_client.py", line 117, in _retry_read
+    return fn()
+  File "/Users/spusapati/Personal/Investment_stratergy/.venv/lib/python3.13/site-packages/alpaca/trading/client.py", line 479, in get_account
+    return TradeAccount(**response)
+  File "/Users/spusapati/Personal/Investment_stratergy/.venv/lib/python3.13/site-packages/pydantic/main.py", line 263, in __init__
+    validated_self = self.__pydantic_validator__.validate_python(data, self_instance=self)
+pydantic_core._pydantic_core.ValidationError: 1 validation error for TradeAccount
+status
+  Input should be 'ACCOUNT_CLOSED', 'ACCOUNT_UPDATED', 'ACTION_REQUIRED', 'ACTIVE', 'AML_REVIEW', 'APPROVAL_PENDING', 'APPROVED', 'DISABLED', 'DISABLE_PENDING', 'EDITED', 'INACTIVE', 'KYC_SUBMITTED', 'LIMITED', 'ONBOARDING', 'PAPER_ONLY', 'REAPPROVAL_PENDING', 'REJECTED', 'RESUBMITTED', 'SIGNED_UP', 'SUBMISSION_FAILED' or 'SUBMITTED' [type=enum, input_value='ACCOUNT_CLOSED_PENDING', input_type=str]
+    For further information visit https://errors.pydantic.dev/2.13/v/enum
+2026-07-27 23:39:27,693 ERROR orchestrator | Watchdog tick failed; continuing.
+Traceback (most recent call last):
+  File "/Users/spusapati/Personal/Investment_stratergy/investment_strategy/orchestrator.py", line 311, in _watchdog_loop
+    self.watchdog.check_once()
+    ~~~~~~~~~~~~~~~~~~~~~~~~^^
+  File "/Users/spusapati/Personal/Investment_stratergy/investment_strategy/monitor/watchdog.py", line 91, in check_once
+    account = self.broker.get_account()
+  File "/Users/spusapati/Personal/Investment_stratergy/investment_strategy/execution/alpaca_client.py", line 162, in get_account
+    snap = self._read_account_once()
+  File "/Users/spusapati/Personal/Investment_stratergy/investment_strategy/execution/alpaca_client.py", line 199, in _read_account_once
+    a = _retry_read(self.trading.get_account, what="get_account")
+  File "/Users/spusapati/Personal/Investment_stratergy/investment_strategy/execution/alpaca_client.py", line 117, in _retry_read
+    return fn()
+  File "/Users/spusapati/Personal/Investment_stratergy/.venv/lib/python3.13/site-packages/alpaca/trading/client.py", line 479, in get_account
+    return TradeAccount(**response)
+  File "/Users/spusapati/Personal/Investment_stratergy/.venv/lib/python3.13/site-packages/pydantic/main.py", line 263, in __init__
+    validated_self = self.__pydantic_validator__.validate_python(data, self_instance=self)
+pydantic_core._pydantic_core.ValidationError: 1 validation error for TradeAccount
+status
+  Input should be 'ACCOUNT_CLOSED', 'ACCOUNT_UPDATED', 'ACTION_REQUIRED', 'ACTIVE', 'AML_REVIEW', 'APPROVAL_PENDING', 'APPROVED', 'DISABLED', 'DISABLE_PENDING', 'EDITED', 'INACTIVE', 'KYC_SUBMITTED', 'LIMITED', 'ONBOARDING', 'PAPER_ONLY', 'REAPPROVAL_PENDING', 'REJECTED', 'RESUBMITTED', 'SIGNED_UP', 'SUBMISSION_FAILED' or 'SUBMITTED' [type=enum, input_value='ACCOUNT_CLOSED_PENDING', input_type=str]
+    For further information visit https://errors.pydantic.dev/2.13/v/enum
+2026-07-27 23:39:57,887 ERROR orchestrator | Watchdog tick failed; continuing.
+Traceback (most recent call last):
+  File "/Users/spusapati/Personal/Investment_stratergy/investment_strategy/orchestrator.py", line 311, in _watchdog_loop
+    self.watchdog.check_once()
+    ~~~~~~~~~~~~~~~~~~~~~~~~^^
+  File "/Users/spusapati/Personal/Investment_stratergy/investment_strategy/monitor/watchdog.py", line 91, in check_once
+    account = self.broker.get_account()
+  File "/Users/spusapati/Personal/Investment_stratergy/investment_strategy/execution/alpaca_client.py", line 162, in get_account
+    snap = self._read_account_once()
+  File "/Users/spusapati/Personal/Investment_stratergy/investment_strategy/execution/alpaca_client.py", line 199, in _read_account_once
+    a = _retry_read(self.trading.get_account, what="get_account")
+  File "/Users/spusapati/Personal/Investment_stratergy/investment_strategy/execution/alpaca_client.py", line 117, in _retry_read
+    return fn()
+  File "/Users/spusapati/Personal/Investment_stratergy/.venv/lib/python3.13/site-packages/alpaca/trading/client.py", line 479, in get_account
+    return TradeAccount(**response)
+  File "/Users/spusapati/Personal/Investment_stratergy/.venv/lib/python3.13/site-packages/pydantic/main.py", line 263, in __init__
+    validated_self = self.__pydantic_validator__.validate_python(data, self_instance=self)
+pydantic_core._pydantic_core.ValidationError: 1 validation error for TradeAccount
+status
+  Input should be 'ACCOUNT_CLOSED', 'ACCOUNT_UPDATED', 'ACTION_REQUIRED', 'ACTIVE', 'AML_REVIEW', 'APPROVAL_PENDING', 'APPROVED', 'DISABLED', 'DISABLE_PENDING', 'EDITED', 'INACTIVE', 'KYC_SUBMITTED', 'LIMITED', 'ONBOARDING', 'PAPER_ONLY', 'REAPPROVAL_PENDING', 'REJECTED', 'RESUBMITTED', 'SIGNED_UP', 'SUBMISSION_FAILED' or 'SUBMITTED' [type=enum, input_value='ACCOUNT_CLOSED_PENDING', input_type=str]
+    For further information visit https://errors.pydantic.dev/2.13/v/enum
+2026-07-27 23:40:28,106 ERROR orchestrator | Watchdog tick failed; continuing.
+Traceback (most recent call last):
+  File "/Users/spusapati/Personal/Investment_stratergy/investment_strategy/orchestrator.py", line 311, in _watchdog_loop
+    self.watchdog.check_once()
+    ~~~~~~~~~~~~~~~~~~~~~~~~^^
+  File "/Users/spusapati/Personal/Investment_stratergy/investment_strategy/monitor/watchdog.py", line 91, in check_once
+    account = self.broker.get_account()
+  File "/Users/spusapati/Personal/Investment_stratergy/investment_strategy/execution/alpaca_client.py", line 162, in get_account
+    snap = self._read_account_once()
+  File "/Users/spusapati/Personal/Investment_stratergy/investment_strategy/execution/alpaca_client.py", line 199, in _read_account_once
+    a = _retry_read(self.trading.get_account, what="get_account")
+  File "/Users/spusapati/Personal/Investment_stratergy/investment_strategy/execution/alpaca_client.py", line 117, in _retry_read
+    return fn()
+  File "/Users/spusapati/Personal/Investment_stratergy/.venv/lib/python3.13/site-packages/alpaca/trading/client.py", line 479, in get_account
+    return TradeAccount(**response)
+  File "/Users/spusapati/Personal/Investment_stratergy/.venv/lib/python3.13/site-packages/pydantic/main.py", line 263, in __init__
+    validated_self = self.__pydantic_validator__.validate_python(data, self_instance=self)
+pydantic_core._pydantic_core.ValidationError: 1 validation error for TradeAccount
+status
+  Input should be 'ACCOUNT_CLOSED', 'ACCOUNT_UPDATED', 'ACTION_REQUIRED', 'ACTIVE', 'AML_REVIEW', 'APPROVAL_PENDING', 'APPROVED', 'DISABLED', 'DISABLE_PENDING', 'EDITED', 'INACTIVE', 'KYC_SUBMITTED', 'LIMITED', 'ONBOARDING', 'PAPER_ONLY', 'REAPPROVAL_PENDING', 'REJECTED', 'RESUBMITTED', 'SIGNED_UP', 'SUBMISSION_FAILED' or 'SUBMITTED' [type=enum, input_value='ACCOUNT_CLOSED_PENDING', input_type=str]
+    For further information visit https://errors.pydantic.dev/2.13/v/enum
+2026-07-27 23:44:44,154 INFO orchestrator | Market closed; skipping decision cycle.
+2026-07-27 23:47:58,351 INFO alpaca | Alpaca client ready (mode=paper).
+2026-07-27 23:47:58,550 INFO orchestrator | Discovery-driven mode: trading scanner-found names + holdings.
+2026-07-27 23:47:58,551 INFO orchestrator | Starting orchestrator (paper). Kill switch: off. Options: on. Benchmark: QQQ.
+2026-07-27 23:47:58,859 INFO orchestrator | Market closed; skipping decision cycle.
+2026-07-27 23:47:58,913 INFO alpaca | Alpaca client ready (mode=paper).
+2026-07-27 23:47:59,239 INFO dashboard | Wrote dashboard with 0 trades -> dashboard.html

@@ -54,6 +54,13 @@ class Regime:
     # direction-sensitive consumers (the option call/put gate) key on this
     # field, never on the label. "" = unknown (degraded read).
     trend: str = ""            # "up" | "down" | ""
+    # TODAY'S move: SPY's last bar vs the prior daily close (during the
+    # session yfinance's last daily bar is the live partial bar, so this is
+    # the intraday move; after hours it's the day's close-to-close). The
+    # 200dma trend above is deliberately slow — this is the FAST read that
+    # drives the falling-tape core defense and the index-put sanction.
+    # None = unknown (degraded read); consumers fail open.
+    day_change_pct: float | None = None
 
 
 class RegimeReader:
@@ -100,6 +107,10 @@ class RegimeReader:
 
         sma = statistics.fmean(spy[-_SMA_DAYS:])
         price = spy[-1]
+        day_change = (
+            round((price / spy[-2] - 1.0) * 100.0, 2) if len(spy) >= 2 and spy[-2] > 0
+            else None
+        )
         above = price >= sma
         trend_factor = 1.0 if above else 0.5
         vol_factor = 1.0 if vix < 20 else (0.7 if vix < 30 else 0.4)
@@ -125,12 +136,18 @@ class RegimeReader:
         trend = "above" if above else "below"
         term = ""
         if vix3m is not None:
-            term = f", VIX3M {vix3m:.0f} ({'BACKWARDATION' if backwardated else 'contango'})"
+            term = f", VIX3M {vix3m:.1f} ({'BACKWARDATION' if backwardated else 'contango'})"
+        day_part = f", today {day_change:+.1f}%" if day_change is not None else ""
+        # VIX at one decimal: the old %.0f rounded a sub-20 read up to "VIX 20"
+        # and made the calm tier look like a missed down-scale (Jul 29 audit).
         reason = (
-            f"SPY {trend} 200dma ({price:.0f} vs {sma:.0f}), VIX {vix:.0f}{term} "
+            f"SPY {trend} 200dma ({price:.0f} vs {sma:.0f}{day_part}), VIX {vix:.1f}{term} "
             f"-> {label}, size x{mult:.2f}."
         )
-        return Regime(mult, label, reason, trend="up" if above else "down")
+        return Regime(
+            mult, label, reason, trend="up" if above else "down",
+            day_change_pct=day_change,
+        )
 
     # -- data (yfinance; keyless) ------------------------------------------ #
     @staticmethod

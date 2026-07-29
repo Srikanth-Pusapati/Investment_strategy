@@ -116,6 +116,16 @@ class Orchestrator:
         # multiplier each cycle — they drive the option call/put direction gate.
         self._regime_trend = ""
         self._regime_label = ""
+        # Buys rejected at EQUITY-only gates this cycle, queued for the scoped
+        # same-cycle option fallback (reset each _execute_proposals pass).
+        self._option_fallbacks: list[tuple[TradeProposal, str]] = []
+        # Falling-tape core defense flag, set each cycle by _apply_core_defense
+        # and read by _apply_core_fill (no DCA into a falling market).
+        self._core_defense_active = False
+        # The index symbol whose defined-risk put the falling-market read
+        # sanctioned THIS cycle ("" = none) — _handle_option passes it to the
+        # direction gate so the sanction survives even when the core isn't held.
+        self._hedge_symbol = ""
         if (
             cfg.risk.options_enabled
             and getattr(cfg.risk, "option_direction_gate", True)
@@ -755,6 +765,7 @@ class Orchestrator:
         self._cycle_market_open = self.broker.is_market_open()
         if not self._cycle_market_open:
             log.info("Market closed; skipping decision cycle.")
+            self._refresh_closing_snapshot()
             self._maybe_run_postmortem()
             self._maybe_run_weekly_autotune()
             self._stamp_liveness()  # the postmortem's LLM call can run ~2 min
@@ -804,6 +815,11 @@ class Orchestrator:
         # snapshot is what the buy path sizes against.
         if self.cfg.risk.regime_filter_enabled:
             self._apply_regime_trim(account, self.regime.assess())
+        # Falling-tape core defense (Jul 29: the QQQ core is pure beta — it ate
+        # -$1.8k while the DCA fill kept BUYING the decline). On a falling read
+        # (risk-off label, long-run downtrend, or an intraday benchmark drop),
+        # trim the core once per day and pause the core fill for the cycle.
+        self._apply_core_defense(account)
 
         # Watchlist + current holdings are always evaluated; the scanner widens
         # this with NEW smart-money names so buy ideas can originate from the
@@ -937,6 +953,22 @@ class Orchestrator:
         # is cached per-cycle). Without this the model never sees the risk-off
         # state and a long-only book just bleeds through a decline.
         _reg = self.regime.assess() if self.cfg.risk.regime_filter_enabled else None
+        # Falling-market INDEX-put sanction (Jul 29): when the deterministic
+        # falling read fires and options are on, tell the model it may buy ONE
+        # defined-risk put on the index itself — profit from the fall, not
+        # just less bleed. The direction gate reads it as core insurance.
+        hedge_symbol, hedge_price, hedge_reason = "", None, ""
+        if self.options is not None:
+            falling, why = self._market_falling()
+            if falling:
+                hedge_symbol = self.cfg.core_etf or self.cfg.benchmark_symbol
+                hedge_reason = why
+                if hedge_symbol:
+                    try:
+                        hedge_price = self.broker.latest_price(hedge_symbol)
+                    except Exception:
+                        hedge_price = None
+        self._hedge_symbol = hedge_symbol
         proposals = self.engine.decide(
             bundles, account, bench_line, external, lessons,
             today=today_block, buy_excluded=buy_excluded,
@@ -946,9 +978,14 @@ class Orchestrator:
             regime_reason=(_reg.reason if _reg else ""),
             regime_trend=(_reg.trend if _reg else ""),
             curated=curated,
+            hedge_symbol=hedge_symbol, hedge_price=hedge_price,
+            hedge_reason=hedge_reason,
         )
         self._stamp_liveness()
-        proposals = self._filter_to_slate(proposals, bundles, account)
+        proposals = self._filter_to_slate(
+            proposals, bundles, account,
+            extra={hedge_symbol} if hedge_symbol else None,
+        )
         # Hard backstop: Claude may still propose an excluded BUY; drop it.
         dropped = set()
         proposals_before = proposals
@@ -988,7 +1025,7 @@ class Orchestrator:
             proposals = kept_sells
         undeployed = self._execute_proposals(
             proposals, account, signal_kinds, tech_ctx=tech_ctx,
-            composites=composites,
+            composites=composites, bundles=bundles,
         )
         if undeployed >= 1.0:
             # Whole-share bracket flooring drops each buy's sub-share remainder
@@ -1114,6 +1151,21 @@ class Orchestrator:
         except Exception as e:
             log.warning("Could not record equity snapshot: %s", e)
 
+    def _refresh_closing_snapshot(self) -> None:
+        """Market-closed tick: overwrite today's equity row with the TRUE
+        post-close read. The in-session snapshot lands whenever the last open
+        cycle ran (Jul 28: stamped 46 min before the bell, overstating the
+        close by $498 — every day-P&L forensic then reconciles against a wrong
+        baseline). Only refreshes a row that already exists for today's UTC
+        date, so a post-midnight tick can't mint a phantom next-day row."""
+        try:
+            rows = self.equity_history.all()
+            today = datetime.now(timezone.utc).date().isoformat()
+            if rows and rows[-1].get("date") == today:
+                self.equity_history.snapshot(compute_status(self.broker))
+        except Exception as e:
+            log.warning("Closing equity snapshot failed: %s", e)
+
     def _attribution_lessons(self) -> str:
         """Per-cycle track-record block (attribution.py) — recomputed every
         cycle and changes whenever a position closes, so it stays in the
@@ -1170,6 +1222,11 @@ class Orchestrator:
         if n <= self.MAX_UNRESOLVED_RETRIES:
             self._oid_retries[oid] = n
             self._pending_oids.append((oid, symbol))
+            # Persist the requeue NOW (not just at cycle-end merge): the
+            # watchdog's vanished-position sweep spares symbols with a pending
+            # order in STATE — during reconcile's drain window an in-memory-
+            # only requeue left a still-working buy's fresh clocks sweepable.
+            self.state.add_pending_order(oid, symbol)
             log.warning(
                 "Order %s (%s) %s — unresolved, re-queued (%d/%d).",
                 oid, symbol, why, n, self.MAX_UNRESOLVED_RETRIES,
@@ -1380,9 +1437,10 @@ class Orchestrator:
                 )
                 # An exchange-side exit also starts the re-entry cooldown —
                 # stamped at the FILL time and price when known (price feeds the
-                # price-aware re-entry guard).
+                # price-aware re-entry guard; realized % feeds the loss streak).
                 self.state.register_exit(
-                    o["symbol"], when=ts, price=o["price"] or None)
+                    o["symbol"], when=ts, price=o["price"] or None,
+                    pl_pct=pl_pct)
         except Exception as e:  # bookkeeping must never break a decision cycle
             log.warning("Exchange-exit backfill failed: %s", e)
 
@@ -1460,6 +1518,29 @@ class Orchestrator:
                     latest_rationale[t.symbol] = t.rationale
         except Exception:
             pass
+        # The model's own LAST verdict on each held name TODAY (from the
+        # decision journal). Jul 29 NU: the 9:25 cycle held a name sitting
+        # 1.4pp from its stop with no memory of its own earlier reasoning and
+        # no view of the stop — 23 minutes later the bracket fired. Confronting
+        # the model with its prior verdict turns hold-reaffirmation into an
+        # explicit decision instead of fresh anchoring each cycle.
+        prior_verdicts: dict[str, tuple[str, float, str]] = {}
+        try:
+            for rec in self.journal.today():
+                # Only records that carry an actual MODEL verdict — synthetic
+                # rows (slate exclusions, backstop drops, fallback declines)
+                # would otherwise masquerade as the model's own reasoning.
+                if (
+                    rec.symbol
+                    and rec.action in ("hold", "sell", "buy")
+                    and rec.verdict not in ("slate_excluded", "dropped_buy")
+                    and not rec.reason.startswith("option fallback")
+                ):
+                    prior_verdicts[rec.symbol] = (
+                        rec.action, rec.conviction, rec.rationale_head,
+                    )
+        except Exception:
+            pass
         for p in account.positions:
             if p.is_option:
                 continue
@@ -1475,10 +1556,27 @@ class Orchestrator:
             age = self.state.entry_age_days(p.symbol)
             if age is not None:
                 bits.append(f"held {age:.1f}d")
+            # Stop geometry (trusted, from our own risk state): the planned
+            # stop width and how far the position currently sits from it —
+            # the number a losing hold must consciously accept riding toward.
+            stop_w = self.state.get_stop_width(p.symbol)
+            if stop_w > 0:
+                dist = stop_w + p.unrealized_pl_pct  # pp of room left
+                bits.append(
+                    f"stop -{stop_w:.1f}% ({max(dist, 0.0):.1f}pp of room left)"
+                )
             note = ", ".join(bits)
             why = latest_rationale.get(p.symbol, "")
             if why:
                 note = (note + "; thesis: " if note else "thesis: ") + why[:90]
+            pv = prior_verdicts.get(p.symbol)
+            if pv:
+                action, pconv, phead = pv
+                note += (
+                    f"; your last verdict today: {action.upper()} "
+                    f"conv {pconv:.2f}"
+                    + (f" ('{phead[:70]}')" if phead else "")
+                )
             if note:
                 notes[p.symbol] = note
         return notes
@@ -1666,6 +1764,7 @@ class Orchestrator:
         self, proposals, account, signal_kinds,
         tech_ctx: dict[str, dict] | None = None,
         composites: dict[str, float] | None = None,
+        bundles: list | None = None,
     ) -> float:
         """Execute the cycle's proposals, equity SELLs first. Returns the $
         dropped by whole-share flooring across the cycle's buys.
@@ -1678,6 +1777,7 @@ class Orchestrator:
         order the model listed them in. The budget split runs AFTER the sells
         for the same reason: on a full book, the rotation buy's deployable
         cash IS the freed capital."""
+        self._option_fallbacks = []
         if not proposals:
             log.info("No actionable proposals this cycle.")
             return 0.0
@@ -1715,7 +1815,71 @@ class Orchestrator:
                     tech=tech_ctx.get(proposal.symbol),
                     composite=composites.get(proposal.symbol),
                 )
+        self._run_option_fallbacks(account, signal_kinds, tech_ctx, bundles)
         return undeployed
+
+    def _run_option_fallbacks(
+        self, account, signal_kinds, tech_ctx: dict[str, dict],
+        bundles: list | None,
+    ) -> None:
+        """Consume the cycle's equity-gate rejections (overextension /
+        earnings blackout) as scoped option-fallback decisions — capped at 2
+        extra LLM calls per cycle, highest conviction first. Each approved
+        structure flows through the normal _handle_option path (premium cap,
+        direction/DTE/liquidity gates, journal, ledger)."""
+        queue, self._option_fallbacks = self._option_fallbacks, []
+        if not queue or self.options is None or not bundles:
+            return
+        if not self.broker.is_market_open():
+            return  # same reasoning as the post-LLM close fence
+        # Per-day attempt cap (Jul 29: F burned a fallback call at 9:25 and a
+        # main-path spread reject at 10:17, and would have re-tried hourly all
+        # day). Count today's option attempts per symbol — fallback declines
+        # AND main-path option verdicts — and stop after 2.
+        attempts: dict[str, int] = {}
+        try:
+            for rec in self.journal.today():
+                if rec.instrument == "option" or rec.reason.startswith(
+                    "option fallback"
+                ):
+                    attempts[rec.symbol] = attempts.get(rec.symbol, 0) + 1
+        except Exception:
+            pass
+        by_symbol = {b.symbol: b for b in bundles}
+        queue.sort(key=lambda pr: -pr[0].conviction)
+        for proposal, reason in queue[:2]:
+            bundle = by_symbol.get(proposal.symbol)
+            if bundle is None:
+                continue
+            if attempts.get(proposal.symbol, 0) >= 2:
+                log.info(
+                    "Option fallback for %s skipped: %d option attempt(s) "
+                    "already today (daily cap 2 — stop ping-ponging one name).",
+                    proposal.symbol, attempts[proposal.symbol],
+                )
+                continue
+            self._stamp_liveness()
+            opt = self.engine.decide_option_fallback(
+                bundle, account, proposal.conviction, reason,
+                price=self.broker.latest_price(proposal.symbol),
+                regime_label=self._regime_label,
+                regime_reason="",
+                curated=self._curated_lessons(),
+            )
+            if opt is None:
+                # Journal the decline: without a durable record the next cycle
+                # (and the nightly postmortem) can't see the attempt happened,
+                # and the daily attempt cap above has nothing to count.
+                self._journal_decision(
+                    proposal.symbol, "hold", "option", proposal.conviction,
+                    0.0, "rejected", 0.0,
+                    "option fallback declined (model HOLD)", "",
+                )
+                continue
+            self._handle_option(
+                opt, account, signal_kinds.get(proposal.symbol, []),
+                tech=tech_ctx.get(proposal.symbol),
+            )
 
     # -- prompt-time buy-headroom / slate filtering (A2) --------------------- #
     def _buy_headroom_usd(self, symbol: str, account) -> tuple[float, str]:
@@ -1889,18 +2053,43 @@ class Orchestrator:
 
     # -- slate whitelist (Todo-3 S.1) --------------------------------------- #
     @staticmethod
-    def _filter_to_slate(proposals, bundles, account):
+    def _filter_to_slate(proposals, bundles, account, extra=None):
         """Drop any proposal whose symbol was never presented to the model. The
         decision prompt embeds UNTRUSTED third-party text (headlines, social
         posts, curated-list names); a crafted payload could persuade the model to
         propose a pumped ticker no screener surfaced. The model may only act on
         the slate it was shown (candidate bundles) plus what we already hold
-        (so closing a position is never blocked)."""
+        (so closing a position is never blocked). `extra` adds symbols WE
+        explicitly sanctioned in the prompt this cycle (the falling-market
+        index-put hedge), which are neither slate names nor necessarily held."""
         allowed = {b.symbol for b in bundles} | {p.symbol for p in account.positions}
+        hedge_only = (set(extra) if extra else set()) - allowed
         kept = []
         for prop in proposals:
             if prop.symbol in allowed:
                 kept.append(prop)
+            elif prop.symbol in hedge_only:
+                # Sanctioned via `extra` alone (the index-put hedge on a name
+                # neither slated nor held): the sanction is PUT-ONLY — enforce
+                # that at the gate, not just in the prompt, so the whitelist
+                # can't be ridden into an equity buy or a call structure.
+                is_put_play = (
+                    getattr(prop.instrument, "value", str(prop.instrument))
+                    == "option"
+                    and prop.option_legs
+                    and all(
+                        leg.right.lower().startswith("p")
+                        for leg in prop.option_legs
+                    )
+                )
+                if is_put_play:
+                    kept.append(prop)
+                else:
+                    log.warning(
+                        "DROPPED %s proposal for %s: the falling-market "
+                        "sanction covers defined-risk PUTs only.",
+                        prop.action.value.upper(), prop.symbol,
+                    )
             else:
                 log.warning(
                     "DROPPED %s proposal for %s: symbol not in the candidate "
@@ -2082,11 +2271,18 @@ class Orchestrator:
                     self._pending_oids.append((oid, pos.symbol))
                     # Persist at submit (mirror the watchdog) — crash-safe fill-check.
                     self.state.add_pending_order(oid, pos.symbol)
-                    # Start the re-entry cooldown clock (churn guard).
-                    self.state.register_exit(pos.symbol)
+                    # Start the re-entry cooldown clock (churn guard) — with
+                    # the exit mark for the price-aware guard and the trip P&L
+                    # for the loss-streak scorecard (decay exits are usually
+                    # losers; without this the streak never sees them).
+                    self.state.register_exit(
+                        pos.symbol, price=live.current_price or None,
+                        pl_pct=live.unrealized_pl_pct)
                 elif outcome == "partial":
                     # Live legs replaced into marketable exits and ledgered
-                    # inside close_now; watchdog keeps tracking to completion.
+                    # inside close_now — close_now's own records already stamp
+                    # the exit clock with price and P&L, so this bare stamp is
+                    # just the cooldown belt (None fields are no-ops).
                     self.state.register_exit(pos.symbol)
                 else:
                     log.error(
@@ -2111,6 +2307,106 @@ class Orchestrator:
             s.score is not None and s.score >= min_score for s in bundle.signals
         )
 
+    # -- falling-tape core defense (Jul 29) --------------------------------- #
+    def _market_falling(self) -> tuple[bool, str]:
+        """Deterministic "the market is falling" read for the core defense and
+        the index-put sanction. True when the regime label is risk-off, the
+        long-run trend is down (SPY below its 200dma), or TODAY'S benchmark
+        move breaches the intraday defense trigger. Fails closed to (False, '')
+        when the regime filter is off or the data is degraded."""
+        if not self.cfg.risk.regime_filter_enabled:
+            return False, ""
+        reg = self.regime.assess()
+        if reg.label == "risk-off":
+            return True, "regime is risk-off"
+        if reg.trend == "down":
+            return True, "SPY below its 200dma (long-run downtrend)"
+        drop = getattr(self.cfg, "market_drop_defense_pct", 0.0)
+        if (
+            drop > 0
+            and reg.day_change_pct is not None
+            and reg.day_change_pct <= -drop
+        ):
+            return True, (
+                f"SPY {reg.day_change_pct:+.1f}% today "
+                f"(<= -{drop:g}% intraday defense trigger)"
+            )
+        return False, ""
+
+    def _apply_core_defense(self, account) -> None:
+        """When the market itself is falling, stop averaging INTO it and take
+        risk OFF the core: pause the core-ETF fill for the cycle (the flag the
+        fill checks) and sell CORE_DEFENSE_TRIM_PCT of the core position, at
+        most once per trading day. This is the deterministic answer to "QQQ
+        always drags the book down when it falls" — the core's other guards
+        (GTC stop 15% under basis, equity floor, daily-loss flatten) only act
+        at catastrophe distance. A defensive trim is not a thesis exit: no
+        re-entry cooldown / loss-streak stamp, and the fill resumes (DCA back
+        in) as soon as the falling read clears."""
+        etf = self.cfg.core_etf
+        self._core_defense_active = False
+        if not etf or not getattr(self.cfg, "core_defense_enabled", False):
+            return
+        falling, why = self._market_falling()
+        if not falling:
+            return
+        self._core_defense_active = True
+        pos = account.position_for(etf)
+        if pos is None or pos.qty <= 0:
+            return
+        if self.state.core_defense_fired_today():
+            return  # already trimmed today; the paused fill carries the defense
+        frac = max(
+            0.0, min(100.0, getattr(self.cfg, "core_defense_trim_pct", 0.0))
+        ) / 100.0
+        sell_qty = float(int(pos.qty * frac))  # whole shares; sub-share trim skipped
+        if frac <= 0 or sell_qty <= 0:
+            return
+        with self._trade_lock:
+            # Release the resting GTC core stop first — its legs reserve the
+            # shares (the same wash-trade/reserved-qty dance as the core fill).
+            self.broker.cancel_open_orders_for(etf)
+            oid = self.broker.reduce_position(etf, sell_qty)
+        # The GTC core stop was just canceled — the core must NOT ride the
+        # rest of this (minutes-long) cycle stopless. Arm the 30s watchdog
+        # retry unconditionally, then try to re-place the stop for the
+        # remainder right now (the snapshot qty is reduced below before this
+        # runs on the success path; on the failure path the full-size stop is
+        # re-placed for the untouched position).
+        self._core_stop_gap = True
+        if not oid:
+            log.warning(
+                "Core defense: trim of %s failed to submit — retrying next "
+                "cycle (GTC stop re-placement armed).", etf,
+            )
+            self._ensure_core_stop(account)
+            return
+        self.state.mark_core_defense()
+        log.warning(
+            "CORE DEFENSE: %s — sold %g of %g %s sh (%.0f%% trim); core fill "
+            "paused while the falling read holds.",
+            why, sell_qty, pos.qty, etf, frac * 100.0,
+        )
+        self._pending_oids.append((oid, etf))
+        self.state.add_pending_order(oid, etf)
+        self.ledger.record(TradeRecord.for_sell(
+            etf, f"core defense trim {frac * 100.0:.0f}% — {why}", oid,
+            qty=sell_qty, realized_pl_pct=pos.unrealized_pl_pct,
+            realized_pl=None, exit_reason="core_defense",
+            exit_price=pos.current_price or None,
+        ))
+        # Keep this cycle's snapshot honest: the trimmed shares are cash now.
+        freed = sell_qty * max(0.0, pos.current_price or 0.0)
+        pos.qty = round(pos.qty - sell_qty, 6)
+        pos.market_value = pos.qty * max(0.0, pos.current_price or 0.0)
+        account.cash += freed
+        account.buying_power += freed
+        # Re-place the GTC stop for the remainder NOW (sized from the reduced
+        # snapshot qty). If the working trim sell wash-blocks it, the armed
+        # watchdog retry heals within ~30s — the core never waits a full
+        # decision cycle unprotected.
+        self._ensure_core_stop(account)
+
     # -- core-satellite fill (1.6) ----------------------------------------- #
     def _apply_core_fill(self, account) -> None:
         """Deploy idle cash into the broad CORE_ETF until the book reaches
@@ -2134,6 +2430,15 @@ class Orchestrator:
         halted, why = self.risk.trading_halted(account)
         if halted:
             log.info("Core fill skipped: %s", why)
+            return
+        # Falling-tape core defense: never DCA INTO a falling market — the
+        # Jul 29 pattern was the fill buying the decline every cycle while the
+        # core dragged the book down. Resumes when the falling read clears.
+        if getattr(self, "_core_defense_active", False):
+            log.info(
+                "Core fill skipped: core defense active (market falling — "
+                "no DCA into the decline)."
+            )
             return
         r = self.cfg.risk
         equity = account.equity
@@ -2379,6 +2684,20 @@ class Orchestrator:
                 0.0,
                 decision.reason, proposal.rationale[:120] if proposal.rationale else "",
             )
+            # Same-cycle option fallback (Jul 28): a buy that died at an
+            # EQUITY-only gate (overextension / earnings blackout) is the
+            # sanctioned capped-debit call setup — evaluate_option exempts
+            # both gates. Queue it for a scoped follow-up decision AFTER the
+            # main proposal loop; next-cycle journal memory alone never
+            # converted (slate rotates, idea decays, model picks fresh names).
+            # Calls trade WITH the tape only, so skip in a down-trend market.
+            if (
+                is_buy
+                and self.options is not None
+                and self._regime_trend != "down"
+                and decision.reason.startswith(("Overextended", "Earnings in"))
+            ):
+                self._option_fallbacks.append((proposal, decision.reason))
             return 0.0
         dropped_notional = 0.0
         # Journaled dollars: sells keep the approved figure; buys are journaled
@@ -2420,9 +2739,11 @@ class Orchestrator:
                         self.state.add_pending_order(oid, proposal.symbol)
                         # Start the re-entry cooldown clock (churn guard) — with
                         # the exit price so the price-aware re-entry guard can
-                        # block a re-buy above where we just sold.
+                        # block a re-buy above where we just sold, and the P&L
+                        # so the loss-streak scorecard sees the trip.
                         self.state.register_exit(
-                            proposal.symbol, price=held.current_price or None)
+                            proposal.symbol, price=held.current_price or None,
+                            pl_pct=held.unrealized_pl_pct)
                         # Reflect the close in this cycle's snapshot so later
                         # proposals see the freed capital / slot.
                         self._apply_pending_close(account, proposal.symbol)
@@ -2434,7 +2755,8 @@ class Orchestrator:
                         # the capital in this cycle's snapshot — marketable
                         # exits fill within ticks.
                         self.state.register_exit(
-                            proposal.symbol, price=held.current_price or None)
+                            proposal.symbol, price=held.current_price or None,
+                            pl_pct=held.unrealized_pl_pct)
                         self._apply_pending_close(account, proposal.symbol)
                     else:
                         # Nothing was ledgered and nothing must be: a phantom
@@ -2550,6 +2872,10 @@ class Orchestrator:
             regime_label=self._regime_label,
             regime_multiplier=self._regime_mult,
             name_trend=name_trend,
+            sanctioned_hedge=(
+                bool(self._hedge_symbol)
+                and proposal.symbol == self._hedge_symbol
+            ),
         )
         log.info(
             "OPTION %s %s -> %s: %s | %s",

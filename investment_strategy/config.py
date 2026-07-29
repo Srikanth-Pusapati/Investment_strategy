@@ -292,6 +292,33 @@ class RiskLimits:
     # A fresh name must clear this; top-ups keep the lower min_conviction
     # floor (the position already earned its slot). 0 = off.
     min_new_name_conviction: float = 0.5
+    # --- starter haircut (Jul 27-29: BEP -$3,189 and NU -$3,291 were both
+    # fresh names entered AT the conviction floor with the stop clamped at the
+    # 4% vol-stop floor — the recurring loss geometry of this book. Raising
+    # the conviction floor would have blocked PATH, the only winner, so the
+    # fix is SIZE: a floor-conviction or floor-stop starter deploys at half
+    # size until the thesis earns a top-up.) ---
+    starter_haircut_enabled: bool = True
+    starter_full_conviction: float = 0.65  # starters below this conviction are halved
+    starter_haircut_mult: float = 0.5      # size multiplier for haircut starters
+    # Widen a vol-scaled stop to at least the entry's extension over the 20d
+    # SMA (still clamped to vol_stop_max_pct). NU Jul 28: entered 6.8% above
+    # the SMA with a 4.1% stop — the stop rested INSIDE the base it broke out
+    # from, so ordinary mean reversion tagged it at the session low. A stop
+    # that at least reaches back to the mean is not tagged by noise; the
+    # per-trade $-risk cap shrinks SIZE to keep dollar risk flat.
+    stop_cover_extension: bool = True
+    # Gap-day chase trigger: an entry more than this % above the PRIOR daily
+    # close fires the overextension gate's extreme leg regardless of RSI/ATR
+    # (VRRM Jul 29: bought +28% over prior close; the gap bar inflated its own
+    # ATR denominator 41%, deflating a 4.1x extension read to 2.93x — under
+    # the 3.0x block). 0 = off.
+    overext_gap_pct: float = 15.0
+    # Loss-streak re-entry bar: a symbol whose last N closed trips ALL lost
+    # needs the composite override bar (reentry_price_override_composite) to
+    # open a fresh position — the book must stop paying the same name's spread
+    # to lose a third time. 0 = off.
+    loss_streak_guard: int = 2
 
 
 @dataclass(frozen=True)
@@ -396,6 +423,16 @@ class Config:
     # from dashboard_file: this one carries the benchmark comparison, per-source
     # attribution, and the baked-in hypothetical-performance disclaimers.
     track_record_file: str = ""
+    # --- core defense (Jul 29: the QQQ core is pure beta — on a falling tape
+    # it drags the book down while the DCA fill keeps BUYING the decline).
+    # When the market is falling (regime risk-off, long-run trend down, or an
+    # intraday benchmark drop beyond market_drop_defense_pct), the core fill
+    # PAUSES and the core is trimmed core_defense_trim_pct once per day. The
+    # same falling-market read sanctions a defined-risk index put in the
+    # decision prompt (profit from the fall, not just less bleed). ---
+    core_defense_enabled: bool = True
+    market_drop_defense_pct: float = 1.5   # intraday SPY drop that reads "falling"
+    core_defense_trim_pct: float = 25.0    # % of the core sold per defense day
 
     # Ops hardening (goGA GA-2.1/2.2). heartbeat_url: an external dead-man
     # monitor (e.g. healthchecks.io ping URL) GET-pinged from the watchdog
@@ -667,6 +704,13 @@ def load_config() -> Config:
                 "ROTATION_GUARD_REPEAT_RELEASE_PCT", 0.75
             ),
             min_new_name_conviction=_f("MIN_NEW_NAME_CONVICTION", 0.5),
+            # Starter haircut + stop-geometry fixes (Jul 29 loss diagnosis).
+            starter_haircut_enabled=_flag("STARTER_HAIRCUT_ENABLED", "on"),
+            starter_full_conviction=_f("STARTER_FULL_CONVICTION", 0.65),
+            starter_haircut_mult=_f("STARTER_HAIRCUT_MULT", 0.5),
+            stop_cover_extension=_flag("STOP_COVER_EXTENSION", "on"),
+            overext_gap_pct=_f("OVEREXT_GAP_PCT", 15.0),
+            loss_streak_guard=_i("LOSS_STREAK_GUARD", 2),
         ),
         screener=ScreenerConfig(
             enabled=_flag("SCREENER_ENABLED", "on"),
@@ -697,6 +741,9 @@ def load_config() -> Config:
         core_max_pct=_f("CORE_MAX_PCT", 30.0),
         core_fill_max_pct=_f("CORE_FILL_MAX_PCT", 5.0),
         core_stop_pct=_f("CORE_STOP_PCT", 15.0),
+        core_defense_enabled=_flag("CORE_DEFENSE_ENABLED", "on"),
+        market_drop_defense_pct=_f("MARKET_DROP_DEFENSE_PCT", 1.5),
+        core_defense_trim_pct=_f("CORE_DEFENSE_TRIM_PCT", 25.0),
         track_record_file=os.getenv("TRACK_RECORD_FILE", "").strip(),
     )
 

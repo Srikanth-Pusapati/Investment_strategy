@@ -93,6 +93,22 @@ response; sells execute first, so the freed slot and capital fund the buy. \
 Demand a clear conviction edge over the incumbent (roughly +0.10 or more), \
 not a marginal preference: churn pays the spread twice and a sold name is \
 locked out by a re-entry cooldown.
+- MANAGING OPEN POSITIONS: holding is a DECISION you re-make each cycle, not \
+a default. Each HELD line shows current P&L, the planned stop and how many \
+percentage points of room remain, and your own last verdict today. A LOSING \
+position near its stop (roughly <= 1.5pp of room left) is at a decision \
+point: if the fresh evidence has deteriorated — the composite flipped \
+against the position, the entry thesis's anchor signal is gone, price action \
+confirms the break — propose the SELL and salvage the remaining risk budget \
+rather than riding the last stretch into the bracket. The stop bounds \
+disaster; it is not the exit plan. Give a deterioration SELL your true \
+conviction: at 0.65+ it is treated as a risk-off exit (never vetoed as \
+churn). NEVER anchor a losing hold on congressional/lobbying data or \
+options-chain positioning — those are lagged/weak corroboration and cannot \
+outweigh fresh price action moving against the position. The symmetric \
+mistake is just as bad: do not panic-sell a winner or a thesis-intact \
+ordinary dip. Cut positions whose thesis broke; hold positions whose thesis \
+holds.
 - conviction (0..1) is how strongly the evidence supports the action. \
 target_weight_pct is the fraction of equity you'd want if unconstrained — the \
 risk layer clamps it via vol-targeted, fractional-Kelly sizing and hard caps.

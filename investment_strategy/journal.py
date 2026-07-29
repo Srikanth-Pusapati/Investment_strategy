@@ -155,12 +155,29 @@ class DecisionJournal:
         rejected_count: dict[str, int] = defaultdict(int)
         rejected_reason: dict[str, str] = {}
         guard_vetoed: dict[str, str] = {}  # sell vetoes (rotation_guard etc.)
+        sold: dict[str, str] = {}          # executed sells (rationale head)
+        hold_count: dict[str, int] = defaultdict(int)
+        hold_last: dict[str, tuple[float, str]] = {}  # conv, rationale head
 
         for r in recs:
             if r.action == "sell" and r.verdict == "rotation_guard":
                 # Surface guard vetoes so the model doesn't re-propose the
                 # SAME rotation every cycle for the rest of the day.
                 guard_vetoed[r.symbol] = r.reason
+                continue
+            if r.action == "sell" and r.verdict in ("approved", "resized"):
+                sold[r.symbol] = r.rationale_head or r.reason
+                continue
+            if r.action == "hold":
+                # The model's own HOLD verdicts, per symbol — so the next cycle
+                # re-examines its prior reasoning instead of re-anchoring
+                # fresh (Jul 29 NU: three cycles of blind hold into the stop).
+                # Option-instrument holds are synthetic records (fallback
+                # declines on names the book never held) — they feed the
+                # fallback attempt cap, not this line.
+                if r.instrument != "option":
+                    hold_count[r.symbol] += 1
+                    hold_last[r.symbol] = (r.conviction, r.rationale_head)
                 continue
             if r.action != "buy":
                 continue
@@ -193,6 +210,28 @@ class DecisionJournal:
             lines.append("Bought: " + ", ".join(parts))
         else:
             lines.append("Bought: nothing yet today.")
+
+        if sold:
+            lines.append(
+                "Sold: " + ", ".join(
+                    f"{sym} ({why[:60]})" if why else sym
+                    for sym, why in list(sold.items())[:6]
+                )
+            )
+
+        if hold_count:
+            hold_parts = []
+            for sym, n in list(hold_count.items())[:8]:
+                conv, head = hold_last.get(sym, (0.0, ""))
+                hold_parts.append(
+                    f"{sym} {n}x (last conv {conv:.2f}"
+                    + (f", '{head[:50]}'" if head else "")
+                    + ")"
+                )
+            lines.append(
+                "Held (your own prior verdicts today — re-examine, don't "
+                "re-anchor): " + ", ".join(hold_parts)
+            )
 
         if excluded:
             excl_parts = [

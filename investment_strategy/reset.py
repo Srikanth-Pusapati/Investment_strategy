@@ -24,6 +24,7 @@ deletes, and never touches the KILL switch file or your .env.
 from __future__ import annotations
 
 import argparse
+import json
 import logging
 import shutil
 from datetime import datetime, timezone
@@ -34,6 +35,46 @@ from .ledger import DEFAULT_LEDGER_PATH
 from .status import DEFAULT_EQUITY_HISTORY_PATH
 
 log = logging.getLogger("reset")
+
+
+def _churn_carryover(cfg: Config) -> dict:
+    """Extract the churn-guard memory from the OLD risk state before it is
+    archived, so a fresh cycle does NOT launder the book's recent history
+    (Jul 27-28: the reset wiped NU's exit clock and price; the next day's
+    re-buy sailed through the cooldown AND the price-aware guard straight
+    into a -4.1% stop — the single largest realized loss of Jul 29).
+
+    Carries: exit clocks/prices, buy clocks/convictions, and loss streaks.
+    Positions still OPEN at reset get a SYNTHESIZED exit stamped at reset
+    time (no price — the price guard fails open), so the re-entry cooldown
+    still applies to names the reset flattened. Best-effort: an unreadable
+    state file carries nothing."""
+    try:
+        d = json.loads(Path(cfg.state_file).read_text(encoding="utf-8"))
+    except Exception:
+        return {}
+    now_iso = datetime.now(timezone.utc).isoformat()
+    exit_times = {k: str(v) for k, v in d.get("exit_times", {}).items()}
+    core = getattr(cfg, "core_etf", "")
+    for sym in d.get("entry_times", {}):
+        # Open at reset (still on the hold clock) — the reset itself is the
+        # exit, so stamp NOW (refreshing any stale stamp from a prior trip:
+        # the cooldown must run from the reset, not from last week). The core
+        # ETF is exempt: it's a passive allocation the fresh cycle
+        # re-establishes immediately.
+        if sym != core:
+            exit_times[sym] = now_iso
+    carry = {
+        "exit_times": exit_times,
+        "exit_prices": {k: float(v) for k, v in d.get("exit_prices", {}).items()},
+        "last_buy_times": {k: str(v) for k, v in d.get("last_buy_times", {}).items()},
+        "last_buy_convictions": {
+            k: float(v) for k, v in d.get("last_buy_convictions", {}).items()
+        },
+        "loss_streaks": {k: int(v) for k, v in d.get("loss_streaks", {}).items()},
+        "streak_times": {k: str(v) for k, v in d.get("streak_times", {}).items()},
+    }
+    return {k: v for k, v in carry.items() if v}
 
 
 def _state_dir(cfg: Config) -> Path:
@@ -66,6 +107,7 @@ def reset_local_state(cfg: Config, archive: bool = True) -> list[str]:
     what happened. Never raises."""
     notes: list[str] = []
     dest = None
+    carry = _churn_carryover(cfg)
     if archive:
         dest = _state_dir(cfg) / "archive" / datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
     for p in per_account_paths(cfg):
@@ -83,6 +125,21 @@ def reset_local_state(cfg: Config, archive: bool = True) -> list[str]:
             notes.append(f"could NOT reset {p}: {e}")
     if archive and dest is not None and dest.exists():
         notes.append(f"backup at {dest}")
+    # Re-seed the fresh risk state with the churn memory: cooldowns, exit
+    # prices, and loss streaks are about the NAMES, not the account, and a
+    # reset must not hand every recently-stopped ticker a clean slate.
+    if carry:
+        try:
+            Path(cfg.state_file).parent.mkdir(parents=True, exist_ok=True)
+            Path(cfg.state_file).write_text(
+                json.dumps(carry, indent=2), encoding="utf-8"
+            )
+            notes.append(
+                "carried churn memory into the fresh state: "
+                + ", ".join(f"{k}({len(v)})" for k, v in carry.items())
+            )
+        except Exception as e:
+            notes.append(f"could NOT carry churn memory: {e}")
     return notes
 
 
