@@ -106,6 +106,22 @@ class PortfolioState:
         # Last market-regime label seen, so the regime-off book TRIM (1B.6) fires
         # ONCE on the transition into risk-off, not every cycle we stay there.
         self.regime_label: str = ""
+        # Consecutive LOSING closed trips per symbol (Jul 29: the book recycles
+        # a small universe — NOK/SPCX/SOFI-class names get re-entered after
+        # every stop-out). A win (>= +1%) resets the streak; a scratch leaves
+        # it. Survives resets (reset.py carries it over) so a fresh cycle
+        # can't launder a name's record.
+        self.loss_streaks: dict[str, int] = {}
+        # When each symbol's streak was last INCREMENTED. One losing trip can
+        # stamp register_exit several times (the partial-close ladder records
+        # per replaced leg, the orchestrator stamps again, a DAY-expired option
+        # close resubmits next open) — dedupe so a trip counts ONCE: stamps
+        # within _STREAK_DEDUPE_HOURS are the same trip, because two REAL trips
+        # are always separated by the 24h re-entry cooldown plus holding time.
+        self.streak_times: dict[str, str] = {}
+        # Last ET trading day the core-defense trim fired, so a falling tape
+        # trims the core at most once per day instead of every hourly cycle.
+        self.core_defense_day: str = ""
         # The watchdog (its own thread) and the decision/risk path both touch this
         # state. A reentrant lock keeps reads/writes and the file save consistent.
         self._lock = threading.RLock()
@@ -166,6 +182,13 @@ class PortfolioState:
                 for k, v in d.get("ledgered_exit_oids", {}).items()
             }
             self.regime_label = str(d.get("regime_label", ""))
+            self.loss_streaks = {
+                k: int(v) for k, v in d.get("loss_streaks", {}).items()
+            }
+            self.streak_times = {
+                k: str(v) for k, v in d.get("streak_times", {}).items()
+            }
+            self.core_defense_day = str(d.get("core_defense_day", ""))
             if self.halted:
                 log.warning("Loaded LATCHED HALT from state: %s", self.halt_reason)
         except Exception as e:  # corrupt state must not crash startup
@@ -199,6 +222,9 @@ class PortfolioState:
                         "pending_orders": self.pending_orders,
                         "ledgered_exit_oids": self.ledgered_exit_oids,
                         "regime_label": self.regime_label,
+                        "loss_streaks": self.loss_streaks,
+                        "streak_times": self.streak_times,
+                        "core_defense_day": self.core_defense_day,
                     },
                     indent=2,
                 ),
@@ -327,6 +353,11 @@ class PortfolioState:
 
     # -- churn-guard clocks (top-up spacing + re-entry cooldown) ------------- #
     _CLOCK_RETENTION_DAYS = 7.0  # cooldowns are hours-scale; week-old stamps are noise
+    # Same-trip window for loss-streak stamps: must exceed the longest gap a
+    # single trip's exit records can span (a DAY-expired close resubmitted at
+    # the next open is ~17.5h later) while staying under the 24h+hold minimum
+    # between two genuine trips of one symbol.
+    _STREAK_DEDUPE_HOURS = 20.0
 
     def register_buy(
         self, symbol: str, when: datetime | None = None,
@@ -355,25 +386,49 @@ class PortfolioState:
 
     def register_exit(
         self, symbol: str, when: datetime | None = None,
-        price: float | None = None,
+        price: float | None = None, pl_pct: float | None = None,
     ) -> None:
         """Stamp the time `symbol` was exited (any reason: decision sell, trail,
         stop, take, time-stop, flatten, exchange-side fill). Drives the post-exit
         re-entry cooldown. `price` (the exit fill/mark, when known) drives the
         price-aware re-entry guard — re-buying above it within the cooldown is
-        chasing."""
+        chasing. `pl_pct` (the trip's realized %, when known) drives the
+        loss-streak scorecard: a losing trip (<= -1%) extends the symbol's
+        streak, a winning one (>= +1%) clears it, a scratch leaves it."""
         with self._lock:
             self.exit_times[symbol] = (
                 when or datetime.now(timezone.utc)
             ).isoformat()
             if price is not None and price > 0:
                 self.exit_prices[symbol] = float(price)
+            if pl_pct is not None:
+                if pl_pct <= -1.0:
+                    # Dedupe: the close ladder can stamp one losing trip
+                    # several times (per replaced leg, per retry tick, on a
+                    # next-open resubmit). Real trips are >= 24h apart (the
+                    # re-entry cooldown), so stamps inside the window are the
+                    # SAME trip and must not inflate the streak.
+                    since = self._hours_since(self.streak_times.get(symbol))
+                    if since is None or since >= self._STREAK_DEDUPE_HOURS:
+                        self.loss_streaks[symbol] = (
+                            self.loss_streaks.get(symbol, 0) + 1
+                        )
+                        self.streak_times[symbol] = datetime.now(
+                            timezone.utc
+                        ).isoformat()
+                elif pl_pct >= 1.0:
+                    self.loss_streaks.pop(symbol, None)
+                    self.streak_times.pop(symbol, None)
             self._prune_clock(self.exit_times)
             # Drop any exit price whose clock was just pruned away.
             for sym in list(self.exit_prices):
                 if sym not in self.exit_times:
                     del self.exit_prices[sym]
             self._save()
+
+    def loss_streak(self, symbol: str) -> int:
+        """Consecutive losing closed trips for `symbol` (0 = none recorded)."""
+        return self.loss_streaks.get(symbol, 0)
 
     def last_exit_price(self, symbol: str) -> float | None:
         """The price at which `symbol` was last exited, or None if unknown."""
@@ -562,6 +617,15 @@ class PortfolioState:
 
     def exit_was_ledgered(self, symbol: str, oid: str) -> bool:
         return str(oid) in self.ledgered_exit_oids.get(symbol, [])
+
+    # -- core-defense daily latch (falling-tape core trim) ------------------- #
+    def core_defense_fired_today(self, when: datetime | None = None) -> bool:
+        return self.core_defense_day == self._trading_day(when)
+
+    def mark_core_defense(self, when: datetime | None = None) -> None:
+        with self._lock:
+            self.core_defense_day = self._trading_day(when)
+            self._save()
 
     # -- last regime label (for the risk-off trim transition, 1B.6) --------- #
     def get_regime_label(self) -> str:

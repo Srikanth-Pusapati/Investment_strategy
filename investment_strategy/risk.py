@@ -208,6 +208,7 @@ class RiskManager:
     # -- vol-scaled ("ATR-style") stop / take distances (R.1) --------------- #
     def _exit_levels(
         self, proposal: TradeProposal, volatility: float | None,
+        tech: dict | None = None,
     ) -> tuple[float, float]:
         """Stop/take distances (%) for this buy. With VOL_STOPS_ENABLED and a
         known realized vol, the stop scales to the name's daily sigma — tight on
@@ -218,7 +219,15 @@ class RiskManager:
         full Kelly: the per-trade $-risk cap (2d) divides by the stop width, so
         a wider stop buys FEWER shares — dollar risk per position stays ~flat.
         Falls back to proposal-else-default when disabled or vol is unknown
-        (a data outage must not silently change the exit regime)."""
+        (a data outage must not silently change the exit regime).
+
+        STOP_COVER_EXTENSION (Jul 29): a breakout entry sitting ABOVE its 20d
+        SMA by more than the sigma stop would rest its stop INSIDE the base it
+        broke out from — ordinary reversion to the mean tags it at the low
+        (NU: entered 6.8% over the SMA, stopped at -4.1%, the exact session
+        low, then it bounced). Widen the stop to at least the extension (still
+        clamped to the max) so only a move BELOW the mean stops it out; the
+        $-risk cap shrinks the position to keep dollar risk unchanged."""
         lim = self.limits
         if lim.vol_stops_enabled and volatility and volatility > 0:
             daily_sigma_pct = volatility / (_TRADING_DAYS_SQRT) * 100.0
@@ -226,6 +235,10 @@ class RiskManager:
                 max(lim.vol_stop_mult * daily_sigma_pct, lim.vol_stop_min_pct),
                 lim.vol_stop_max_pct,
             )
+            if getattr(lim, "stop_cover_extension", False) and tech:
+                ext_pct = tech.get("ext_pct_sma20")
+                if ext_pct is not None and ext_pct > stop:
+                    stop = min(float(ext_pct), lim.vol_stop_max_pct)
             return stop, stop * lim.vol_stop_take_ratio
         return (
             proposal.stop_loss_pct or lim.default_stop_loss_pct,
@@ -340,7 +353,14 @@ class RiskManager:
         overext_mult = 1.0
         if self.limits.overextension_gate_enabled and tech:
             rsi = tech.get("rsi14")
-            ext_atr = tech.get("ext_atr")
+            # Prefer the PRIOR-day ATR denominator when the feed provides it: a
+            # gap day's own huge bar inflates today's ATR and deflates the
+            # extension read (VRRM Jul 29: 4.1x true extension read as 2.93x —
+            # under the 3.0x extreme block — because the +28% gap bar had
+            # already fattened its own yardstick).
+            ext_atr = tech.get("ext_atr_prior")
+            if ext_atr is None:
+                ext_atr = tech.get("ext_atr")
             ext_pct = tech.get("ext_pct_sma20")
             extended = (
                 (ext_atr is not None and ext_atr >= self.limits.overext_atr_mult)
@@ -358,16 +378,39 @@ class RiskManager:
                 and ext_atr is not None
                 and ext_atr >= self.limits.overext_extreme_atr_mult
             )
+            # Gap-day trigger: RSI/ATR-vs-SMA never see a ONE-DAY move, so a
+            # +28% gap open (VRRM) walked through both legs. An entry this far
+            # above the PRIOR close is a chase by definition — fires the
+            # extreme leg's mode (hard block by default).
+            gap_pct = None
+            prev_close = tech.get("prev_close")
+            if (
+                self.limits.overext_gap_pct > 0
+                and prev_close and prev_close > 0 and price > 0
+            ):
+                gap_pct = (price / prev_close - 1.0) * 100.0
+                if gap_pct >= self.limits.overext_gap_pct:
+                    extreme = True
+            gapped = (
+                gap_pct is not None and self.limits.overext_gap_pct > 0
+                and gap_pct >= self.limits.overext_gap_pct
+            )
             if hot_and_extended or extreme:
-                how_far = (
-                    f"{ext_atr:.1f}xATR" if ext_atr is not None
-                    else f"{ext_pct:.1f}%"
-                )
-                why = (
-                    f"{how_far} above the 20d SMA (extreme extension)"
-                    if extreme and not hot_and_extended
-                    else f"RSI {rsi:.0f} and {how_far} above the 20d SMA"
-                )
+                if ext_atr is not None:
+                    how_far = f"{ext_atr:.1f}xATR"
+                elif ext_pct is not None:
+                    how_far = f"{ext_pct:.1f}%"
+                else:
+                    how_far = "n/a"
+                if gapped:
+                    why = (
+                        f"+{gap_pct:.0f}% above the prior close (gap-day chase; "
+                        f"{how_far} over the 20d SMA)"
+                    )
+                elif extreme and not hot_and_extended:
+                    why = f"{how_far} above the 20d SMA (extreme extension)"
+                else:
+                    why = f"RSI {rsi:.0f} and {how_far} above the 20d SMA"
                 # The EXTREME leg has its own mode: a >=Nx-ATR screaming
                 # extension is a different risk than a mild hot-and-extended
                 # entry, and defaults to a hard block (the shared "haircut" mode
@@ -437,6 +480,33 @@ class RiskManager:
                         f"composite {'n/a' if composite_score is None else f'{composite_score:+.2f}'}"
                         f" doesn't clear the +{self.limits.reentry_price_override_composite:g} "
                         "override (churn guard).",
+                    )
+
+        # Loss-streak re-entry bar (Jul 29 diagnosis: the book recycles a small
+        # universe — a name whose last N trips ALL lost keeps getting a fresh
+        # slot at the same floor conviction). After `loss_streak_guard`
+        # consecutive losing closed trips, a FRESH entry needs the composite
+        # override bar — the same "top-decile new edge" standard the price
+        # guard uses — or it waits. A winning trip clears the streak.
+        streak_bar = int(getattr(self.limits, "loss_streak_guard", 0))
+        if (
+            streak_bar > 0
+            and account.position_for(proposal.symbol) is None
+        ):
+            streak = self.state.loss_streak(proposal.symbol)
+            if streak >= streak_bar:
+                override = (
+                    composite_score is not None
+                    and composite_score >= self.limits.reentry_price_override_composite
+                )
+                if not override:
+                    return self._reject(
+                        proposal,
+                        f"{proposal.symbol} lost its last {streak} closed "
+                        f"trip(s) — fresh entry needs composite >= "
+                        f"+{self.limits.reentry_price_override_composite:g} "
+                        f"({'n/a' if composite_score is None else f'{composite_score:+.2f}'}) "
+                        "to try again (loss-streak guard).",
                     )
 
         # Daily concentration brake, count leg (2026-07-06: 10 LLY buys in one
@@ -524,7 +594,7 @@ class RiskManager:
                 f"(liquidity guard).",
             )
 
-        stop_pct, take_pct = self._exit_levels(proposal, volatility)
+        stop_pct, take_pct = self._exit_levels(proposal, volatility, tech)
 
         # Cost / slippage edge floor: a trade whose profit target can't clear the
         # round-trip friction (spread + slippage) is negative-expectancy the moment
@@ -554,6 +624,40 @@ class RiskManager:
         # 1a) Anti-chasing haircut (computed above): halve what an extended
         #     entry may deploy, BEFORE the additive caps below shave it further.
         target_notional *= overext_mult
+
+        # 1a-ii) Starter haircut (Jul 27-29: BEP -$3,189 / NU -$3,291 — every
+        #     fresh name this cycle entered AT the conviction floor with the
+        #     stop clamped near the 4% vol floor, and two of five died inside
+        #     a day). A thin-edge STARTER deploys at half size; conviction can
+        #     still build the position via top-ups once the thesis is working.
+        #     Top-ups are exempt — the position already earned its slot.
+        starter_note = ""
+        if (
+            getattr(self.limits, "starter_haircut_enabled", False)
+            and account.position_for(proposal.symbol) is None
+        ):
+            low_conv = (
+                self.limits.starter_full_conviction > 0
+                and proposal.conviction < self.limits.starter_full_conviction
+            )
+            floor_stop = (
+                self.limits.vol_stops_enabled
+                and volatility is not None and volatility > 0
+                and self.limits.vol_stop_min_pct > 0
+                and stop_pct <= self.limits.vol_stop_min_pct * 1.15
+            )
+            if low_conv or floor_stop:
+                mult = max(0.0, min(1.0, self.limits.starter_haircut_mult))
+                target_notional *= mult
+                bits = []
+                if low_conv:
+                    bits.append(
+                        f"conviction {proposal.conviction:.2f} < "
+                        f"{self.limits.starter_full_conviction:g}"
+                    )
+                if floor_stop:
+                    bits.append(f"stop at the {stop_pct:.1f}% vol floor")
+                starter_note = f" Starter haircut x{mult:g} ({'; '.join(bits)})."
 
         # 1b) Market-regime scaling — shrink size in a risk-off backdrop (SPY below
         #     its 200dma / elevated VIX). 1.0 in a calm uptrend; clamped to [0,1]
@@ -719,6 +823,7 @@ class RiskManager:
                 f"Sized to {qty:g} sh (${approved_notional:,.0f}) within caps."
                 + (" Reduced from request." if resized else "")
                 + overext_note
+                + starter_note
             ),
         )
 
@@ -732,6 +837,7 @@ class RiskManager:
         regime_label: str = "",
         regime_multiplier: float = 1.0,
         name_trend: str = "",
+        sanctioned_hedge: bool = False,
     ) -> RiskDecision:
         """Size a defined-risk options play by capped DEBIT. Max loss on a long
         option / debit spread is the premium paid, so we bound that premium to a
@@ -749,7 +855,11 @@ class RiskManager:
         put candidacy even in a bull tape. `regime_multiplier` scales the
         premium budget the same way it already scales equity sizing, so
         option risk also shrinks when the market turns; all four default to
-        inert values for legacy callers."""
+        inert values for legacy callers. `sanctioned_hedge` marks the
+        deterministic falling-market INDEX-put sanction (Jul 29): the same
+        read that authored the prompt block must also satisfy the direction
+        gate, or the sanctioned put dies at the gate exactly when the core is
+        not held (fresh reset / CORE_ETF unset)."""
         if not self.limits.options_enabled:
             return self._reject(proposal, "Options trading disabled (OPTIONS_ENABLED=off).")
         # Same account-wide gate as equity buys: halt latch, kill switch, daily
@@ -777,6 +887,7 @@ class RiskManager:
             return self._reject(proposal, why)
         ok, why = self._direction_fits_market(
             proposal, account, market_trend, regime_label, name_trend,
+            sanctioned_hedge=sanctioned_hedge,
         )
         if not ok:
             return self._reject(proposal, why)
@@ -849,6 +960,7 @@ class RiskManager:
     def _direction_fits_market(
         self, proposal: TradeProposal, account: AccountSnapshot,
         market_trend: str, regime_label: str, name_trend: str = "",
+        sanctioned_hedge: bool = False,
     ) -> tuple[bool, str]:
         """Option debits must trade WITH the long-run market trend (SPY vs its
         200dma): calls in an up market, puts in a down market. A put bought
@@ -896,6 +1008,12 @@ class RiskManager:
                 return True, ""  # vol-spiked uptrend: the put mandate rules
             if name_trend == "down":
                 return True, ""  # single-name breakdown keeps its put candidacy
+            if sanctioned_hedge:
+                # The falling-market read sanctioned this index put in the
+                # prompt — the gate honors its own system's sanction (the
+                # intraday-drop leg can fire while the 200dma trend still
+                # reads "up", and the core may not be held yet on a reset day).
+                return True, ""
             holds_equity = any(
                 not p.is_option and p.symbol == proposal.symbol and p.qty > 0
                 for p in account.positions

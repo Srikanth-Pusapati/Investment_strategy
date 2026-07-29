@@ -51,6 +51,8 @@ class DecisionEngine:
         regime_label: str = "", regime_reason: str = "",
         regime_trend: str = "",
         curated: str = "",
+        hedge_symbol: str = "", hedge_price: float | None = None,
+        hedge_reason: str = "",
     ) -> list[TradeProposal]:
         """Ask Claude for proposals across all candidate symbols at once.
 
@@ -73,6 +75,10 @@ class DecisionEngine:
         `composites` (symbol -> score) is OUR deterministic weighted signal
         index (score x freshness-lag x realized track record) — a numeric
         prior the model's conviction should not wildly contradict unstated.
+        `hedge_symbol`/`hedge_price`/`hedge_reason` (set only when the
+        deterministic falling-market read fired and options are on) sanction
+        ONE defined-risk index put so the book can PROFIT from a decline
+        instead of only bleeding through it.
         """
         if not bundles:
             return []
@@ -87,6 +93,8 @@ class DecisionEngine:
             composites=composites or {},
             regime_label=regime_label, regime_reason=regime_reason,
             regime_trend=regime_trend,
+            hedge_symbol=hedge_symbol, hedge_price=hedge_price,
+            hedge_reason=hedge_reason,
         )
         try:
             resp = self.client.messages.create(
@@ -303,6 +311,8 @@ class DecisionEngine:
         composites: dict[str, float] | None = None,
         regime_label: str = "", regime_reason: str = "",
         regime_trend: str = "",
+        hedge_symbol: str = "", hedge_price: float | None = None,
+        hedge_reason: str = "",
     ) -> str:
         # Our own derived data (track-record, today-so-far, exclusions) sits
         # OUTSIDE <market_data> — it's trusted guidance, not third-party text.
@@ -427,6 +437,38 @@ class DecisionEngine:
                 "the ONLY way to make money as the market falls. Keep it defined-risk "
                 "and within the options premium budget. If NO slate name has a "
                 "genuinely bearish, corroborated setup, don't force one.",
+                "",
+            ]
+        # Falling-market INDEX hedge (Jul 29): the risk-off mandate above needs
+        # the slow 200dma/VIX regime to fully flip, and it only targets single
+        # names. This block fires on the FAST falling read (intraday benchmark
+        # drop / long-run downtrend) and sanctions ONE defined-risk put on the
+        # INDEX itself — the direct way to profit from a market-wide fall and
+        # insure the core (which this account holds, so the direction gate
+        # reads it as a hedge, not counter-trend speculation).
+        if (
+            hedge_symbol
+            and r is not None
+            and getattr(r, "options_enabled", False)
+        ):
+            lines.append(
+                f"## MARKET FALLING — a defined-risk INDEX PUT on "
+                f"{hedge_symbol} is sanctioned"
+            )
+            if hedge_reason:
+                lines.append(f"Deterministic read: {hedge_reason}.")
+            lines += [
+                f"You MAY propose ONE long_put or bear_put_spread on "
+                f"{hedge_symbol}"
+                + (f" (latest price ${hedge_price:,.2f})" if hedge_price else "")
+                + ", expiry 2-8 weeks out, strikes at/near the money, within "
+                "the options premium budget. It PROFITS from a continued "
+                "decline and insures the index core this account holds. "
+                "Propose it when the decline shows continuation risk "
+                "(follow-through, vol term structure, breadth of the move); "
+                "SKIP it when today's drop reads as ordinary noise — an index "
+                "put bought on every red day just bleeds premium. High ATM IV "
+                "favors the spread over the single leg.",
                 "",
             ]
         # All third-party text lives inside <market_data> so the system prompt can
@@ -571,6 +613,21 @@ class DecisionEngine:
             out.append(
                 f"- One options play risks at most {pct(r.max_option_premium_pct)} of "
                 "equity as net debit."
+            )
+        if getattr(r, "options_enabled", False) and (
+            getattr(r, "max_option_spread_pct", 0)
+            or getattr(r, "min_option_open_interest", 0)
+        ):
+            # Jul 29: F's spread died at this gate and the model could not
+            # know why — the cap was enforced but never stated, so conviction
+            # kept flowing into un-executable strikes.
+            out.append(
+                f"- Every option LEG must be liquid: open interest ≥ "
+                f"{getattr(r, 'min_option_open_interest', 0):g} and bid-ask "
+                f"spread ≤ {getattr(r, 'max_option_spread_pct', 0):g}% of mid. "
+                "Prefer high-OI, near-the-money strikes at round-number "
+                "levels; a thin or wide-spread leg is auto-rejected however "
+                "good the thesis."
             )
         if not out:
             return []

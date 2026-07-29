@@ -52,6 +52,12 @@ class _FakeState:
                 self.pending.append((oid, sym))
                 seen.add(oid)
 
+    def add_pending_order(self, oid, symbol):
+        # Jul 29: _requeue_unresolved persists each requeue immediately so the
+        # watchdog's vanished-sweep sparing can see it mid-reconcile.
+        if oid not in {p[0] for p in self.pending}:
+            self.pending.append((oid, symbol))
+
     def note_exit_ledgered(self, symbol, oid):
         self.exit_oids.add((symbol, oid))
 

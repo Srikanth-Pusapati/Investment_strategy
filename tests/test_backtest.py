@@ -36,6 +36,10 @@ def _limits(**over) -> RiskLimits:
         scale_out_enabled=False, scale_out_pct=50.0,
         kelly_fraction=0.0, target_annual_vol_pct=25.0,
         options_enabled=False, max_option_premium_pct=1.0,
+        # These tests target specific caps/exits; the starter haircut (Jul 29)
+        # halves fresh low-conviction entries and would skew every sizing
+        # assertion, so it's exercised in test_risk_manager instead.
+        starter_haircut_enabled=False,
     )
     base.update(over)
     return RiskLimits(**base)
