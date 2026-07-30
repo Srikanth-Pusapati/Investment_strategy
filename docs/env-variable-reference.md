@@ -910,3 +910,19 @@ For traceability, here is the section each variable landed in:
 **Note on one extra variable:** `MAX_DAY_TRADES_UNDER_25K` appears in Section 4 (as `PDT_GUARD_ENABLED`'s paired threshold knob) but was **not** part of the required 117-variable list in the task brief. It is documented anyway since it lives in the same `.env` block and dropping it would leave `PDT_GUARD_ENABLED`'s cross-reference dangling — flagged here so its presence is visible rather than silently smuggled in as if it had been on the original list.
 
 **Secret-scan confirmation:** all API keys (`ALPACA_API_KEY`, `ALPACA_SECRET_KEY`, `ANTHROPIC_API_KEY`, `FINNHUB_API_KEY`, `QUIVER_API_KEY`, `FRED_API_KEY`, `POLYGON_API_KEY`), the SMTP app password (`ALERT_SMTP_PASSWORD`), the Robinhood OAuth-adjacent secret (`ROBINHOOD_MCP_TOKEN`, blank in this deployment), the brokerage account number (`ROBINHOOD_ACCOUNT_NUMBER`), the SEC contact string (`SEC_USER_AGENT`), and the healthchecks.io ping URL (`HEARTBEAT_URL`) are all rendered as `<redacted>` (or partially redacted for `HEARTBEAT_URL`'s unique path). Non-secret personal contact info (`ALERT_SMTP_USER`, `ALERT_EMAIL_TO` — both Gmail addresses) was left in cleartext per the task's own scope, which restricts redaction to secret *values* (API keys, passwords, tokens), not incidental PII already present in the source drafts.
+---
+
+## Addendum 2026-07-30 — all-weather knobs (PR: complete-review implementation)
+
+New variables shipped with the Jul-30 all-weather upgrade. Code defaults in parentheses; `.env` activates the two sleeves.
+
+- **`HEDGE_ETF=PSQ`** (code default "" = off) — 1x inverse ETF the orchestrator buys DETERMINISTICALLY when the falling read holds `AUTO_HEDGE_MIN_CYCLES` consecutive cycles; unwound after the same number of clear cycles. Plain-equity path: works with `OPTIONS_ENABLED=off`, no junk-quote risk. Use 1x (PSQ/SH) only — 3x products decay. System-managed: slate-excluded, trail/time-stop exempt, model proposals ignored.
+- **`AUTO_HEDGE_RATIO=0.30`** (0.30) — hedge notional as a fraction of net-long exposure. Higher = flatter book in declines but more drag on bounces.
+- **`AUTO_HEDGE_MIN_CYCLES=2`** (2) — persistence filter in decision cycles, both for arming and unwinding. 1 = react to a single red tick (noisy); 3+ = slower, misses fast declines at a 60-min cadence.
+- **`AUTO_HEDGE_MAX_PCT=15`** (15) — hedge ceiling as % of equity, independent of the ratio.
+- **`DEFENSIVE_CORE_ETF=SGOV`** (code default "" = off) — while the falling read holds, the core DCA redirects into this T-bill ETF instead of pausing; auto-rotated back to cash when the read clears. Exempt from the exposure ladder (cash proxy) and from trail/time-stop.
+- **`EXPOSURE_LADDER=on`** (on) with **`EXPOSURE_NEUTRAL_PCT=60`** / **`EXPOSURE_RISK_OFF_PCT=30`** — regime-label caps on gross RISK exposure (defensive sleeve excluded). Applies to satellite buys AND the core fill. Existing positions are never force-sold by the ladder; the regime trim / core defense do that.
+- **`EXPECTANCY_GATE=on`** (on) with **`EXPECTANCY_GATE_MIN_TRIPS=8`** / **`EXPECTANCY_GATE_WINDOW_DAYS=14`** — fresh entries whose CITED signal families are ALL negative-expectancy over the trailing window are rejected. Top-ups exempt; uncited proposals fail open; families under the trip floor are never judged.
+- **`ROTATION_GUARD_RED_DAY_RELEASE=on`** (on) — on a negative day-P&L book, a requested loss-cut past `ROTATION_GUARD_MIN_LOSS_PCT` is never vetoed.
+- **`PUT_BREAKDOWN_EXT_PCT=5`** (5; 0 = off) — direction-gate carve-out: a name at least this % below its 20d SMA keeps put candidacy in an up market (broken momentum names sit above their 200dma, so the old carve-out never fired).
+- **`THESIS_DECAY_ENABLED`** — code default flipped **off -> on** this date (losers held 3.8d vs winners 2.5d); `.env` updated to `on` to match.

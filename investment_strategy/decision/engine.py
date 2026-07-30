@@ -400,7 +400,8 @@ class DecisionEngine:
                     "Long-run market trend is UP — option debits should be "
                     "CALL structures (long_call / bull_call_spread). PUTs are "
                     "auto-rejected by the risk layer unless the NAME itself "
-                    "is breaking down (price below its own 200-day), the put "
+                    "is breaking down (price below its own 200-day OR sharply "
+                    "below its 20d SMA — a broken momentum name), the put "
                     "hedges a name this account HOLDS, or the regime reads "
                     "risk-off; don't spend conviction on puts outside those "
                     "cases."
@@ -414,6 +415,36 @@ class DecisionEngine:
                     "conviction proposing them."
                 )
             lines.append("")
+        # BEARISH CANDIDATES (Jul 30 review): the model saw bearish reads for
+        # weeks (TSCO composite -1.10, COO put-skew +15.9) and every one ended
+        # in "HOLD — no action" — zero puts across 388 trades — because
+        # nothing ever TAUGHT the downside expression the way PR #45 taught
+        # the equity-gate call fallback. Name the put-eligible names
+        # explicitly, with the exact shape to use, every cycle they exist.
+        if r is not None and getattr(r, "options_enabled", False) and composites:
+            bear_names = sorted(
+                ((s, c) for s, c in composites.items() if c <= -0.4),
+                key=lambda kv: kv[1],
+            )[:4]
+            if bear_names:
+                listed = ", ".join(f"{s} ({c:+.2f})" for s, c in bear_names)
+                lines += [
+                    "## BEARISH CANDIDATES — a corroborated breakdown is a "
+                    "trade, not a HOLD",
+                    f"Slate names with a strongly negative composite: {listed}.",
+                    "If the bearish read is corroborated (downtrend or broken "
+                    "20d SMA, bearish options flow/chain lean, insider or "
+                    "congress selling), EXPRESS it: propose a defined-risk "
+                    "long_put or bear_put_spread on the name — instrument "
+                    "'option', action 'buy', expiry 2-8 weeks out, strikes "
+                    "at/near the money, within the premium budget. You cannot "
+                    "short stock; an unexpressed bearish read earns nothing. "
+                    "The direction gate passes a put when the name is below "
+                    "its 200dma OR sharply below its 20d SMA, when it hedges "
+                    "a held position, or when the regime is risk-off. Do NOT "
+                    "force one on an uncorroborated read.",
+                    "",
+                ]
         # RISK-OFF downside mandate: when the market is genuinely turning down
         # (SPY below its 200dma AND elevated VIX -> regime label "risk-off"), a
         # long-only book just loses more slowly. Tell the model to EXPRESS the

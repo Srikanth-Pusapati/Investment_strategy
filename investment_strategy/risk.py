@@ -150,6 +150,10 @@ class RiskManager:
         corr_data_missing: bool = False,
         tech: dict | None = None,
         composite_score: float | None = None,
+        regime_label: str = "",
+        entry_families: set[str] | None = None,
+        neg_families: dict | None = None,
+        defensive_exempt_usd: float = 0.0,
     ) -> RiskDecision:
         """`price` is the current market price for proposal.symbol. `volatility`
         is the symbol's annualized realized vol (fraction, e.g. 0.45) used for
@@ -173,7 +177,13 @@ class RiskManager:
         technical-signal data dict (rsi14 / ext_atr / ext_pct_sma20) for the
         anti-chasing overextension gate; `composite_score` is our deterministic
         weighted signal index for the opt-in composite floor. Both fail open
-        when None."""
+        when None. `regime_label` drives the exposure ladder (risk-exposure
+        clamp in neutral/risk-off) and `defensive_exempt_usd` is the market
+        value of the defensive T-bill sleeve the ladder must not count as
+        risk. `entry_families` are the cited signal families behind this
+        proposal and `neg_families` maps family -> SourceStats for families
+        with negative trailing expectancy (the expectancy gate); all default
+        inert."""
         if proposal.action is Action.HOLD:
             # Same REJECTED verdict (nothing downstream may execute a HOLD),
             # but without _reject's "REJECT hold X" log line — a no-op HOLD is
@@ -188,7 +198,9 @@ class RiskManager:
             proposal, account, price, volatility, pending_buy_notional,
             days_to_earnings, sector, sector_exposure_usd, regime_multiplier,
             max_held_corr, corr_symbol, cycle_budget_cap, corr_data_missing,
-            tech, composite_score,
+            tech, composite_score, regime_label=regime_label,
+            entry_families=entry_families, neg_families=neg_families,
+            defensive_exempt_usd=defensive_exempt_usd,
         )
 
     # -- survival-first sizing: vol-targeted, fractional-Kelly -------------- #
@@ -272,6 +284,10 @@ class RiskManager:
         corr_data_missing: bool = False,
         tech: dict | None = None,
         composite_score: float | None = None,
+        regime_label: str = "",
+        entry_families: set[str] | None = None,
+        neg_families: dict | None = None,
+        defensive_exempt_usd: float = 0.0,
     ) -> RiskDecision:
         halted, why = self.trading_halted(account)
         if halted:
@@ -320,6 +336,31 @@ class RiskManager:
                 f"Fresh-name conviction {proposal.conviction:.2f} below the "
                 f"new-position floor {self.limits.min_new_name_conviction:.2f} "
                 "— starter positions need better than coin-flip conviction.",
+            )
+
+        # Expectancy gate on signal families (Jul 30 review): a FRESH entry
+        # whose cited thesis families are ALL losing money over the trailing
+        # window is the same trade the ledger just paid to learn (NU/NOK/BEP
+        # were consecutive momentum-flow starters). Blocks only when every
+        # cited family is in the negative set — one healthy/unjudged family
+        # keeps the entry alive. Top-ups exempt; no citations = fail open.
+        if (
+            self.limits.expectancy_gate_enabled
+            and neg_families and entry_families
+            and account.position_for(proposal.symbol) is None
+            and set(entry_families) <= set(neg_families)
+        ):
+            worst_fam = min(
+                entry_families, key=lambda f: neg_families[f].avg_pl_pct
+            )
+            ws = neg_families[worst_fam]
+            return self._reject(
+                proposal,
+                f"Expectancy gate: every cited thesis family is negative over "
+                f"the trailing window (worst: {worst_fam} "
+                f"{ws.avg_pl_pct:+.1f}%/trip across {ws.trips} closed trips) — "
+                "no fresh entries from families that are currently losing "
+                "money.",
             )
 
         # Composite floor (opt-in): the deterministic weighted signal index
@@ -730,10 +771,41 @@ class RiskManager:
                 _mdm = max(0.0, min(1.0, self.limits.missing_data_mult))
                 target_notional *= _mdm
 
-        # 2c) No-leverage gross cap — never let TOTAL deployed exceed this % of
+        # 2c) Exposure ladder (Jul 30 review) — in a neutral/risk-off regime,
+        #     RISK exposure is capped at the regime's rung. The multiplier only
+        #     ever shrank individual buys, so the book's floor posture stayed
+        #     fully-invested-long through every decline; the ladder stops NEW
+        #     money from keeping the book maxed (existing positions aren't
+        #     force-sold — the regime trim / core defense handle that). The
+        #     defensive T-bill sleeve is a cash proxy and doesn't count as
+        #     risk (`defensive_exempt_usd`), or parking cash defensively
+        #     would block every remaining satellite.
+        gross_held = sum(p.market_value for p in account.positions)
+        if self.limits.exposure_ladder_enabled and regime_label in (
+            "neutral", "risk-off",
+        ):
+            rung = (
+                self.limits.exposure_neutral_pct if regime_label == "neutral"
+                else self.limits.exposure_risk_off_pct
+            )
+            if 0 < rung < self.limits.max_gross_exposure_pct:
+                risk_held = gross_held - max(0.0, defensive_exempt_usd)
+                rung_val = equity * (rung / 100.0)
+                ladder_room = (
+                    rung_val - risk_held - max(0.0, pending_buy_notional)
+                )
+                if ladder_room <= 0:
+                    return self._reject(
+                        proposal,
+                        f"At/over the {rung:.0f}% exposure-ladder cap "
+                        f"({regime_label} regime; risk deployed "
+                        f"${risk_held:,.0f} of ${rung_val:,.0f}).",
+                    )
+                target_notional = min(target_notional, ladder_room)
+
+        # 2c') No-leverage gross cap — never let TOTAL deployed exceed this % of
         #     equity. On a margin account (Alpaca offers ~2x buying power) this is
         #     the explicit guard that we never trade with borrowed money.
-        gross_held = sum(p.market_value for p in account.positions)
         max_gross_val = equity * (self.limits.max_gross_exposure_pct / 100.0)
         gross_room = max_gross_val - gross_held - max(0.0, pending_buy_notional)
         if gross_room <= 0:
@@ -838,6 +910,7 @@ class RiskManager:
         regime_multiplier: float = 1.0,
         name_trend: str = "",
         sanctioned_hedge: bool = False,
+        name_ext_pct: float | None = None,
     ) -> RiskDecision:
         """Size a defined-risk options play by capped DEBIT. Max loss on a long
         option / debit spread is the premium paid, so we bound that premium to a
@@ -859,7 +932,12 @@ class RiskManager:
         deterministic falling-market INDEX-put sanction (Jul 29): the same
         read that authored the prompt block must also satisfy the direction
         gate, or the sanctioned put dies at the gate exactly when the core is
-        not held (fresh reset / CORE_ETF unset)."""
+        not held (fresh reset / CORE_ETF unset). `name_ext_pct` is the
+        underlying's % distance from its 20d SMA (ext_pct_sma20; negative =
+        below) — a sharp short-term breakdown keeps its put candidacy even
+        while the name still sits above its 200dma (Jul 30 review: NU/NOK
+        broke hard yet read name_trend="up", so every put died at the
+        gate)."""
         if not self.limits.options_enabled:
             return self._reject(proposal, "Options trading disabled (OPTIONS_ENABLED=off).")
         # Same account-wide gate as equity buys: halt latch, kill switch, daily
@@ -887,7 +965,7 @@ class RiskManager:
             return self._reject(proposal, why)
         ok, why = self._direction_fits_market(
             proposal, account, market_trend, regime_label, name_trend,
-            sanctioned_hedge=sanctioned_hedge,
+            sanctioned_hedge=sanctioned_hedge, name_ext_pct=name_ext_pct,
         )
         if not ok:
             return self._reject(proposal, why)
@@ -961,6 +1039,7 @@ class RiskManager:
         self, proposal: TradeProposal, account: AccountSnapshot,
         market_trend: str, regime_label: str, name_trend: str = "",
         sanctioned_hedge: bool = False,
+        name_ext_pct: float | None = None,
     ) -> tuple[bool, str]:
         """Option debits must trade WITH the long-run market trend (SPY vs its
         200dma): calls in an up market, puts in a down market. A put bought
@@ -1008,6 +1087,14 @@ class RiskManager:
                 return True, ""  # vol-spiked uptrend: the put mandate rules
             if name_trend == "down":
                 return True, ""  # single-name breakdown keeps its put candidacy
+            # Broken-MOMENTUM carve-out (Jul 30 review): the names that
+            # actually break intraday (NU, NOK) are recent runners still far
+            # ABOVE their 200dma — name_trend reads "up" and the put dies. A
+            # name at least put_breakdown_ext_pct BELOW its 20d SMA is in a
+            # sharp short-term breakdown; its put keeps candidacy too.
+            bd = getattr(self.limits, "put_breakdown_ext_pct", 0.0)
+            if bd > 0 and name_ext_pct is not None and name_ext_pct <= -bd:
+                return True, ""
             if sanctioned_hedge:
                 # The falling-market read sanctioned this index put in the
                 # prompt — the gate honors its own system's sanction (the
@@ -1024,7 +1111,8 @@ class RiskManager:
                 "Long-run market trend is UP (SPY above its 200dma) and this "
                 "name is not in its own breakdown — puts into an uptrend "
                 "bleed theta and are blocked (OPTION_DIRECTION_GATE) unless "
-                "the name trades below its 200dma, the put hedges a held "
+                "the name trades below its 200dma, sits sharply below its "
+                "20d SMA (PUT_BREAKDOWN_EXT_PCT), the put hedges a held "
                 "position, or the regime turns risk-off."
             )
         return True, ""

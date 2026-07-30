@@ -33,6 +33,7 @@ consumers now use, with a per-trip fallback to presence when nothing was cited.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from datetime import datetime, timedelta, timezone
 
 from .ledger import TradeLedger, TradeRecord
 
@@ -446,6 +447,40 @@ def attribute(
             s.wins += 1 if t.pl_pct > 0 else 0
             s.pl_pcts.append(t.pl_pct)
     return stats
+
+
+def negative_expectancy_families(
+    ledger: TradeLedger, window_days: int = 14, min_trips: int = 8,
+    now: datetime | None = None,
+) -> dict[str, SourceStats]:
+    """Signal families whose CITED trailing realized expectancy is negative —
+    the input to the risk layer's expectancy gate (Jul 30 review). A family
+    is judged only on trips that closed inside the trailing window AND only
+    once it has at least `min_trips` of them (small samples never block).
+    Cited basis: the gate blocks the thesis families the model actually
+    NAMED, mirroring how the trades were attributed. Best-effort by design —
+    any parse problem returns {} (gate fails open)."""
+    try:
+        cutoff = (now or datetime.now(timezone.utc)) - timedelta(days=window_days)
+        recent: list[RoundTrip] = []
+        for t in round_trips(ledger.effective()):
+            if not t.exit_ts:
+                continue
+            try:
+                ts = datetime.fromisoformat(t.exit_ts)
+                if ts.tzinfo is None:
+                    ts = ts.replace(tzinfo=timezone.utc)
+            except ValueError:
+                continue
+            if ts >= cutoff:
+                recent.append(t)
+        stats = attribute(recent, basis="cited")
+        return {
+            src: s for src, s in stats.items()
+            if s.trips >= min_trips and s.avg_pl_pct < 0
+        }
+    except Exception:  # noqa: BLE001 — advisory read; the gate fails open
+        return {}
 
 
 def render_lessons(

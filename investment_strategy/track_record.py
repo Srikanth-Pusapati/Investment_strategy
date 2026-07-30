@@ -279,6 +279,33 @@ def _multi_line_chart(series: dict[str, list[float]], dates: list[str]) -> str:
     return f"<div class='legend'>{legend}</div>" + "".join(parts)
 
 
+def _capture_ratio_card(equity_rows: list[dict]) -> str:
+    """The all-weather headline KPI (Jul 30 review): dollars earned on up
+    days divided by dollars lost on down days. > 1.0 means the book keeps
+    more of the upside than it gives back — the July baseline was 0.29
+    (+$8,024 up vs -$27,953 down), the signature of a long-only book with no
+    downside expression. Judge every strategy change against this number."""
+    up = sum(
+        r["day_pl"] for r in equity_rows
+        if (r.get("day_pl") or 0) > 0
+    )
+    down = -sum(
+        r["day_pl"] for r in equity_rows
+        if (r.get("day_pl") or 0) < 0
+    )
+    if up <= 0 and down <= 0:
+        return ""
+    ratio = (up / down) if down > 0 else float("inf")
+    val = "∞" if ratio == float("inf") else f"{ratio:.2f}"
+    color = _GREEN if ratio >= 1.0 else _RED
+    return (
+        "<div class='card'><div class='card-lbl'>Capture ratio</div>"
+        f"<div class='card-val' style='color:{color}'>{val}</div>"
+        f"<div class='card-sub'>up-day +${up:,.0f} vs down-day "
+        f"-${down:,.0f} · &ge;1.0 = all-weather bar</div></div>"
+    )
+
+
 def _stat_cards(series: dict[str, list[float]], trail_exits: int) -> str:
     cards = []
     for label, vals in series.items():
@@ -490,6 +517,7 @@ def build_html(
         "<div class='card-val'>—</div>"
         "<div class='card-sub'>needs >= 2 daily snapshots</div></div>"
     )
+    stat_cards = _capture_ratio_card(equity_rows) + stat_cards
     return _PAGE.format(
         css=_CSS,
         trail=TRAIL_PCT,

@@ -78,14 +78,17 @@ on a name you do NOT currently hold. Evaluate it FRESH on its full signal bundle
 corroborated thesis warrants a starter BUY (or a defined-risk long option if \
 enabled and time-sensitive); thin or conflicting evidence is a HOLD. Do not chase \
 a name solely because the scanner surfaced it.
-- Aim to keep the book working: staying in cash is an implicit SHORT against the \
-benchmark and usually loses to it over time, so put capital behind your best 6-10 \
-corroborated ideas rather than sitting out. HOLD only when the evidence is \
-genuinely absent or self-contradictory — not merely because you'd like more \
-confirmation. Do NOT force a trade on a thin or conflicting thesis, but recognize \
-that idle cash is itself a losing bet vs the index. (Any cash you leave undeployed \
-is separately swept into a broad core ETF, so under-proposing does not "preserve" \
-return — it just cedes the selection edge to the passive core.)
+- Aim to keep the book working IN PROPORTION TO THE REGIME: in a risk-on tape, \
+staying in cash is an implicit SHORT against the benchmark and usually loses to \
+it, so put capital behind your best 6-10 corroborated ideas rather than sitting \
+out. In a neutral or risk-off regime the exposure ladder deliberately caps the \
+book lower and idle cash is parked in a T-bill sleeve that EARNS the short rate \
+— defense there is a position, not a failure to deploy. HOLD only when the \
+evidence is genuinely absent or self-contradictory — not merely because you'd \
+like more confirmation. Do NOT force a trade on a thin or conflicting thesis. \
+(Any cash you leave undeployed is separately swept into the core/defensive \
+sleeve, so under-proposing does not "preserve" return — it just cedes the \
+selection edge to the passive core.)
 - ROTATION: when the user message says the book is FULL, a new name can only \
 enter by displacing a weaker holding — propose the SELL of your weakest \
 (lowest-conviction) holding and the BUY of the stronger candidate in the SAME \

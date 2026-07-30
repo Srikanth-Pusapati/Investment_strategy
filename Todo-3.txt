@@ -488,3 +488,83 @@ What the prune actually does now
 The composite perf-weights went from a meaningless flat band (0.62–0.69 for everything) to a real spread: insider/congress/options_chain clamped at the 0.50 floor, options_flow/fundamentals near 0.9. The decision prompt's track-record block and the subscriptions report both now show cited stats. This feeds every future cycle automatically.
 
 The adversarial review (16 agents) caught 12 real issues in my first draft — all fixed: a phantom-lot regression (buys ledger requested qty, sells ledger actual fills), option-contracts-vs-equity-shares commingling under one ticker, duplicate-retry double-counting, and citation-parser gaps confirmed against your real ledger strings. 794 tests pass; the replayed walk's open positions now exactly match your broker book.
+--------------------------------------------------------------------------------
+PHASE AW — ALL-WEATHER UPGRADE  (opened 2026-07-30 from the complete review)
+--------------------------------------------------------------------------------
+Context (the Jul-30 review, artifact "Trading bot review — July 2026"):
+  22 sessions / 5 cycles: net -$19,929. Up-capture +$8,024 (9 days) vs
+  down-capture -$27,953 (12 days) = capture ratio 0.29. Expectancy -$133/trade
+  (avg win $43 vs avg loss $335). ZERO bearish trades in 388 all-time; every
+  bearish read died at HOLD. Twist: the three worst days (Jul 23/27/29) were
+  all RISK-ON on our own regime gauge — losses were single-name momentum
+  reversals, and the PR #46 falling-market defenses (keyed to market-wide
+  triggers) would not have fired even on their own diagnostic day (SPY -1.2%
+  vs the -1.5% trigger). Grep proof: "MARKET FALLING" / "CORE DEFENSE" appear
+  zero times in all logs.
+
+[DONE 2026-07-30] AW.1 Expectancy gate on signal families (EXPECTANCY_GATE,
+        default on). negative_expectancy_families() (attribution.py) recomputes
+        per cycle; a FRESH entry whose CITED families are ALL negative over the
+        trailing 14d (>=8 closed trips per family) is rejected. Top-ups exempt;
+        no citations = fail open. NU/NOK/BEP were consecutive momentum-flow
+        starters from a family the ledger already showed losing.
+[DONE 2026-07-30] AW.2 Rotation-guard red-day release
+        (ROTATION_GUARD_RED_DAY_RELEASE, default on): on a negative day-P&L
+        book, a requested loss-cut past the guard's min-loss band always passes
+        (Jul 29: NOK's -4.8% exit was pinned ~2h).
+[DONE 2026-07-30] AW.3 THESIS_DECAY_ENABLED default flipped ON (code + .env):
+        losers held 3.8d vs winners 2.5d; decay exit is the anti-disposition
+        backstop.
+[DONE 2026-07-30] AW.4 Deterministic inverse-ETF AUTO-HEDGE (HEDGE_ETF=PSQ):
+        falling read 2+ consecutive cycles -> orchestrator buys 1x inverse
+        sized to 30% of net-long (ceiling 15% of equity); unwinds after 2+
+        clear cycles. Plain-equity path (no options fragility, works with
+        OPTIONS_ENABLED=off); exempt from trail/time-stop (system-managed);
+        excluded from the model's slate; model proposals on it are ignored.
+[DONE 2026-07-30] AW.5 Defensive T-bill core (DEFENSIVE_CORE_ETF=SGOV): while
+        the falling read holds, the core DCA redirects into SGOV (earns the
+        short rate) instead of pausing dead; auto-rotates back to cash when
+        the read clears. Prompt cash-language updated: defense is a position.
+[DONE 2026-07-30] AW.6 Regime EXPOSURE LADDER (EXPOSURE_LADDER, default on):
+        gross RISK exposure capped 60% in neutral / 30% in risk-off (SGOV
+        exempt as cash proxy). Applies to satellite buys AND the core fill so
+        the sweep can't rebuild what the ladder capped.
+[DONE 2026-07-30] AW.7 Broken-momentum put carve-out (PUT_BREAKDOWN_EXT_PCT=5):
+        a name >=5% below its 20d SMA keeps put candidacy in an up market —
+        NU/NOK-shaped breaks read name_trend="up" on the 200dma and every put
+        died at the direction gate. Prompt teaching updated to match.
+[DONE 2026-07-30] AW.8 BEARISH CANDIDATES prompt block: slate names with
+        composite <= -0.4 are named put-eligible every cycle with the exact
+        shape to use (the PR #45 treatment, applied to puts). BEARISH FUNNEL
+        log line each cycle: slate_bearish / put_proposals / put_approved /
+        auto_hedge — dormancy is now visible, never silent.
+[DONE 2026-07-30] AW.9 Breadth-aware regime (regime.py): SPY risk-on is shaded
+        to NEUTRAL when BOTH QQQ and IWM sit below their 50dma (the "calm
+        index, breaking names" July pattern). Tighten-only, like VIX3M.
+[DONE 2026-07-30] AW.10 Capture-ratio KPI card in track_record.html: up-day $
+        / down-day $; >=1.0 is the all-weather bar (July baseline 0.29). Judge
+        every strategy change against this number.
+        Tests: tests/test_all_weather.py (28) — 920 total pass.
+
+NEXT STEPS (not yet done — the model-improvement queue)
+[ ] AW.11 Portfolio VOL TARGETING: scale gross exposure to a 12-15% annualized
+        realized-vol target from equity_history daily returns. Needs >=2-3
+        weeks of history on the current cycle to be meaningful — wire after
+        the data exists (deferred deliberately, not forgotten).
+[ ] AW.12 Bear-market BACKTEST scenario: backtest.py has no falling-tape
+        fixture; replay a synthetic -15% month and assert the ladder/hedge/
+        defensive-core keep max DD under the long-only baseline.
+[ ] AW.13 Funnel-to-dashboard: surface the BEARISH FUNNEL counters and the
+        auto-hedge state on dashboard.html (log-only today).
+[ ] AW.14 Put-path live validation: first real long_put fill end-to-end on
+        paper (entry, premium stop/take, expiry close) — the carve-out is
+        tested but no put has ever actually filled. Watch the funnel line.
+[ ] AW.15 Ladder rung tuning: 60/30 are principled defaults; after 2+ weeks
+        of regime flips, sweep rungs in autotune style against realized P&L.
+[ ] AW.16 Expectancy-gate window/min-trips tuning via the weekly autotune
+        report once >=4 weeks of cited trips exist.
+[ ] AW.17 Live-float cost math re-run before any live deployment: $8/session
+        of API on a $100-1,000 float dwarfs any plausible edge (review
+        finding) — either batch cadence down or raise the float.
+[ ] AW.18 Judge the whole phase on ONE number: capture ratio >= 1.0 over a
+        full cycle with the downside sleeve having fired at least once.

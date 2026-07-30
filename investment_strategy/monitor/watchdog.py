@@ -141,7 +141,18 @@ class Watchdog:
                 core_etf and pos.symbol == core_etf
                 and getattr(self.cfg, "core_stop_pct", 0.0) > 0
             )
-            if trail_ok and not core_exempt:
+            # The auto-hedge inverse ETF and the defensive T-bill core (Jul 30
+            # review) are system-managed sleeves, not thesis trades: the
+            # orchestrator opens AND closes them deterministically off the
+            # falling read. A trail here would dump the hedge on the first
+            # bounce of a decline it exists to insure against.
+            system_exempt = pos.symbol in {
+                s for s in (
+                    getattr(self.cfg, "hedge_etf", ""),
+                    getattr(self.cfg, "defensive_core_etf", ""),
+                ) if s
+            }
+            if trail_ok and not core_exempt and not system_exempt:
                 self._update_trailing_stop(pos)
         self._retry_pending_decision_sells({p.symbol: p for p in equities})
         self._check_option_positions(option_rows)
@@ -567,8 +578,17 @@ class Watchdog:
             return False
         # The core-satellite ETF (Todo 1.6) is a permanent, diversified holding — it
         # has no thesis to go stale, so the "recycle dead capital" time-stop must not
-        # rotate it out. Account-level guards still protect it.
-        if getattr(self.cfg, "core_etf", "") and pos.symbol == self.cfg.core_etf:
+        # rotate it out. Account-level guards still protect it. Same for the
+        # system-managed defensive sleeves (Jul 30): a flat T-bill core or a
+        # flat hedge is WORKING, not dead — the orchestrator rotates them off
+        # the falling read, not off age.
+        if pos.symbol in {
+            s for s in (
+                getattr(self.cfg, "core_etf", ""),
+                getattr(self.cfg, "hedge_etf", ""),
+                getattr(self.cfg, "defensive_core_etf", ""),
+            ) if s
+        }:
             return False
         self.state.register_entry(pos.symbol)  # idempotent; first-seen fallback
         age = self.state.entry_age_days(pos.symbol)
