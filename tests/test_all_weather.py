@@ -564,3 +564,131 @@ def test_new_knob_defaults(monkeypatch):
     assert cfg.risk.rotation_guard_red_day_release is True
     assert cfg.risk.put_breakdown_ext_pct == 5.0
     assert cfg.hedge_etf == "" and cfg.defensive_core_etf == ""
+
+
+# --------------------------------------------------------------------------- #
+# Jul 31 — put-gate PRECHECK (funnel 4->0 autopsy)
+# The prompt warned "puts are auto-rejected unless the name is breaking down"
+# but never said WHICH bearish names would pass, so the model held every one
+# (slate_bearish>0, put_proposals=0 all week). put_precheck previews the real
+# direction gate per name; these tests pin each carve-out AND parity with the
+# gate itself so the two can never drift apart silently.
+# --------------------------------------------------------------------------- #
+def test_put_precheck_eligible_when_market_not_up():
+    rm = _rm(_limits(options_enabled=True))
+    ok, why = rm.put_precheck("XYZ", _account(), "down", "risk-on", None)
+    assert ok and "not up" in why
+
+
+def test_put_precheck_eligible_on_riskoff():
+    rm = _rm(_limits(options_enabled=True))
+    ok, why = rm.put_precheck("XYZ", _account(), "up", "risk-off", None)
+    assert ok and "risk-off" in why
+
+
+def test_put_precheck_eligible_below_200dma():
+    rm = _rm(_limits(options_enabled=True))
+    ok, why = rm.put_precheck(
+        "XYZ", _account(), "up", "risk-on",
+        {"price": 90.0, "sma200": 100.0, "ext_pct_sma20": -1.0},
+    )
+    assert ok and "200dma" in why
+
+
+def test_put_precheck_eligible_on_sharp_20d_breakdown():
+    rm = _rm(_limits(options_enabled=True))
+    ok, why = rm.put_precheck(
+        "XYZ", _account(), "up", "risk-on",
+        {"price": 110.0, "sma200": 100.0, "ext_pct_sma20": -6.0},
+    )
+    assert ok and "20d SMA" in why
+
+
+def test_put_precheck_eligible_when_hedging_held_equity():
+    rm = _rm(_limits(options_enabled=True))
+    acct = _account(positions=[_pos(symbol="XYZ")])
+    ok, why = rm.put_precheck(
+        "XYZ", acct, "up", "risk-on",
+        {"price": 110.0, "sma200": 100.0, "ext_pct_sma20": -1.0},
+    )
+    assert ok and "held" in why
+
+
+def test_put_precheck_blocked_in_unbroken_uptrend():
+    rm = _rm(_limits(options_enabled=True))
+    ok, why = rm.put_precheck(
+        "XYZ", _account(), "up", "risk-on",
+        {"price": 110.0, "sma200": 100.0, "ext_pct_sma20": -1.0},
+    )
+    assert not ok and "not in its own breakdown" in why
+
+
+def test_put_precheck_missing_tech_blocks_in_uptrend():
+    # No technical data => no breakdown evidence; the real gate would reject
+    # (name_trend "" falls through to the uptrend reject), so the preview
+    # must NOT advertise eligibility it can't verify.
+    rm = _rm(_limits(options_enabled=True))
+    ok, _ = rm.put_precheck("XYZ", _account(), "up", "risk-on", None)
+    assert not ok
+
+
+def test_put_precheck_parity_with_real_gate():
+    # The preview must agree with evaluate_option's direction gate for the
+    # same facts — eligible names must not be auto-rejected, blocked names
+    # must be.
+    rm = _rm(_limits(options_enabled=True))
+    cases = [
+        ({"price": 110.0, "sma200": 100.0, "ext_pct_sma20": -6.0}, "up"),
+        ({"price": 110.0, "sma200": 100.0, "ext_pct_sma20": -3.0}, "up"),
+        ({"price": 90.0, "sma200": 100.0, "ext_pct_sma20": -1.0}, "down"),
+    ]
+    for tech, name_trend in cases:
+        pre_ok, _ = rm.put_precheck("XYZ", _account(), "up", "risk-on", tech)
+        d = rm.evaluate_option(
+            _long_put(), _account(), est_premium_per_contract=2.0,
+            market_trend="up", regime_label="risk-on", name_trend=name_trend,
+            name_ext_pct=tech["ext_pct_sma20"],
+        )
+        gate_ok = d.verdict is not RiskVerdict.REJECTED
+        assert pre_ok == gate_ok, (tech, name_trend)
+
+
+# --------------------------------------------------------------------------- #
+# Jul 31 — _bearish_lean honors the composite
+# A Robinhood-discovered mover (discovery +0.60) whose full bundle nets
+# composite <= -bar was counted bearish by the funnel yet dropped from the
+# slate here on its positive discovery score — the prompt then listed put
+# candidates whose data had been partitioned away.
+# --------------------------------------------------------------------------- #
+def _lean_self():
+    return SimpleNamespace(cfg=SimpleNamespace(screener=SimpleNamespace(
+        min_score=0.25, bearish_reserve_bar=0.4,
+    )))
+
+
+def _lean_bundle(discovery_score, composite):
+    from investment_strategy.models import Signal, SignalBundle, SignalKind
+    b = SignalBundle(symbol="XYZ", signals=[Signal(
+        kind=SignalKind.DISCOVERY, symbol="XYZ", summary="x",
+        score=discovery_score,
+    )])
+    b.composite_score = composite
+    return b
+
+
+def test_bearish_lean_keeps_composite_bearish_despite_bullish_discovery():
+    assert Orchestrator._bearish_lean(
+        _lean_self(), _lean_bundle(discovery_score=0.6, composite=-0.8),
+    )
+
+
+def test_bearish_lean_still_false_when_neither_read_is_bearish():
+    assert not Orchestrator._bearish_lean(
+        _lean_self(), _lean_bundle(discovery_score=0.6, composite=0.5),
+    )
+
+
+def test_bearish_lean_discovery_path_unchanged():
+    assert Orchestrator._bearish_lean(
+        _lean_self(), _lean_bundle(discovery_score=-0.5, composite=None),
+    )

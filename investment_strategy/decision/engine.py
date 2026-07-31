@@ -53,6 +53,7 @@ class DecisionEngine:
         curated: str = "",
         hedge_symbol: str = "", hedge_price: float | None = None,
         hedge_reason: str = "",
+        put_eligibility: dict[str, tuple[bool, str]] | None = None,
     ) -> list[TradeProposal]:
         """Ask Claude for proposals across all candidate symbols at once.
 
@@ -95,6 +96,7 @@ class DecisionEngine:
             regime_trend=regime_trend,
             hedge_symbol=hedge_symbol, hedge_price=hedge_price,
             hedge_reason=hedge_reason,
+            put_eligibility=put_eligibility or {},
         )
         try:
             resp = self.client.messages.create(
@@ -313,6 +315,7 @@ class DecisionEngine:
         regime_trend: str = "",
         hedge_symbol: str = "", hedge_price: float | None = None,
         hedge_reason: str = "",
+        put_eligibility: dict[str, tuple[bool, str]] | None = None,
     ) -> str:
         # Our own derived data (track-record, today-so-far, exclusions) sits
         # OUTSIDE <market_data> — it's trusted guidance, not third-party text.
@@ -419,32 +422,62 @@ class DecisionEngine:
         # weeks (TSCO composite -1.10, COO put-skew +15.9) and every one ended
         # in "HOLD — no action" — zero puts across 388 trades — because
         # nothing ever TAUGHT the downside expression the way PR #45 taught
-        # the equity-gate call fallback. Name the put-eligible names
-        # explicitly, with the exact shape to use, every cycle they exist.
-        if r is not None and getattr(r, "options_enabled", False) and composites:
-            bear_names = sorted(
-                ((s, c) for s, c in composites.items() if c <= -0.4),
-                key=lambda kv: kv[1],
-            )[:4]
-            if bear_names:
-                listed = ", ".join(f"{s} ({c:+.2f})" for s, c in bear_names)
+        # the equity-gate call fallback.
+        # Jul 31 rework: naming the names wasn't enough — slate_bearish>0 with
+        # put_proposals=0 persisted all week. Two causes fixed here: (1) the
+        # list came from the PRE-partition composites map, so it could name
+        # symbols whose candidate data was dropped from the prompt; (2) the
+        # regime line threatens "puts are auto-rejected unless the name is
+        # breaking down", and the model — unable to verify which bearish name
+        # would pass the direction gate — rationally held every time. The
+        # orchestrator now prechecks the REAL gate per on-slate bearish name
+        # (risk.put_precheck) and we render the verdict, so proposing a put on
+        # an ELIGIBLE name carries no auto-reject risk the model must guess at.
+        if (
+            r is not None and getattr(r, "options_enabled", False)
+            and put_eligibility
+        ):
+            ranked = sorted(
+                put_eligibility.items(),
+                key=lambda kv: composites.get(kv[0], 0.0) if composites else 0.0,
+            )
+            eligible = [(s, why) for s, (ok, why) in ranked if ok][:4]
+            blocked = [(s, why) for s, (ok, why) in ranked if not ok][:4]
+            lines.append(
+                "## BEARISH CANDIDATES — a corroborated breakdown is a "
+                "trade, not a HOLD"
+            )
+            if eligible:
+                listed = ", ".join(
+                    f"{s} ({composites.get(s, 0.0):+.2f} composite; "
+                    f"gate passes: {why})"
+                    for s, why in eligible
+                )
                 lines += [
-                    "## BEARISH CANDIDATES — a corroborated breakdown is a "
-                    "trade, not a HOLD",
-                    f"Slate names with a strongly negative composite: {listed}.",
-                    "If the bearish read is corroborated (downtrend or broken "
-                    "20d SMA, bearish options flow/chain lean, insider or "
-                    "congress selling), EXPRESS it: propose a defined-risk "
-                    "long_put or bear_put_spread on the name — instrument "
-                    "'option', action 'buy', expiry 2-8 weeks out, strikes "
-                    "at/near the money, within the premium budget. You cannot "
-                    "short stock; an unexpressed bearish read earns nothing. "
-                    "The direction gate passes a put when the name is below "
-                    "its 200dma OR sharply below its 20d SMA, when it hedges "
-                    "a held position, or when the regime is risk-off. Do NOT "
-                    "force one on an uncorroborated read.",
-                    "",
+                    f"Put-ELIGIBLE (direction gate pre-checked this cycle — "
+                    f"a put on these will NOT be auto-rejected): {listed}.",
+                    "If the bearish read is corroborated by the name's own "
+                    "data (downtrend or broken 20d SMA, bearish options "
+                    "flow/chain lean, insider or congress selling), EXPRESS "
+                    "it: propose a defined-risk long_put or bear_put_spread — "
+                    "instrument 'option', action 'buy', expiry 2-8 weeks out, "
+                    "strikes at/near the money, within the premium budget. "
+                    "You cannot short stock; an unexpressed bearish read "
+                    "earns nothing. If you still decline an eligible name, "
+                    "note why in that name's HOLD rationale.",
                 ]
+            if blocked:
+                lines.append(
+                    "Gate-BLOCKED today (do NOT propose puts on these — the "
+                    "direction gate would reject them): "
+                    + ", ".join(
+                        f"{s} ({composites.get(s, 0.0):+.2f}; {why})"
+                        for s, why in blocked
+                    )
+                    + ". A bearish read on a gate-blocked HELD name is a "
+                    "SELL/trim decision instead."
+                )
+            lines.append("")
         # RISK-OFF downside mandate: when the market is genuinely turning down
         # (SPY below its 200dma AND elevated VIX -> regime label "risk-off"), a
         # long-only book just loses more slowly. Tell the model to EXPRESS the

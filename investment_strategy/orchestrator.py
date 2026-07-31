@@ -138,6 +138,11 @@ class Orchestrator:
         # end so put-path dormancy is visible instead of silent.
         self._bear_puts_proposed = 0
         self._bear_puts_approved = 0
+        # Per-cycle put-gate precheck verdicts for bearish-composite slate
+        # names (Jul 31): symbol -> (eligible, why). Rendered into the prompt's
+        # BEARISH CANDIDATES block and the funnel line, so the 4->0 drop-off
+        # decomposes into "gate-blocked (tape)" vs "eligible but declined".
+        self._bear_eligibility: dict[str, tuple[bool, str]] = {}
         if (
             cfg.risk.options_enabled
             and getattr(cfg.risk, "option_direction_gate", True)
@@ -911,10 +916,23 @@ class Orchestrator:
                     top = sorted(
                         composites.items(), key=lambda kv: kv[1], reverse=True
                     )[:8]
+                    # Bearish tail too (Jul 31): the funnel counts names with
+                    # composite <= -bar, but a top-8-only log never showed WHO
+                    # they were — the 4->0 autopsy had to guess identities.
+                    _bar = self.cfg.screener.bearish_reserve_bar or 0.4
+                    tail = sorted(
+                        (kv for kv in composites.items() if kv[1] <= -_bar),
+                        key=lambda kv: kv[1],
+                    )[:6]
                     log.info(
-                        "Composite index (%d scored, top: %s).",
+                        "Composite index (%d scored, top: %s%s).",
                         len(composites),
                         ", ".join(f"{s} {v:+.2f}" for s, v in top),
+                        (
+                            "; bear tail: "
+                            + ", ".join(f"{s} {v:+.2f}" for s, v in tail)
+                            if tail else ""
+                        ),
                     )
             except Exception as e:
                 log.warning("Composite index unavailable this cycle: %s", e)
@@ -1008,6 +1026,27 @@ class Orchestrator:
                     except Exception:
                         hedge_price = None
         self._hedge_symbol = hedge_symbol
+        # Put-gate PRECHECK per bearish-composite slate name (Jul 31 funnel
+        # autopsy): the prompt used to warn "puts are auto-rejected unless the
+        # name is breaking down" without saying WHICH names would pass, so the
+        # model held every bearish read (slate_bearish>0, put_proposals=0 all
+        # week). Run the deterministic gate preview here — same carve-outs as
+        # risk._direction_fits_market — and hand the verdicts to the prompt
+        # and the funnel line. Only ON-SLATE names: the model must never be
+        # asked to trade a name whose data was partitioned out of the prompt.
+        self._bear_eligibility = {}
+        if self.options is not None and composites:
+            _bear_bar = self.cfg.screener.bearish_reserve_bar or 0.4
+            _slate_syms = {b.symbol for b in bundles}
+            for _sym, _comp in composites.items():
+                if _comp > -_bear_bar or _sym not in _slate_syms:
+                    continue
+                self._bear_eligibility[_sym] = self.risk.put_precheck(
+                    _sym, account,
+                    (_reg.trend if _reg else ""),
+                    (_reg.label if _reg else ""),
+                    tech_ctx.get(_sym),
+                )
         proposals = self.engine.decide(
             bundles, account, bench_line, external, lessons,
             today=today_block, buy_excluded=buy_excluded,
@@ -1019,6 +1058,7 @@ class Orchestrator:
             curated=curated,
             hedge_symbol=hedge_symbol, hedge_price=hedge_price,
             hedge_reason=hedge_reason,
+            put_eligibility=self._bear_eligibility,
         )
         self._stamp_liveness()
         proposals = self._filter_to_slate(
@@ -1071,14 +1111,30 @@ class Orchestrator:
         # downside-conviction leakage visible: how many slate names carried a
         # real bearish read, how many puts the model proposed, how many the
         # gates passed, and whether the deterministic hedge sleeve is on.
+        # Jul 31: decomposed per name — the bare count hid WHERE the 4->0
+        # drop-off happened (off-slate? gate-blocked by the uptrend? model
+        # declined an eligible name?). Each bearish name now shows its stage.
         bear_bar = self.cfg.screener.bearish_reserve_bar or 0.4
-        bear_slate = sum(1 for v in composites.values() if v <= -bear_bar)
+        bear_map = {s: v for s, v in composites.items() if v <= -bear_bar}
+        bear_detail = ""
+        if bear_map:
+            parts = []
+            for s, v in sorted(bear_map.items(), key=lambda kv: kv[1])[:6]:
+                verdict = self._bear_eligibility.get(s)
+                if verdict is None:
+                    parts.append(f"{s} {v:+.2f} off-slate")
+                elif verdict[0]:
+                    parts.append(f"{s} {v:+.2f} ELIGIBLE ({verdict[1]})")
+                else:
+                    parts.append(f"{s} {v:+.2f} gate-blocked")
+            bear_detail = " [" + "; ".join(parts) + "]"
         h_etf = getattr(self.cfg, "hedge_etf", "")
         hedge_pos = account.position_for(h_etf) if h_etf else None
         log.info(
-            "BEARISH FUNNEL: slate_bearish=%d put_proposals=%d put_approved=%d "
-            "auto_hedge=%s",
-            bear_slate,
+            "BEARISH FUNNEL: slate_bearish=%d%s put_proposals=%d "
+            "put_approved=%d auto_hedge=%s",
+            len(bear_map),
+            bear_detail,
             getattr(self, "_bear_puts_proposed", 0),
             getattr(self, "_bear_puts_approved", 0),
             (
@@ -2070,7 +2126,16 @@ class Orchestrator:
         candidate. The discovery signal (the screener's smart-money lean that
         surfaced the name) is the primary read — mirror the aggregator's
         bearish intake bar; without one, fall back to the mean of the scored
-        signals."""
+        signals. Jul 31: also honor the COMPOSITE — a bullishly-DISCOVERED
+        name (Robinhood mover, discovery +0.60) whose full bundle nets
+        composite <= -bar is exactly what the funnel counts as bearish, yet
+        was dropped here on its positive discovery score alone, so the prompt
+        listed put candidates whose data had been partitioned away."""
+        comp = getattr(bundle, "composite_score", None)
+        if comp is not None and comp <= -(
+            self.cfg.screener.bearish_reserve_bar or 0.4
+        ):
+            return True
         bar = max(0.2, self.cfg.screener.min_score)
         disc = [
             s.score for s in bundle.signals

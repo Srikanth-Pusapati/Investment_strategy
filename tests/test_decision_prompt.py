@@ -461,3 +461,54 @@ def test_option_fallback_prompt_scoped_and_cache_reuses_stable_block():
     # Byte-identical stable block vs the main decide() call -> cache READ.
     main_kwargs = _call_decide(eng, curated="SAME-CURATED")
     assert stable["text"] == main_kwargs["messages"][0]["content"][0]["text"]
+
+
+# -- Jul 31: put-gate precheck verdicts in the BEARISH CANDIDATES block ------ #
+# The old block named bearish names but left the model to guess which would
+# survive the direction gate — under "puts are auto-rejected unless…" it
+# rationally held every time (slate_bearish>0 -> put_proposals=0 all week).
+# The orchestrator now prechecks the real gate per on-slate name and the
+# prompt renders the verdict.
+def test_bearish_block_renders_eligible_and_blocked_verdicts():
+    eng = _engine(options_enabled=True)
+    acct = _acct([_pos("CVX")])
+    text = eng._render_dynamic(
+        [_bundle("IREN"), _bundle("FOO")], acct, "", [],
+        composites={"IREN": -0.55, "FOO": -0.44},
+        put_eligibility={
+            "IREN": (True, "-6.2% vs 20d SMA breakdown"),
+            "FOO": (False, "uptrend name, not in its own breakdown"),
+        },
+    )
+    assert "BEARISH CANDIDATES" in text
+    assert "Put-ELIGIBLE" in text
+    assert "IREN (-0.55 composite; gate passes: -6.2% vs 20d SMA breakdown)" in text
+    assert "will NOT be auto-rejected" in text
+    assert "Gate-BLOCKED today" in text
+    assert "FOO (-0.44; uptrend name, not in its own breakdown)" in text
+    # Trusted guidance sits OUTSIDE the untrusted region.
+    assert text.index("BEARISH CANDIDATES") < text.index("<market_data>")
+
+
+def test_bearish_block_absent_without_precheck_verdicts():
+    # Negative composites alone no longer author the block — only names the
+    # orchestrator actually prechecked (on-slate, bearish) may be listed, so
+    # the model is never told to trade a name whose data was partitioned out.
+    eng = _engine(options_enabled=True)
+    acct = _acct([_pos("CVX")])
+    text = eng._render_dynamic(
+        [_bundle("MU")], acct, "", [],
+        composites={"GONE": -1.2},
+    )
+    assert "BEARISH CANDIDATES" not in text
+
+
+def test_bearish_block_absent_when_options_off():
+    eng = _engine(options_enabled=False)
+    acct = _acct([_pos("CVX")])
+    text = eng._render_dynamic(
+        [_bundle("IREN")], acct, "", [],
+        composites={"IREN": -0.55},
+        put_eligibility={"IREN": (True, "below its 200dma")},
+    )
+    assert "BEARISH CANDIDATES" not in text

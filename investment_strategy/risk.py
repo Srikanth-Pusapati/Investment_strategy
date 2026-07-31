@@ -1117,6 +1117,40 @@ class RiskManager:
             )
         return True, ""
 
+    def put_precheck(
+        self, symbol: str, account: AccountSnapshot,
+        market_trend: str, regime_label: str,
+        tech: dict | None,
+    ) -> tuple[bool, str]:
+        """Deterministic PREVIEW of `_direction_fits_market` for a hypothetical
+        all-puts structure on `symbol`, computed BEFORE the model is asked to
+        decide. Jul 31 funnel autopsy: the prompt warned "puts are auto-rejected
+        unless the name is breaking down" but never said WHICH bearish names
+        would pass — so the model, unable to verify eligibility, held every
+        time (slate_bearish=4 -> put_proposals=0, all week). Annotating each
+        bearish candidate with this verdict replaces that guess. Mirrors the
+        real gate's carve-outs exactly (same order); keep the two in lockstep."""
+        if not getattr(self.limits, "option_direction_gate", True):
+            return True, "direction gate off"
+        if market_trend != "up":
+            return True, "market trend not up"
+        if regime_label == "risk-off":
+            return True, "risk-off regime"
+        price = (tech or {}).get("price")
+        sma200 = (tech or {}).get("sma200")
+        if price and sma200 and price < sma200:
+            return True, "below its 200dma"
+        bd = getattr(self.limits, "put_breakdown_ext_pct", 0.0)
+        ext = (tech or {}).get("ext_pct_sma20")
+        if bd > 0 and ext is not None and ext <= -bd:
+            return True, f"{ext:+.1f}% vs 20d SMA breakdown"
+        if any(
+            not p.is_option and p.symbol == symbol and p.qty > 0
+            for p in account.positions
+        ):
+            return True, "hedges a held position"
+        return False, "uptrend name, not in its own breakdown"
+
     # -- option expiry sanity ------------------------------------------------ #
     def _legs_dte_sane(self, proposal: TradeProposal) -> tuple[bool, str]:
         """Every leg's expiry inside [min_option_dte, max_option_dte]: too close
