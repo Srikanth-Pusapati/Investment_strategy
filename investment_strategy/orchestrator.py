@@ -143,6 +143,18 @@ class Orchestrator:
         # BEARISH CANDIDATES block and the funnel line, so the 4->0 drop-off
         # decomposes into "gate-blocked (tape)" vs "eligible but declined".
         self._bear_eligibility: dict[str, tuple[bool, str]] = {}
+        # Per-cycle model verdict per put-ELIGIBLE name (Aug 1): symbol ->
+        # "put proposed" / "declined: ..." / "IGNORED", reconciled from the
+        # schema-required bearish_verdicts output right after decide() and
+        # appended to the funnel line's per-name stages.
+        self._bear_verdict_stage: dict[str, str] = {}
+        # Per-cycle NAME-level falling reads (Jul 30 review, Phase-1 gap):
+        # held symbol -> "-5.2% today vs SPY +0.1%". Index-level defense
+        # never fired on the actual loss days (Jul 29 bottomed -1.2% vs the
+        # -1.5% trigger while NU/NOK broke -5% alone); this is the per-name
+        # variant. Feeds the HELD prompt lines and the rotation guard's
+        # loss-cut release.
+        self._falling_names: dict[str, str] = {}
         if (
             cfg.risk.options_enabled
             and getattr(cfg.risk, "option_direction_gate", True)
@@ -946,6 +958,14 @@ class Orchestrator:
             if s.kind is SignalKind.TECHNICAL and s.data
         }
 
+        # Per-NAME falling reads for this cycle: defense that doesn't wait
+        # for an index-wide day. Feeds the HELD prompt lines and the rotation
+        # guard's loss-cut release below.
+        self._falling_names = self._name_falling_reads(account, tech_ctx)
+        for _s, _why in self._falling_names.items():
+            log.info("NAME FALLING: %s %s — defense read armed "
+                     "(loss-cut release + HELD-line note).", _s, _why)
+
         # Expectancy gate input (Jul 30 review): signal families whose CITED
         # trailing realized expectancy is negative. Recomputed once per cycle
         # from the ledger; the risk layer blocks FRESH entries whose thesis
@@ -1061,6 +1081,10 @@ class Orchestrator:
             put_eligibility=self._bear_eligibility,
         )
         self._stamp_liveness()
+        # Reconcile the schema-required bearish_verdicts against this cycle's
+        # ELIGIBLE names BEFORE any filtering drops proposals — a put the
+        # slate filter later removes still counts as "the model proposed".
+        self._reconcile_bear_verdicts(proposals)
         proposals = self._filter_to_slate(
             proposals, bundles, account,
             extra={hedge_symbol} if hedge_symbol else None,
@@ -1124,7 +1148,15 @@ class Orchestrator:
                 if verdict is None:
                     parts.append(f"{s} {v:+.2f} off-slate")
                 elif verdict[0]:
-                    parts.append(f"{s} {v:+.2f} ELIGIBLE ({verdict[1]})")
+                    # Aug 1: append the model's reconciled verdict so the
+                    # funnel line shows where an ELIGIBLE name ended — put
+                    # proposed / declined(reason) / IGNORED — not just that
+                    # it was offered.
+                    stage = self._bear_verdict_stage.get(s, "")
+                    parts.append(
+                        f"{s} {v:+.2f} ELIGIBLE ({verdict[1]})"
+                        + (f" -> {stage}" if stage else "")
+                    )
                 else:
                     parts.append(f"{s} {v:+.2f} gate-blocked")
             bear_detail = " [" + "; ".join(parts) + "]"
@@ -1650,7 +1682,12 @@ class Orchestrator:
                 if (
                     rec.symbol
                     and rec.action in ("hold", "sell", "buy")
-                    and rec.verdict not in ("slate_excluded", "dropped_buy")
+                    and rec.verdict not in (
+                        "slate_excluded", "dropped_buy",
+                        # Aug 1 verdict-reconciliation rows: bookkeeping about
+                        # the put path, not the model's read on a held equity.
+                        "put_declined", "put_ignored",
+                    )
                     and not rec.reason.startswith("option fallback")
                 ):
                     prior_verdicts[rec.symbol] = (
@@ -1681,6 +1718,16 @@ class Orchestrator:
                 dist = stop_w + p.unrealized_pl_pct  # pp of room left
                 bits.append(
                     f"stop -{stop_w:.1f}% ({max(dist, 0.0):.1f}pp of room left)"
+                )
+            # Per-name falling read (Jul 30 review): the model must see that
+            # THIS name's own defense trigger fired even when the index reads
+            # calm — and that a loss-cut it asks for will not be guard-vetoed.
+            falling = getattr(self, "_falling_names", {}).get(p.symbol, "")
+            if falling:
+                bits.append(
+                    f"NAME FALLING {falling} — name-level defense read is "
+                    "armed; a loss-cut SELL passes the rotation guard this "
+                    "cycle"
                 )
             note = ", ".join(bits)
             why = latest_rationale.get(p.symbol, "")
@@ -1792,6 +1839,21 @@ class Orchestrator:
                     "Rotation guard: PASS %s at %+.1f%% — red book day "
                     "(day P/L %.2f%%): a requested loss-cut is defense, "
                     "not churn.", p.symbol, pos.unrealized_pl_pct, day_pl,
+                )
+                kept.append(p)
+                continue
+            # Name-level falling release (Jul 30 review, Phase-1 gap): the
+            # red-day release needs the BOOK to be losing, but the July
+            # pattern is a single name breaking inside a calm or even green
+            # tape. When this cycle's per-name falling read fired for the
+            # symbol, the requested loss-cut is defense against ITS OWN
+            # break — pass it, whatever the book's day P/L reads.
+            fall_why = getattr(self, "_falling_names", {}).get(p.symbol, "")
+            if fall_why:
+                log.info(
+                    "Rotation guard: PASS %s at %+.1f%% — name-level falling "
+                    "read (%s): cutting a breaking name is defense, not "
+                    "churn.", p.symbol, pos.unrealized_pl_pct, fall_why,
                 )
                 kept.append(p)
                 continue
@@ -2119,6 +2181,64 @@ class Orchestrator:
                 + (f" …+{len(buy_excluded) - 5} more" if len(buy_excluded) > 5 else ""),
             )
         return filtered, buy_excluded
+
+    def _reconcile_bear_verdicts(self, proposals) -> None:
+        """Close the loop the output schema now forces (Aug 1): for every
+        put-ELIGIBLE bearish name this cycle the model owes an explicit
+        bearish_verdicts entry — a put proposal, or a decline naming the
+        missing evidence. Jul 31, the day the precheck/verdict prompt fix
+        shipped, three cycles ran with ELIGIBLE names (GLUE, RBLX, VCYT) and
+        the decision journal recorded ZERO mention of any of them: the model
+        neither proposed nor declined, it silently skipped. Prose asked twice;
+        the required schema field is the escalation. Every eligible name now
+        lands in the journal as put_proposed / put_declined(reason) /
+        put_ignored, so dormancy is a queryable record instead of an absence
+        — and the decline REASONS become the nightly postmortem's raw
+        material for the next fix."""
+        self._bear_verdict_stage = {}
+        eligible = [
+            s for s, (ok, _w) in getattr(self, "_bear_eligibility", {}).items()
+            if ok
+        ]
+        if not eligible:
+            return
+        verdicts = getattr(self.engine, "last_bear_verdicts", {}) or {}
+        put_syms = {
+            p.symbol for p in proposals
+            if p.action is Action.BUY
+            and p.instrument is Instrument.OPTION
+            and p.option_legs
+            and all(l.right.lower().startswith("p") for l in p.option_legs)
+        }
+        for s in eligible:
+            if s in put_syms:
+                self._bear_verdict_stage[s] = "put proposed"
+                continue
+            v = verdicts.get(s)
+            if v and v[0] == "declined":
+                reason = (v[1] or "").strip() or "no reason given"
+                self._bear_verdict_stage[s] = f"declined: {reason[:60]}"
+                self._journal_decision(
+                    s, "hold", "option", 0.0, 0.0, "put_declined", 0.0,
+                    reason[:200], "",
+                )
+                log.info("Bearish verdict: %s DECLINED — %s", s, reason[:160])
+            else:
+                # No verdict at all, or a claimed put_proposed with no actual
+                # put in the response — either way the eligible name went
+                # unaddressed.
+                why = (
+                    "model claimed put_proposed but returned no put proposal"
+                    if v and v[0] == "put_proposed" else
+                    "model returned no bearish_verdicts entry for an "
+                    "ELIGIBLE name (the schema requires one per listed name)"
+                )
+                self._bear_verdict_stage[s] = "IGNORED"
+                self._journal_decision(
+                    s, "hold", "option", 0.0, 0.0, "put_ignored", 0.0, why, "",
+                )
+                log.warning("Bearish verdict: %s ELIGIBLE but IGNORED — %s.",
+                            s, why)
 
     def _bearish_lean(self, bundle) -> bool:
         """True when the bundle's evidence leans bearish enough to justify
@@ -2474,6 +2594,46 @@ class Orchestrator:
                 f"(<= -{drop:g}% intraday defense trigger)"
             )
         return False, ""
+
+    def _name_falling_reads(self, account, tech_ctx) -> dict[str, str]:
+        """Per-NAME falling read (Jul 30 review, Phase-1 gap): every falling-
+        market defense keys on an INDEX-level trigger, and July's losses did
+        not happen on index-level days — Jul 29 bottomed at -1.2% vs the
+        -1.5% intraday trigger while NU/NOK broke -5%+ alone in a calm tape.
+        A held name down NAME_DROP_DEFENSE_PCT%+ on the day is ITSELF
+        falling, whatever the index reads. Day change is the live position
+        price against the technical feed's prior daily close; a name without
+        tech data this cycle fails open (no read, no release — the bracket
+        stop still bounds it). System-managed sleeves are skipped: the
+        orchestrator already manages their exits deterministically. Returns
+        symbol -> human-readable read ("-5.2% today vs SPY +0.1%"); the SPY
+        tail contextualizes name-vs-tape without gating the read on it (a
+        name in freefall deserves defense on a red index day too)."""
+        thresh = getattr(self.cfg, "name_drop_defense_pct", 0.0) or 0.0
+        if thresh <= 0:
+            return {}
+        spy = None
+        try:
+            if self.cfg.risk.regime_filter_enabled:
+                spy = self.regime.assess().day_change_pct
+        except Exception:
+            spy = None
+        out: dict[str, str] = {}
+        managed = self._system_managed_symbols()
+        for p in account.positions:
+            if p.is_option or p.qty <= 0 or p.symbol in managed:
+                continue
+            prev = (tech_ctx.get(p.symbol) or {}).get("prev_close")
+            px = p.current_price or 0.0
+            if not prev or prev <= 0 or px <= 0:
+                continue
+            day = (px / prev - 1.0) * 100.0
+            if day <= -thresh:
+                out[p.symbol] = (
+                    f"{day:+.1f}% today"
+                    + (f" vs SPY {spy:+.1f}%" if spy is not None else "")
+                )
+        return out
 
     def _apply_core_defense(self, account) -> None:
         """When the market itself is falling, stop averaging INTO it and take

@@ -38,6 +38,13 @@ class DecisionEngine:
             api_key=cfg.anthropic_api_key, timeout=cfg.decision_timeout_s, max_retries=1,
         )
         self.model = cfg.decision_model
+        # symbol -> (verdict, reason) from the REQUIRED bearish_verdicts output
+        # field, refreshed by every decide() call. The orchestrator reconciles
+        # these against the cycle's put-ELIGIBLE names right after decide(), so
+        # an eligible name the model neither proposed nor declined surfaces as
+        # IGNORED instead of vanishing (Jul 31: three cycles of eligible names,
+        # zero mention anywhere in the decision journal).
+        self.last_bear_verdicts: dict[str, tuple[str, str]] = {}
 
     def decide(
         self, bundles: list[SignalBundle], account: AccountSnapshot,
@@ -81,6 +88,7 @@ class DecisionEngine:
         ONE defined-risk index put so the book can PROFIT from a decline
         instead of only bleeding through it.
         """
+        self.last_bear_verdicts = {}  # never carry a prior cycle's verdicts
         if not bundles:
             return []
 
@@ -155,7 +163,8 @@ class DecisionEngine:
             return []
 
         text = next((b.text for b in resp.content if b.type == "text"), "")
-        return self._parse(text)
+        proposals, self.last_bear_verdicts = self._parse(text)
+        return proposals
 
     def decide_option_fallback(
         self, bundle: SignalBundle, account: AccountSnapshot,
@@ -243,7 +252,7 @@ class DecisionEngine:
             )
             return None
         text = next((b.text for b in resp.content if b.type == "text"), "")
-        for p in self._parse(text):
+        for p in self._parse(text)[0]:
             if (
                 p.symbol == bundle.symbol
                 and p.action.value == "buy"
@@ -463,8 +472,18 @@ class DecisionEngine:
                     "instrument 'option', action 'buy', expiry 2-8 weeks out, "
                     "strikes at/near the money, within the premium budget. "
                     "You cannot short stock; an unexpressed bearish read "
-                    "earns nothing. If you still decline an eligible name, "
-                    "note why in that name's HOLD rationale.",
+                    "earns nothing.",
+                    # Aug 1 escalation: the Jul 31 prompt fix showed the model
+                    # verified-eligible names and it still skipped every one —
+                    # no put, no HOLD, no mention in 76 journal records. The
+                    # schema's required bearish_verdicts field ends silence as
+                    # an option; this line binds it to THIS list.
+                    "MANDATORY: your bearish_verdicts output must contain one "
+                    "entry for EVERY symbol in the Put-ELIGIBLE list above — "
+                    "verdict 'put_proposed' alongside the option proposal, or "
+                    "'declined' naming the specific evidence that is missing. "
+                    "An omitted symbol is logged as IGNORED and audited "
+                    "nightly.",
                 ]
             if blocked:
                 lines.append(
@@ -712,14 +731,19 @@ class DecisionEngine:
 
     # -- response parsing --------------------------------------------------- #
     @staticmethod
-    def _parse(text: str) -> list[TradeProposal]:
+    def _parse(
+        text: str,
+    ) -> tuple[list[TradeProposal], dict[str, tuple[str, str]]]:
+        """Returns (proposals, bearish verdicts). Verdicts map symbol ->
+        (verdict, reason) from the required bearish_verdicts field; a reply
+        without the field (old shape, fallback calls) parses to {}."""
         if not text.strip():
-            return []
+            return [], {}
         try:
             data = json.loads(text)
         except json.JSONDecodeError as e:
             log.error("Could not parse decision JSON: %s", e)
-            return []
+            return [], {}
 
         proposals: list[TradeProposal] = []
         for raw in data.get("proposals", []):
@@ -727,5 +751,16 @@ class DecisionEngine:
                 proposals.append(TradeProposal(**raw))
             except Exception as e:  # one bad item shouldn't drop the rest
                 log.warning("Skipping malformed proposal %s: %s", raw, e)
-        log.info("Claude returned %d proposal(s).", len(proposals))
-        return proposals
+        verdicts: dict[str, tuple[str, str]] = {}
+        for raw in data.get("bearish_verdicts", []) or []:
+            try:
+                verdicts[str(raw["symbol"]).upper()] = (
+                    str(raw["verdict"]), str(raw.get("reason", "")),
+                )
+            except Exception as e:
+                log.warning("Skipping malformed bearish verdict %s: %s", raw, e)
+        log.info(
+            "Claude returned %d proposal(s), %d bearish verdict(s).",
+            len(proposals), len(verdicts),
+        )
+        return proposals, verdicts
