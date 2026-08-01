@@ -319,6 +319,38 @@ class RiskLimits:
     # open a fresh position — the book must stop paying the same name's spread
     # to lose a third time. 0 = off.
     loss_streak_guard: int = 2
+    # --- expectancy gate on SIGNAL FAMILIES (Jul 30 review, roadmap item
+    # #10): NU, NOK and BEP were all fresh entries whose cited thesis came
+    # from the same families (options-flow momentum / congress) while those
+    # families' trailing realized expectancy was negative. A family that is
+    # demonstrably losing money right now doesn't earn NEW starters; top-ups
+    # are exempt (the position already cleared entry), and a family with
+    # fewer than min_trips closed trips in the window is never judged. ---
+    expectancy_gate_enabled: bool = True   # EXPECTANCY_GATE (on/off)
+    expectancy_gate_min_trips: int = 8     # closed trips before a family is judged
+    expectancy_gate_window_days: int = 14  # trailing window for the read
+    # Red-day rotation release (Jul 29: the guard held NOK's -4.8% exit open
+    # ~2h into a losing session). On a day the BOOK is losing, a loss-cut the
+    # model asks for is defense, not lukewarm churn — the guard yields to any
+    # sell already past the guard's own min-loss band. On/off only; the band
+    # edges stay rotation_guard_min/max_loss_pct.
+    rotation_guard_red_day_release: bool = True
+    # Put carve-out for broken MOMENTUM names (Jul 30 review): the direction
+    # gate only kept a put's candidacy when the name sat below its own 200dma,
+    # but the names that actually break (NU, NOK) are recent runners still far
+    # ABOVE their 200dma — so every recognized breakdown died at HOLD. A name
+    # trading at least this % BELOW its 20d SMA is in a sharp short-term
+    # breakdown and keeps its put candidacy in an up market too. 0 = off.
+    put_breakdown_ext_pct: float = 5.0
+    # --- regime EXPOSURE LADDER (Jul 30 review): the regime multiplier only
+    # shrinks NEW buys, so the book's floor posture stays fully-invested-long
+    # through any decline. The ladder caps GROSS exposure by regime label —
+    # risk-on keeps max_gross_exposure_pct; neutral and risk-off clamp lower
+    # (new buys AND the core fill respect it; existing positions are not
+    # force-sold — the regime trim / core defense handle that). ---
+    exposure_ladder_enabled: bool = True
+    exposure_neutral_pct: float = 60.0     # gross-exposure cap in a neutral regime
+    exposure_risk_off_pct: float = 30.0    # gross-exposure cap in risk-off
 
 
 @dataclass(frozen=True)
@@ -433,6 +465,26 @@ class Config:
     core_defense_enabled: bool = True
     market_drop_defense_pct: float = 1.5   # intraday SPY drop that reads "falling"
     core_defense_trim_pct: float = 25.0    # % of the core sold per defense day
+    # --- deterministic AUTO-HEDGE (Jul 30 review). The Jul-29 index-put
+    # sanction is model-discretionary and has fired zero times; the model
+    # demonstrably skips discretionary defense. When the falling read holds
+    # for auto_hedge_min_cycles consecutive decision cycles, the orchestrator
+    # ITSELF buys a 1x inverse ETF (hedge_etf) sized to auto_hedge_ratio x the
+    # book's net long exposure — plain-equity path, so brackets/watchdog/
+    # cooldowns all apply and it works with OPTIONS_ENABLED off. Unwinds
+    # symmetrically once the read clears for the same number of cycles.
+    # hedge_etf="" disables. Managed by the system: excluded from the model's
+    # slate exactly like the core ETF. ---
+    hedge_etf: str = ""                    # HEDGE_ETF (e.g. PSQ / SH; "" = off)
+    auto_hedge_ratio: float = 0.30         # hedge notional / net long exposure
+    auto_hedge_min_cycles: int = 2         # falling cycles before arming (and clearing)
+    auto_hedge_max_pct: float = 15.0       # hedge ceiling as % of equity
+    # --- DEFENSIVE CORE (Jul 30 review): while the core defense is active the
+    # QQQ fill pauses — but the freed/idle cash then earns nothing. Redirect
+    # the core fill into a short-duration T-bill ETF instead (SGOV/BIL), and
+    # rotate it back out when the falling read clears so the QQQ core can
+    # refill. "" = off (old behavior: cash just sits). ---
+    defensive_core_etf: str = ""           # DEFENSIVE_CORE_ETF (e.g. SGOV; "" = off)
 
     # Ops hardening (goGA GA-2.1/2.2). heartbeat_url: an external dead-man
     # monitor (e.g. healthchecks.io ping URL) GET-pinged from the watchdog
@@ -598,7 +650,11 @@ def load_config() -> Config:
             # thesis (no signal at/above thesis_min_score), past a grace age. Runs
             # in the decision cycle but does NOT need the LLM. Opt-in: a transient
             # data outage that blanks signals could otherwise force spurious exits.
-            thesis_decay_enabled=_flag("THESIS_DECAY_ENABLED", "off"),
+            # Default flipped ON (Jul 30 review): losers were held 3.8d vs
+            # winners 2.5d across the full ledger — the deterministic decay
+            # exit is the anti-disposition backstop, and the signal-outage
+            # concern is covered by the grace period + corroboration check.
+            thesis_decay_enabled=_flag("THESIS_DECAY_ENABLED", "on"),
             thesis_decay_min_age_days=_f("THESIS_DECAY_MIN_AGE_DAYS", 3.0),
             thesis_min_score=_f("THESIS_MIN_SCORE", 0.1),
             pdt_guard_enabled=_flag("PDT_GUARD_ENABLED", "on"),
@@ -711,6 +767,17 @@ def load_config() -> Config:
             stop_cover_extension=_flag("STOP_COVER_EXTENSION", "on"),
             overext_gap_pct=_f("OVEREXT_GAP_PCT", 15.0),
             loss_streak_guard=_i("LOSS_STREAK_GUARD", 2),
+            # All-weather upgrades (Jul 30 review).
+            expectancy_gate_enabled=_flag("EXPECTANCY_GATE", "on"),
+            expectancy_gate_min_trips=_i("EXPECTANCY_GATE_MIN_TRIPS", 8),
+            expectancy_gate_window_days=_i("EXPECTANCY_GATE_WINDOW_DAYS", 14),
+            rotation_guard_red_day_release=_flag(
+                "ROTATION_GUARD_RED_DAY_RELEASE", "on"
+            ),
+            put_breakdown_ext_pct=_f("PUT_BREAKDOWN_EXT_PCT", 5.0),
+            exposure_ladder_enabled=_flag("EXPOSURE_LADDER", "on"),
+            exposure_neutral_pct=_f("EXPOSURE_NEUTRAL_PCT", 60.0),
+            exposure_risk_off_pct=_f("EXPOSURE_RISK_OFF_PCT", 30.0),
         ),
         screener=ScreenerConfig(
             enabled=_flag("SCREENER_ENABLED", "on"),
@@ -744,6 +811,11 @@ def load_config() -> Config:
         core_defense_enabled=_flag("CORE_DEFENSE_ENABLED", "on"),
         market_drop_defense_pct=_f("MARKET_DROP_DEFENSE_PCT", 1.5),
         core_defense_trim_pct=_f("CORE_DEFENSE_TRIM_PCT", 25.0),
+        hedge_etf=os.getenv("HEDGE_ETF", "").strip().upper(),
+        auto_hedge_ratio=_f("AUTO_HEDGE_RATIO", 0.30),
+        auto_hedge_min_cycles=_i("AUTO_HEDGE_MIN_CYCLES", 2),
+        auto_hedge_max_pct=_f("AUTO_HEDGE_MAX_PCT", 15.0),
+        defensive_core_etf=os.getenv("DEFENSIVE_CORE_ETF", "").strip().upper(),
         track_record_file=os.getenv("TRACK_RECORD_FILE", "").strip(),
     )
 

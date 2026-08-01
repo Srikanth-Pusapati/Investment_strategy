@@ -1,0 +1,509 @@
+2026-07-30 00:15:02,933 INFO orchestrator | Market closed; skipping decision cycle.
+2026-07-30 01:07:04,158 INFO orchestrator | Market closed; skipping decision cycle.
+2026-07-30 01:59:05,442 INFO orchestrator | Market closed; skipping decision cycle.
+2026-07-30 02:51:06,753 INFO orchestrator | Market closed; skipping decision cycle.
+2026-07-30 03:43:07,872 INFO orchestrator | Market closed; skipping decision cycle.
+2026-07-30 04:35:09,189 INFO orchestrator | Market closed; skipping decision cycle.
+2026-07-30 05:27:10,442 INFO orchestrator | Market closed; skipping decision cycle.
+2026-07-30 06:19:11,772 INFO orchestrator | Market closed; skipping decision cycle.
+2026-07-30 07:11:12,894 INFO orchestrator | Market closed; skipping decision cycle.
+2026-07-30 08:02:50,540 WARNING alpaca | get_account: transient network error (ReadTimeout); retry 1/2.
+2026-07-30 08:03:14,152 INFO orchestrator | Market closed; skipping decision cycle.
+2026-07-30 08:25:22,326 CRITICAL orchestrator | On BATTERY during market hours — clamshell/battery sleep will blind the bot (caffeinate cannot prevent it). Plug in AC or move to the always-on host (ops/).
+2026-07-30 08:25:23,870 INFO notify | CRITICAL alert emailed to srikanthpusapati1@gmail.com: Bot on battery during market hours
+2026-07-30 08:30:15,926 INFO orchestrator | Market regime: SPY above 200dma (736 vs 697, today +0.8%), VIX 18.9, VIX3M 20.5 (contango) -> risk-on, size x1.00.
+2026-07-30 08:30:16,620 INFO quiver | Quiver live/congresstrading -> 1000 row(s).
+2026-07-30 08:30:18,166 INFO screener | EDGAR Form-4 feed -> 61 filing(s) (scanning up to 100).
+2026-07-30 08:30:34,805 INFO screener | Options-flow most-actives pool -> 40 name(s).
+2026-07-30 08:31:13,264 INFO screener | robinhood screener disabled (no credentials); skipping.
+2026-07-30 08:31:13,280 INFO screener | robinhood_scans screener disabled (no credentials); skipping.
+2026-07-30 08:31:13,284 INFO screener | Discovered 18 candidate(s) from 5 source(s) (185 merged, 21 above min_score, capped to 18).
+2026-07-30 08:31:13,285 INFO screener |   candidate GRAB [options_flow] score=+0.63 — Options flow: 4,175 call / 952 put vol (bullish call imbalance +0.63) on a most-active name.
+2026-07-30 08:31:13,289 INFO screener |   candidate MSTU [options_flow] score=+0.60 — Options flow: 7,203 call / 1,819 put vol (bullish call imbalance +0.60) on a most-active name.
+2026-07-30 08:31:13,290 INFO screener |   candidate TSLL [options_flow] score=+0.57 — Options flow: 56,437 call / 15,613 put vol (bullish call imbalance +0.57) on a most-active name.
+2026-07-30 08:31:13,291 INFO screener |   candidate SQQQ [options_flow] score=+0.52 — Options flow: 46,885 call / 14,827 put vol (bullish call imbalance +0.52) on a most-active name.
+2026-07-30 08:31:13,291 INFO screener |   candidate KORU [options_flow] score=+0.51 — Options flow: 58,236 call / 19,119 put vol (bullish call imbalance +0.51) on a most-active name.
+2026-07-30 08:31:13,292 INFO screener |   candidate PLUG [options_flow] score=+0.50 — Options flow: 7,999 call / 2,663 put vol (bullish call imbalance +0.50) on a most-active name.
+2026-07-30 08:31:13,293 INFO screener |   candidate SNXX [options_flow] score=+0.49 — Options flow: 29,067 call / 9,879 put vol (bullish call imbalance +0.49) on a most-active name.
+2026-07-30 08:31:13,293 INFO screener |   candidate NVD [options_flow] score=+0.47 — Options flow: 422 call / 153 put vol (bullish call imbalance +0.47) on a most-active name.
+2026-07-30 08:31:13,294 INFO screener |   candidate HYG [options_flow] score=-0.43 — Options flow: 63,240 call / 160,087 put vol (bearish put imbalance -0.43) on a most-active name.
+2026-07-30 08:31:13,294 INFO screener |   candidate MUU [options_flow] score=+0.42 — Options flow: 9,672 call / 3,932 put vol (bullish call imbalance +0.42) on a most-active name.
+2026-07-30 08:31:13,295 INFO screener |   candidate NOK [congress+options_flow] score=+0.41 — Congress: 0 buy / 3 sell filings in last 60d (disclosures lag up to ~45d). | Options flow: 114,675 call / 30,068 put vol (bullish call imbalance +0.58) on a most-active name.
+2026-07-30 08:31:13,295 INFO screener |   candidate TQQQ [options_flow] score=+0.37 — Options flow: 205,130 call / 94,557 put vol (bullish call imbalance +0.37) on a most-active name.
+2026-07-30 08:31:13,296 INFO screener |   candidate SOFI [options_flow] score=+0.36 — Options flow: 356,990 call / 167,326 put vol (bullish call imbalance +0.36) on a most-active name.
+2026-07-30 08:31:13,296 INFO screener |   candidate INTC [congress+options_flow] score=+0.33 — Congress: 0 buy / 2 sell filings in last 60d (disclosures lag up to ~45d). | Options flow: 331,485 call / 126,495 put vol (bullish call imbalance +0.45) on a most-active name.
+2026-07-30 08:31:13,297 INFO screener |   candidate SOXS [options_flow] score=+0.32 — Options flow: 52,330 call / 26,846 put vol (bullish call imbalance +0.32) on a most-active name.
+2026-07-30 08:31:13,298 INFO screener |   candidate COE [insider] score=+0.30 — Insider: 1 open-market buy filing(s), 637,200 sh (SEC Form 4, last filings feed).
+2026-07-30 08:31:13,298 INFO screener |   candidate ACI [insider] score=+0.30 — Insider: 1 open-market buy filing(s), 39,409 sh (SEC Form 4, last filings feed).
+2026-07-30 08:31:13,299 INFO screener |   candidate BEP [congress] score=+0.23 — Congress: 6 buy / 0 sell filings in last 60d (disclosures lag up to ~45d).
+2026-07-30 08:31:51,309 INFO quiver | Quiver live/offexchange -> 5496 row(s).
+2026-07-30 08:31:51,812 INFO quiver | Quiver live/govcontractsall -> 20000 row(s).
+2026-07-30 08:31:52,731 INFO quiver | Quiver live/lobbying -> 20000 row(s).
+2026-07-30 08:33:10,246 INFO signals | Gathered signals for 23/23 symbols (+3 market signals).
+2026-07-30 08:33:10,266 INFO orchestrator | Composite index (23 scored, top: SQQQ +2.07, F +1.78, COE +1.49, SPGI +1.12, NVD +0.97, MSTU +0.95, BEP +0.84, VRRM +0.79).
+2026-07-30 08:33:10,614 INFO orchestrator | Buy-excluded from slate this cycle: GRAB (price $3.38 < $5 liquidity floor), MSTU (price $1.83 < $5 liquidity floor), NOK (exited 19.6h ago (cooldown 24h)), PLUG (price $1.96 < $5 liquidity floor)
+2026-07-30 08:33:48,210 INFO usage | decision call: 12298 in / 2749 out (cache r=0 w=6786) ~$0.1981 [claude-opus-4-8]
+2026-07-30 08:33:48,214 INFO decision | Claude returned 5 proposal(s).
+2026-07-30 08:33:48,378 INFO orchestrator | HOLD F (no action) | Held -2.4% with ~1.6pp stop room, but thesis intact: composite +1.78, uptrend px>50>200, MACD bull, 
+2026-07-30 08:33:48,487 INFO orchestrator | HOLD PATH (no action) | Winner at +4.2% with ample stop room (11.1pp). Bullish options flow C/P +0.65, bullish chain positio
+2026-07-30 08:33:48,647 INFO orchestrator | HOLD SPGI (no action) | Held -1.7%, 2.7pp room. Durable fundamentals anchor (EBITDA $8.1B, 50.5% margin, rev +10.4%) plus in
+2026-07-30 08:33:48,793 INFO orchestrator | HOLD VRRM (no action) | Held -1.2% with wide 8.8pp stop room. Strong options flow C/P +0.91, RSI 59, MACD bull; composite +0
+2026-07-30 08:33:48,910 INFO orchestrator | HOLD WAB (no action) | Held flat, clean uptrend px>50>200, MACD bull, technical improving +0.63, fundamentals solid (rev +1
+2026-07-30 08:33:48,914 INFO orchestrator | Core fill skipped: QQQ already at/above the 15% ceiling.
+2026-07-30 08:33:48,976 INFO alpaca | Alpaca client ready (mode=paper).
+2026-07-30 08:33:50,028 INFO dashboard | Wrote dashboard with 14 trades -> dashboard.html
+2026-07-30 08:35:05,888 INFO ledger | Ledger: SELL F qty=3204 $48266
+2026-07-30 08:35:05,893 INFO orchestrator | Backfilled exchange exit: F 3204 sh @ 15.06 (stop -> bracket_stop, -3.2%).
+2026-07-30 08:55:35,327 CRITICAL orchestrator | On BATTERY during market hours — clamshell/battery sleep will blind the bot (caffeinate cannot prevent it). Plug in AC or move to the always-on host (ops/).
+2026-07-30 08:55:36,981 INFO notify | CRITICAL alert emailed to srikanthpusapati1@gmail.com: Bot on battery during market hours
+2026-07-30 09:22:21,812 INFO orchestrator | Market regime: SPY above 200dma (738 vs 697, today +1.2%), VIX 18.2, VIX3M 20.0 (contango) -> risk-on, size x1.00.
+2026-07-30 09:22:22,526 INFO quiver | Quiver live/congresstrading -> 1000 row(s).
+2026-07-30 09:22:22,817 INFO screener | EDGAR Form-4 feed -> 52 filing(s) (scanning up to 100).
+2026-07-30 09:22:36,962 INFO screener | Options-flow most-actives pool -> 40 name(s).
+2026-07-30 09:23:12,452 INFO screener | robinhood screener disabled (no credentials); skipping.
+2026-07-30 09:23:12,457 INFO screener | robinhood_scans screener disabled (no credentials); skipping.
+2026-07-30 09:23:12,459 INFO screener | Discovered 18 candidate(s) from 5 source(s) (181 merged, 18 above min_score, capped to 18).
+2026-07-30 09:23:12,460 INFO screener |   candidate INO [options_flow] score=+0.86 — Options flow: 2,348 call / 179 put vol (bullish call imbalance +0.86) on a most-active name.
+2026-07-30 09:23:12,463 INFO screener |   candidate KEEL [options_flow] score=+0.81 — Options flow: 19,412 call / 2,086 put vol (bullish call imbalance +0.81) on a most-active name.
+2026-07-30 09:23:12,464 INFO screener |   candidate TE [options_flow] score=+0.79 — Options flow: 33,197 call / 3,980 put vol (bullish call imbalance +0.79) on a most-active name.
+2026-07-30 09:23:12,466 INFO screener |   candidate MARA [options_flow] score=+0.68 — Options flow: 75,042 call / 14,517 put vol (bullish call imbalance +0.68) on a most-active name.
+2026-07-30 09:23:12,467 INFO screener |   candidate MUU [options_flow] score=+0.49 — Options flow: 6,806 call / 2,299 put vol (bullish call imbalance +0.49) on a most-active name.
+2026-07-30 09:23:12,469 INFO screener |   candidate SNXX [options_flow] score=+0.49 — Options flow: 16,270 call / 5,585 put vol (bullish call imbalance +0.49) on a most-active name.
+2026-07-30 09:23:12,470 INFO screener |   candidate MSFT [congress+options_flow] score=+0.47 — Congress: 4 buy / 3 sell filings in last 60d (disclosures lag up to ~45d). | Options flow: 325,755 call / 126,575 put vol (bullish call imbalance +0.44) on a most-active name.
+2026-07-30 09:23:12,472 INFO screener |   candidate SOFI [options_flow] score=+0.46 — Options flow: 65,585 call / 24,043 put vol (bullish call imbalance +0.46) on a most-active name.
+2026-07-30 09:23:12,473 INFO screener |   candidate IREN [options_flow] score=+0.46 — Options flow: 99,931 call / 36,735 put vol (bullish call imbalance +0.46) on a most-active name.
+2026-07-30 09:23:12,474 INFO screener |   candidate TSLL [options_flow] score=+0.44 — Options flow: 19,188 call / 7,407 put vol (bullish call imbalance +0.44) on a most-active name.
+2026-07-30 09:23:12,475 INFO screener |   candidate DRAM [options_flow] score=+0.40 — Options flow: 75,817 call / 32,459 put vol (bullish call imbalance +0.40) on a most-active name.
+2026-07-30 09:23:12,477 INFO screener |   candidate NOK [congress+options_flow] score=+0.39 — Congress: 0 buy / 3 sell filings in last 60d (disclosures lag up to ~45d). | Options flow: 37,256 call / 10,312 put vol (bullish call imbalance +0.57) on a most-active name.
+2026-07-30 09:23:12,478 INFO screener |   candidate NVDA [congress+options_flow] score=+0.39 — Congress: 3 buy / 4 sell filings in last 60d (disclosures lag up to ~45d). | Options flow: 464,273 call / 189,014 put vol (bullish call imbalance +0.42) on a most-active name.
+2026-07-30 09:23:12,480 INFO screener |   candidate INTC [congress+options_flow] score=+0.36 — Congress: 0 buy / 2 sell filings in last 60d (disclosures lag up to ~45d). | Options flow: 142,564 call / 50,831 put vol (bullish call imbalance +0.47) on a most-active name.
+2026-07-30 09:23:12,481 INFO screener |   candidate MSTU [options_flow] score=+0.36 — Options flow: 2,049 call / 967 put vol (bullish call imbalance +0.36) on a most-active name.
+2026-07-30 09:23:12,482 INFO screener |   candidate BEP [congress] score=+0.23 — Congress: 6 buy / 0 sell filings in last 60d (disclosures lag up to ~45d).
+2026-07-30 09:23:12,483 INFO screener |   candidate HUBB [congress] score=+0.23 — Congress: 5 buy / 0 sell filings in last 60d (disclosures lag up to ~45d).
+2026-07-30 09:23:12,484 INFO screener |   candidate SPCX [congress] score=+0.23 — Congress: 4 buy / 0 sell filings in last 60d (disclosures lag up to ~45d).
+2026-07-30 09:23:28,246 INFO quiver | Quiver live/offexchange -> 5496 row(s).
+2026-07-30 09:23:29,103 INFO quiver | Quiver live/govcontractsall -> 20000 row(s).
+2026-07-30 09:23:29,550 INFO quiver | Quiver live/lobbying -> 0 row(s).
+2026-07-30 09:24:28,657 INFO signals | Gathered signals for 22/22 symbols (+3 market signals).
+2026-07-30 09:24:28,687 INFO orchestrator | Composite index (22 scored, top: INO +1.47, SPGI +1.35, MSFT +0.95, PATH +0.93, KEEL +0.85, BEP +0.83, NOK +0.73, VRRM +0.68).
+2026-07-30 09:24:29,041 INFO orchestrator | Buy-excluded from slate this cycle: INO (price $0.58 < $5 liquidity floor), KEEL (price $4.03 < $5 liquidity floor), MSTU (price $1.88 < $5 liquidity floor), NOK (exited 20.4h ago (cooldown 24h)), TE (price $4.24 < $5 liquidity floor)
+2026-07-30 09:25:33,357 INFO usage | decision call: 13239 in / 4599 out (cache r=6786 w=0) ~$0.1846 [claude-opus-4-8]
+2026-07-30 09:25:33,362 INFO decision | Claude returned 5 proposal(s).
+2026-07-30 09:25:33,615 INFO orchestrator | SELL SPGI -> approved: Closing existing position. | Losing hold (-2.9%) with only 1.5pp of stop room left and fresh evidence deteriorating: technical -0
+2026-07-30 09:25:33,799 WARNING alpaca | replace sell 38ab5380-5197-4748-b901-aa8dde617878 failed ({"code":42210000,"message":"take_profit.limit_price must be \u003e stop_loss.stop_price"}); falling back to cancel.
+2026-07-30 09:25:33,895 ERROR orchestrator | SELL SPGI approved but the close FAILED — queued for the watchdog to retry every tick.
+2026-07-30 09:25:34,101 INFO orchestrator | SELL VRRM -> approved: Closing existing position. | Biggest open loser (-6.3%) and thesis has materially decayed: composite fell from +1.61 at entry to 
+2026-07-30 09:25:34,335 WARNING alpaca | Exit via resting sell 2c7a966e-8b76-4e23-9f9e-4eecb6d15d0d (VRRM): replaced limit -> 4.90 (marketable; new order a54097ed-65e9-465f-af5e-1ca03aaa68fe).
+2026-07-30 09:25:34,341 INFO ledger | Ledger: SELL VRRM qty=11192 $55792
+2026-07-30 09:25:34,344 WARNING watchdog | Partial close VRRM (decision): sold 0 available share(s), made 1 resting sell(s) marketable; 11192 reserved by open orders — will retry the full close next tick.
+2026-07-30 09:25:34,521 INFO orchestrator | HOLD PATH (no action) | Winner at +0.7% with ample stop room (7.6pp). Thesis intact: composite +0.93, bullish options chain 
+2026-07-30 09:25:34,650 INFO orchestrator | HOLD WAB (no action) | Cleanest technical+fundamental combo among held names: uptrend px>50>200, MACD bull, technical +0.62
+2026-07-30 09:25:35,205 INFO orchestrator | OPTION OptionStrategy.LONG_CALL MSFT -> approved: 17 contract(s), $9,503 debit (cap $9,800). | Strongest fresh bullish name on the slate: composite +0.95, fundamentals +0.58 (62.5% margin, rev +1
+2026-07-30 09:25:35,259 INFO alpaca | OPTION 1-leg order qty=17 limit=6.71 (order 566671c3-f85b-4454-8999-0fe522bbfa3d)
+2026-07-30 09:25:35,262 INFO ledger | Ledger: BUY MSFT qty=17 $9503
+2026-07-30 09:25:35,265 INFO orchestrator | Core fill skipped: QQQ already at/above the 15% ceiling.
+2026-07-30 09:25:35,318 INFO alpaca | Alpaca client ready (mode=paper).
+2026-07-30 09:25:35,685 INFO notify | CRITICAL alert emailed to srikanthpusapati1@gmail.com: SPGI SELL approved but close FAILED
+2026-07-30 09:25:36,250 INFO dashboard | Wrote dashboard with 17 trades -> dashboard.html
+2026-07-30 09:25:47,417 CRITICAL orchestrator | On BATTERY during market hours — clamshell/battery sleep will blind the bot (caffeinate cannot prevent it). Plug in AC or move to the always-on host (ops/).
+2026-07-30 09:25:47,745 INFO alpaca | CLOSE SPGI (order 7d4ad71a-8b06-41f7-9498-64d36cdbc9f3)
+2026-07-30 09:25:47,753 INFO ledger | Ledger: SELL SPGI qty=189 $76884
+2026-07-30 09:25:48,868 INFO notify | CRITICAL alert emailed to srikanthpusapati1@gmail.com: Bot on battery during market hours
+2026-07-30 10:14:37,324 INFO orchestrator | Order 566671c3-f85b-4454-8999-0fe522bbfa3d (MSFT) FILLED (17/17).
+2026-07-30 10:14:37,373 INFO orchestrator | Order a54097ed-65e9-465f-af5e-1ca03aaa68fe (VRRM) FILLED (11192/11192).
+2026-07-30 10:14:37,423 INFO orchestrator | Order 7d4ad71a-8b06-41f7-9498-64d36cdbc9f3 (SPGI) FILLED (189/189).
+2026-07-30 10:14:38,040 INFO orchestrator | Market regime: SPY above 200dma (735 vs 697, today +0.8%), VIX 18.7, VIX3M 20.4 (contango) -> risk-on, size x1.00.
+2026-07-30 10:14:38,678 INFO quiver | Quiver live/congresstrading -> 1000 row(s).
+2026-07-30 10:14:39,082 INFO screener | EDGAR Form-4 feed -> 61 filing(s) (scanning up to 100).
+2026-07-30 10:14:55,921 INFO screener | Options-flow most-actives pool -> 40 name(s).
+2026-07-30 10:15:34,473 INFO screener | robinhood screener disabled (no credentials); skipping.
+2026-07-30 10:15:34,477 INFO screener | robinhood_scans screener disabled (no credentials); skipping.
+2026-07-30 10:15:34,478 INFO screener | Discovered 18 candidate(s) from 5 source(s) (186 merged, 23 above min_score, capped to 18).
+2026-07-30 10:15:34,479 INFO screener |   candidate TE [options_flow] score=+0.88 — Options flow: 42,829 call / 2,794 put vol (bullish call imbalance +0.88) on a most-active name.
+2026-07-30 10:15:34,481 INFO screener |   candidate INO [options_flow] score=+0.85 — Options flow: 2,414 call / 190 put vol (bullish call imbalance +0.85) on a most-active name.
+2026-07-30 10:15:34,483 INFO screener |   candidate KEEL [options_flow] score=+0.83 — Options flow: 28,926 call / 2,646 put vol (bullish call imbalance +0.83) on a most-active name.
+2026-07-30 10:15:34,484 INFO screener |   candidate MARA [options_flow] score=+0.58 — Options flow: 97,809 call / 26,156 put vol (bullish call imbalance +0.58) on a most-active name.
+2026-07-30 10:15:34,485 INFO screener |   candidate SOFI [options_flow] score=+0.51 — Options flow: 105,885 call / 34,577 put vol (bullish call imbalance +0.51) on a most-active name.
+2026-07-30 10:15:34,486 INFO screener |   candidate SNXX [options_flow] score=+0.51 — Options flow: 24,217 call / 7,949 put vol (bullish call imbalance +0.51) on a most-active name.
+2026-07-30 10:15:34,487 INFO screener |   candidate MUU [options_flow] score=+0.50 — Options flow: 9,307 call / 3,072 put vol (bullish call imbalance +0.50) on a most-active name.
+2026-07-30 10:15:34,488 INFO screener |   candidate TSLL [options_flow] score=+0.50 — Options flow: 30,893 call / 10,352 put vol (bullish call imbalance +0.50) on a most-active name.
+2026-07-30 10:15:34,489 INFO screener |   candidate NOK [congress+options_flow] score=+0.50 — Congress: 0 buy / 3 sell filings in last 60d (disclosures lag up to ~45d). | Options flow: 98,466 call / 19,549 put vol (bullish call imbalance +0.67) on a most-active name.
+2026-07-30 10:15:34,491 INFO screener |   candidate DRAM [options_flow] score=+0.49 — Options flow: 133,723 call / 46,149 put vol (bullish call imbalance +0.49) on a most-active name.
+2026-07-30 10:15:34,492 INFO screener |   candidate MSTU [options_flow] score=+0.46 — Options flow: 2,252 call / 831 put vol (bullish call imbalance +0.46) on a most-active name.
+2026-07-30 10:15:34,493 INFO screener |   candidate PLUG [options_flow] score=+0.46 — Options flow: 5,049 call / 1,880 put vol (bullish call imbalance +0.46) on a most-active name.
+2026-07-30 10:15:34,494 INFO screener |   candidate SQQQ [options_flow] score=+0.38 — Options flow: 30,077 call / 13,602 put vol (bullish call imbalance +0.38) on a most-active name.
+2026-07-30 10:15:34,495 INFO screener |   candidate IREN [options_flow] score=+0.37 — Options flow: 142,300 call / 64,823 put vol (bullish call imbalance +0.37) on a most-active name.
+2026-07-30 10:15:34,496 INFO screener |   candidate NVDA [congress+options_flow] score=+0.34 — Congress: 3 buy / 4 sell filings in last 60d (disclosures lag up to ~45d). | Options flow: 792,173 call / 361,631 put vol (bullish call imbalance +0.37) on a most-active name.
+2026-07-30 10:15:34,497 INFO screener |   candidate KORU [options_flow] score=+0.33 — Options flow: 27,151 call / 13,795 put vol (bullish call imbalance +0.33) on a most-active name.
+2026-07-30 10:15:34,498 INFO screener |   candidate NWFL [insider] score=+0.30 — Insider: 1 open-market buy filing(s), 3,100 sh (SEC Form 4, last filings feed).
+2026-07-30 10:15:34,499 INFO screener |   candidate COSM [insider] score=+0.30 — Insider: 1 open-market buy filing(s), 766,284 sh (SEC Form 4, last filings feed).
+2026-07-30 10:15:47,281 INFO quiver | Quiver live/offexchange -> 5496 row(s).
+2026-07-30 10:15:47,752 INFO quiver | Quiver live/govcontractsall -> 20000 row(s).
+2026-07-30 10:15:48,735 INFO quiver | Quiver live/lobbying -> 20000 row(s).
+2026-07-30 10:16:25,120 INFO signals | Gathered signals for 21/21 symbols (+3 market signals).
+2026-07-30 10:16:25,142 INFO orchestrator | Composite index (21 scored, top: SQQQ +1.70, NWFL +1.68, KEEL +1.42, INO +1.02, MSFT +0.87, COSM +0.83, TE +0.78, MSTU +0.76).
+2026-07-30 10:16:25,624 INFO orchestrator | Buy-excluded from slate this cycle: COSM (price $0.20 < $5 liquidity floor), INO (price $0.62 < $5 liquidity floor), KEEL (price $4.14 < $5 liquidity floor), MSFT (topped up 0.8h ago (next ok in 4h)), MSTU (price $1.86 < $5 liquidity floor) …+3 more
+2026-07-30 10:17:05,285 INFO usage | decision call: 9994 in / 3002 out (cache r=6786 w=0) ~$0.1284 [claude-opus-4-8]
+2026-07-30 10:17:05,289 INFO decision | Claude returned 4 proposal(s).
+2026-07-30 10:17:05,340 INFO orchestrator | Cycle budget $683,892 split across 2 buy(s): NWFL $410,335, NVDA $148,135.
+2026-07-30 10:17:07,035 INFO orchestrator | BUY NWFL -> resized: Sized to 876.108 sh ($29,551) within caps. Reduced from request. Starter haircut x0.5 (conviction 0.62 < 0.65; stop at the 4.5% vol floor). | Highest composite on the slate (+1.68) with a fresh, corroborated anchor: fresh insider open-market 
+2026-07-30 10:17:07,086 WARNING alpaca | NWFL: floored 876.108 sh -> 876 for the exchange bracket; $3.64 of the $29551.12 allocation NOT deployed (stays cash; core sweep / next cycle can redeploy).
+2026-07-30 10:17:07,225 INFO alpaca | BUY market NWFL qty=876.0 notional=None lim=None (order 83e83b35-fdd8-44d6-9a5f-2cf459efcc4c)
+2026-07-30 10:17:07,230 INFO ledger | Ledger: BUY NWFL qty=876 $29547
+2026-07-30 10:17:08,032 INFO orchestrator | BUY NVDA -> resized: Sized to 202.724 sh ($39,401) within caps. Reduced from request. Starter haircut x0.5 (conviction 0.60 < 0.65). | Elite fundamentals (+0.80: margin 76.1%, rev growth +65.5%, D/E 7) anchor the thesis in a risk-on up
+2026-07-30 10:17:08,097 WARNING alpaca | NVDA: floored 202.724 sh -> 202 for the exchange bracket; $140.81 of the $39401.50 allocation NOT deployed (stays cash; core sweep / next cycle can redeploy).
+2026-07-30 10:17:08,166 INFO alpaca | BUY market NVDA qty=202.0 notional=None lim=None (order 8cdaefa0-5048-4587-af04-e2a419f10ee8)
+2026-07-30 10:17:08,169 INFO ledger | Ledger: BUY NVDA qty=202 $39270
+2026-07-30 10:17:08,338 INFO orchestrator | HOLD PATH (no action) | Winner at +0.6% with ample stop room (7.5pp). Thesis intact: composite +0.45, options_chain bullish 
+2026-07-30 10:17:08,457 INFO orchestrator | HOLD WAB (no action) | Cleanest technical+fundamental combo among holds: technical +0.61 improving (uptrend px>50>200, MACD
+2026-07-30 10:17:08,462 INFO orchestrator | Cycle budget not fully deployed: $144.45 dropped by whole-share flooring across this cycle's buys (stays cash; core sweep / next cycle can redeploy).
+2026-07-30 10:17:08,465 INFO orchestrator | Core fill skipped: QQQ already at/above the 15% ceiling.
+2026-07-30 10:17:08,526 INFO alpaca | Alpaca client ready (mode=paper).
+2026-07-30 10:17:09,757 INFO dashboard | Wrote dashboard with 20 trades -> dashboard.html
+2026-07-30 11:06:40,831 INFO orchestrator | Order 83e83b35-fdd8-44d6-9a5f-2cf459efcc4c (NWFL) FILLED (876/876).
+2026-07-30 11:06:40,893 INFO orchestrator | Order 8cdaefa0-5048-4587-af04-e2a419f10ee8 (NVDA) FILLED (202/202).
+2026-07-30 11:06:41,808 INFO orchestrator | Market regime: SPY above 200dma (738 vs 697, today +1.2%), VIX 18.6, VIX3M 20.3 (contango) -> risk-on, size x1.00.
+2026-07-30 11:06:42,573 INFO quiver | Quiver live/congresstrading -> 1000 row(s).
+2026-07-30 11:06:42,710 INFO screener | EDGAR Form-4 feed -> 61 filing(s) (scanning up to 100).
+2026-07-30 11:06:59,690 INFO screener | Options-flow most-actives pool -> 40 name(s).
+2026-07-30 11:07:42,340 INFO screener | robinhood screener disabled (no credentials); skipping.
+2026-07-30 11:07:42,345 INFO screener | robinhood_scans screener disabled (no credentials); skipping.
+2026-07-30 11:07:42,347 INFO screener | Discovered 18 candidate(s) from 5 source(s) (182 merged, 18 above min_score, capped to 18).
+2026-07-30 11:07:42,348 INFO screener |   candidate TE [options_flow] score=+0.86 — Options flow: 45,576 call / 3,335 put vol (bullish call imbalance +0.86) on a most-active name.
+2026-07-30 11:07:42,351 INFO screener |   candidate KEEL [options_flow] score=+0.83 — Options flow: 35,711 call / 3,400 put vol (bullish call imbalance +0.83) on a most-active name.
+2026-07-30 11:07:42,353 INFO screener |   candidate MARA [options_flow] score=+0.54 — Options flow: 105,241 call / 31,661 put vol (bullish call imbalance +0.54) on a most-active name.
+2026-07-30 11:07:42,354 INFO screener |   candidate MUU [options_flow] score=+0.52 — Options flow: 10,473 call / 3,330 put vol (bullish call imbalance +0.52) on a most-active name.
+2026-07-30 11:07:42,355 INFO screener |   candidate DRAM [options_flow] score=+0.51 — Options flow: 174,842 call / 56,690 put vol (bullish call imbalance +0.51) on a most-active name.
+2026-07-30 11:07:42,357 INFO screener |   candidate SNXX [options_flow] score=+0.51 — Options flow: 27,903 call / 9,181 put vol (bullish call imbalance +0.51) on a most-active name.
+2026-07-30 11:07:42,358 INFO screener |   candidate SOFI [options_flow] score=+0.50 — Options flow: 136,820 call / 45,937 put vol (bullish call imbalance +0.50) on a most-active name.
+2026-07-30 11:07:42,360 INFO screener |   candidate MSTU [options_flow] score=+0.49 — Options flow: 2,610 call / 881 put vol (bullish call imbalance +0.49) on a most-active name.
+2026-07-30 11:07:42,361 INFO screener |   candidate TSLL [options_flow] score=+0.49 — Options flow: 36,755 call / 12,502 put vol (bullish call imbalance +0.49) on a most-active name.
+2026-07-30 11:07:42,362 INFO screener |   candidate PLUG [options_flow] score=+0.45 — Options flow: 5,401 call / 2,031 put vol (bullish call imbalance +0.45) on a most-active name.
+2026-07-30 11:07:42,364 INFO screener |   candidate ONDS [options_flow] score=+0.44 — Options flow: 24,004 call / 9,360 put vol (bullish call imbalance +0.44) on a most-active name.
+2026-07-30 11:07:42,365 INFO screener |   candidate NOK [congress+options_flow] score=+0.41 — Congress: 0 buy / 3 sell filings in last 60d (disclosures lag up to ~45d). | Options flow: 103,408 call / 27,147 put vol (bullish call imbalance +0.58) on a most-active name.
+2026-07-30 11:07:42,366 INFO screener |   candidate SQQQ [options_flow] score=+0.41 — Options flow: 35,570 call / 14,937 put vol (bullish call imbalance +0.41) on a most-active name.
+2026-07-30 11:07:42,368 INFO screener |   candidate RELL [insider] score=-0.36 — Insider: 2 open-market SELL filing(s), 45,000 sh — bearish cluster (SEC Form 4, last filings feed).
+2026-07-30 11:07:42,369 INFO screener |   candidate BEP [congress] score=+0.23 — Congress: 6 buy / 0 sell filings in last 60d (disclosures lag up to ~45d).
+2026-07-30 11:07:42,370 INFO screener |   candidate HUBB [congress] score=+0.23 — Congress: 5 buy / 0 sell filings in last 60d (disclosures lag up to ~45d).
+2026-07-30 11:07:42,371 INFO screener |   candidate SPGI [congress] score=-0.23 — Congress: 0 buy / 5 sell filings in last 60d (disclosures lag up to ~45d).
+2026-07-30 11:07:42,372 INFO screener |   candidate SPCX [congress] score=+0.23 — Congress: 4 buy / 0 sell filings in last 60d (disclosures lag up to ~45d).
+2026-07-30 11:07:55,817 INFO quiver | Quiver live/offexchange -> 5496 row(s).
+2026-07-30 11:07:57,135 INFO quiver | Quiver live/govcontractsall -> 20000 row(s).
+2026-07-30 11:08:00,649 INFO quiver | Quiver live/lobbying -> 20000 row(s).
+2026-07-30 11:08:36,541 INFO signals | Gathered signals for 23/23 symbols (+3 market signals).
+2026-07-30 11:08:36,573 INFO orchestrator | Composite index (23 scored, top: SQQQ +1.74, KEEL +1.42, NWFL +1.38, BEP +0.83, MSTU +0.80, TE +0.77, MSFT +0.66, HUBB +0.64).
+2026-07-30 11:08:37,380 INFO orchestrator | Buy-excluded from slate this cycle: KEEL (price $4.26 < $5 liquidity floor), MSFT (topped up 1.7h ago (next ok in 4h)), MSTU (price $1.89 < $5 liquidity floor), NOK (exited 22.1h ago (cooldown 24h)), NVDA (topped up 0.9h ago (next ok in 4h)) …+4 more
+2026-07-30 11:09:12,052 INFO usage | decision call: 13417 in / 2419 out (cache r=6786 w=0) ~$0.1310 [claude-opus-4-8]
+2026-07-30 11:09:12,057 INFO decision | Claude returned 5 proposal(s).
+2026-07-30 11:09:12,059 WARNING orchestrator | DROPPED HOLD proposal for F: symbol not in the candidate slate or held book (possible prompt injection).
+2026-07-30 11:09:12,229 INFO orchestrator | HOLD NVDA (no action) | Elite fundamentals (+0.80, margin 76.1%, rev growth +65.5%) anchor thesis but technical is inflectio
+2026-07-30 11:09:12,325 INFO orchestrator | HOLD NWFL (no action) | Strongest corroborated name on slate: composite +1.38, fresh insider open-market buying (+1.00 Form 
+2026-07-30 11:09:12,508 INFO orchestrator | HOLD PATH (no action) | Winner at +2.6% with ample 9.5pp stop room. Fundamentals steady (margin 7.4%, rev +17.3%), bullish o
+2026-07-30 11:09:12,654 INFO orchestrator | HOLD WAB (no action) | Cleanest technical+fundamental combo among holds: technical +0.61 improving, uptrend px>50>200, bull
+2026-07-30 11:09:12,658 INFO orchestrator | Core fill skipped: QQQ already at/above the 15% ceiling.
+2026-07-30 11:09:12,716 INFO alpaca | Alpaca client ready (mode=paper).
+2026-07-30 11:09:13,850 INFO dashboard | Wrote dashboard with 20 trades -> dashboard.html
+2026-07-30 11:58:45,954 INFO orchestrator | Market regime: SPY above 200dma (739 vs 697, today +1.3%), VIX 18.3, VIX3M 20.1 (contango) -> risk-on, size x1.00.
+2026-07-30 11:58:46,904 INFO quiver | Quiver live/congresstrading -> 1000 row(s).
+2026-07-30 11:58:47,171 INFO screener | EDGAR Form-4 feed -> 60 filing(s) (scanning up to 100).
+2026-07-30 11:59:05,258 INFO screener | Options-flow most-actives pool -> 40 name(s).
+2026-07-30 11:59:42,620 INFO screener | robinhood screener disabled (no credentials); skipping.
+2026-07-30 11:59:42,626 INFO screener | robinhood_scans screener disabled (no credentials); skipping.
+2026-07-30 11:59:42,627 INFO screener | Discovered 16 candidate(s) from 5 source(s) (180 merged, 16 above min_score, capped to 18).
+2026-07-30 11:59:42,629 INFO screener |   candidate TE [options_flow] score=+0.86 — Options flow: 47,650 call / 3,561 put vol (bullish call imbalance +0.86) on a most-active name.
+2026-07-30 11:59:42,632 INFO screener |   candidate KEEL [options_flow] score=+0.81 — Options flow: 38,640 call / 3,944 put vol (bullish call imbalance +0.81) on a most-active name.
+2026-07-30 11:59:42,634 INFO screener |   candidate MSTU [options_flow] score=+0.54 — Options flow: 3,107 call / 942 put vol (bullish call imbalance +0.54) on a most-active name.
+2026-07-30 11:59:42,635 INFO screener |   candidate MUU [options_flow] score=+0.52 — Options flow: 11,220 call / 3,503 put vol (bullish call imbalance +0.52) on a most-active name.
+2026-07-30 11:59:42,637 INFO screener |   candidate SNXX [options_flow] score=+0.50 — Options flow: 31,515 call / 10,562 put vol (bullish call imbalance +0.50) on a most-active name.
+2026-07-30 11:59:42,638 INFO screener |   candidate SOFI [options_flow] score=+0.48 — Options flow: 170,221 call / 59,139 put vol (bullish call imbalance +0.48) on a most-active name.
+2026-07-30 11:59:42,640 INFO screener |   candidate TSLL [options_flow] score=+0.48 — Options flow: 39,711 call / 13,920 put vol (bullish call imbalance +0.48) on a most-active name.
+2026-07-30 11:59:42,641 INFO screener |   candidate DRAM [options_flow] score=+0.46 — Options flow: 202,361 call / 74,520 put vol (bullish call imbalance +0.46) on a most-active name.
+2026-07-30 11:59:42,643 INFO screener |   candidate SQQQ [options_flow] score=+0.43 — Options flow: 39,699 call / 15,842 put vol (bullish call imbalance +0.43) on a most-active name.
+2026-07-30 11:59:42,644 INFO screener |   candidate ONDS [options_flow] score=+0.42 — Options flow: 27,620 call / 11,165 put vol (bullish call imbalance +0.42) on a most-active name.
+2026-07-30 11:59:42,645 INFO screener |   candidate NOK [congress+options_flow] score=+0.38 — Congress: 0 buy / 3 sell filings in last 60d (disclosures lag up to ~45d). | Options flow: 106,879 call / 30,873 put vol (bullish call imbalance +0.55) on a most-active name.
+2026-07-30 11:59:42,647 INFO screener |   candidate KORU [options_flow] score=+0.32 — Options flow: 34,200 call / 17,519 put vol (bullish call imbalance +0.32) on a most-active name.
+2026-07-30 11:59:42,648 INFO screener |   candidate BEP [congress] score=+0.23 — Congress: 6 buy / 0 sell filings in last 60d (disclosures lag up to ~45d).
+2026-07-30 11:59:42,649 INFO screener |   candidate HUBB [congress] score=+0.23 — Congress: 5 buy / 0 sell filings in last 60d (disclosures lag up to ~45d).
+2026-07-30 11:59:42,650 INFO screener |   candidate SPGI [congress] score=-0.23 — Congress: 0 buy / 5 sell filings in last 60d (disclosures lag up to ~45d).
+2026-07-30 11:59:42,651 INFO screener |   candidate SPCX [congress] score=+0.23 — Congress: 4 buy / 0 sell filings in last 60d (disclosures lag up to ~45d).
+2026-07-30 11:59:53,029 INFO quiver | Quiver live/offexchange -> 5496 row(s).
+2026-07-30 11:59:53,985 INFO quiver | Quiver live/govcontractsall -> 20000 row(s).
+2026-07-30 11:59:55,298 INFO quiver | Quiver live/lobbying -> 20000 row(s).
+2026-07-30 12:00:32,254 INFO signals | Gathered signals for 21/21 symbols (+3 market signals).
+2026-07-30 12:00:32,285 INFO orchestrator | Composite index (21 scored, top: SQQQ +1.77, KEEL +1.40, NWFL +1.38, MSTU +0.86, SPGI +0.85, BEP +0.83, MSFT +0.69, HUBB +0.62).
+2026-07-30 12:00:32,730 INFO orchestrator | Buy-excluded from slate this cycle: KEEL (price $4.16 < $5 liquidity floor), MSFT (topped up 2.6h ago (next ok in 4h)), MSTU (price $1.90 < $5 liquidity floor), NOK (exited 23.0h ago (cooldown 24h)), NVDA (topped up 1.7h ago (next ok in 4h)) …+3 more
+2026-07-30 12:01:00,208 INFO usage | decision call: 12546 in / 2190 out (cache r=6786 w=0) ~$0.1209 [claude-opus-4-8]
+2026-07-30 12:01:00,212 INFO decision | Claude returned 5 proposal(s).
+2026-07-30 12:01:00,214 WARNING orchestrator | DROPPED HOLD proposal for F: symbol not in the candidate slate or held book (possible prompt injection).
+2026-07-30 12:01:00,531 INFO orchestrator | HOLD NWFL (no action) | Strongest corroborated name held: composite +1.38, technical +0.56 (RSI 65, MACD bull, uptrend px>50
+2026-07-30 12:01:00,635 INFO orchestrator | HOLD PATH (no action) | Winner at +3.5% with ample 10.5pp stop room. Fundamentals steady (margin 7.4%, rev +17.3%), MACD bul
+2026-07-30 12:01:00,788 INFO orchestrator | HOLD WAB (no action) | Cleanest technical+fundamental combo among holds: technical +0.62 improving (RSI 61, MACD bull, uptr
+2026-07-30 12:01:00,935 INFO orchestrator | HOLD NVDA (no action) | Elite fundamentals (+0.80: margin 76.1%, rev +65.5%, D/E 7) anchor the thesis, but heavy insider sel
+2026-07-30 12:01:00,939 INFO orchestrator | Core fill skipped: QQQ already at/above the 15% ceiling.
+2026-07-30 12:01:01,082 INFO alpaca | Alpaca client ready (mode=paper).
+2026-07-30 12:01:02,200 INFO dashboard | Wrote dashboard with 20 trades -> dashboard.html
+2026-07-30 12:03:36,118 INFO alpaca | Alpaca client ready (mode=paper).
+2026-07-30 12:03:36,455 INFO orchestrator | Discovery-driven mode: trading scanner-found names + holdings.
+2026-07-30 12:03:36,456 INFO orchestrator | Starting orchestrator (paper). Kill switch: off. Options: on. Benchmark: QQQ.
+2026-07-30 12:03:38,134 INFO orchestrator | Market regime: SPY above 200dma (740 vs 697, today +1.4%), VIX 18.2, VIX3M 20.1 (contango), QQQ+IWM below 50dma (narrow breadth) -> neutral, size x0.70.
+2026-07-30 12:03:38,709 INFO quiver | Quiver live/congresstrading -> 0 row(s).
+2026-07-30 12:03:39,044 INFO screener | EDGAR Form-4 feed -> 63 filing(s) (scanning up to 100).
+2026-07-30 12:03:58,067 INFO screener | Options-flow most-actives pool -> 40 name(s).
+2026-07-30 12:04:40,264 INFO screener | Robinhood 'Daily movers' -> 20 name(s).
+2026-07-30 12:04:41,487 INFO screener | Robinhood '100 most popular' -> 100 name(s).
+2026-07-30 12:04:42,352 INFO screener | Robinhood scans: none saved (define scans in the RH app to use this leg).
+2026-07-30 12:04:42,353 INFO screener | Discovered 18 candidate(s) from 5 source(s) (127 merged, 127 above min_score, capped to 18).
+2026-07-30 12:04:42,354 INFO screener |   candidate KEEL [options_flow+robinhood] score=+1.41 — Options flow: 39,072 call / 4,068 put vol (bullish call imbalance +0.81) on a most-active name. | Robinhood Daily Movers (today's biggest movers — momentum)
+2026-07-30 12:04:42,359 INFO screener |   candidate NOK [options_flow+robinhood] score=+0.90 — Options flow: 107,524 call / 31,146 put vol (bullish call imbalance +0.55) on a most-active name. | Robinhood 100 Most Popular (retail crowd positioning)
+2026-07-30 12:04:42,360 INFO screener |   candidate TE [options_flow] score=+0.86 — Options flow: 47,762 call / 3,590 put vol (bullish call imbalance +0.86) on a most-active name.
+2026-07-30 12:04:42,361 INFO screener |   candidate SOFI [options_flow+robinhood] score=+0.83 — Options flow: 171,351 call / 59,809 put vol (bullish call imbalance +0.48) on a most-active name. | Robinhood 100 Most Popular (retail crowd positioning)
+2026-07-30 12:04:42,362 INFO screener |   candidate DFNS [robinhood] score=+0.60 — Robinhood Daily Movers (today's biggest movers — momentum)
+2026-07-30 12:04:42,363 INFO screener |   candidate ALNY [robinhood] score=+0.60 — Robinhood Daily Movers (today's biggest movers — momentum)
+2026-07-30 12:04:42,364 INFO screener |   candidate CORT [robinhood] score=+0.60 — Robinhood Daily Movers (today's biggest movers — momentum)
+2026-07-30 12:04:42,365 INFO screener |   candidate RTO [robinhood] score=+0.60 — Robinhood Daily Movers (today's biggest movers — momentum)
+2026-07-30 12:04:42,366 INFO screener |   candidate CIFR [robinhood] score=+0.60 — Robinhood Daily Movers (today's biggest movers — momentum)
+2026-07-30 12:04:42,367 INFO screener |   candidate MKTX [robinhood] score=+0.60 — Robinhood Daily Movers (today's biggest movers — momentum)
+2026-07-30 12:04:42,368 INFO screener |   candidate BHC [robinhood] score=+0.60 — Robinhood Daily Movers (today's biggest movers — momentum)
+2026-07-30 12:04:42,369 INFO screener |   candidate SONO [robinhood] score=+0.60 — Robinhood Daily Movers (today's biggest movers — momentum)
+2026-07-30 12:04:42,369 INFO screener |   candidate PLPC [robinhood] score=+0.60 — Robinhood Daily Movers (today's biggest movers — momentum)
+2026-07-30 12:04:42,370 INFO screener |   candidate COUR [robinhood] score=+0.60 — Robinhood Daily Movers (today's biggest movers — momentum)
+2026-07-30 12:04:42,371 INFO screener |   candidate TDOC [robinhood] score=+0.60 — Robinhood Daily Movers (today's biggest movers — momentum)
+2026-07-30 12:04:42,371 INFO screener |   candidate LVWR [robinhood] score=+0.60 — Robinhood Daily Movers (today's biggest movers — momentum)
+2026-07-30 12:04:42,372 INFO screener |   candidate PHAT [robinhood] score=+0.60 — Robinhood Daily Movers (today's biggest movers — momentum)
+2026-07-30 12:04:42,373 INFO screener |   candidate PN [robinhood] score=+0.60 — Robinhood Daily Movers (today's biggest movers — momentum)
+2026-07-30 12:05:10,383 WARNING signals | Finnhub news-sentiment is premium-gated on this key (HTTP 403) — using the VADER fallback for this run.
+2026-07-30 12:05:12,262 INFO quiver | Quiver live/offexchange -> 5496 row(s).
+2026-07-30 12:05:12,780 INFO quiver | Quiver live/govcontractsall -> 20000 row(s).
+2026-07-30 12:05:16,526 INFO quiver | Quiver live/lobbying -> 20000 row(s).
+2026-07-30 12:07:02,701 INFO signals | Gathered signals for 23/23 symbols (+3 market signals).
+2026-07-30 12:07:02,738 INFO orchestrator | Composite index (23 scored, top: KEEL +2.31, MKTX +1.88, BHC +1.59, NWFL +1.38, PN +1.33, NOK +1.17, LVWR +1.04, TE +0.87).
+2026-07-30 12:07:04,934 INFO robinhood | Imported 1 Robinhood holding(s) for context (read-only).
+2026-07-30 12:07:04,942 INFO orchestrator | Buy-excluded from slate this cycle: KEEL (price $4.11 < $5 liquidity floor), LVWR (price $1.96 < $5 liquidity floor), MSFT (topped up 2.7h ago (next ok in 4h)), NOK (exited 23.1h ago (cooldown 24h)), NVDA (topped up 1.8h ago (next ok in 4h)) …+2 more
+2026-07-30 12:08:13,249 INFO usage | decision call: 12569 in / 4739 out (cache r=0 w=6863) ~$0.2500 [claude-opus-4-8]
+2026-07-30 12:08:13,254 INFO decision | Claude returned 5 proposal(s).
+2026-07-30 12:08:15,064 INFO earnings | Robinhood earnings calendar: 3805 name(s) reporting within 31d.
+2026-07-30 12:08:17,546 INFO risk | REJECT buy BHC: Overextended: +26% above the prior close (gap-day chase; 5.6xATR over the 20d SMA) — chasing a local top; wait for a pullback or base.
+2026-07-30 12:08:17,552 INFO orchestrator | BUY BHC -> rejected: Overextended: +26% above the prior close (gap-day chase; 5.6xATR over the 20d SMA) — chasing a local top; wait for a pullback or base. | Strongest corroborated bull on the slate (composite +1.59): fundamentals +0.52 (EBITDA $3.6B, 34.3% 
+2026-07-30 12:08:17,654 INFO orchestrator | HOLD NWFL (no action) | Strongest corroborated hold: composite +1.38, technical +0.56 uptrend (px>50>200, MACD bull), fresh 
+2026-07-30 12:08:17,852 INFO orchestrator | HOLD PATH (no action) | Winner at +3.7% with ample 10.6pp of stop room. Fundamentals steady (margin 7.4%, rev +17.3%), optio
+2026-07-30 12:08:17,992 INFO orchestrator | HOLD WAB (no action) | Cleanest technical+fundamental combo among holds: technical +0.62 improving uptrend (px>50>200), fun
+2026-07-30 12:08:18,108 INFO orchestrator | HOLD NVDA (no action) | Elite fundamentals +0.80 (margin 76.1%, rev +65.5%) anchor, but technicals soft: -0.16 inflection-be
+2026-07-30 12:08:29,713 INFO usage | option_fallback call: 867 in / 792 out (cache r=6863 w=0) ~$0.0276 [claude-opus-4-8]
+2026-07-30 12:08:29,720 INFO decision | Claude returned 1 proposal(s).
+2026-07-30 12:08:29,722 INFO decision | Option fallback for BHC: model declined (HOLD) — conviction did not clear the bar as an option either.
+2026-07-30 12:08:29,726 INFO orchestrator | BEARISH FUNNEL: slate_bearish=0 put_proposals=0 put_approved=0 auto_hedge=off
+2026-07-30 12:08:29,728 INFO orchestrator | Core fill skipped: QQQ already at/above the 15% ceiling.
+2026-07-30 12:08:29,881 INFO alpaca | Alpaca client ready (mode=paper).
+2026-07-30 12:08:31,105 INFO dashboard | Wrote dashboard with 20 trades -> dashboard.html
+2026-07-30 12:10:55,012 INFO alpaca | Alpaca client ready (mode=paper).
+2026-07-30 12:10:55,287 INFO orchestrator | Discovery-driven mode: trading scanner-found names + holdings.
+2026-07-30 12:10:55,289 INFO orchestrator | Starting orchestrator (paper). Kill switch: off. Options: on. Benchmark: QQQ.
+2026-07-30 12:10:57,008 INFO orchestrator | Market regime: SPY above 200dma (740 vs 697, today +1.4%), VIX 18.1, VIX3M 20.0 (contango), QQQ+IWM below 50dma (narrow breadth) -> neutral, size x0.70.
+2026-07-30 12:10:57,741 INFO quiver | Quiver live/congresstrading -> 1000 row(s).
+2026-07-30 12:11:01,136 INFO screener | EDGAR Form-4 feed -> 61 filing(s) (scanning up to 100).
+2026-07-30 12:11:20,135 INFO screener | Options-flow most-actives pool -> 40 name(s).
+2026-07-30 12:12:01,191 INFO screener | Robinhood 'Daily movers' -> 20 name(s).
+2026-07-30 12:12:02,551 INFO screener | Robinhood '100 most popular' -> 100 name(s).
+2026-07-30 12:12:03,524 INFO screener | Robinhood scans: none saved (define scans in the RH app to use this leg).
+2026-07-30 12:12:03,526 INFO screener | Discovered 18 candidate(s) from 5 source(s) (272 merged, 129 above min_score, capped to 18).
+2026-07-30 12:12:03,527 INFO screener |   candidate KEEL [options_flow+robinhood] score=+1.41 — Options flow: 39,136 call / 4,184 put vol (bullish call imbalance +0.81) on a most-active name. | Robinhood Daily Movers (today's biggest movers — momentum)
+2026-07-30 12:12:03,531 INFO screener |   candidate TE [options_flow] score=+0.86 — Options flow: 48,588 call / 3,596 put vol (bullish call imbalance +0.86) on a most-active name.
+2026-07-30 12:12:03,532 INFO screener |   candidate SOFI [options_flow+robinhood] score=+0.83 — Options flow: 175,470 call / 60,873 put vol (bullish call imbalance +0.48) on a most-active name. | Robinhood 100 Most Popular (retail crowd positioning)
+2026-07-30 12:12:03,534 INFO screener |   candidate PLUG [options_flow+robinhood] score=+0.76 — Options flow: 5,917 call / 2,487 put vol (bullish call imbalance +0.41) on a most-active name. | Robinhood 100 Most Popular (retail crowd positioning)
+2026-07-30 12:12:03,536 INFO screener |   candidate NOK [congress+options_flow+robinhood] score=+0.72 — Congress: 0 buy / 3 sell filings in last 60d (disclosures lag up to ~45d). | Options flow: 108,676 call / 31,901 put vol (bullish call imbalance +0.55) on a most-active name. | Robinhood 100 Most Popular (retail crowd positioning)
+2026-07-30 12:12:03,538 INFO screener |   candidate DFNS [robinhood] score=+0.60 — Robinhood Daily Movers (today's biggest movers — momentum)
+2026-07-30 12:12:03,539 INFO screener |   candidate ALNY [robinhood] score=+0.60 — Robinhood Daily Movers (today's biggest movers — momentum)
+2026-07-30 12:12:03,540 INFO screener |   candidate IREN [robinhood] score=+0.60 — Robinhood Daily Movers (today's biggest movers — momentum)
+2026-07-30 12:12:03,541 INFO screener |   candidate RTO [robinhood] score=+0.60 — Robinhood Daily Movers (today's biggest movers — momentum)
+2026-07-30 12:12:03,542 INFO screener |   candidate CIFR [robinhood] score=+0.60 — Robinhood Daily Movers (today's biggest movers — momentum)
+2026-07-30 12:12:03,543 INFO screener |   candidate MKTX [robinhood] score=+0.60 — Robinhood Daily Movers (today's biggest movers — momentum)
+2026-07-30 12:12:03,544 INFO screener |   candidate SONO [robinhood] score=+0.60 — Robinhood Daily Movers (today's biggest movers — momentum)
+2026-07-30 12:12:03,545 INFO screener |   candidate FCEL [robinhood] score=+0.60 — Robinhood Daily Movers (today's biggest movers — momentum)
+2026-07-30 12:12:03,546 INFO screener |   candidate PLPC [robinhood] score=+0.60 — Robinhood Daily Movers (today's biggest movers — momentum)
+2026-07-30 12:12:03,547 INFO screener |   candidate COUR [robinhood] score=+0.60 — Robinhood Daily Movers (today's biggest movers — momentum)
+2026-07-30 12:12:03,548 INFO screener |   candidate TDOC [robinhood] score=+0.60 — Robinhood Daily Movers (today's biggest movers — momentum)
+2026-07-30 12:12:03,549 INFO screener |   candidate LVWR [robinhood] score=+0.60 — Robinhood Daily Movers (today's biggest movers — momentum)
+2026-07-30 12:12:03,550 INFO screener |   candidate PHAT [robinhood] score=+0.60 — Robinhood Daily Movers (today's biggest movers — momentum)
+2026-07-30 12:12:23,048 WARNING signals | Finnhub news-sentiment is premium-gated on this key (HTTP 403) — using the VADER fallback for this run.
+2026-07-30 12:12:25,080 INFO quiver | Quiver live/offexchange -> 5496 row(s).
+2026-07-30 12:12:25,602 INFO quiver | Quiver live/govcontractsall -> 20000 row(s).
+2026-07-30 12:12:26,929 INFO quiver | Quiver live/lobbying -> 20000 row(s).
+2026-07-30 12:14:13,150 INFO signals | Gathered signals for 23/23 symbols (+3 market signals).
+2026-07-30 12:14:13,187 INFO orchestrator | Composite index (23 scored, top: KEEL +2.21, MKTX +1.89, FCEL +1.55, NWFL +1.38, LVWR +1.02, NOK +0.96, SONO +0.80, PLUG +0.78).
+2026-07-30 12:14:15,433 INFO robinhood | Imported 1 Robinhood holding(s) for context (read-only).
+2026-07-30 12:14:15,440 INFO orchestrator | Buy-excluded from slate this cycle: KEEL (price $4.10 < $5 liquidity floor), LVWR (price $1.94 < $5 liquidity floor), MSFT (topped up 2.8h ago (next ok in 4h)), NOK (exited 23.2h ago (cooldown 24h)), NVDA (topped up 2.0h ago (next ok in 4h)) …+3 more
+2026-07-30 12:15:15,703 INFO usage | decision call: 12768 in / 3492 out (cache r=6863 w=0) ~$0.1546 [claude-opus-4-8]
+2026-07-30 12:15:15,711 INFO decision | Claude returned 5 proposal(s).
+2026-07-30 12:15:17,681 INFO earnings | Robinhood earnings calendar: 3805 name(s) reporting within 31d.
+2026-07-30 12:15:20,264 INFO risk | REJECT buy FCEL: Overextended: +28% above the prior close (gap-day chase; 0.4xATR over the 20d SMA) — chasing a local top; wait for a pullback or base.
+2026-07-30 12:15:20,267 INFO orchestrator | BUY FCEL -> rejected: Overextended: +28% above the prior close (gap-day chase; 0.4xATR over the 20d SMA) — chasing a local top; wait for a pullback or base. | Highest composite on the slate (+1.55) with a genuinely corroborated fresh anchor: insider open-mark
+2026-07-30 12:15:20,726 INFO orchestrator | HOLD NWFL (no action) | Strongest corroborated hold: composite +1.38, technical +0.56 uptrend, fresh insider buying +1.00 an
+2026-07-30 12:15:20,898 INFO orchestrator | HOLD PATH (no action) | Winner at +4.4% with ample 11.3pp of stop room. Fundamentals steady (rev +17.3%), bullish options-ch
+2026-07-30 12:15:21,088 INFO orchestrator | HOLD WAB (no action) | Cleanest technical+fundamental combo: technical +0.62 improving uptrend (px>50>200, MACD bull), fund
+2026-07-30 12:15:21,212 INFO orchestrator | HOLD NVDA (no action) | Elite fundamentals +0.80 (margin 76.1%, rev +65.5%) anchor, but technicals inflection-bearish (MACD 
+2026-07-30 12:15:35,784 INFO usage | option_fallback call: 966 in / 952 out (cache r=6863 w=0) ~$0.0321 [claude-opus-4-8]
+2026-07-30 12:15:35,797 INFO decision | Claude returned 1 proposal(s).
+2026-07-30 12:15:35,799 INFO decision | Option fallback for FCEL: model declined (HOLD) — conviction did not clear the bar as an option either.
+2026-07-30 12:15:35,802 INFO orchestrator | BEARISH FUNNEL: slate_bearish=0 put_proposals=0 put_approved=0 auto_hedge=flat
+2026-07-30 12:15:35,804 INFO orchestrator | Core fill skipped: QQQ already at/above the 15% ceiling.
+2026-07-30 12:15:35,860 INFO alpaca | Alpaca client ready (mode=paper).
+2026-07-30 12:15:37,036 INFO dashboard | Wrote dashboard with 20 trades -> dashboard.html
+2026-07-30 13:03:20,428 INFO orchestrator | Market regime: SPY above 200dma (740 vs 697, today +1.5%), VIX 18.0, VIX3M 19.9 (contango), QQQ+IWM below 50dma (narrow breadth) -> neutral, size x0.70.
+2026-07-30 13:03:21,424 INFO quiver | Quiver live/congresstrading -> 1000 row(s).
+2026-07-30 13:03:31,681 INFO screener | EDGAR Form-4 feed -> 62 filing(s) (scanning up to 100).
+2026-07-30 13:04:02,520 INFO screener | Options-flow most-actives pool -> 40 name(s).
+2026-07-30 13:04:48,217 INFO screener | Robinhood 'Daily movers' -> 20 name(s).
+2026-07-30 13:04:49,469 INFO screener | Robinhood '100 most popular' -> 100 name(s).
+2026-07-30 13:04:50,275 INFO screener | Robinhood scans: none saved (define scans in the RH app to use this leg).
+2026-07-30 13:04:50,279 INFO screener | Discovered 18 candidate(s) from 5 source(s) (274 merged, 131 above min_score, capped to 18).
+2026-07-30 13:04:50,280 INFO screener |   candidate TE [options_flow] score=+0.86 — Options flow: 49,713 call / 3,826 put vol (bullish call imbalance +0.86) on a most-active name.
+2026-07-30 13:04:50,282 INFO screener |   candidate SOFI [options_flow+robinhood] score=+0.84 — Options flow: 208,193 call / 71,292 put vol (bullish call imbalance +0.49) on a most-active name. | Robinhood 100 Most Popular (retail crowd positioning)
+2026-07-30 13:04:50,283 INFO screener |   candidate PLUG [options_flow+robinhood] score=+0.81 — Options flow: 7,482 call / 2,747 put vol (bullish call imbalance +0.46) on a most-active name. | Robinhood 100 Most Popular (retail crowd positioning)
+2026-07-30 13:04:50,285 INFO screener |   candidate F [options_flow+robinhood] score=+0.72 — Options flow: 50,494 call / 23,418 put vol (bullish call imbalance +0.37) on a most-active name. | Robinhood 100 Most Popular (retail crowd positioning)
+2026-07-30 13:04:50,287 INFO screener |   candidate NOK [congress+options_flow+robinhood] score=+0.71 — Congress: 0 buy / 3 sell filings in last 60d (disclosures lag up to ~45d). | Options flow: 112,980 call / 34,715 put vol (bullish call imbalance +0.53) on a most-active name. | Robinhood 100 Most Popular (retail crowd positioning)
+2026-07-30 13:04:50,288 INFO screener |   candidate KEEL [options_flow] score=+0.70 — Options flow: 40,688 call / 7,285 put vol (bullish call imbalance +0.70) on a most-active name.
+2026-07-30 13:04:50,289 INFO screener |   candidate DFNS [robinhood] score=+0.60 — Robinhood Daily Movers (today's biggest movers — momentum)
+2026-07-30 13:04:50,290 INFO screener |   candidate NBIS [robinhood] score=+0.60 — Robinhood Daily Movers (today's biggest movers — momentum)
+2026-07-30 13:04:50,291 INFO screener |   candidate ALNY [robinhood] score=+0.60 — Robinhood Daily Movers (today's biggest movers — momentum)
+2026-07-30 13:04:50,292 INFO screener |   candidate RTO [robinhood] score=+0.60 — Robinhood Daily Movers (today's biggest movers — momentum)
+2026-07-30 13:04:50,293 INFO screener |   candidate CIFR [robinhood] score=+0.60 — Robinhood Daily Movers (today's biggest movers — momentum)
+2026-07-30 13:04:50,294 INFO screener |   candidate MKTX [robinhood] score=+0.60 — Robinhood Daily Movers (today's biggest movers — momentum)
+2026-07-30 13:04:50,294 INFO screener |   candidate AXTI [robinhood] score=+0.60 — Robinhood Daily Movers (today's biggest movers — momentum)
+2026-07-30 13:04:50,295 INFO screener |   candidate SONO [robinhood] score=+0.60 — Robinhood Daily Movers (today's biggest movers — momentum)
+2026-07-30 13:04:50,296 INFO screener |   candidate FCEL [robinhood] score=+0.60 — Robinhood Daily Movers (today's biggest movers — momentum)
+2026-07-30 13:04:50,297 INFO screener |   candidate PLPC [robinhood] score=+0.60 — Robinhood Daily Movers (today's biggest movers — momentum)
+2026-07-30 13:04:50,297 INFO screener |   candidate COUR [robinhood] score=+0.60 — Robinhood Daily Movers (today's biggest movers — momentum)
+2026-07-30 13:04:50,298 INFO screener |   candidate TDOC [robinhood] score=+0.60 — Robinhood Daily Movers (today's biggest movers — momentum)
+2026-07-30 13:05:06,767 INFO quiver | Quiver live/offexchange -> 5496 row(s).
+2026-07-30 13:05:06,901 INFO quiver | Quiver live/govcontractsall -> 0 row(s).
+2026-07-30 13:05:08,036 INFO quiver | Quiver live/lobbying -> 20000 row(s).
+2026-07-30 13:05:50,830 INFO signals | Gathered signals for 23/23 symbols (+3 market signals).
+2026-07-30 13:05:50,870 INFO orchestrator | Composite index (23 scored, top: FCEL +2.22, MKTX +1.90, F +1.61, NWFL +1.38, KEEL +1.30, TE +0.94, PLUG +0.86, NOK +0.85).
+2026-07-30 13:05:52,992 INFO robinhood | Imported 1 Robinhood holding(s) for context (read-only).
+2026-07-30 13:05:52,994 INFO orchestrator | Buy-excluded from slate this cycle: F (exited 4.5h ago (cooldown 24h)), KEEL (price $4.07 < $5 liquidity floor), MSFT (topped up 3.7h ago (next ok in 4h)), NVDA (topped up 2.8h ago (next ok in 4h)), NWFL (topped up 2.8h ago (next ok in 4h)) …+2 more
+2026-07-30 13:06:36,509 INFO usage | decision call: 13447 in / 3112 out (cache r=6863 w=0) ~$0.1485 [claude-opus-4-8]
+2026-07-30 13:06:36,515 INFO decision | Claude returned 4 proposal(s).
+2026-07-30 13:06:36,694 INFO orchestrator | HOLD NVDA (no action) | Elite fundamentals (+0.80: margin 76.1%, rev +65.5%, D/E 7) anchor the thesis, but technical is bear
+2026-07-30 13:06:37,070 INFO orchestrator | HOLD NWFL (no action) | Strongest corroborated hold on the slate: composite +1.38, technical +0.56 uptrend (px>50>200, MACD 
+2026-07-30 13:06:37,266 INFO orchestrator | HOLD PATH (no action) | Winner at +4.9% with ample 11.8pp of stop room. Fundamentals steady (margin 7.4%, rev +17.3%), techn
+2026-07-30 13:06:37,438 INFO orchestrator | HOLD WAB (no action) | Cleanest technical+fundamental combo among fresh names: technical +0.62 improving uptrend (px>50>200
+2026-07-30 13:06:37,440 INFO orchestrator | BEARISH FUNNEL: slate_bearish=0 put_proposals=0 put_approved=0 auto_hedge=flat
+2026-07-30 13:06:37,441 INFO orchestrator | Core fill skipped: QQQ already at/above the 15% ceiling.
+2026-07-30 13:06:37,498 INFO alpaca | Alpaca client ready (mode=paper).
+2026-07-30 13:06:38,667 INFO dashboard | Wrote dashboard with 20 trades -> dashboard.html
+2026-07-30 13:55:21,351 INFO orchestrator | Market regime: SPY above 200dma (741 vs 697, today +1.5%), VIX 17.8, VIX3M 19.9 (contango), QQQ+IWM below 50dma (narrow breadth) -> neutral, size x0.70.
+2026-07-30 13:55:21,993 INFO quiver | Quiver live/congresstrading -> 1000 row(s).
+2026-07-30 13:55:24,563 INFO screener | EDGAR Form-4 feed -> 67 filing(s) (scanning up to 100).
+2026-07-30 13:56:18,069 INFO screener | Options-flow most-actives pool -> 40 name(s).
+2026-07-30 13:56:58,166 INFO screener | Robinhood 'Daily movers' -> 20 name(s).
+2026-07-30 13:56:59,273 INFO screener | Robinhood '100 most popular' -> 100 name(s).
+2026-07-30 13:57:00,214 INFO screener | Robinhood scans: none saved (define scans in the RH app to use this leg).
+2026-07-30 13:57:00,216 INFO screener | Discovered 18 candidate(s) from 5 source(s) (278 merged, 135 above min_score, capped to 18).
+2026-07-30 13:57:00,217 INFO screener |   candidate KEEL [options_flow+robinhood] score=+1.39 — Options flow: 64,280 call / 7,442 put vol (bullish call imbalance +0.79) on a most-active name. | Robinhood Daily Movers (today's biggest movers — momentum)
+2026-07-30 13:57:00,218 INFO screener |   candidate SPCX [congress+options_flow+robinhood] score=+0.92 — Congress: 4 buy / 0 sell filings in last 60d (disclosures lag up to ~45d). | Options flow: 308,023 call / 153,000 put vol (bullish call imbalance +0.34) on a most-active name. | Robinhood 100 Most Popular (retail crowd positioning)
+2026-07-30 13:57:00,220 INFO screener |   candidate SOFI [options_flow+robinhood] score=+0.81 — Options flow: 220,703 call / 81,340 put vol (bullish call imbalance +0.46) on a most-active name. | Robinhood 100 Most Popular (retail crowd positioning)
+2026-07-30 13:57:00,222 INFO screener |   candidate PLUG [options_flow+robinhood] score=+0.75 — Options flow: 7,938 call / 3,389 put vol (bullish call imbalance +0.40) on a most-active name. | Robinhood 100 Most Popular (retail crowd positioning)
+2026-07-30 13:57:00,223 INFO screener |   candidate NOK [congress+options_flow+robinhood] score=+0.71 — Congress: 0 buy / 3 sell filings in last 60d (disclosures lag up to ~45d). | Options flow: 115,256 call / 35,422 put vol (bullish call imbalance +0.53) on a most-active name. | Robinhood 100 Most Popular (retail crowd positioning)
+2026-07-30 13:57:00,225 INFO screener |   candidate F [options_flow+robinhood] score=+0.70 — Options flow: 53,402 call / 25,712 put vol (bullish call imbalance +0.35) on a most-active name. | Robinhood 100 Most Popular (retail crowd positioning)
+2026-07-30 13:57:00,226 INFO screener |   candidate TE [options_flow] score=+0.69 — Options flow: 50,642 call / 9,194 put vol (bullish call imbalance +0.69) on a most-active name.
+2026-07-30 13:57:00,227 INFO screener |   candidate DFNS [robinhood] score=+0.60 — Robinhood Daily Movers (today's biggest movers — momentum)
+2026-07-30 13:57:00,228 INFO screener |   candidate ALNY [robinhood] score=+0.60 — Robinhood Daily Movers (today's biggest movers — momentum)
+2026-07-30 13:57:00,229 INFO screener |   candidate RTO [robinhood] score=+0.60 — Robinhood Daily Movers (today's biggest movers — momentum)
+2026-07-30 13:57:00,230 INFO screener |   candidate CIFR [robinhood] score=+0.60 — Robinhood Daily Movers (today's biggest movers — momentum)
+2026-07-30 13:57:00,230 INFO screener |   candidate MKTX [robinhood] score=+0.60 — Robinhood Daily Movers (today's biggest movers — momentum)
+2026-07-30 13:57:00,231 INFO screener |   candidate WAY [robinhood] score=+0.60 — Robinhood Daily Movers (today's biggest movers — momentum)
+2026-07-30 13:57:00,232 INFO screener |   candidate AXTI [robinhood] score=+0.60 — Robinhood Daily Movers (today's biggest movers — momentum)
+2026-07-30 13:57:00,233 INFO screener |   candidate SONO [robinhood] score=+0.60 — Robinhood Daily Movers (today's biggest movers — momentum)
+2026-07-30 13:57:00,233 INFO screener |   candidate FCEL [robinhood] score=+0.60 — Robinhood Daily Movers (today's biggest movers — momentum)
+2026-07-30 13:57:00,234 INFO screener |   candidate PLPC [robinhood] score=+0.60 — Robinhood Daily Movers (today's biggest movers — momentum)
+2026-07-30 13:57:00,235 INFO screener |   candidate VOSSY [robinhood] score=+0.60 — Robinhood Daily Movers (today's biggest movers — momentum)
+2026-07-30 13:57:14,676 INFO quiver | Quiver live/offexchange -> 5496 row(s).
+2026-07-30 13:57:15,320 INFO quiver | Quiver live/govcontractsall -> 20000 row(s).
+2026-07-30 13:57:16,636 INFO quiver | Quiver live/lobbying -> 20000 row(s).
+2026-07-30 13:57:48,269 INFO signals | Gathered signals for 23/23 symbols (+3 market signals).
+2026-07-30 13:57:48,305 INFO orchestrator | Composite index (23 scored, top: KEEL +2.29, FCEL +2.00, MKTX +1.95, F +1.89, NWFL +1.38, SPCX +1.02, AXTI +0.96, NOK +0.91).
+2026-07-30 13:57:50,293 INFO robinhood | Imported 1 Robinhood holding(s) for context (read-only).
+2026-07-30 13:57:50,295 INFO orchestrator | Buy-excluded from slate this cycle: F (exited 5.4h ago (cooldown 24h)), KEEL (price $4.07 < $5 liquidity floor), NVDA (topped up 3.7h ago (next ok in 4h)), NWFL (topped up 3.7h ago (next ok in 4h)), PLUG (price $2.05 < $5 liquidity floor) …+1 more
+2026-07-30 13:59:02,587 INFO usage | decision call: 14077 in / 5426 out (cache r=6863 w=0) ~$0.2095 [claude-opus-4-8]
+2026-07-30 13:59:02,595 INFO decision | Claude returned 6 proposal(s).
+2026-07-30 13:59:02,646 INFO orchestrator | Cycle budget $615,014 split across 2 buy(s): MSFT $162,912, MKTX $369,009.
+2026-07-30 13:59:04,238 INFO earnings | Robinhood earnings calendar: 3805 name(s) reporting within 31d.
+2026-07-30 13:59:06,855 INFO risk | REJECT buy MSFT: Overextended: +17% above the prior close (gap-day chase; 5.3xATR over the 20d SMA) — chasing a local top; wait for a pullback or base.
+2026-07-30 13:59:06,859 INFO orchestrator | BUY MSFT -> rejected: Overextended: +17% above the prior close (gap-day chase; 5.3xATR over the 20d SMA) — chasing a local top; wait for a pullback or base. | Top-up (already held from today). Durable fundamentals (+0.58: margin 62.5%, rev +17.8%), bullish op
+2026-07-30 13:59:07,618 INFO risk | REJECT buy MKTX: Overextended: +30% above the prior close (gap-day chase; 11.9xATR over the 20d SMA) — chasing a local top; wait for a pullback or base.
+2026-07-30 13:59:07,621 INFO orchestrator | BUY MKTX -> rejected: Overextended: +30% above the prior close (gap-day chase; 11.9xATR over the 20d SMA) — chasing a local top; wait for a pullback or base. | Strong quality name: fundamentals +0.52 (margin 50.3%, rev +11.9%, low D/E), technical +0.70 MACD bu
+2026-07-30 13:59:07,904 INFO orchestrator | HOLD NWFL (no action) | Highest corroborated composite on slate (+1.38): fresh insider open-market buying (+1.00), congress 
+2026-07-30 13:59:08,128 INFO orchestrator | HOLD PATH (no action) | Winner +4.7% with ample 11.6pp stop room. Bullish options-chain positioning (+0.38), MACD bull, fund
+2026-07-30 13:59:08,479 INFO orchestrator | HOLD WAB (no action) | -1.0% with 4.0pp stop room but thesis intact: cleanest technical+fundamental combo — technical +0.62
+2026-07-30 13:59:08,643 INFO orchestrator | HOLD NVDA (no action) | Elite fundamentals (+0.80: margin 76.1%, rev +65.5%, D/E 7) anchor thesis but technical inflection-b
+2026-07-30 13:59:20,786 INFO usage | option_fallback call: 1007 in / 739 out (cache r=6863 w=0) ~$0.0269 [claude-opus-4-8]
+2026-07-30 13:59:20,792 INFO decision | Claude returned 1 proposal(s).
+2026-07-30 13:59:20,793 INFO decision | Option fallback for MSFT: model declined (HOLD) — conviction did not clear the bar as an option either.
+2026-07-30 13:59:30,948 INFO usage | option_fallback call: 863 in / 677 out (cache r=6863 w=0) ~$0.0247 [claude-opus-4-8]
+2026-07-30 13:59:30,952 INFO decision | Claude returned 1 proposal(s).
+2026-07-30 13:59:30,953 INFO decision | Option fallback for MKTX: model declined (HOLD) — conviction did not clear the bar as an option either.
+2026-07-30 13:59:30,955 INFO orchestrator | BEARISH FUNNEL: slate_bearish=0 put_proposals=0 put_approved=0 auto_hedge=flat
+2026-07-30 13:59:30,957 INFO orchestrator | Core fill skipped: QQQ already at/above the 15% ceiling.
+2026-07-30 13:59:31,013 INFO alpaca | Alpaca client ready (mode=paper).
+2026-07-30 13:59:32,130 INFO dashboard | Wrote dashboard with 20 trades -> dashboard.html
+2026-07-30 14:47:45,591 INFO orchestrator | Market regime: SPY above 200dma (742 vs 697, today +1.7%), VIX 17.5, VIX3M 19.7 (contango) -> risk-on, size x1.00.
+2026-07-30 14:47:46,714 INFO quiver | Quiver live/congresstrading -> 1000 row(s).
+2026-07-30 14:47:49,089 INFO screener | EDGAR Form-4 feed -> 52 filing(s) (scanning up to 100).
+2026-07-30 14:48:10,445 INFO screener | Options-flow most-actives pool -> 40 name(s).
+2026-07-30 14:49:10,479 WARNING signals | options-flow (screener): 1 of 40 chain read(s) failed — first: SPCX (ReadTimeout(ReadTimeoutError("HTTPSConnectionPool(host='api.polygon.io', port=443): Read timed out. (read timeout=20)"))). Flow read degraded this cycle.
+2026-07-30 14:49:13,349 INFO screener | Robinhood 'Daily movers' -> 20 name(s).
+2026-07-30 14:49:14,775 INFO screener | Robinhood '100 most popular' -> 100 name(s).
+2026-07-30 14:49:15,554 INFO screener | Robinhood scans: none saved (define scans in the RH app to use this leg).
+2026-07-30 14:49:15,555 INFO screener | Discovered 18 candidate(s) from 5 source(s) (274 merged, 132 above min_score, capped to 18).
+2026-07-30 14:49:15,556 INFO screener |   candidate KEEL [options_flow] score=+0.77 — Options flow: 65,807 call / 8,659 put vol (bullish call imbalance +0.77) on a most-active name.
+2026-07-30 14:49:15,557 INFO screener |   candidate NOK [congress+options_flow+robinhood] score=+0.75 — Congress: 0 buy / 3 sell filings in last 60d (disclosures lag up to ~45d). | Options flow: 152,541 call / 41,126 put vol (bullish call imbalance +0.57) on a most-active name. | Robinhood 100 Most Popular (retail crowd positioning)
+2026-07-30 14:49:15,558 INFO screener |   candidate SOFI [options_flow+robinhood] score=+0.73 — Options flow: 257,608 call / 114,668 put vol (bullish call imbalance +0.38) on a most-active name. | Robinhood 100 Most Popular (retail crowd positioning)
+2026-07-30 14:49:15,560 INFO screener |   candidate F [options_flow+robinhood] score=+0.73 — Options flow: 61,205 call / 27,572 put vol (bullish call imbalance +0.38) on a most-active name. | Robinhood 100 Most Popular (retail crowd positioning)
+2026-07-30 14:49:15,561 INFO screener |   candidate DFNS [robinhood] score=+0.60 — Robinhood Daily Movers (today's biggest movers — momentum)
+2026-07-30 14:49:15,563 INFO screener |   candidate BE [robinhood] score=+0.60 — Robinhood Daily Movers (today's biggest movers — momentum)
+2026-07-30 14:49:15,564 INFO screener |   candidate ALNY [robinhood] score=+0.60 — Robinhood Daily Movers (today's biggest movers — momentum)
+2026-07-30 14:49:15,565 INFO screener |   candidate RTO [robinhood] score=+0.60 — Robinhood Daily Movers (today's biggest movers — momentum)
+2026-07-30 14:49:15,566 INFO screener |   candidate FRVO [robinhood] score=+0.60 — Robinhood Daily Movers (today's biggest movers — momentum)
+2026-07-30 14:49:15,567 INFO screener |   candidate MKTX [robinhood] score=+0.60 — Robinhood Daily Movers (today's biggest movers — momentum)
+2026-07-30 14:49:15,568 INFO screener |   candidate GNCGY [robinhood] score=+0.60 — Robinhood Daily Movers (today's biggest movers — momentum)
+2026-07-30 14:49:15,569 INFO screener |   candidate SONO [robinhood] score=+0.60 — Robinhood Daily Movers (today's biggest movers — momentum)
+2026-07-30 14:49:15,570 INFO screener |   candidate FCEL [robinhood] score=+0.60 — Robinhood Daily Movers (today's biggest movers — momentum)
+2026-07-30 14:49:15,570 INFO screener |   candidate PLPC [robinhood] score=+0.60 — Robinhood Daily Movers (today's biggest movers — momentum)
+2026-07-30 14:49:15,571 INFO screener |   candidate COUR [robinhood] score=+0.60 — Robinhood Daily Movers (today's biggest movers — momentum)
+2026-07-30 14:49:15,572 INFO screener |   candidate LVWR [robinhood] score=+0.60 — Robinhood Daily Movers (today's biggest movers — momentum)
+2026-07-30 14:49:15,573 INFO screener |   candidate VOSSY [robinhood] score=+0.60 — Robinhood Daily Movers (today's biggest movers — momentum)
+2026-07-30 14:49:15,574 INFO screener |   candidate TDOC [robinhood] score=+0.60 — Robinhood Daily Movers (today's biggest movers — momentum)
+2026-07-30 14:49:28,387 INFO quiver | Quiver live/offexchange -> 5496 row(s).
+2026-07-30 14:49:31,277 INFO quiver | Quiver live/govcontractsall -> 20000 row(s).
+2026-07-30 14:49:35,130 INFO quiver | Quiver live/lobbying -> 20000 row(s).
+2026-07-30 14:50:14,481 INFO signals | Gathered signals for 23/23 symbols (+3 market signals).
+2026-07-30 14:50:14,532 INFO orchestrator | Composite index (23 scored, top: MKTX +1.94, F +1.91, FCEL +1.84, NWFL +1.38, GNCGY +1.04, NOK +1.04, LVWR +0.88, KEEL +0.86).
+2026-07-30 14:50:16,646 INFO robinhood | Imported 1 Robinhood holding(s) for context (read-only).
+2026-07-30 14:50:16,651 INFO orchestrator | Buy-excluded from slate this cycle: F (exited 6.3h ago (cooldown 24h)), KEEL (price $4.05 < $5 liquidity floor), LVWR (price $1.96 < $5 liquidity floor)
+2026-07-30 14:50:45,920 INFO usage | decision call: 13958 in / 2097 out (cache r=6863 w=0) ~$0.1256 [claude-opus-4-8]
+2026-07-30 14:50:45,929 INFO decision | Claude returned 4 proposal(s).
+2026-07-30 14:50:46,108 INFO orchestrator | HOLD NVDA (no action) | Elite fundamentals (+0.80: margin 76.1%, rev +65.5%, D/E 7) anchor the thesis, but technical inflect
+2026-07-30 14:50:46,451 INFO orchestrator | HOLD NWFL (no action) | Highest corroborated composite on slate (+1.38): fresh insider open-market buying (+1.00, w=0.91), u
+2026-07-30 14:50:46,584 INFO orchestrator | HOLD PATH (no action) | Winner +5.7% with ample 12.6pp stop room. Bullish options-chain positioning (+0.27), MACD bull, neut
+2026-07-30 14:50:46,711 INFO orchestrator | HOLD WAB (no action) | Cleanest technical+fundamental combo among held names: uptrend px>50>200, MACD bull, technical impro
+2026-07-30 14:50:46,714 INFO orchestrator | BEARISH FUNNEL: slate_bearish=0 put_proposals=0 put_approved=0 auto_hedge=flat
+2026-07-30 14:50:46,715 INFO orchestrator | Core fill skipped: QQQ already at/above the 15% ceiling.
+2026-07-30 14:50:46,775 INFO alpaca | Alpaca client ready (mode=paper).
+2026-07-30 14:50:47,999 INFO dashboard | Wrote dashboard with 20 trades -> dashboard.html
+2026-07-30 15:39:59,645 INFO orchestrator | Market closed; skipping decision cycle.
+2026-07-30 15:39:59,942 INFO orchestrator | Running nightly post-mortem for 2026-07-30 …
+2026-07-30 15:40:11,057 INFO usage | postmortem call: 5305 in / 565 out (cache r=0 w=0) ~$0.0406 [claude-opus-4-8]
+2026-07-30 15:40:11,078 INFO postmortem | Post-mortem written to state/lessons/2026-07-30.md
+2026-07-30 15:40:11,109 INFO postmortem | Post-mortem lessons: When two names take >80% of the day's buy dollars, require a third uncorrelated position or trim before executing.
+2026-07-30 15:40:11,126 INFO orchestrator | API spend today: $1.80 across 15 calls (137,321 in / 37,550 out tokens).
+2026-07-30 15:40:11,184 INFO alpaca | Alpaca client ready (mode=paper).
+2026-07-30 15:40:12,435 INFO dashboard | Wrote dashboard with 20 trades -> dashboard.html
+2026-07-30 16:32:25,475 INFO orchestrator | Market closed; skipping decision cycle.
+2026-07-30 17:24:37,808 INFO orchestrator | Market closed; skipping decision cycle.
+2026-07-30 18:16:51,654 INFO orchestrator | Market closed; skipping decision cycle.
+2026-07-30 19:09:05,224 INFO orchestrator | Market closed; skipping decision cycle.
+2026-07-30 20:01:18,516 INFO orchestrator | Market closed; skipping decision cycle.
+2026-07-30 20:53:31,648 INFO orchestrator | Market closed; skipping decision cycle.
+2026-07-30 21:45:44,996 INFO orchestrator | Market closed; skipping decision cycle.
+2026-07-30 22:37:58,275 INFO orchestrator | Market closed; skipping decision cycle.
+2026-07-30 23:30:12,489 INFO orchestrator | Market closed; skipping decision cycle.

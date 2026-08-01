@@ -23,7 +23,7 @@ from requests.exceptions import ConnectionError as RequestsConnectionError
 from requests.exceptions import Timeout as RequestsTimeout
 from urllib3.exceptions import ProtocolError
 
-from .attribution import render_lessons
+from .attribution import negative_expectancy_families, parse_cited, render_lessons
 from .journal import DecisionJournal, DecisionRecord
 from .benchmark import BenchmarkTracker
 from .config import Config
@@ -126,6 +126,23 @@ class Orchestrator:
         # sanctioned THIS cycle ("" = none) — _handle_option passes it to the
         # direction gate so the sanction survives even when the core isn't held.
         self._hedge_symbol = ""
+        # Auto-hedge persistence counters (Jul 30): consecutive decision cycles
+        # the falling read has held / been clear. In-memory by design — a
+        # restart just re-counts, which only ever DELAYS arming or unwinding.
+        self._falling_cycles = 0
+        self._clear_cycles = 0
+        # Signal families with negative trailing expectancy, recomputed each
+        # cycle from the ledger and fed to the risk layer's expectancy gate.
+        self._neg_families: dict = {}
+        # Bearish-funnel counters (Jul 30): reset each cycle, logged at the
+        # end so put-path dormancy is visible instead of silent.
+        self._bear_puts_proposed = 0
+        self._bear_puts_approved = 0
+        # Per-cycle put-gate precheck verdicts for bearish-composite slate
+        # names (Jul 31): symbol -> (eligible, why). Rendered into the prompt's
+        # BEARISH CANDIDATES block and the funnel line, so the 4->0 drop-off
+        # decomposes into "gate-blocked (tape)" vs "eligible but declined".
+        self._bear_eligibility: dict[str, tuple[bool, str]] = {}
         if (
             cfg.risk.options_enabled
             and getattr(cfg.risk, "option_direction_gate", True)
@@ -820,6 +837,13 @@ class Orchestrator:
         # (risk-off label, long-run downtrend, or an intraday benchmark drop),
         # trim the core once per day and pause the core fill for the cycle.
         self._apply_core_defense(account)
+        # Deterministic inverse-ETF hedge + defensive-core rotation (Jul 30
+        # review): the Jul-29 index-put sanction is model-discretionary and
+        # has fired zero times — this pair is the system acting on its own
+        # falling read. Runs right after the core defense so both share the
+        # same per-cycle read and the hedge sizes against the trimmed book.
+        self._apply_auto_hedge(account)
+        self._apply_defensive_rotation(account)
 
         # Watchlist + current holdings are always evaluated; the scanner widens
         # this with NEW smart-money names so buy ideas can originate from the
@@ -837,11 +861,11 @@ class Orchestrator:
             else:
                 held.add(p.symbol)
         base = set(self.watchlist) | held
-        # The core-satellite ETF (Todo 1.6) is managed by _apply_core_fill, not by
-        # Claude — drop it from the decision slate so the model doesn't churn the
-        # core (buy/sell/thesis-decay it); it's held as a passive base allocation.
-        if self.cfg.core_etf:
-            base.discard(self.cfg.core_etf)
+        # System-managed symbols (core ETF, auto-hedge inverse ETF, defensive
+        # T-bill core) are opened and closed by the orchestrator, not by
+        # Claude — drop them from the decision slate so the model doesn't
+        # churn them (buy/sell/thesis-decay); they're passive allocations.
+        base -= self._system_managed_symbols()
         discovered = self.screeners.scan(exclude=base) if self.cfg.screener.enabled else []
         symbols = sorted(base | {c.symbol for c in discovered})
         self._stamp_liveness()
@@ -892,10 +916,23 @@ class Orchestrator:
                     top = sorted(
                         composites.items(), key=lambda kv: kv[1], reverse=True
                     )[:8]
+                    # Bearish tail too (Jul 31): the funnel counts names with
+                    # composite <= -bar, but a top-8-only log never showed WHO
+                    # they were — the 4->0 autopsy had to guess identities.
+                    _bar = self.cfg.screener.bearish_reserve_bar or 0.4
+                    tail = sorted(
+                        (kv for kv in composites.items() if kv[1] <= -_bar),
+                        key=lambda kv: kv[1],
+                    )[:6]
                     log.info(
-                        "Composite index (%d scored, top: %s).",
+                        "Composite index (%d scored, top: %s%s).",
                         len(composites),
                         ", ".join(f"{s} {v:+.2f}" for s, v in top),
+                        (
+                            "; bear tail: "
+                            + ", ".join(f"{s} {v:+.2f}" for s, v in tail)
+                            if tail else ""
+                        ),
                     )
             except Exception as e:
                 log.warning("Composite index unavailable this cycle: %s", e)
@@ -908,6 +945,26 @@ class Orchestrator:
             for s in b.signals
             if s.kind is SignalKind.TECHNICAL and s.data
         }
+
+        # Expectancy gate input (Jul 30 review): signal families whose CITED
+        # trailing realized expectancy is negative. Recomputed once per cycle
+        # from the ledger; the risk layer blocks FRESH entries whose thesis
+        # rests entirely on these families. Best-effort — {} disarms the gate.
+        self._neg_families = {}
+        if self.cfg.risk.expectancy_gate_enabled:
+            self._neg_families = negative_expectancy_families(
+                self.ledger,
+                window_days=self.cfg.risk.expectancy_gate_window_days,
+                min_trips=self.cfg.risk.expectancy_gate_min_trips,
+            )
+            if self._neg_families:
+                log.info(
+                    "Expectancy gate armed against: %s",
+                    ", ".join(
+                        f"{k} {v.avg_pl_pct:+.1f}%/trip x{v.trips}"
+                        for k, v in sorted(self._neg_families.items())
+                    ),
+                )
 
         bench_stats = self.benchmark.compute()
         bench_line = self.benchmark.context_line(bench_stats)
@@ -969,6 +1026,27 @@ class Orchestrator:
                     except Exception:
                         hedge_price = None
         self._hedge_symbol = hedge_symbol
+        # Put-gate PRECHECK per bearish-composite slate name (Jul 31 funnel
+        # autopsy): the prompt used to warn "puts are auto-rejected unless the
+        # name is breaking down" without saying WHICH names would pass, so the
+        # model held every bearish read (slate_bearish>0, put_proposals=0 all
+        # week). Run the deterministic gate preview here — same carve-outs as
+        # risk._direction_fits_market — and hand the verdicts to the prompt
+        # and the funnel line. Only ON-SLATE names: the model must never be
+        # asked to trade a name whose data was partitioned out of the prompt.
+        self._bear_eligibility = {}
+        if self.options is not None and composites:
+            _bear_bar = self.cfg.screener.bearish_reserve_bar or 0.4
+            _slate_syms = {b.symbol for b in bundles}
+            for _sym, _comp in composites.items():
+                if _comp > -_bear_bar or _sym not in _slate_syms:
+                    continue
+                self._bear_eligibility[_sym] = self.risk.put_precheck(
+                    _sym, account,
+                    (_reg.trend if _reg else ""),
+                    (_reg.label if _reg else ""),
+                    tech_ctx.get(_sym),
+                )
         proposals = self.engine.decide(
             bundles, account, bench_line, external, lessons,
             today=today_block, buy_excluded=buy_excluded,
@@ -980,6 +1058,7 @@ class Orchestrator:
             curated=curated,
             hedge_symbol=hedge_symbol, hedge_price=hedge_price,
             hedge_reason=hedge_reason,
+            put_eligibility=self._bear_eligibility,
         )
         self._stamp_liveness()
         proposals = self._filter_to_slate(
@@ -1026,6 +1105,44 @@ class Orchestrator:
         undeployed = self._execute_proposals(
             proposals, account, signal_kinds, tech_ctx=tech_ctx,
             composites=composites, bundles=bundles,
+        )
+        # Bearish funnel (Jul 30 review): the put path was dormant for 388
+        # straight trades and nothing surfaced it. One line per cycle makes
+        # downside-conviction leakage visible: how many slate names carried a
+        # real bearish read, how many puts the model proposed, how many the
+        # gates passed, and whether the deterministic hedge sleeve is on.
+        # Jul 31: decomposed per name — the bare count hid WHERE the 4->0
+        # drop-off happened (off-slate? gate-blocked by the uptrend? model
+        # declined an eligible name?). Each bearish name now shows its stage.
+        bear_bar = self.cfg.screener.bearish_reserve_bar or 0.4
+        bear_map = {s: v for s, v in composites.items() if v <= -bear_bar}
+        bear_detail = ""
+        if bear_map:
+            parts = []
+            for s, v in sorted(bear_map.items(), key=lambda kv: kv[1])[:6]:
+                verdict = self._bear_eligibility.get(s)
+                if verdict is None:
+                    parts.append(f"{s} {v:+.2f} off-slate")
+                elif verdict[0]:
+                    parts.append(f"{s} {v:+.2f} ELIGIBLE ({verdict[1]})")
+                else:
+                    parts.append(f"{s} {v:+.2f} gate-blocked")
+            bear_detail = " [" + "; ".join(parts) + "]"
+        h_etf = getattr(self.cfg, "hedge_etf", "")
+        hedge_pos = account.position_for(h_etf) if h_etf else None
+        log.info(
+            "BEARISH FUNNEL: slate_bearish=%d%s put_proposals=%d "
+            "put_approved=%d auto_hedge=%s",
+            len(bear_map),
+            bear_detail,
+            getattr(self, "_bear_puts_proposed", 0),
+            getattr(self, "_bear_puts_approved", 0),
+            (
+                f"${max(0.0, hedge_pos.market_value):,.0f} {h_etf}"
+                if hedge_pos is not None else
+                ("armed" if self._falling_cycles > 0 and h_etf
+                 else ("off" if not h_etf else "flat"))
+            ),
         )
         if undeployed >= 1.0:
             # Whole-share bracket flooring drops each buy's sub-share remainder
@@ -1544,8 +1661,8 @@ class Orchestrator:
         for p in account.positions:
             if p.is_option:
                 continue
-            if self.cfg.core_etf and p.symbol == self.cfg.core_etf:
-                continue  # passive core: never on the slate, never rotated
+            if p.symbol in self._system_managed_symbols():
+                continue  # passive core/hedge/defensive: never on the slate
             bits: list[str] = []
             # Same durable baseline the rotation guard enforces (state clock
             # with ledger fallback) — the prompt must show the bar the guard
@@ -1665,6 +1782,19 @@ class Orchestrator:
             if pos is None or pos.unrealized_pl_pct > -r.rotation_guard_min_loss_pct:
                 kept.append(p)  # not a loss-locking sell
                 continue
+            # Red-day release (Jul 29: NOK's -4.8% exit was vetoed at 16:09
+            # and only closed at 18:00 — the guard held a sinking loser open
+            # ~2h into a losing session). On a day the BOOK is losing, a
+            # loss-cut the model asks for is defense, not lukewarm churn.
+            day_pl = getattr(account, "day_pl_pct", 0.0) or 0.0
+            if getattr(r, "rotation_guard_red_day_release", False) and day_pl < 0:
+                log.info(
+                    "Rotation guard: PASS %s at %+.1f%% — red book day "
+                    "(day P/L %.2f%%): a requested loss-cut is defense, "
+                    "not churn.", p.symbol, pos.unrealized_pl_pct, day_pl,
+                )
+                kept.append(p)
+                continue
             # Deterioration releases (SPCX Jul 22: vetoed at -5.4/-5.6/-6.6/
             # -9.3%, then the bracket stop fired at -9.8% — the guard pinned a
             # sinking position all the way into a WORSE exit). (a) Depth: past
@@ -1778,6 +1908,8 @@ class Orchestrator:
         for the same reason: on a full book, the rotation buy's deployable
         cash IS the freed capital."""
         self._option_fallbacks = []
+        self._bear_puts_proposed = 0
+        self._bear_puts_approved = 0
         if not proposals:
             log.info("No actionable proposals this cycle.")
             return 0.0
@@ -1994,7 +2126,16 @@ class Orchestrator:
         candidate. The discovery signal (the screener's smart-money lean that
         surfaced the name) is the primary read — mirror the aggregator's
         bearish intake bar; without one, fall back to the mean of the scored
-        signals."""
+        signals. Jul 31: also honor the COMPOSITE — a bullishly-DISCOVERED
+        name (Robinhood mover, discovery +0.60) whose full bundle nets
+        composite <= -bar is exactly what the funnel counts as bearish, yet
+        was dropped here on its positive discovery score alone, so the prompt
+        listed put candidates whose data had been partitioned away."""
+        comp = getattr(bundle, "composite_score", None)
+        if comp is not None and comp <= -(
+            self.cfg.screener.bearish_reserve_bar or 0.4
+        ):
+            return True
         bar = max(0.2, self.cfg.screener.min_score)
         disc = [
             s.score for s in bundle.signals
@@ -2240,9 +2381,10 @@ class Orchestrator:
             # (watchdog premium stop/take + expiry close); leave them to it.
             if pos.is_option:
                 continue
-            # The core-satellite ETF carries no per-name thesis, so signal ABSENCE
-            # must not decay-exit it (Todo 1.6) — it's a passive base allocation.
-            if self.cfg.core_etf and pos.symbol == self.cfg.core_etf:
+            # System-managed allocations (core / hedge / defensive) carry no
+            # per-name thesis, so signal ABSENCE must not decay-exit them —
+            # the orchestrator opens and closes them off deterministic reads.
+            if pos.symbol in self._system_managed_symbols():
                 continue
             age = self.state.entry_age_days(pos.symbol)
             if age is None or age < r.thesis_decay_min_age_days:
@@ -2407,6 +2549,183 @@ class Orchestrator:
         # decision cycle unprotected.
         self._ensure_core_stop(account)
 
+    def _system_managed_symbols(self) -> set[str]:
+        """Symbols the ORCHESTRATOR owns end-to-end (core ETF, auto-hedge
+        inverse ETF, defensive T-bill core). They never enter the model's
+        slate and model proposals against them are ignored — Claude proposes
+        theses; these are allocations."""
+        return {
+            s for s in (
+                getattr(self.cfg, "core_etf", ""),
+                getattr(self.cfg, "hedge_etf", ""),
+                getattr(self.cfg, "defensive_core_etf", ""),
+            ) if s
+        }
+
+    # -- deterministic inverse-ETF auto-hedge (Jul 30) ---------------------- #
+    def _apply_auto_hedge(self, account) -> None:
+        """When the falling read holds for auto_hedge_min_cycles consecutive
+        decision cycles, buy a 1x inverse ETF sized to auto_hedge_ratio x the
+        book's net long exposure; unwind it once the read stays clear for the
+        same number of cycles. This is the plain-EQUITY downside instrument
+        the Jul-30 review called for: no options fragility, works with
+        OPTIONS_ENABLED off, and — unlike the index-put sanction, which asks
+        the model — it never waits on discretion. The persistence requirement
+        is the noise filter: a single red tick arms nothing."""
+        etf = getattr(self.cfg, "hedge_etf", "")
+        if not etf:
+            return
+        falling, why = self._market_falling()
+        if falling:
+            self._falling_cycles += 1
+            self._clear_cycles = 0
+        else:
+            self._clear_cycles += 1
+        need = max(1, getattr(self.cfg, "auto_hedge_min_cycles", 2))
+        pos = account.position_for(etf)
+        held_val = max(0.0, pos.market_value) if pos is not None else 0.0
+        if not falling:
+            if self._clear_cycles >= need:
+                self._falling_cycles = 0
+                if pos is not None and pos.qty > 0:
+                    with self._trade_lock:
+                        self.broker.cancel_open_orders_for(etf)
+                        oid = self.broker.close_position(etf)
+                    if oid:
+                        log.warning(
+                            "AUTO-HEDGE UNWIND: falling read clear %d cycles — "
+                            "closing %g %s (%+.1f%%).",
+                            self._clear_cycles, pos.qty, etf,
+                            pos.unrealized_pl_pct,
+                        )
+                        self.ledger.record(TradeRecord.for_sell(
+                            etf, "auto-hedge unwind: falling read cleared",
+                            oid, qty=pos.qty,
+                            realized_pl_pct=pos.unrealized_pl_pct,
+                            realized_pl=pos.unrealized_pl,
+                            exit_reason="hedge_unwind",
+                            exit_price=pos.current_price or None,
+                        ))
+                        self._pending_oids.append((oid, etf))
+                        self.state.add_pending_order(oid, etf)
+                        # Keep the cycle's snapshot honest: hedge is cash now.
+                        account.cash += held_val
+                        account.buying_power += held_val
+                        pos.qty = 0.0
+                        pos.market_value = 0.0
+            return
+        if self._falling_cycles < need:
+            log.info(
+                "Auto-hedge: falling read (%s) cycle %d/%d — not arming yet.",
+                why, self._falling_cycles, need,
+            )
+            return
+        # An account-wide halt means the book is already in flatten/defense
+        # mode — don't open anything through it, even a hedge.
+        halted, halt_why = self.risk.trading_halted(account)
+        if halted:
+            log.info("Auto-hedge skipped: %s", halt_why)
+            return
+        net_long = sum(
+            max(0.0, p.market_value) for p in account.positions
+            if not p.is_option and p.symbol != etf
+        )
+        ratio = max(0.0, min(1.0, getattr(self.cfg, "auto_hedge_ratio", 0.0)))
+        ceiling = account.equity * (
+            max(0.0, getattr(self.cfg, "auto_hedge_max_pct", 0.0)) / 100.0
+        )
+        target = min(ratio * net_long, ceiling)
+        gap = target - held_val
+        r = self.cfg.risk
+        min_fill = max(
+            r.min_order_usd, account.equity * (r.min_order_pct / 100.0), 1.0
+        )
+        if gap < min_fill:
+            return
+        min_cash = account.equity * (r.min_cash_buffer_pct / 100.0)
+        spendable = max(0.0, min(account.cash - min_cash, account.buying_power))
+        notional = round(min(gap, spendable), 2)
+        if notional < min_fill:
+            log.info(
+                "Auto-hedge: want $%.0f more %s but only $%.0f spendable "
+                "after the cash buffer.", gap, etf, spendable,
+            )
+            return
+        price = self.broker.latest_price(etf)
+        with self._trade_lock:
+            oid = self.broker.submit_notional_buy(etf, notional)
+        if not oid:
+            log.warning("Auto-hedge buy of %s failed to submit — next cycle.", etf)
+            return
+        log.warning(
+            "AUTO-HEDGE: %s (cycle %d) — bought $%.0f of %s "
+            "(hedge $%.0f/$%.0f target = %.0f%% of $%.0f net-long).",
+            why, self._falling_cycles, notional, etf, held_val + notional,
+            target, ratio * 100.0, net_long,
+        )
+        self.ledger.record(TradeRecord(
+            symbol=etf, action="buy", instrument="equity",
+            qty=round(notional / price, 6) if price and price > 0 else 0.0,
+            entry_price=price or 0.0, cost_usd=round(notional, 2),
+            rationale=f"auto-hedge: {why}",
+            entry_signals=["auto_hedge"], verdict="approved",
+            risk_note=(
+                f"deterministic inverse-ETF hedge, {ratio:.0%} of net-long, "
+                f"ceiling {getattr(self.cfg, 'auto_hedge_max_pct', 0.0):.0f}% equity"
+            ),
+            order_id=oid,
+        ))
+        self._pending_oids.append((oid, etf))
+        self.state.add_pending_order(oid, etf)
+        self.state.register_entry(etf)
+        self._apply_pending_buy(
+            account, etf, notional, price,
+            notional / price if price and price > 0 else 0.0,
+        )
+
+    def _apply_defensive_rotation(self, account) -> None:
+        """Rotate the defensive T-bill core (SGOV/BIL) back to cash once the
+        falling read clears, so the regular core fill can redeploy toward the
+        real core ETF. The inbound leg lives in _apply_core_fill (which buys
+        the defensive ETF instead of the core while the defense is active);
+        this is the outbound leg. Position goes in one piece — it's a cash
+        proxy, there is nothing to average out of."""
+        d_etf = getattr(self.cfg, "defensive_core_etf", "")
+        if not d_etf or getattr(self, "_core_defense_active", False):
+            return
+        pos = account.position_for(d_etf)
+        if pos is None or pos.qty <= 0:
+            return
+        held_val = max(0.0, pos.market_value)
+        with self._trade_lock:
+            self.broker.cancel_open_orders_for(d_etf)
+            oid = self.broker.close_position(d_etf)
+        if not oid:
+            log.warning(
+                "Defensive rotation: close of %s failed to submit — next cycle.",
+                d_etf,
+            )
+            return
+        log.info(
+            "DEFENSIVE ROTATION: falling read clear — closing $%.0f of %s so "
+            "the core fill can redeploy.", held_val, d_etf,
+        )
+        self.ledger.record(TradeRecord.for_sell(
+            d_etf, "defensive-core rotation: falling read cleared",
+            oid, qty=pos.qty,
+            realized_pl_pct=pos.unrealized_pl_pct,
+            realized_pl=pos.unrealized_pl,
+            exit_reason="defensive_rotate",
+            exit_price=pos.current_price or None,
+        ))
+        self._pending_oids.append((oid, d_etf))
+        self.state.add_pending_order(oid, d_etf)
+        # Snapshot honesty: the defensive sleeve is cash again this cycle.
+        account.cash += held_val
+        account.buying_power += held_val
+        pos.qty = 0.0
+        pos.market_value = 0.0
+
     # -- core-satellite fill (1.6) ----------------------------------------- #
     def _apply_core_fill(self, account) -> None:
         """Deploy idle cash into the broad CORE_ETF until the book reaches
@@ -2434,12 +2753,21 @@ class Orchestrator:
         # Falling-tape core defense: never DCA INTO a falling market — the
         # Jul 29 pattern was the fill buying the decline every cycle while the
         # core dragged the book down. Resumes when the falling read clears.
+        # With a defensive core configured (Jul 30), the fill REDIRECTS into
+        # the T-bill ETF instead of stopping — idle cash earns the short rate
+        # while the book waits out the decline (_apply_defensive_rotation
+        # sells it back once the read clears).
+        defensive_fill = False
         if getattr(self, "_core_defense_active", False):
-            log.info(
-                "Core fill skipped: core defense active (market falling — "
-                "no DCA into the decline)."
-            )
-            return
+            d_etf = getattr(self.cfg, "defensive_core_etf", "")
+            if not d_etf:
+                log.info(
+                    "Core fill skipped: core defense active (market falling — "
+                    "no DCA into the decline)."
+                )
+                return
+            etf = d_etf
+            defensive_fill = True
         r = self.cfg.risk
         equity = account.equity
         if equity <= 0:
@@ -2449,6 +2777,22 @@ class Orchestrator:
         # Never target beyond the no-leverage gross cap (respect the same ceiling
         # single-name buys do).
         target = min(self.cfg.target_invested_pct, r.max_gross_exposure_pct)
+        # Exposure ladder (Jul 30): a RISK-core fill must respect the regime
+        # rung too, or the sweep quietly rebuilds the exposure the ladder just
+        # capped for satellites. The DEFENSIVE fill is exempt — T-bills are a
+        # cash proxy, and parking cash is the point of the defensive posture.
+        _label = getattr(self, "_regime_label", "")
+        if (
+            not defensive_fill
+            and getattr(r, "exposure_ladder_enabled", False)
+            and _label in ("neutral", "risk-off")
+        ):
+            rung = (
+                r.exposure_neutral_pct if _label == "neutral"
+                else r.exposure_risk_off_pct
+            )
+            if rung > 0:
+                target = min(target, rung)
         if invested_pct >= target:
             return
         gap = equity * (target - invested_pct) / 100.0
@@ -2496,11 +2840,28 @@ class Orchestrator:
         if not oid:
             return
         log.info(
-            "Core fill: bought $%.0f of %s (invested %.0f%% -> ~%.0f%%, target %.0f%%).",
+            "%s fill: bought $%.0f of %s (invested %.0f%% -> ~%.0f%%, target %.0f%%).",
+            "Defensive core" if defensive_fill else "Core",
             notional, etf, invested_pct,
             invested_pct + notional / equity * 100.0, target,
         )
-        self.ledger.record(TradeRecord.from_core_fill(etf, notional, price, oid))
+        if defensive_fill:
+            self.ledger.record(TradeRecord(
+                symbol=etf, action="buy", instrument="equity",
+                qty=round(notional / price, 6) if price > 0 else 0.0,
+                entry_price=price, cost_usd=round(notional, 2),
+                rationale=(
+                    "defensive core fill: park idle cash in T-bills while "
+                    "the falling read holds"
+                ),
+                entry_signals=["defensive_fill"], verdict="approved",
+                risk_note="defensive T-bill core — cash proxy, ladder-exempt",
+                order_id=oid,
+            ))
+        else:
+            self.ledger.record(
+                TradeRecord.from_core_fill(etf, notional, price, oid)
+            )
         self._pending_oids.append((oid, etf))
         # Persist at submit (mirror the watchdog) — crash-safe fill-check.
         self.state.add_pending_order(oid, etf)
@@ -2637,6 +2998,16 @@ class Orchestrator:
         so the cycle can total the undeployed drag. `tech` (RSI/extension) and
         `composite` feed the risk layer's anti-chasing gate and composite
         floor; both fail open when None."""
+        # System-managed allocations (core / auto-hedge / defensive core) are
+        # opened and closed by the orchestrator off deterministic reads — a
+        # model proposal against one is ignored, never executed (the slate
+        # already excludes them, but held names ride in via _filter_to_slate).
+        if proposal.symbol in self._system_managed_symbols():
+            log.info(
+                "Proposal for %s ignored: system-managed allocation "
+                "(core/hedge/defensive sleeve).", proposal.symbol,
+            )
+            return 0.0
         price = self.broker.latest_price(proposal.symbol)
         vol = self.broker.annualized_vol(proposal.symbol)
         is_buy = proposal.action.value == "buy"
@@ -2653,6 +3024,11 @@ class Orchestrator:
             self._corr_context(proposal.symbol, account)
             if is_buy and self.cfg.risk.max_pairwise_corr > 0 else (None, "", False)
         )
+        # The cited thesis families behind a BUY, for the expectancy gate —
+        # the same parse the attribution layer scores realized trips with.
+        fams = parse_cited(proposal.key_signals) if is_buy else set()
+        d_etf = getattr(self.cfg, "defensive_core_etf", "")
+        d_pos = account.position_for(d_etf) if d_etf else None
         decision = self.risk.evaluate(
             proposal, account, price, vol, pending, days_to_earnings,
             sector, sector_exposure, self._regime_mult,
@@ -2660,6 +3036,12 @@ class Orchestrator:
             cycle_budget_cap=cycle_budget_cap,
             corr_data_missing=corr_missing,
             tech=tech, composite_score=composite,
+            regime_label=getattr(self, "_regime_label", ""),
+            entry_families=fams or None,
+            neg_families=getattr(self, "_neg_families", None) or None,
+            defensive_exempt_usd=(
+                max(0.0, d_pos.market_value) if d_pos is not None else 0.0
+            ),
         )
         if proposal.action.value == "hold":
             # A HOLD is the model saying "no action" — the risk layer returns
@@ -2865,6 +3247,13 @@ class Orchestrator:
             t_price, t_sma200 = tech.get("price"), tech.get("sma200")
             if t_price and t_sma200:
                 name_trend = "down" if t_price < t_sma200 else "up"
+        # Bearish-funnel bookkeeping (Jul 30): count every all-puts structure
+        # proposed and approved, so put-path dormancy shows in the cycle log.
+        is_put_play = bool(proposal.option_legs) and all(
+            leg.right.lower().startswith("p") for leg in proposal.option_legs
+        )
+        if is_put_play:
+            self._bear_puts_proposed = getattr(self, "_bear_puts_proposed", 0) + 1
         decision = self.risk.evaluate_option(
             proposal, account, premium, leg_liquidity=liquidity,
             min_leg_premium=min_leg,
@@ -2876,7 +3265,13 @@ class Orchestrator:
                 bool(self._hedge_symbol)
                 and proposal.symbol == self._hedge_symbol
             ),
+            # % distance from the 20d SMA (negative = below): the broken-
+            # momentum put carve-out — NU/NOK-shaped names break hard while
+            # still reading name_trend="up" on their 200dma.
+            name_ext_pct=tech.get("ext_pct_sma20") if tech else None,
         )
+        if is_put_play and decision.verdict != RiskVerdict.REJECTED:
+            self._bear_puts_approved = getattr(self, "_bear_puts_approved", 0) + 1
         log.info(
             "OPTION %s %s -> %s: %s | %s",
             proposal.option_strategy, proposal.symbol,

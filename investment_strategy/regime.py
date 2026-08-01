@@ -133,6 +133,29 @@ class RegimeReader:
             label = "neutral"
         else:
             label = "risk-off"
+        # Breadth confirm (Jul 30 review): SPY comfortably above its 200dma
+        # read "risk-on" straight through the Jul 23/27/29 losing days — a
+        # single-index price read is blind to "calm index, breaking names".
+        # When BOTH growth (QQQ) and small-caps (IWM) trade below their own
+        # 50dma while SPY still reads risk-on, the advance is narrow: shade
+        # to neutral. ENHANCEMENT-only, like the VIX3M read — it only ever
+        # TIGHTENS, and a fetch failure keeps the SPY+VIX read unchanged.
+        breadth_note = ""
+        if label == "risk-on":
+            try:
+                below = 0
+                for b_sym in ("QQQ", "IWM"):
+                    closes = self._daily_closes(b_sym, 60)
+                    if len(closes) >= 50:
+                        b_sma = statistics.fmean(closes[-50:])
+                        if closes[-1] < b_sma:
+                            below += 1
+                if below >= 2:
+                    label = "neutral"
+                    mult = round(min(mult, _BACKWARDATION_VOL_FACTOR), 2)
+                    breadth_note = ", QQQ+IWM below 50dma (narrow breadth)"
+            except Exception as e:  # noqa: BLE001 — breadth is best-effort
+                log.debug("breadth confirm failed: %s", e)
         trend = "above" if above else "below"
         term = ""
         if vix3m is not None:
@@ -141,8 +164,8 @@ class RegimeReader:
         # VIX at one decimal: the old %.0f rounded a sub-20 read up to "VIX 20"
         # and made the calm tier look like a missed down-scale (Jul 29 audit).
         reason = (
-            f"SPY {trend} 200dma ({price:.0f} vs {sma:.0f}{day_part}), VIX {vix:.1f}{term} "
-            f"-> {label}, size x{mult:.2f}."
+            f"SPY {trend} 200dma ({price:.0f} vs {sma:.0f}{day_part}), VIX {vix:.1f}{term}"
+            f"{breadth_note} -> {label}, size x{mult:.2f}."
         )
         return Regime(
             mult, label, reason, trend="up" if above else "down",
