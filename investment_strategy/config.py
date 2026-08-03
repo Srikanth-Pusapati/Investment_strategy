@@ -465,6 +465,13 @@ class Config:
     core_defense_enabled: bool = True
     market_drop_defense_pct: float = 1.5   # intraday SPY drop that reads "falling"
     core_defense_trim_pct: float = 25.0    # % of the core sold per defense day
+    # Per-NAME falling read (Jul 30 review, Phase-1 gap): a HELD name down
+    # this % on the day is itself falling, whatever the index reads — Jul 29
+    # bottomed -1.2% (under the 1.5% trigger) while NU/NOK broke -5%+ alone.
+    # Arms the HELD-line defense note and the rotation guard's loss-cut
+    # release for that name. 0 disables. Default 4.0: NOK sat pinned at -4.8%
+    # for ~2h on the day this read would have released it.
+    name_drop_defense_pct: float = 4.0     # NAME_DROP_DEFENSE_PCT
     # --- deterministic AUTO-HEDGE (Jul 30 review). The Jul-29 index-put
     # sanction is model-discretionary and has fired zero times; the model
     # demonstrably skips discretionary defense. When the falling read holds
@@ -810,6 +817,7 @@ def load_config() -> Config:
         core_stop_pct=_f("CORE_STOP_PCT", 15.0),
         core_defense_enabled=_flag("CORE_DEFENSE_ENABLED", "on"),
         market_drop_defense_pct=_f("MARKET_DROP_DEFENSE_PCT", 1.5),
+        name_drop_defense_pct=_f("NAME_DROP_DEFENSE_PCT", 4.0),
         core_defense_trim_pct=_f("CORE_DEFENSE_TRIM_PCT", 25.0),
         hedge_etf=os.getenv("HEDGE_ETF", "").strip().upper(),
         auto_hedge_ratio=_f("AUTO_HEDGE_RATIO", 0.30),

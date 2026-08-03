@@ -926,3 +926,10 @@ New variables shipped with the Jul-30 all-weather upgrade. Code defaults in pare
 - **`ROTATION_GUARD_RED_DAY_RELEASE=on`** (on) — on a negative day-P&L book, a requested loss-cut past `ROTATION_GUARD_MIN_LOSS_PCT` is never vetoed.
 - **`PUT_BREAKDOWN_EXT_PCT=5`** (5; 0 = off) — direction-gate carve-out: a name at least this % below its 20d SMA keeps put candidacy in an up market (broken momentum names sit above their 200dma, so the old carve-out never fired).
 - **`THESIS_DECAY_ENABLED`** — code default flipped **off -> on** this date (losers held 3.8d vs winners 2.5d); `.env` updated to `on` to match.
+
+---
+
+## Addendum 2026-08-01 — bearish-verdict forcing + per-name falling read
+
+- **`NAME_DROP_DEFENSE_PCT=4`** (4; 0 = off) — per-NAME falling read: a HELD name down this % on the day (live price vs prior daily close) arms a name-level defense, whatever the index reads. Effects: the HELD prompt line tells the model the read fired and that a loss-cut passes the guard; the rotation guard releases loss-cut SELLs on that name even on a green book day (the red-day release only covers losing sessions). Jul 29 fixture: NOK -4.8% sat guard-pinned ~2h on a day SPY bottomed -1.2% — under every index trigger.
+- *(no new variable)* **bearish_verdicts** — the decision output schema now REQUIRES a verdict per put-ELIGIBLE bearish name (`put_proposed` or `declined` + the missing evidence). Declines/omissions land in the decision journal as `put_declined` / `put_ignored` and on the BEARISH FUNNEL log line (`ELIGIBLE (...) -> declined: ...`), so put-path dormancy is queryable instead of silent.

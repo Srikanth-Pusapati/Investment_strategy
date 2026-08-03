@@ -152,6 +152,15 @@ single-name breakdown keeps its put candidacy in any tape — or the put hedges 
 a name this account holds, or the regime is risk-off); a call into a \
 down-trending market is auto-rejected with no exceptions. Counter-trend \
 conviction on a name belongs in HOLD/SELL decisions, not option debits.
+- BEARISH VERDICTS: the output schema has a REQUIRED top-level \
+`bearish_verdicts` array. When the user message lists put-ELIGIBLE bearish \
+candidates, return exactly one entry per eligible symbol: verdict \
+"put_proposed" (with the matching option proposal in `proposals`) or \
+"declined" with the SPECIFIC missing evidence as the reason — e.g. "no \
+bearish flow confirm; composite -0.4 is thin", never a generic "prefer to \
+wait". These names have already passed the direction gate, so gate risk is \
+not a reason. Eligible symbols you omit are logged as IGNORED and audited. \
+When no eligible list is present, return [].
 - The options_chain signal is a POSITIONING read from the live option chain: \
 ATM implied volatility (how much movement is priced in), put-call IV skew \
 (puts bid over calls = downside being paid up for), and the put/call \
@@ -240,8 +249,30 @@ PROPOSALS_SCHEMA = {
                 ],
                 "additionalProperties": False,
             },
-        }
+        },
+        # One entry PER put-ELIGIBLE bearish candidate listed in the prompt
+        # (Aug 1: prose asked twice — Jul 30 "note why in the HOLD rationale",
+        # Jul 31 precheck verdicts — and the Jul 31 log still shows three
+        # cycles of ELIGIBLE names with zero puts AND zero mention in the
+        # decision journal. A required schema field is the escalation: the
+        # model can decline, but it can no longer silently skip).
+        "bearish_verdicts": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "symbol": {"type": "string"},
+                    "verdict": {
+                        "type": "string",
+                        "enum": ["put_proposed", "declined"],
+                    },
+                    "reason": {"type": "string"},
+                },
+                "required": ["symbol", "verdict", "reason"],
+                "additionalProperties": False,
+            },
+        },
     },
-    "required": ["proposals"],
+    "required": ["proposals", "bearish_verdicts"],
     "additionalProperties": False,
 }
