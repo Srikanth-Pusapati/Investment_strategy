@@ -1,0 +1,46 @@
+2026-08-01 00:03:32,607 INFO orchestrator | Market closed; skipping decision cycle.
+2026-08-01 00:55:46,762 INFO orchestrator | Market closed; skipping decision cycle.
+2026-08-01 01:48:00,994 INFO orchestrator | Market closed; skipping decision cycle.
+2026-08-01 02:40:14,572 INFO orchestrator | Market closed; skipping decision cycle.
+2026-08-01 03:32:27,938 INFO orchestrator | Market closed; skipping decision cycle.
+2026-08-01 04:24:41,870 INFO orchestrator | Market closed; skipping decision cycle.
+2026-08-01 05:16:55,980 INFO orchestrator | Market closed; skipping decision cycle.
+2026-08-01 06:02:42,036 WARNING alpaca | get_account: transient network error (ConnectionError); retry 1/2.
+2026-08-01 06:02:42,750 WARNING alpaca | get_account: transient network error (ConnectionError); retry 2/2.
+2026-08-01 06:02:43,948 WARNING orchestrator | Watchdog tick skipped on a transient network error (ConnectionError); retrying next tick (1 in a row).
+2026-08-01 06:09:09,756 INFO orchestrator | Market closed; skipping decision cycle.
+2026-08-01 06:41:20,288 WARNING alpaca | get_account: transient network error (ConnectionError); retry 1/2.
+2026-08-01 07:01:23,836 INFO orchestrator | Market closed; skipping decision cycle.
+2026-08-01 07:53:38,232 INFO orchestrator | Market closed; skipping decision cycle.
+2026-08-01 08:45:52,074 INFO orchestrator | Market closed; skipping decision cycle.
+2026-08-01 09:38:06,059 INFO orchestrator | Market closed; skipping decision cycle.
+2026-08-01 09:51:07,110 INFO alpaca | Alpaca client ready (mode=paper).
+2026-08-01 09:51:07,372 INFO orchestrator | Discovery-driven mode: trading scanner-found names + holdings.
+2026-08-01 09:51:07,373 INFO orchestrator | Loaded 1 pending order(s) from state to reconcile.
+2026-08-01 09:51:07,374 INFO orchestrator | Starting orchestrator (paper). Kill switch: off. Options: on. Benchmark: QQQ.
+2026-08-01 09:51:07,739 INFO orchestrator | Market closed; skipping decision cycle.
+2026-08-01 09:51:07,804 INFO alpaca | Alpaca client ready (mode=paper).
+2026-08-01 09:51:09,122 INFO dashboard | Wrote dashboard with 25 trades -> dashboard.html
+2026-08-01 10:27:47,910 INFO alpaca | Alpaca client ready (mode=paper).
+2026-08-01 10:27:48,667 INFO orchestrator | Discovery-driven mode: trading scanner-found names + holdings.
+2026-08-01 10:27:48,668 INFO orchestrator | Loaded 1 pending order(s) from state to reconcile.
+2026-08-01 10:27:48,669 INFO orchestrator | Starting orchestrator (paper). Kill switch: off. Options: on. Benchmark: QQQ.
+2026-08-01 10:27:48,915 INFO orchestrator | Market closed; skipping decision cycle.
+2026-08-01 10:27:48,972 INFO alpaca | Alpaca client ready (mode=paper).
+2026-08-01 10:27:50,272 INFO dashboard | Wrote dashboard with 25 trades -> dashboard.html
+2026-08-01 11:20:09,286 INFO orchestrator | Market closed; skipping decision cycle.
+2026-08-01 12:12:23,551 INFO orchestrator | Market closed; skipping decision cycle.
+2026-08-01 13:04:37,619 INFO orchestrator | Market closed; skipping decision cycle.
+2026-08-01 13:56:51,758 INFO orchestrator | Market closed; skipping decision cycle.
+2026-08-01 14:49:05,680 INFO orchestrator | Market closed; skipping decision cycle.
+2026-08-01 15:41:20,326 INFO orchestrator | Market closed; skipping decision cycle.
+2026-08-01 16:33:34,866 INFO orchestrator | Market closed; skipping decision cycle.
+2026-08-01 17:25:49,414 INFO orchestrator | Market closed; skipping decision cycle.
+2026-08-01 18:18:03,365 INFO orchestrator | Market closed; skipping decision cycle.
+2026-08-01 19:10:17,049 INFO orchestrator | Market closed; skipping decision cycle.
+2026-08-01 20:02:30,890 INFO orchestrator | Market closed; skipping decision cycle.
+2026-08-01 20:54:44,568 INFO orchestrator | Market closed; skipping decision cycle.
+2026-08-01 21:29:02,251 WARNING alpaca | get_all_positions: transient network error (ReadTimeout); retry 1/2.
+2026-08-01 21:46:58,260 INFO orchestrator | Market closed; skipping decision cycle.
+2026-08-01 22:39:11,999 INFO orchestrator | Market closed; skipping decision cycle.
+2026-08-01 23:31:25,779 INFO orchestrator | Market closed; skipping decision cycle.
