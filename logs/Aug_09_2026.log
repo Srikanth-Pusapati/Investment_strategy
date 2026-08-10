@@ -1,0 +1,36 @@
+2026-08-09 00:33:02,437 INFO orchestrator | Market closed; skipping decision cycle.
+2026-08-09 01:25:15,775 INFO orchestrator | Market closed; skipping decision cycle.
+2026-08-09 02:17:28,816 INFO orchestrator | Market closed; skipping decision cycle.
+2026-08-09 03:09:42,587 INFO orchestrator | Market closed; skipping decision cycle.
+2026-08-09 04:01:55,636 INFO orchestrator | Market closed; skipping decision cycle.
+2026-08-09 04:54:08,368 INFO orchestrator | Market closed; skipping decision cycle.
+2026-08-09 05:46:21,969 INFO orchestrator | Market closed; skipping decision cycle.
+2026-08-09 06:38:34,904 INFO orchestrator | Market closed; skipping decision cycle.
+2026-08-09 07:30:48,580 INFO orchestrator | Market closed; skipping decision cycle.
+2026-08-09 08:23:02,105 INFO orchestrator | Market closed; skipping decision cycle.
+2026-08-09 09:15:15,071 INFO orchestrator | Market closed; skipping decision cycle.
+2026-08-09 10:07:28,861 INFO orchestrator | Market closed; skipping decision cycle.
+2026-08-09 10:59:42,448 INFO orchestrator | Market closed; skipping decision cycle.
+2026-08-09 11:51:55,785 INFO orchestrator | Market closed; skipping decision cycle.
+2026-08-09 12:44:10,360 INFO orchestrator | Market closed; skipping decision cycle.
+2026-08-09 13:36:20,428 INFO orchestrator | Market closed; skipping decision cycle.
+2026-08-09 14:28:35,056 INFO orchestrator | Market closed; skipping decision cycle.
+2026-08-09 15:20:48,798 INFO orchestrator | Market closed; skipping decision cycle.
+2026-08-09 16:13:02,735 INFO orchestrator | Market closed; skipping decision cycle.
+2026-08-09 17:05:16,951 INFO orchestrator | Market closed; skipping decision cycle.
+2026-08-09 17:57:31,238 INFO orchestrator | Market closed; skipping decision cycle.
+2026-08-09 18:49:45,125 INFO orchestrator | Market closed; skipping decision cycle.
+2026-08-09 19:41:59,069 INFO orchestrator | Market closed; skipping decision cycle.
+2026-08-09 20:34:13,560 INFO orchestrator | Market closed; skipping decision cycle.
+2026-08-09 21:26:26,638 INFO orchestrator | Market closed; skipping decision cycle.
+2026-08-09 22:19:11,123 WARNING orchestrator | DARK GAP (market closed): no loop tick for 13 min (sleep/suspend?) — positions could not move; not paging.
+2026-08-09 22:19:12,632 INFO orchestrator | Resumed after a 13-min gap — settling the network (<= 20s) before the first cycle.
+2026-08-09 22:19:31,498 INFO orchestrator | Market closed; skipping decision cycle.
+2026-08-09 22:19:36,229 WARNING alpaca | get_account: transient network error (ReadTimeout); retry 1/2.
+2026-08-09 22:20:33,761 INFO alpaca | Alpaca client ready (mode=paper).
+2026-08-09 22:20:34,171 INFO orchestrator | Discovery-driven mode: trading scanner-found names + holdings.
+2026-08-09 22:20:34,174 INFO orchestrator | Starting orchestrator (paper). Kill switch: off. Options: on. Benchmark: QQQ.
+2026-08-09 22:20:34,572 INFO orchestrator | Market closed; skipping decision cycle.
+2026-08-09 22:20:34,641 INFO alpaca | Alpaca client ready (mode=paper).
+2026-08-09 22:20:36,802 INFO dashboard | Wrote dashboard with 57 trades -> dashboard.html
+2026-08-09 23:12:49,605 INFO orchestrator | Market closed; skipping decision cycle.
