@@ -29,3 +29,4 @@ state/
 # ---- Generated artifacts ----
 dashboard.html
 track_record.html
+ops/status_page.html

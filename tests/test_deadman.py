@@ -59,6 +59,81 @@ def test_diagnose_healthy_when_stamp_fresh(monkeypatch):
     assert deadman.diagnose() is None
 
 
+def test_attempt_restart_respects_cooldown(monkeypatch):
+    stamp = Path(tempfile.mkdtemp()) / "deadman.restart-stamp"
+    stamp.touch()                                  # fresh -> cooldown active
+    assert deadman.attempt_restart(None, stamp=stamp) is None
+
+
+def test_attempt_restart_dead_bot_posts_panel(monkeypatch):
+    stamp = Path(tempfile.mkdtemp()) / "deadman.restart-stamp"  # missing -> go
+    calls = []
+
+    class _Resp:
+        def read(self):
+            return b"Bot restarted (pid 111).\n"
+        def __enter__(self):
+            return self
+        def __exit__(self, *a):
+            return False
+
+    import urllib.request
+    monkeypatch.setattr(deadman, "bot_alive", lambda pid: False)
+    monkeypatch.setattr(
+        urllib.request, "urlopen",
+        lambda req, timeout=None: calls.append(req) or _Resp(),
+    )
+    out = deadman.attempt_restart(4242, stamp=stamp)
+    assert out == "auto-restart: Bot restarted (pid 111)."
+    assert calls and calls[0].get_method() == "POST"
+    assert stamp.exists()                          # cooldown armed for next run
+
+
+def test_attempt_restart_wedged_bot_is_killed_first(monkeypatch):
+    stamp = Path(tempfile.mkdtemp()) / "deadman.restart-stamp"
+    killed = []
+    alive = {"v": True}
+
+    def _fake_run(cmd, **kw):
+        if cmd[0] == "kill":
+            killed.append(cmd)
+            alive["v"] = False                     # TERM works on 1st check
+        import types as _t
+        return _t.SimpleNamespace(stdout="")
+
+    import urllib.request
+    monkeypatch.setattr(deadman, "bot_alive", lambda pid: alive["v"])
+    monkeypatch.setattr(deadman.subprocess, "run", _fake_run)
+
+    class _Resp:
+        def read(self):
+            return b"ok"
+        def __enter__(self):
+            return self
+        def __exit__(self, *a):
+            return False
+
+    monkeypatch.setattr(
+        urllib.request, "urlopen", lambda req, timeout=None: _Resp(),
+    )
+    out = deadman.attempt_restart(4242, stamp=stamp)
+    assert killed and killed[0] == ["kill", "-TERM", "4242"]
+    assert out == "auto-restart: ok"
+
+
+def test_attempt_restart_panel_down_reports_failure(monkeypatch):
+    stamp = Path(tempfile.mkdtemp()) / "deadman.restart-stamp"
+    import urllib.request
+
+    def _boom(req, timeout=None):
+        raise OSError("connection refused")
+
+    monkeypatch.setattr(deadman, "bot_alive", lambda pid: False)
+    monkeypatch.setattr(urllib.request, "urlopen", _boom)
+    out = deadman.attempt_restart(None, stamp=stamp)
+    assert out is not None and "auto-restart FAILED" in out
+
+
 def _run_all():
     import types
     monkey = types.SimpleNamespace(_saved=[])
