@@ -632,6 +632,7 @@ from investment_strategy.execution.options import (
     build_closing_legs,
     occ_symbol,
     parse_occ,
+    split_option_close_chunks,
 )
 from investment_strategy.models import Position
 
@@ -861,6 +862,126 @@ def test_build_closing_legs_flips_sides_and_uses_close_intents():
     assert legs[0].position_intent == _PI.SELL_TO_CLOSE
     assert legs[1].side == _OS.BUY
     assert legs[1].position_intent == _PI.BUY_TO_CLOSE
+
+
+def _amzn_5leg_group():
+    # The exact 2026-08-07 shape: two call structures merged under one
+    # underlying+expiry — 6x 230/245 spread, 26x 280/290 spread, +2 240 long.
+    return [
+        _opt_pos("AMZN260918C00230000", qty=6.0),
+        _opt_pos("AMZN260918C00240000", qty=2.0),
+        _opt_pos("AMZN260918C00245000", qty=-6.0),
+        _opt_pos("AMZN260918C00280000", qty=26.0),
+        _opt_pos("AMZN260918C00290000", qty=-26.0),
+    ]
+
+
+def test_split_chunks_amzn_5leg_pairs_shorts_and_conserves_contracts():
+    chunks = split_option_close_chunks(_amzn_5leg_group())
+    assert all(len(c) <= 2 for c in chunks)
+    # Every short leg rides with a call cover at a strike at or below its own.
+    for c in chunks:
+        for s in (p for p in c if p.qty < 0):
+            k_short = parse_occ(s.symbol)[3]
+            assert any(
+                p.qty > 0 and parse_occ(p.symbol)[3] <= k_short for p in c
+            ), f"short {s.symbol} left uncovered in its chunk"
+    totals: dict[str, float] = {}
+    for c in chunks:
+        for p in c:
+            totals[p.symbol] = totals.get(p.symbol, 0.0) + p.qty
+    assert totals == {
+        "AMZN260918C00230000": 6.0,
+        "AMZN260918C00240000": 2.0,
+        "AMZN260918C00245000": -6.0,
+        "AMZN260918C00280000": 26.0,
+        "AMZN260918C00290000": -26.0,
+    }
+
+
+def test_split_chunks_put_cover_needs_higher_strike():
+    chunks = split_option_close_chunks([
+        _opt_pos("SPY260918P00500000", qty=3.0),    # cover (strike above)
+        _opt_pos("SPY260918P00480000", qty=-3.0),   # short
+        _opt_pos("SPY260918P00450000", qty=2.0),    # too LOW to cover a 480 short
+        _opt_pos("SPY260918P00470000", qty=1.0),
+        _opt_pos("SPY260918P00440000", qty=1.0),
+    ])
+    pair = next(c for c in chunks if len(c) == 2)
+    assert {p.symbol for p in pair} == {
+        "SPY260918P00500000", "SPY260918P00480000"
+    }
+
+
+def test_split_chunks_uncovered_short_closes_alone():
+    chunks = split_option_close_chunks([
+        _opt_pos("XYZ260918C00100000", qty=-2.0),   # no long anywhere below
+        _opt_pos("XYZ260918C00110000", qty=1.0),
+        _opt_pos("XYZ260918C00120000", qty=1.0),
+        _opt_pos("XYZ260918C00130000", qty=1.0),
+        _opt_pos("XYZ260918C00140000", qty=1.0),
+    ])
+    bare = [c for c in chunks if len(c) == 1 and c[0].qty < 0]
+    assert len(bare) == 1 and bare[0][0].qty == -2.0
+
+
+def test_split_chunks_partial_qty_splits_the_long():
+    chunks = split_option_close_chunks([
+        _opt_pos("QQQ260918C00400000", qty=6.0),
+        _opt_pos("QQQ260918C00410000", qty=-4.0),
+        _opt_pos("QQQ260918C00420000", qty=1.0),
+        _opt_pos("QQQ260918C00430000", qty=1.0),
+        _opt_pos("QQQ260918C00440000", qty=1.0),
+    ])
+    pair = next(c for c in chunks if len(c) == 2)
+    lng = next(p for p in pair if p.qty > 0)
+    assert lng.symbol == "QQQ260918C00400000" and lng.qty == 4.0
+    leftover = [
+        c[0] for c in chunks
+        if len(c) == 1 and c[0].symbol == "QQQ260918C00400000"
+    ]
+    assert len(leftover) == 1 and leftover[0].qty == 2.0
+
+
+class _FakeMlegCloseTrading:
+    """Accepts market closes AND MLEG submits, mirroring Alpaca's 4-leg cap
+    (MarketOrderRequest itself enforces it at construction, before submit)."""
+
+    def __init__(self, fail_on_submit: int | None = None):
+        self.submitted = []
+        self.closed = []
+        self.fail_on_submit = fail_on_submit
+
+    def close_position(self, symbol):
+        self.closed.append(symbol)
+        return SimpleNamespace(id=f"mkt-{len(self.closed)}")
+
+    def submit_order(self, req):
+        self.submitted.append(req)
+        if self.fail_on_submit == len(self.submitted):
+            raise Exception("simulated venue rejection")
+        return SimpleNamespace(id=f"mleg-{len(self.submitted)}")
+
+
+def test_close_option_group_5_legs_splits_into_capped_orders():
+    trading = _FakeMlegCloseTrading()
+    c = AlpacaClient.__new__(AlpacaClient)
+    c.trading = trading
+    oid = c.close_option_group(_amzn_5leg_group())
+    assert oid is not None
+    # Two covered pairs as MLEG orders + the lone 240C via market close.
+    assert len(trading.submitted) == 2
+    assert all(len(r.legs) <= 4 for r in trading.submitted)
+    assert trading.closed == ["AMZN260918C00240000"]
+
+
+def test_close_option_group_partial_chunk_failure_returns_none():
+    trading = _FakeMlegCloseTrading(fail_on_submit=2)
+    c = AlpacaClient.__new__(AlpacaClient)
+    c.trading = trading
+    # None -> the watchdog stays CRITICAL and retries the remainder.
+    assert c.close_option_group(_amzn_5leg_group()) is None
+    assert len(trading.submitted) == 2         # both pairs were attempted
 
 
 def test_to_position_maps_asset_class():
