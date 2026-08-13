@@ -25,8 +25,19 @@ never loosened unattended.**
 1. **Health**: pid in `state/bot.lock` alive and is the bot; `state/last_tick.stamp`
    fresh (<5 min during market hours); tail `logs/deadman.log`;
    `state/robinhood_health.json` (auth_dead=true is DEGRADED not broken — bot
-   continues without RH signals; do not attempt OAuth re-login headless);
-   does `state/KILL` exist?
+   continues without RH signals; do not attempt OAuth re-login from the
+   HEADLESS fallback — no browser there); does `state/KILL` exist?
+   - RH re-auth from THIS resident session works and was dry-run 2026-08-13:
+     `BROWSER=true PYTHONUNBUFFERED=1 .venv/bin/python -m
+     investment_strategy.portfolio.robinhood_auth login` in the background,
+     grab the printed auth URL, open it in a Claude-in-Chrome MCP tab, click
+     Allow. Robinhood then either silently verifies the recognized device
+     (what happened in the dry run) or pushes an approve notification to the
+     operator's phone — if pushed, ping the operator and retry by reloading
+     the auth URL + Allow (same state/PKCE stays valid while `login` waits).
+     A failed handshake never touches the existing token file; on success the
+     reader latch self-heals in ~60s, no restart. If consent stalls twice,
+     stop, leave DEGRADED, warn pill on the status page.
 2. **Incidents**: grep the day's log for `CRITICAL|ERROR|halt|FAILED`;
    grep `BEARISH FUNNEL` terminal stages (`-> IGNORED` = schema violation,
    escalate on the status page); grep `Option exit|OPTION close`.
