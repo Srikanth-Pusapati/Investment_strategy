@@ -77,6 +77,85 @@ def build_closing_legs(positions: list[Position]) -> tuple[list[OptionLegRequest
     return legs, group_qty
 
 
+def split_option_close_chunks(positions: list[Position]) -> list[list[Position]]:
+    """Partition an option group too big to close as ONE MLEG order — Alpaca
+    caps the mleg order class at 4 legs (2026-08-07: a 5-leg AMZN call group,
+    two structures merged under one underlying+expiry, had its stop-close
+    rejected with "At most 4 legs are allowed" on every retry, leaving the
+    book unprotected) — into chunks that are each risk-safe to close alone:
+
+    - every SHORT leg travels with a covering LONG (call cover: long strike
+      <= short strike; put cover: long strike >= short strike) in the same
+      2-leg chunk, so a cover is only ever sold in the SAME atomic order
+      that buys its short back — no fill order can pass through a
+      naked-short state;
+    - a short with no available cover closes ALONE (buying back a short is
+      pure risk reduction, always safe);
+    - leftover longs close alone, last.
+
+    A pairing that consumes only part of a leg clones the row at the matched
+    qty; the remainder stays available for further chunks. Contracts in the
+    output always sum back to the input.
+    """
+    shorts: list[dict] = []
+    longs: list[dict] = []
+    for p in positions:
+        occ = parse_occ(p.symbol)
+        row = {
+            "pos": p, "left": abs(p.qty),
+            "right": occ[2] if occ else None,
+            "strike": occ[3] if occ else None,
+        }
+        (shorts if p.qty < 0 else longs).append(row)
+
+    def _covers(lng: dict, sht: dict) -> bool:
+        if lng["right"] is None or lng["right"] != sht["right"]:
+            return False
+        if sht["right"] == "C":
+            return lng["strike"] <= sht["strike"]
+        return lng["strike"] >= sht["strike"]
+
+    def _clone(row: dict, qty: float) -> Position:
+        return row["pos"].model_copy(
+            update={"qty": qty, "qty_available": qty}
+        )
+
+    chunks: list[list[Position]] = []
+    # Hardest-to-cover shorts first (lowest call strike / highest put strike
+    # has the fewest eligible covers); give each the least generally-useful
+    # cover (tightest strike) so wider covers stay free for later shorts.
+    def _short_order(r: dict):
+        if r["strike"] is None:
+            return float("inf")
+        return r["strike"] if r["right"] == "C" else -r["strike"]
+
+    for sht in sorted([r for r in shorts if r["right"]], key=_short_order):
+        while sht["left"] > 1e-9:
+            cands = [l for l in longs if l["left"] > 1e-9 and _covers(l, sht)]
+            if not cands:
+                break
+            # Prefer a cover that absorbs the WHOLE short (fewest orders),
+            # tightest strike among those; only fragment across covers when
+            # no single long is big enough (then: biggest first).
+            full = [l for l in cands if l["left"] >= sht["left"] - 1e-9]
+            strike_sign = 1.0 if sht["right"] == "C" else -1.0
+            if full:
+                cover = max(full, key=lambda l: strike_sign * l["strike"])
+            else:
+                cover = max(cands, key=lambda l: l["left"])
+            qty = min(sht["left"], cover["left"])
+            chunks.append([_clone(cover, qty), _clone(sht, -qty)])
+            sht["left"] -= qty
+            cover["left"] -= qty
+    for sht in shorts:                       # bare shorts: safe to close alone
+        if sht["left"] > 1e-9:
+            chunks.append([_clone(sht, -sht["left"])])
+    for lng in longs:                        # leftover longs go last
+        if lng["left"] > 1e-9:
+            chunks.append([_clone(lng, lng["left"])])
+    return chunks
+
+
 class OptionsHelper:
     def __init__(self, cfg: Config):
         self.data = bound_client(OptionHistoricalDataClient(

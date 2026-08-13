@@ -9,9 +9,15 @@ failure it exists to detect. During market hours it checks:
      log is a wedged bot (deadlocked thread, hung API call), which is worse
      than a dead one because the lock still blocks a manual restart.
 
-On failure it pages through the SAME SMTP/webhook sink the bot's CRITICAL
-alerts use (proven by preflight's test alert), throttled to one page per
-~30 min by an on-disk stamp file — the Alerter's own cooldown lives in
+On failure it SELF-HEALS first (added 2026-08-12, for unattended stretches):
+a wedged bot is killed to release the instance lock, then the launchd-
+supervised control panel is asked to restart the bot (the same POST
+/api/restart path used interactively — panel spawn keeps the caffeinate
+attach). Restarts are throttled to one per ~10 min by an on-disk stamp so a
+crash-looping bot can't be restart-spammed. It THEN pages through the SAME
+SMTP/webhook sink the bot's CRITICAL alerts use (proven by preflight's test
+alert), with the auto-restart outcome in the page body, throttled to one
+page per ~30 min by its own stamp file — the Alerter's cooldown lives in
 process memory and dies with each 5-min launchd run, so it cannot throttle
 across runs.
 
@@ -41,6 +47,11 @@ ET = ZoneInfo("America/New_York")
 # every hour). Derive it from the bot's own .env cadence + grace.
 STALE_GRACE_MINUTES = 15.0
 PAGE_COOLDOWN_S = 1800.0
+RESTART_COOLDOWN_S = 600.0
+# The control panel (its own KeepAlive launchd job) owns the spawn path —
+# restarting through it keeps the flock handling + caffeinate attach identical
+# to an interactive restart.
+PANEL_RESTART_URL = "http://127.0.0.1:8787/api/restart"
 # The bot writes state/last_tick.stamp on every MAIN-loop tick (~30s) and
 # through each decision cycle, so a wedged decision thread goes stale here in
 # minutes even while the 24/7 watchdog keeps logs/bot.log warm. Tighter than the
@@ -152,6 +163,43 @@ def diagnose(now: dt.datetime | None = None) -> str | None:
     return None
 
 
+def attempt_restart(
+    pid: int | None,
+    stamp: Path = ROOT / "state" / "deadman.restart-stamp",
+) -> str | None:
+    """Self-heal a dead/wedged bot: release the instance lock (TERM, then KILL
+    if it won't die) and ask the control panel to restart. Returns a one-line
+    outcome for the page body, or None when the restart cooldown is active
+    (a bot that dies again within ~10 min needs a human, not a spam loop)."""
+    import time
+    import urllib.request
+
+    try:
+        if time.time() - stamp.stat().st_mtime < RESTART_COOLDOWN_S:
+            return None
+    except OSError:
+        pass
+    try:
+        stamp.touch()
+    except OSError:
+        pass
+    if pid and bot_alive(pid):          # wedged — it still holds the flock
+        subprocess.run(["kill", "-TERM", str(pid)], capture_output=True)
+        for _ in range(10):
+            time.sleep(1)
+            if not bot_alive(pid):
+                break
+        else:
+            subprocess.run(["kill", "-KILL", str(pid)], capture_output=True)
+            time.sleep(2)
+    try:
+        req = urllib.request.Request(PANEL_RESTART_URL, method="POST")
+        with urllib.request.urlopen(req, timeout=60) as resp:
+            return f"auto-restart: {resp.read().decode().strip()}"
+    except Exception as e:  # panel down too — the page must say so
+        return f"auto-restart FAILED (panel unreachable?): {e}"
+
+
 def should_page(stamp: Path = ROOT / "state" / "deadman.page-stamp") -> bool:
     """Cross-run throttle: each launchd run is a fresh process, so the
     Alerter's in-memory cooldown never applies here. One page per ~30 min."""
@@ -181,6 +229,9 @@ def main() -> int:
     if problem is None:
         print(f"{stamp} ok", flush=True)
         return 0
+    outcome = attempt_restart(bot_pid())
+    if outcome:
+        problem = f"{problem}\n\n{outcome}"
     if not should_page():
         print(f"{stamp} STALE (page throttled): {problem}", flush=True)
         return 1

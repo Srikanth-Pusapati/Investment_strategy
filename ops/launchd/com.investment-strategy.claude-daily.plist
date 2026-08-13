@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- Away-mode fallback babysitter (2026-08-12): weekday 17:37 local, runs
+     ops/claude_daily.sh which NO-OPS while the operator's interactive Claude
+     session is doing the daily routine (fresh dated-log commit) and launches
+     a headless claude -p run only when that primary has gone quiet. Install:
+       cp ops/launchd/com.investment-strategy.claude-daily.plist ~/Library/LaunchAgents/
+       launchctl load ~/Library/LaunchAgents/com.investment-strategy.claude-daily.plist -->
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.investment-strategy.claude-daily</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>/bin/sh</string>
+        <string>/Users/spusapati/Personal/Investment_stratergy/ops/claude_daily.sh</string>
+    </array>
+    <key>WorkingDirectory</key>
+    <string>/Users/spusapati/Personal/Investment_stratergy</string>
+    <key>StartCalendarInterval</key>
+    <array>
+        <dict>
+            <key>Weekday</key><integer>1</integer>
+            <key>Hour</key><integer>17</integer>
+            <key>Minute</key><integer>37</integer>
+        </dict>
+        <dict>
+            <key>Weekday</key><integer>2</integer>
+            <key>Hour</key><integer>17</integer>
+            <key>Minute</key><integer>37</integer>
+        </dict>
+        <dict>
+            <key>Weekday</key><integer>3</integer>
+            <key>Hour</key><integer>17</integer>
+            <key>Minute</key><integer>37</integer>
+        </dict>
+        <dict>
+            <key>Weekday</key><integer>4</integer>
+            <key>Hour</key><integer>17</integer>
+            <key>Minute</key><integer>37</integer>
+        </dict>
+        <dict>
+            <key>Weekday</key><integer>5</integer>
+            <key>Hour</key><integer>17</integer>
+            <key>Minute</key><integer>37</integer>
+        </dict>
+    </array>
+    <key>StandardOutPath</key>
+    <string>/Users/spusapati/Personal/Investment_stratergy/logs/claude_daily.log</string>
+    <key>StandardErrorPath</key>
+    <string>/Users/spusapati/Personal/Investment_stratergy/logs/claude_daily.log</string>
+</dict>
+</plist>

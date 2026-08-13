@@ -642,19 +642,55 @@ class AlpacaClient:
         )
         return str(order.id)
 
+    # Alpaca hard-caps the mleg order class at 4 legs — a 5th leg fails
+    # request validation before it ever reaches the venue (AMZN 2026-08-07).
+    _MLEG_MAX_LEGS = 4
+
     def close_option_group(self, positions: list[Position]) -> Optional[str]:
         """Close a whole option structure — never gated by the kill switch
         (closing is risk reduction). One leg -> close_option_leg (market, then
-        a DAY-limit fallback — see its docstring); 2+ legs -> ONE closing MLEG
+        a DAY-limit fallback — see its docstring); 2-4 legs -> ONE closing MLEG
         market order (each leg flipped to its *_TO_CLOSE intent) so a spread
-        never passes through a naked-short intermediate state. The MLEG path
+        never passes through a naked-short intermediate state. 5+ legs cannot
+        go as one order (Alpaca's 4-leg MLEG cap; groups get that big when two
+        structures share an underlying+expiry) — they split into risk-safe
+        chunks (each short atomically paired with its cover, singles for the
+        rest) submitted as several orders. Returns an order id only when EVERY
+        chunk went through; on a partial failure it returns None so the
+        watchdog stays CRITICAL and retries — legs whose close did fill drop
+        out of the group by the next tick, shrinking the retry. The MLEG path
         has no limit-order fallback yet (a net limit across legs needs a
         per-leg quote, which is exactly what's missing when this fires) — a
         failed multi-leg close is retried by the watchdog next tick same as
         before."""
-        from .options import build_closing_legs
+        from .options import split_option_close_chunks
         if len(positions) == 1:
             return self.close_option_leg(positions[0])
+        if len(positions) <= self._MLEG_MAX_LEGS:
+            return self._submit_mleg_close(positions)
+        chunks = split_option_close_chunks(positions)
+        log.warning(
+            "Option group %s has %d legs — over the %d-leg MLEG cap; closing "
+            "as %d risk-safe chunk(s).",
+            ",".join(p.symbol for p in positions), len(positions),
+            self._MLEG_MAX_LEGS, len(chunks),
+        )
+        first: Optional[str] = None
+        all_ok = True
+        for chunk in chunks:
+            oid = (
+                self.close_option_leg(chunk[0]) if len(chunk) == 1
+                else self._submit_mleg_close(chunk)
+            )
+            if oid is None:
+                all_ok = False
+            elif first is None:
+                first = oid
+        return first if all_ok else None
+
+    def _submit_mleg_close(self, positions: list[Position]) -> Optional[str]:
+        """Submit ONE closing MLEG market order for <=4 legs."""
+        from .options import build_closing_legs
         try:
             legs, group_qty = build_closing_legs(positions)
             req = MarketOrderRequest(

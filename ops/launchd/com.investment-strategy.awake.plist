@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- Keep the Mac awake independently of the bot (added 2026-08-12 for
+     unattended stretches). The control panel attaches `caffeinate -w <pid>`
+     to the bot it spawns, but that assertion dies WITH the bot — a crashed
+     bot would let the machine idle-sleep (pmset sleep=1) before deadman's
+     next 5-min run could self-heal it. This agent holds a permanent
+     `caffeinate -s` (prevents system sleep while on AC power; no sudo
+     needed). It does NOT survive lid-close without an external display —
+     leave the lid open — and cannot enable unattended reboot recovery
+     (FileVault blocks auto-login). Install:
+       cp ops/launchd/com.investment-strategy.awake.plist ~/Library/LaunchAgents/
+       launchctl load ~/Library/LaunchAgents/com.investment-strategy.awake.plist -->
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.investment-strategy.awake</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>/usr/bin/caffeinate</string>
+        <string>-s</string>
+    </array>
+    <key>RunAtLoad</key>
+    <true/>
+    <key>KeepAlive</key>
+    <true/>
+</dict>
+</plist>
