@@ -486,6 +486,16 @@ class Config:
     auto_hedge_ratio: float = 0.30         # hedge notional / net long exposure
     auto_hedge_min_cycles: int = 2         # falling cycles before arming (and clearing)
     auto_hedge_max_pct: float = 15.0       # hedge ceiling as % of equity
+    # --- PUT LIQUIDITY PROXY (Aug 14, window-end ship): the bearish slate
+    # surfaces micro-caps whose own chains fail the OI/spread liquidity floor
+    # — in the Aug 3-14 window every model-proposed put (EXTR, TDC) died on
+    # exactly that gate, so the funnel produced 0 filled puts while red days
+    # still bled. When a model-proposed put is rejected FOR LIQUIDITY, the
+    # system re-expresses the same bearish read as a deterministic near-ATM
+    # bear put spread on a LIQUID proxy ETF (small-cap slate -> IWM default).
+    # Deterministic like the auto-hedge; every other option gate (DTE,
+    # premium caps, slots, the proxy's own liquidity) still applies. "" = off.
+    put_proxy_etf: str = "IWM"             # PUT_PROXY_ETF ("" = off)
     # --- DEFENSIVE CORE (Jul 30 review): while the core defense is active the
     # QQQ fill pauses — but the freed/idle cash then earns nothing. Redirect
     # the core fill into a short-duration T-bill ETF instead (SGOV/BIL), and
@@ -823,6 +833,7 @@ def load_config() -> Config:
         auto_hedge_ratio=_f("AUTO_HEDGE_RATIO", 0.30),
         auto_hedge_min_cycles=_i("AUTO_HEDGE_MIN_CYCLES", 2),
         auto_hedge_max_pct=_f("AUTO_HEDGE_MAX_PCT", 15.0),
+        put_proxy_etf=os.getenv("PUT_PROXY_ETF", "IWM").strip().upper(),
         defensive_core_etf=os.getenv("DEFENSIVE_CORE_ETF", "").strip().upper(),
         track_record_file=os.getenv("TRACK_RECORD_FILE", "").strip(),
     )
