@@ -972,6 +972,9 @@ class RiskManager:
         ok, why = self._under_option_position_cap(proposal, account)
         if not ok:
             return self._reject(proposal, why)
+        ok, why = self._legs_merge_safe(proposal, account)
+        if not ok:
+            return self._reject(proposal, why)
         ok, why = self._legs_liquid(leg_liquidity)
         if not ok:
             return self._reject(proposal, why)
@@ -1205,6 +1208,43 @@ class RiskManager:
                 f"At max option positions ({cap} underlyings: "
                 f"{', '.join(sorted(held))})."
             )
+        return True, ""
+
+    # -- entry-side leg-merge guard (Alpaca 4-leg MLEG cap) -------------------- #
+    def _legs_merge_safe(
+        self, proposal: TradeProposal, account: AccountSnapshot,
+    ) -> tuple[bool, str]:
+        """Alpaca caps the mleg order class at 4 legs, and the watchdog closes
+        a whole underlying+expiry group as ONE order. Adding a structure that
+        pushes an existing group past 4 distinct contracts makes the merged
+        group unclosable atomically (2026-08-07 AMZN: a long call + two
+        spreads merged to 5 legs and every stop-close was rejected at request
+        validation while the position sat unprotected). The close-side
+        chunking (PR #52) remains the backstop for legacy groups; this guard
+        stops NEW ones from forming. A leg on an already-held contract merges
+        into that row (top-up), so it doesn't count twice."""
+        from .execution.options import occ_symbol, parse_occ
+        max_legs = 4  # Alpaca hard cap — keep in sync with AlpacaClient._MLEG_MAX_LEGS
+        held: dict[str, set[str]] = {}
+        under = proposal.symbol.upper()
+        for p in account.positions:
+            if p.is_option:
+                occ = parse_occ(p.symbol)
+                if occ and occ[0] == under:
+                    held.setdefault(occ[1], set()).add(p.symbol)
+        for expiry in {leg.expiry for leg in proposal.option_legs}:
+            existing = held.get(expiry, set())
+            merged = existing | {
+                occ_symbol(under, leg.expiry, leg.strike, leg.right)
+                for leg in proposal.option_legs if leg.expiry == expiry
+            }
+            if len(merged) > max_legs:
+                return False, (
+                    f"Would merge to {len(merged)} legs on {under} {expiry} "
+                    f"({len(existing)} already held) — Alpaca caps multi-leg "
+                    f"orders at {max_legs}, so the merged group could not "
+                    f"close atomically (AMZN 2026-08-07)."
+                )
         return True, ""
 
     # -- option leg liquidity -------------------------------------------------- #

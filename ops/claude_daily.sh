@@ -3,8 +3,13 @@
 # inside the operator's long-running interactive Claude session; its daily
 # log-archive commit is the liveness signal. This script (launchd, weekday
 # 17:37) no-ops while that signal is fresh and only launches a headless
-# `claude -p` run when the primary has gone quiet (>30h without a dated-log
-# commit) — so the two never run concurrently in the shared working tree.
+# `claude -p` run when the primary has gone quiet — two signals are checked
+# (see below) so the two sessions don't collide in the shared working tree.
+#
+# Headless limits: a `claude -p` run has NO artifact tool and NO browser, so it
+# can neither republish the phone status artifact nor re-auth Robinhood. It
+# rewrites ops/status_page.html and commits its findings instead; the operator
+# reads them from GitHub.
 set -eu
 ROOT="/Users/spusapati/Personal/Investment_stratergy"
 export PATH="$HOME/.local/bin:/usr/local/bin:/opt/homebrew/bin:$PATH"
@@ -13,14 +18,30 @@ CLAUDE="$HOME/.local/bin/claude"
 [ -n "$CLAUDE" ] || { echo "claude CLI not found"; exit 1; }
 cd "$ROOT"
 
-last_commit_ts=$(git log -1 --format=%ct -- 'logs/*_*_*.log' 2>/dev/null || echo 0)
-age_h=$(( ($(date +%s) - last_commit_ts) / 3600 ))
-if [ "$age_h" -lt 30 ]; then
-    echo "[$(date '+%F %T')] primary session healthy (last log-archive commit ${age_h}h ago) — skip"
+now=$(date +%s)
+last_log_ts=$(git log -1 --format=%ct -- 'logs/*_*_*.log' 2>/dev/null || echo 0)
+last_any_ts=$(git log -1 --format=%ct 2>/dev/null || echo 0)
+log_age_h=$(( (now - last_log_ts) / 3600 ))
+any_age_h=$(( (now - last_any_ts) / 3600 ))
+
+if [ "$log_age_h" -lt 30 ]; then
+    echo "[$(date '+%F %T')] primary session healthy (last log-archive commit ${log_age_h}h ago) — skip"
     exit 0
 fi
 
-echo "[$(date '+%F %T')] primary quiet for ${age_h}h — running headless fallback"
-"$CLAUDE" -p "FALLBACK away-mode run: the operator's interactive Claude session appears dead (no dated-log commit for ${age_h}h). Read ops/away_mode.md and execute the daily checklist end-to-end, including republishing the status artifact (URL inside the runbook) and noting on the status page that the fallback ran. Honor every guardrail in the runbook." \
+# Second liveness signal. The archive commit lands at most once a day, so it can
+# drift past 30h while the primary is demonstrably alive — that fired a false
+# fallback on 2026-08-13 that ran CONCURRENTLY with the live primary (both
+# sessions did the checklist; the primary won the shared-tree race). Any commit
+# at all in the last 12h means the primary is working, just late on the archive.
+# The fallback's own commits can't self-suppress: it runs once a day, so its
+# commits are ~24h old by the next fire.
+if [ "$any_age_h" -lt 12 ]; then
+    echo "[$(date '+%F %T')] archive stale (${log_age_h}h) but primary committed ${any_age_h}h ago — alive, skip"
+    exit 0
+fi
+
+echo "[$(date '+%F %T')] primary quiet for ${log_age_h}h (no commits for ${any_age_h}h) — running headless fallback"
+"$CLAUDE" -p "FALLBACK away-mode run: the operator's interactive Claude session appears dead (no dated-log commit for ${log_age_h}h, no commits at all for ${any_age_h}h). Read ops/away_mode.md and execute the daily checklist end-to-end. You are HEADLESS: you have no artifact tool and no browser, so do NOT attempt to republish the phone status artifact or re-auth Robinhood — instead rewrite ops/status_page.html with fresh values, note that the fallback ran and that the artifact is therefore stale, and commit+push so the operator can read it on GitHub. Before doing anything, re-verify the primary really is dead (check for a recent ops/status_page.html mtime and recent commits); if it is alive, stop and report rather than racing it in the shared working tree. Honor every guardrail in the runbook." \
     --permission-mode bypassPermissions \
     --model opus 2>&1

@@ -1,7 +1,9 @@
 # Away-mode runbook (2026-08-13 → ~2026-08-27)
 
 The operator is away; a scheduled Claude session runs each market weekday
-evening and follows this file. The bot trades PAPER account PA3HBZ8ODAMD.
+evening and follows this file. The bot trades PAPER account PA3IRR2BT9FT
+(verified live against `/v2/account` 2026-08-13; the older PA3HBZ8ODAMD in
+earlier notes is the pre-Jul-27 account and is wrong).
 Everything here is subordinate to one rule: **the risk layer and watchdog are
 never loosened unattended.**
 

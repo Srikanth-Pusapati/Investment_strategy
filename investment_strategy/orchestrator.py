@@ -37,6 +37,7 @@ from .models import (
     Action,
     Candidate,
     Instrument,
+    OptionStrategy,
     OrderRequest,
     OrderType,
     Position,
@@ -138,6 +139,8 @@ class Orchestrator:
         # end so put-path dormancy is visible instead of silent.
         self._bear_puts_proposed = 0
         self._bear_puts_approved = 0
+        # Put-liquidity proxy outcome this cycle (Aug 14): "" = not attempted.
+        self._proxy_put_state = ""
         # Per-cycle put-gate precheck verdicts for bearish-composite slate
         # names (Jul 31): symbol -> (eligible, why). Rendered into the prompt's
         # BEARISH CANDIDATES block and the funnel line, so the 4->0 drop-off
@@ -1164,7 +1167,7 @@ class Orchestrator:
         hedge_pos = account.position_for(h_etf) if h_etf else None
         log.info(
             "BEARISH FUNNEL: slate_bearish=%d%s put_proposals=%d "
-            "put_approved=%d auto_hedge=%s",
+            "put_approved=%d auto_hedge=%s proxy_put=%s",
             len(bear_map),
             bear_detail,
             getattr(self, "_bear_puts_proposed", 0),
@@ -1175,6 +1178,7 @@ class Orchestrator:
                 ("armed" if self._falling_cycles > 0 and h_etf
                  else ("off" if not h_etf else "flat"))
             ),
+            getattr(self, "_proxy_put_state", "") or "none",
         )
         if undeployed >= 1.0:
             # Whole-share bracket flooring drops each buy's sub-share remainder
@@ -1972,6 +1976,7 @@ class Orchestrator:
         self._option_fallbacks = []
         self._bear_puts_proposed = 0
         self._bear_puts_approved = 0
+        self._proxy_put_state = ""
         if not proposals:
             log.info("No actionable proposals this cycle.")
             return 0.0
@@ -3392,7 +3397,14 @@ class Orchestrator:
     def _handle_option(
         self, proposal: TradeProposal, account,
         signal_kinds: list[str] | None = None, tech: dict | None = None,
+        proxy_for: str = "",
     ) -> None:
+        """`proxy_for` marks the SYSTEM's put-liquidity proxy re-proposal (the
+        original bearish name whose own chain failed the liquidity floor):
+        it satisfies the direction gate the same way the sanctioned hedge
+        does — the bearish read was already model-proposed and precheck-
+        eligible on the ORIGINAL name; only the venue changed — and it never
+        re-proxies (depth 1 by construction)."""
         if self.options is None:
             log.info("Option proposal for %s ignored: options disabled.", proposal.symbol)
             return
@@ -3422,8 +3434,11 @@ class Orchestrator:
             regime_multiplier=self._regime_mult,
             name_trend=name_trend,
             sanctioned_hedge=(
-                bool(self._hedge_symbol)
-                and proposal.symbol == self._hedge_symbol
+                bool(proxy_for)
+                or (
+                    bool(self._hedge_symbol)
+                    and proposal.symbol == self._hedge_symbol
+                )
             ),
             # % distance from the 20d SMA (negative = below): the broken-
             # momentum put carve-out — NU/NOK-shaped names break hard while
@@ -3446,7 +3461,21 @@ class Orchestrator:
             decision.approved_notional if decision.verdict != RiskVerdict.REJECTED else 0.0,
             decision.reason, proposal.rationale[:120] if proposal.rationale else "",
         )
+        if proxy_for:
+            self._proxy_put_state = (
+                f"{proposal.symbol} for {proxy_for} -> {decision.verdict.value}"
+            )
         if decision.verdict == RiskVerdict.REJECTED:
+            # Put-liquidity fallback (Aug 14): a model-proposed put that died
+            # ONLY on its own chain's liquidity re-expresses on the liquid
+            # proxy ETF. Trigger on the liquidity reasons alone — every other
+            # rejection (direction, DTE, premium, slots) is a real veto.
+            if (
+                is_put_play and not proxy_for
+                and ("open interest" in decision.reason
+                     or "bid-ask spread" in decision.reason)
+            ):
+                self._propose_proxy_put(proposal, account, signal_kinds)
             return
         legs = self.options.build_legs(proposal)
         with self._trade_lock:
@@ -3466,3 +3495,65 @@ class Orchestrator:
             self.state.register_daily_deploy(
                 proposal.symbol, decision.approved_notional,
             )
+
+    def _propose_proxy_put(
+        self, blocked: TradeProposal, account,
+        signal_kinds: list[str] | None,
+    ) -> None:
+        """Put-liquidity fallback (Aug 14 window-end ship): re-express a
+        liquidity-rejected single-name put as a deterministic near-ATM bear
+        put spread on the liquid proxy ETF (PUT_PROXY_ETF). The bearish read
+        was model-proposed AND precheck-eligible on the original name — only
+        its chain was untradeable — so the system supplies a tradeable venue,
+        auto-hedge-style. One attempt per cycle; skipped when the proxy
+        already carries an option structure; the re-proposal runs the FULL
+        gate stack (DTE, premium caps, slots, the proxy's own liquidity)."""
+        etf = getattr(self.cfg, "put_proxy_etf", "") or ""
+        if not etf or etf == blocked.symbol.upper():
+            return
+        if getattr(self, "_proxy_put_state", ""):
+            return  # once per cycle
+        from .execution.options import parse_occ
+        held_unders = {
+            occ[0] for p in account.positions if p.is_option
+            for occ in [parse_occ(p.symbol)] if occ
+        }
+        if etf in held_unders:
+            self._proxy_put_state = f"{etf} skipped: structure already open"
+            return
+        try:
+            spot = self.broker.latest_price(etf)
+        except Exception as e:
+            log.warning("Proxy put: price read failed for %s: %s", etf, e)
+            return
+        lo = int(max(25.0, getattr(self.risk.limits, "min_option_dte", 7.0)))
+        hi = int(min(50.0, getattr(self.risk.limits, "max_option_dte", 60.0)))
+        legs = self.options.build_proxy_put_spread(etf, spot, lo, hi)
+        if not legs:
+            self._proxy_put_state = f"{etf} skipped: no workable chain pair"
+            log.info("Proxy put for %s: no workable %s chain pair.", blocked.symbol, etf)
+            return
+        proxy = TradeProposal(
+            symbol=etf,
+            action=Action.BUY,
+            conviction=blocked.conviction,
+            target_weight_pct=blocked.target_weight_pct,
+            rationale=(
+                f"SYSTEM PROXY PUT for {blocked.symbol}: its own chain failed "
+                f"the liquidity floor, re-expressing the bearish read on "
+                f"liquid {etf}. Original thesis: {blocked.rationale[:150]}"
+            ),
+            key_signals=blocked.key_signals,
+            instrument=Instrument.OPTION,
+            option_strategy=OptionStrategy.BEAR_PUT_SPREAD,
+            option_legs=legs,
+            max_premium_usd=blocked.max_premium_usd,
+        )
+        log.info(
+            "PROXY PUT: %s put blocked on liquidity -> proposing %s %s/%s %s.",
+            blocked.symbol, etf, legs[0].strike, legs[1].strike, legs[0].expiry,
+        )
+        self._handle_option(
+            proxy, account, signal_kinds, tech=None,
+            proxy_for=blocked.symbol,
+        )

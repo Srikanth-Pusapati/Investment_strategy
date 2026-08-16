@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import logging
 import re
-from datetime import datetime
+from datetime import datetime, timedelta
 from math import gcd
 
 from alpaca.data.historical.option import OptionHistoricalDataClient
@@ -257,6 +257,65 @@ class OptionsHelper:
                 log.warning("spread lookup failed for %s: %s", sym, e)
             out.append({"symbol": sym, "oi": oi, "rel_spread_pct": spread})
         return out
+
+    def build_proxy_put_spread(
+        self, underlying: str, spot: float,
+        min_dte: int = 25, max_dte: int = 50, width_pct: float = 5.0,
+    ) -> list[OptionLeg] | None:
+        """Deterministic near-ATM bear put spread on a LIQUID proxy ETF (the
+        put-liquidity fallback, Aug 14): long the highest put strike at or
+        below spot, short the nearest strike at or below long x (1-width%),
+        on the listed expiry closest to the middle of [min_dte, max_dte].
+        Strikes/expiries come from the venue's own contract list — never
+        synthesized, so an unlisted strike can't be proposed. Returns None
+        when the chain has no workable pair (caller logs and moves on)."""
+        from alpaca.trading.requests import GetOptionContractsRequest
+        if spot <= 0:
+            return None
+        today = datetime.now().date()
+        lo = today + timedelta(days=int(min_dte))
+        hi = today + timedelta(days=int(max_dte))
+        try:
+            resp = self.trading.get_option_contracts(GetOptionContractsRequest(
+                underlying_symbols=[underlying.upper()],
+                type="put",
+                expiration_date_gte=lo.isoformat(),
+                expiration_date_lte=hi.isoformat(),
+                strike_price_gte=str(round(spot * (1 - 2.5 * width_pct / 100.0), 2)),
+                strike_price_lte=str(round(spot * 1.02, 2)),
+                limit=500,
+            ))
+            contracts = list(resp.option_contracts or [])
+        except Exception as e:
+            log.warning("proxy put chain lookup failed for %s: %s", underlying, e)
+            return None
+        by_expiry: dict[str, list[float]] = {}
+        for c in contracts:
+            try:
+                exp = str(c.expiration_date)
+                by_expiry.setdefault(exp, []).append(float(c.strike_price))
+            except (TypeError, ValueError):
+                continue
+        if not by_expiry:
+            return None
+        target = today + timedelta(days=(int(min_dte) + int(max_dte)) // 2)
+        expiry = min(
+            by_expiry,
+            key=lambda e: abs((datetime.strptime(e, "%Y-%m-%d").date() - target).days),
+        )
+        strikes = sorted(set(by_expiry[expiry]))
+        longs = [k for k in strikes if k <= spot]
+        if not longs:
+            return None
+        long_k = longs[-1]
+        shorts = [k for k in strikes if k <= long_k * (1 - width_pct / 100.0)]
+        if not shorts:
+            return None
+        short_k = shorts[-1]
+        return [
+            OptionLeg(expiry=expiry, strike=long_k, right="put", side=Action.BUY),
+            OptionLeg(expiry=expiry, strike=short_k, right="put", side=Action.SELL),
+        ]
 
     def _mid_price(self, underlying: str, leg: OptionLeg) -> float:
         sym = occ_symbol(underlying, leg.expiry, leg.strike, leg.right)
