@@ -26,10 +26,11 @@ TIMELINE TO LIVE MONEY (the neat version; dates slip only by contract rules)
   2026-08-23  [DONE] Arm flatten_and_restart waiter -> fires Mon 09:31 ET:
               flatten book, reset local state, relaunch on new code.
   2026-08-24  RUN-5 DAY 1 (Mon). USER ACTIONS before/at open:
-                [ ] Robinhood browser re-auth (runbook: commit 0998aac,
-                    ops/away_mode.md) — 2/5 screener feeds are dead without it
-                [ ] launchctl load the claude-daily babysit plist (still pending
-                    since Aug 13; it died silently during away mode)
+                [x] Robinhood browser re-auth — DONE 00:06 ET Aug 24; bot prober
+                    confirms "Robinhood OAuth: authorized"
+                [x] claude-daily babysit — plist was already installed; verified
+                    loaded + kickstarted clean (exit 0, "primary healthy — skip")
+                    and headless CLI auth probe returns AUTH-OK
                 [ ] (optional) Alpaca dashboard reset to a round $1,000,000
                     BEFORE 09:31 ET if preferred over continuing from ~$1.007M;
                     either way the contract pins starting equity = post-flatten
@@ -98,3 +99,8 @@ OBSERVATIONS LOG (append-only; date every entry; newest at the bottom)
             Away-mode postmortem: bot ran clean 9 days unattended, but both
             watchers (claude-daily, RH auth) died silently — feed liveness is
             now a logged validity condition rather than an assumption.
+2026-08-24  00:15 ET pre-open: RH re-auth landed (token file rewritten 00:06,
+            prober says authorized — watch robinhood_health.json flip on the
+            next probe + FEEDS: line at the open). claude-daily verified end-
+            to-end (loaded, exit 0, headless auth OK). Flatten waiter armed
+            (pid 95963) for 09:31 ET. Run-5 clock starts at today's open.
