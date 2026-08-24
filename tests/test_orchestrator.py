@@ -745,8 +745,13 @@ def test_backfill_records_bracket_legs_with_realized_pl():
     )
     o._backfill_exchange_exits()
     new = o.ledger.records[3:]
-    assert [r.exit_reason for r in new] == ["bracket_stop", "bracket_take", "external"]
-    stop, take, manual = new
+    # Aug-23 measurement integrity: the manual MSFT sale has NO ledger basis —
+    # a P&L-less SELL row is exactly the corruption the ledger now rejects, so
+    # the backfill SKIPS it loudly (cooldown still stamped) instead of
+    # recording a realized_pl=null row.
+    assert [r.exit_reason for r in new] == ["bracket_stop", "bracket_take"]
+    assert all(r.symbol != "MSFT" for r in new)
+    stop, take = new
     # FIFO basis: 8 shares remain of the $100 lot -> -8% on what's covered.
     assert abs(stop.realized_pl_pct - (-8.0)) < 1e-9
     assert abs(stop.realized_pl - (-64.0)) < 1e-9   # (92-100) x 8 covered shares
@@ -754,8 +759,50 @@ def test_backfill_records_bracket_legs_with_realized_pl():
     assert stop.ts.isoformat() == "2026-07-02T15:30:00+00:00"  # actual FILL time
     assert abs(take.realized_pl_pct - 20.0) < 1e-9
     assert abs(take.realized_pl - 200.0) < 1e-9
-    assert manual.realized_pl_pct is None      # no ledger entry price for MSFT
-    assert manual.symbol == "MSFT"
+
+
+def test_backfill_skips_corrupt_and_baseless_rows_instead_of_writing_them():
+    """Aug-23 measurement integrity (the Aug-17 AMZN MLEG unwind): a broker
+    MLEG parent order carries symbol=None (str()-ed to "None" upstream) and an
+    option chunk fill has no FIFO basis (lots.py excludes options) — both used
+    to land as corrupt SELL rows (symbol="None" / realized_pl=null). The
+    backfill must skip BOTH, and only ledger rows it can price."""
+    o = _backfill_orch(
+        closed_sells=[
+            _closed("mleg-parent", symbol="None", qty=26.0, price=-1.19,
+                    otype="market"),
+            _closed("occ-chunk", symbol="AMZN260918C00240000", qty=2.0,
+                    price=22.0, otype="market"),
+            _closed("leg-stop", qty=10.0, price=92.0, otype="stop"),
+        ],
+        records=[_buy_rec("AAPL", entry=100.0)],
+    )
+    o._backfill_exchange_exits()
+    new = o.ledger.records[1:]
+    assert [r.symbol for r in new] == ["AAPL"]       # only the priced equity leg
+    assert new[0].realized_pl is not None
+    # Skips are remembered so the ERROR fires once per oid, not every cycle.
+    assert o._backfill_skipped_oids == {"mleg-parent", "occ-chunk"}
+
+
+def test_backfill_option_skip_never_stamps_premium_as_underlying_price():
+    """Aug-23 follow-up: the no-basis OCC skip stamps the exit COOLDOWN under
+    the underlying but must NOT record the option's per-share PREMIUM as the
+    underlying's exit price — exit_prices["AMZN"]=1.19 would trip the
+    price-aware re-entry guard on every fresh AMZN equity buy for up to 7
+    days (price $230 >= exit $1.19 reads as 'chasing above the exit')."""
+    from datetime import datetime as _dt, timedelta as _td, timezone as _tz
+    recent = (_dt.now(_tz.utc) - _td(hours=1)).isoformat()
+    o = _backfill_orch(
+        closed_sells=[_closed("occ-chunk", symbol="AMZN260918C00240000",
+                              qty=2.0, price=1.19, otype="market",
+                              filled_at=recent)],
+        records=[],
+    )
+    o._backfill_exchange_exits()
+    assert o.ledger.records == []                         # no corrupt row
+    assert o.state.hours_since_exit("AMZN") is not None   # cooldown stamped
+    assert o.state.last_exit_price("AMZN") is None        # premium NOT stamped
 
 
 def test_backfill_uses_fifo_basis_across_multiple_lots():

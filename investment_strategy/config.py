@@ -121,6 +121,25 @@ class RiskLimits:
     # must never be fought by its own gate). Inert unless
     # regime_filter_enabled — the trend is only read under that flag.
     option_direction_gate: bool = True    # OPTION_DIRECTION_GATE (on/off)
+    # Per-underlying premium concentration cap (Aug 12-21 forensic review):
+    # max_option_premium_pct bounds each PLAY's debit, but nothing bounded the
+    # PILE — AMZN stacked ~$29.8k of open premium across structures on one
+    # underlying and lost -$14,956. Cap the TOTAL open net premium per
+    # underlying (existing lots + the new debit) at this % of equity; a new
+    # entry is clamped into the remaining headroom and rejected when even one
+    # contract no longer fits. Sanctioned hedges (falling-market index put /
+    # put-liquidity proxy) are exempt — they concentrate on a fixed venue by
+    # design. 0 = off.
+    per_underlying_premium_pct: float = 0.5
+    # Exit-side mark hardening (Aug 12-21 forensic: HL premium-stopped -67.6%
+    # 14s after the open on a junk one-sided auction quote while the underlying
+    # traded UP — the Jul-23 failure mode, which PR #40 hardened on ENTRIES
+    # only). The watchdog's premium stop/take must never fire off one bad tick:
+    # require consecutive breach ticks, refuse one-sided/absurd NBBOs as
+    # countable evidence, and distrust marks in the open-auction minutes.
+    option_exit_max_spread_pct: float = 10.0  # exit-mark NBBO spread ceiling for a countable breach tick (0=no ceiling; same number as the entry-side cap)
+    option_stop_confirm_ticks: int = 2        # consecutive watchdog ticks (~30s apart) a premium stop/take breach must persist (1=old single-tick behavior)
+    option_stop_open_mute_min: float = 5.0    # minutes after 09:30 ET to suppress premium-stop closes unless the UNDERLYING gapped adversely (0=off)
     # --- R.1 vol-scaled ("ATR-style") dynamic stops ---
     # One fixed stop % is too tight for volatile names (chopped out by normal
     # noise — the exact failure D.1 measured on the old 5% stop) and too loose
@@ -329,6 +348,19 @@ class RiskLimits:
     expectancy_gate_enabled: bool = True   # EXPECTANCY_GATE (on/off)
     expectancy_gate_min_trips: int = 8     # closed trips before a family is judged
     expectancy_gate_window_days: int = 14  # trailing window for the read
+    # --- corroboration gate (Aug 12-21 forensic review): insider-cited
+    # entries ran -$18,681 across 13 trades, and every single-soft-signal
+    # starter (QNT, LFTO, INTC, F, AVBC) failed fast. Conviction floors
+    # provably cannot express this — the autotune sweeps moved 0 trades at
+    # every candidate floor. A FRESH name whose cited signal set is exactly
+    # ONE soft family (insider / congress / options_flow) with zero
+    # fundamentals/news/technical corroboration deploys at the starter-
+    # haircut fraction AND needs the composite at/above the bar to enter at
+    # all (fails open on a missing composite — best-effort feed, not a
+    # required one). Top-ups exempt; the expectancy gate stays the family-
+    # level backstop. ---
+    corroboration_gate_enabled: bool = True   # CORROBORATION_GATE_ENABLED
+    corroboration_min_composite: float = 1.25 # composite bar for a solo soft signal
     # Red-day rotation release (Jul 29: the guard held NOK's -4.8% exit open
     # ~2h into a losing session). On a day the BOOK is losing, a loss-cut the
     # model asks for is defense, not lukewarm churn — the guard yields to any
@@ -486,6 +518,21 @@ class Config:
     auto_hedge_ratio: float = 0.30         # hedge notional / net long exposure
     auto_hedge_min_cycles: int = 2         # falling cycles before arming (and clearing)
     auto_hedge_max_pct: float = 15.0       # hedge ceiling as % of equity
+    # --- BREADTH trigger for the falling-tape defenses (Aug 18 forensic:
+    # -$26,844 at 3.9x SPY down-capture with ELEVEN per-name NAME FALLING
+    # reads in one cycle while every defense slept — _market_falling keyed
+    # ONLY on the index and SPY never breached the intraday trigger). The
+    # core defense / auto-hedge / index-put sanction now ALSO arm when the
+    # BOOK itself is falling: >= breadth_falling_names_min held names carry
+    # the cycle's falling read, or intraday book P/L is at or below
+    # breadth_book_drawdown_pct (% of equity, equity vs last_equity — the
+    # same numbers as the risk layer's daily-loss halt). Whipsaw bounds are
+    # unchanged: auto_hedge_min_cycles persistence and the auto_hedge_max_pct
+    # ceiling apply to whichever source arms the read. 0 disables a leg;
+    # the drawdown knob is sign-agnostic (-1.25 and 1.25 both mean a 1.25%
+    # intraday loss). ---
+    breadth_falling_names_min: int = 3     # BREADTH_FALLING_NAMES_MIN (0 = off)
+    breadth_book_drawdown_pct: float = -1.25  # BREADTH_BOOK_DRAWDOWN_PCT (0 = off)
     # --- PUT LIQUIDITY PROXY (Aug 14, window-end ship): the bearish slate
     # surfaces micro-caps whose own chains fail the OI/spread liquidity floor
     # — in the Aug 3-14 window every model-proposed put (EXTR, TDC) died on
@@ -712,6 +759,12 @@ def load_config() -> Config:
             min_option_premium=_f("MIN_OPTION_PREMIUM", 0.10),
             max_option_contracts=int(_f("MAX_OPTION_CONTRACTS", 50.0)),
             option_direction_gate=_flag("OPTION_DIRECTION_GATE", "on"),
+            # Per-underlying premium concentration cap (Aug 12-21: AMZN piled
+            # ~$29.8k of premium into ONE underlying, -$14,956).
+            per_underlying_premium_pct=_f("PER_UNDERLYING_PREMIUM_PCT", 0.5),
+            option_exit_max_spread_pct=_f("OPTION_EXIT_MAX_SPREAD_PCT", 10.0),
+            option_stop_confirm_ticks=int(_f("OPTION_STOP_CONFIRM_TICKS", 2.0)),
+            option_stop_open_mute_min=_f("OPTION_STOP_OPEN_MUTE_MIN", 5.0),
             # R.1 vol-scaled stops: off until the --sweep-stops evidence says
             # otherwise for this account's basket; flip in .env when it does.
             vol_stops_enabled=_flag("VOL_STOPS_ENABLED"),
@@ -788,6 +841,10 @@ def load_config() -> Config:
             expectancy_gate_enabled=_flag("EXPECTANCY_GATE", "on"),
             expectancy_gate_min_trips=_i("EXPECTANCY_GATE_MIN_TRIPS", 8),
             expectancy_gate_window_days=_i("EXPECTANCY_GATE_WINDOW_DAYS", 14),
+            # Corroboration gate on single-soft-signal starters (Aug 12-21
+            # forensic review; see the RiskLimits field notes).
+            corroboration_gate_enabled=_flag("CORROBORATION_GATE_ENABLED", "on"),
+            corroboration_min_composite=_f("CORROBORATION_MIN_COMPOSITE", 1.25),
             rotation_guard_red_day_release=_flag(
                 "ROTATION_GUARD_RED_DAY_RELEASE", "on"
             ),
@@ -833,6 +890,8 @@ def load_config() -> Config:
         auto_hedge_ratio=_f("AUTO_HEDGE_RATIO", 0.30),
         auto_hedge_min_cycles=_i("AUTO_HEDGE_MIN_CYCLES", 2),
         auto_hedge_max_pct=_f("AUTO_HEDGE_MAX_PCT", 15.0),
+        breadth_falling_names_min=_i("BREADTH_FALLING_NAMES_MIN", 3),
+        breadth_book_drawdown_pct=_f("BREADTH_BOOK_DRAWDOWN_PCT", -1.25),
         put_proxy_etf=os.getenv("PUT_PROXY_ETF", "IWM").strip().upper(),
         defensive_core_etf=os.getenv("DEFENSIVE_CORE_ETF", "").strip().upper(),
         track_record_file=os.getenv("TRACK_RECORD_FILE", "").strip(),

@@ -27,7 +27,7 @@ from investment_strategy.monitor.watchdog import Watchdog
 from investment_strategy.reset import _churn_carryover
 from investment_strategy.state import PortfolioState
 
-from test_risk import _account, _buy, _limits, _pos, _rm
+from test_risk import _account, _buy, _limits, _opt_exp, _pos, _rm
 
 
 def _tmp_state() -> PortfolioState:
@@ -221,7 +221,10 @@ def test_sanctioned_hedge_put_passes_direction_gate_without_held_core():
         symbol="QQQ", action=Action.BUY, conviction=0.7, target_weight_pct=1.0,
         rationale="index hedge", instrument=Instrument.OPTION,
         option_strategy=OptionStrategy.LONG_PUT,
-        option_legs=[OptionLeg(expiry="2026-08-28", strike=650.0,
+        # Dynamic expiry: a fixed date here drifted under the 7d DTE minimum
+        # and failed the test at the DTE gate before it ever reached the
+        # direction gate it exists to exercise.
+        option_legs=[OptionLeg(expiry=_opt_exp(30), strike=650.0,
                                right="put", side=Action.BUY, ratio=1)],
     )
     blocked = rm.evaluate_option(

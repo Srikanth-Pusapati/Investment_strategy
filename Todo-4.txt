@@ -1,0 +1,100 @@
+================================================================================
+ACTIVE TODO  (supersedes Todo-3.txt; completed items live in completed.txt)
+Opened 2026-08-23 around the ROAD TO LIVE: pre-final test runs -> real money.
+THIS IS THE LIVING FILE: every session (human or Claude) READS this before
+touching strategy and APPENDS observations to the log at the bottom. The
+per-run pass/fail rules live in runs/pre-final-test-run-5/EVAL_CONTRACT.md.
+================================================================================
+
+WHY THIS FILE EXISTS (the 2026-08-23 diagnosis)
+  Run-4 (Jul 27 - Aug 21) graded B-: expectancy finally positive (+$167/trade,
+  PF 1.10) but down-capture still broken (2.31 vs SPY), the bearish sleeve
+  executed 0 trades in 83 chances, options bled -$22k through a documented gate
+  bypass, and the self-measurement loop (ledger/postmortem/autotune) was feeding
+  itself wrong data. Full autopsy: runs/pre-final-test-run-4/RUN_SUMMARY.md
+  Root process problem: WEEKLY strategy changes meant no configuration ever
+  accumulated the ~24 trades a statistical verdict needs. The fix is contract-
+  gated, frozen windows from here to live money. No more vibes-driven knobs.
+
+--------------------------------------------------------------------------------
+TIMELINE TO LIVE MONEY (the neat version; dates slip only by contract rules)
+--------------------------------------------------------------------------------
+  2026-08-23  [DONE] Ship roadmap ranks 1-8 (sizing revert, eval contract,
+              option-stop hardening, options bypass close, breadth hedge
+              trigger, measurement integrity, corroboration gate, feed
+              liveness). Archive run-4 to runs/pre-final-test-run-4/.
+  2026-08-23  [DONE] Arm flatten_and_restart waiter -> fires Mon 09:31 ET:
+              flatten book, reset local state, relaunch on new code.
+  2026-08-24  RUN-5 DAY 1 (Mon). USER ACTIONS before/at open:
+                [ ] Robinhood browser re-auth (runbook: commit 0998aac,
+                    ops/away_mode.md) — 2/5 screener feeds are dead without it
+                [ ] launchctl load the claude-daily babysit plist (still pending
+                    since Aug 13; it died silently during away mode)
+                [ ] (optional) Alpaca dashboard reset to a round $1,000,000
+                    BEFORE 09:31 ET if preferred over continuing from ~$1.007M;
+                    either way the contract pins starting equity = post-flatten
+                [ ] Record starting equity in the OBSERVATIONS LOG below
+  2026-08-24 -> 09-04  PRE-FINAL-TEST-RUN-5. Config FROZEN (validity condition).
+              Recording: nightly postmortems (now close-to-close), weekly
+              autotune W35/W36 (read-only), observations appended here.
+  2026-09-04  Window close (extend to 09-11 if closed trades < 24).
+  2026-09-05  Verdict: scripts/eval_contract_check.py --start 2026-08-24
+              --end 2026-09-04. PASS/FAIL/CONFOUNDED per the contract.
+              PASS -> RUN-6 same config Sep 8-19 (second consecutive window).
+              FAIL -> one diagnostic, ONE change-set, fresh window.
+  ~2026-09-22 If two consecutive PASSES: LIVE PILOT GO decision.
+              Live pilot shape (from the solo small-float plan):
+                - $500-1,000 real money, fractional shares, Alpaca live keys
+                - OPTIONS OFF for the pilot (paper keeps running them in
+                  parallel; options earn live access by passing on paper)
+                - Risk caps scaled down: MAX_DAILY_LOSS_PCT 2, single-name cap
+                  tightened, kill-switch drilled before day 1
+                - Paper bot keeps running side-by-side as the control arm
+  ~2026-10-20 Live pilot review after ~4 weeks: scale to $2-5k, hold, or pull
+              back to paper. Scale rule: live tracks paper within noise AND
+              paper keeps passing its windows.
+  Parked: GA/multi-user ambitions stay parked (~1yr per goGA.txt decision).
+
+--------------------------------------------------------------------------------
+STANDING RULES (learned the hard way, run-4 receipts in RUN_SUMMARY.md)
+--------------------------------------------------------------------------------
+  R1  No strategy/prompt/knob commits inside an eval window. Breakage fixes
+      only, logged below.
+  R2  No verdicts below 24 closed trades. Extend the window instead.
+  R3  Every new gate logs its trigger + the counterfactual size so the next
+      review can measure what it did (grep: CORROBORATION GATE, breadth:,
+      FEEDS:, premium mark unreliable).
+  R4  Do-not-do list from the Aug 23 review stays binding: no put-persuasion
+      prompts, no equity stop tightening, no composite floor arming, no
+      conviction floor raises, no ORB/0DTE/grid imports wholesale.
+  R5  Postmortem/autotune conclusions are inputs, not orders — cross-check
+      against the ledger before acting (they misattributed the two biggest
+      run-4 losses).
+
+--------------------------------------------------------------------------------
+OPEN ITEMS (non-window work, allowed anytime)
+--------------------------------------------------------------------------------
+  [ ] Aug 24: verify FEEDS: line shows 5/5 after RH re-auth
+  [ ] Aug 24: confirm flatten completed + starting equity recorded
+  [ ] Sep 5: run the contract checker + write the verdict below
+  [ ] Later-track (post run-5, only between windows):
+      - winner-protection veto on green decision-sells below 1.5R trail-arm
+        (ship only if run-5 instrumentation confirms the drag)
+      - cadence 3120s -> 1560s after the cache-ledger audit
+      - open-auction hygiene: defer open-bell NEW buys to ~10:00 ET with
+        RVOL/opening-range confirmation
+      - RVOL >= 1.5-2x "in play" pre-filter before the LLM sees the slate
+      - NAME_DROP_DEFENSE_PCT 4.0 -> 2.5-3.0 (add to .env, watch churn)
+      - pyramiding release on winners >= +5% that pass anti-chase
+  [ ] Status artifact still shows the old account id (PA3HBZ8ODAMD) — fix to
+      PA3IRR2BT9FT next time the status page is touched.
+
+--------------------------------------------------------------------------------
+OBSERVATIONS LOG (append-only; date every entry; newest at the bottom)
+--------------------------------------------------------------------------------
+2026-08-23  Run-4 closed and archived. B- grade. Roadmap ranks 1-8 shipped;
+            .env sizing reverted to half-Kelly/25% vol; flatten waiter armed
+            for Mon 09:31 ET. Eval contract pre-registered for Aug 24 - Sep 4.
+            Away-mode postmortem: bot ran clean 9 days unattended, but both
+            watchers (claude-daily, RH auth) died silently — feed liveness is
+            now a logged validity condition rather than an assumption.

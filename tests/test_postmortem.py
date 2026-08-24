@@ -229,6 +229,135 @@ def test_run_postmortem_reads_the_labeled_et_day_not_previous():
     assert result is not None, "post-mortem skipped the labeled day's records"
 
 
+# ---- day_marks: close-to-close per-name day attribution (Aug-23) ----------- #
+
+def _rec(**kw):
+    from investment_strategy.ledger import TradeRecord
+    return TradeRecord(**kw)
+
+
+def _closes(table):
+    """close_series stub: {symbol: [(date, close), ...]} -> callable."""
+    def _fn(symbol, days):
+        return table.get(symbol, [])
+    return _fn
+
+
+def test_day_marks_held_winner_giveback_is_the_day_loser():
+    """The IESC shape: a partial exit realized +$ against entry basis, but the
+    name fell hard close-to-close — the day attribution must show the hit and
+    pick the loser by the close-to-close number."""
+    day = "2026-08-18"
+    records = [
+        # 100 sh bought at 50 four days earlier (entry basis far below).
+        _rec(ts="2026-08-14T14:00:00Z", symbol="IESC", action="buy",
+             qty=100.0, entry_price=50.0, cost_usd=5000.0),
+        _rec(ts="2026-08-14T14:00:00Z", symbol="WINR", action="buy",
+             qty=10.0, entry_price=100.0, cost_usd=1000.0),
+        # Scale-out of 20 sh at 62 on the day: realized +$240 entry-basis.
+        _rec(ts="2026-08-18T15:00:00Z", symbol="IESC", action="sell",
+             qty=20.0, exit_price=62.0, realized_pl_pct=24.0,
+             realized_pl=240.0, exit_reason="scale"),
+    ]
+    closes = _closes({
+        # Prior close 70 -> today 60: held 80 sh lose $800 + the 20 sold at 62
+        # lose (62-70)*20 = -160 vs the prior mark. day = 80*60 - 100*70 + 20*62
+        "IESC": [("2026-08-17", 70.0), ("2026-08-18", 60.0)],
+        "WINR": [("2026-08-17", 100.0), ("2026-08-18", 103.0)],
+    })
+    lines, winner, loser = pm_mod.day_marks(records, day, closes)
+    text = "\n".join(lines)
+    assert "IESC" in text and "-960" in text          # 4800-7000+1240
+    assert "realized today (entry-basis): +240" in text
+    assert "LOSER by close-to-close: IESC" in loser
+    assert "WINNER by close-to-close: WINR" in winner  # +30 held, no trades
+
+
+def test_day_marks_flat_at_close_uses_exit_proceeds():
+    day = "2026-08-18"
+    records = [
+        _rec(ts="2026-08-17T14:00:00Z", symbol="AAPL", action="buy",
+             qty=10.0, entry_price=100.0, cost_usd=1000.0),
+        _rec(ts="2026-08-18T15:00:00Z", symbol="AAPL", action="sell",
+             qty=10.0, exit_price=104.0, realized_pl_pct=4.0,
+             realized_pl=40.0, exit_reason="decision"),
+    ]
+    closes = _closes({"AAPL": [("2026-08-17", 102.0), ("2026-08-18", 99.0)]})
+    lines, winner, loser = pm_mod.day_marks(records, day, closes)
+    text = "\n".join(lines)
+    # Close-to-close: sold at 104 vs prior close 102 -> +20, NOT the +40
+    # entry-basis realized number.
+    assert "+20" in text and "flat at close" in text
+    assert "realized today (entry-basis): +40" in text
+
+
+def test_day_marks_options_are_realized_only():
+    day = "2026-08-18"
+    records = [
+        _rec(ts="2026-08-18T15:00:00Z", symbol="AMZN", action="sell",
+             instrument="option", qty=26.0, realized_pl_pct=-50.0,
+             realized_pl=-14956.0, exit_reason="stop"),
+    ]
+    lines, winner, loser = pm_mod.day_marks(records, day, _closes({}))
+    text = "\n".join(lines)
+    assert "(option)" in text and "-14,956" in text
+    assert "no close-to-close mark for options" in text
+    assert winner == "" and loser == ""               # no equity marks
+
+
+def test_day_marks_missing_closes_degrades_to_na_line():
+    day = "2026-08-18"
+    records = [
+        _rec(ts="2026-08-14T14:00:00Z", symbol="NOPX", action="buy",
+             qty=5.0, entry_price=10.0, cost_usd=50.0),
+    ]
+    lines, winner, loser = pm_mod.day_marks(records, day, _closes({}))
+    assert any("NOPX" in l and "n/a" in l for l in lines)
+
+
+def test_run_postmortem_dry_run_includes_close_to_close_block():
+    """End-to-end: a broker stub with daily_close_series gets the block into
+    the prompt, and the winner/loser line rides along."""
+    import json
+    from unittest.mock import MagicMock
+    from investment_strategy.journal import DecisionJournal
+
+    base = _tmpdir()
+    day = "2026-08-18"
+    (base / f"{day}.jsonl").write_text(json.dumps({
+        "ts": f"{day}T14:00:00+00:00", "symbol": "IESC", "action": "buy",
+        "instrument": "equity", "conviction": 0.6, "target_weight_pct": 5.0,
+        "verdict": "approved", "approved_notional": 500.0, "reason": "r",
+        "rationale_head": "rh",
+    }) + "\n", encoding="utf-8")
+    journal = DecisionJournal(base_dir=base)
+
+    class _Ledger:
+        def effective(self):
+            return [
+                _rec(ts="2026-08-14T14:00:00Z", symbol="IESC", action="buy",
+                     qty=100.0, entry_price=50.0, cost_usd=5000.0),
+                _rec(ts="2026-08-18T15:00:00Z", symbol="IESC", action="sell",
+                     qty=20.0, exit_price=62.0, realized_pl_pct=24.0,
+                     realized_pl=240.0, exit_reason="scale"),
+            ]
+
+    broker = MagicMock()
+    broker.daily_close_series = _closes(
+        {"IESC": [("2026-08-17", 70.0), ("2026-08-18", 60.0)]})
+
+    printed: list[str] = []
+    with patch.dict(sys.modules, {"anthropic": MagicMock()}), \
+         patch("builtins.print", lambda *a, **k: printed.append(" ".join(map(str, a)))):
+        result = pm_mod.run_postmortem(None, _Ledger(), journal, day=day,
+                                       dry_run=True, broker=broker)
+    assert result is not None
+    prompt = "\n".join(printed)
+    assert "CLOSE-TO-CLOSE" in prompt
+    assert "LOSER by close-to-close: IESC" in prompt
+    assert "realized today (entry-basis): +240" in prompt
+
+
 def _run_all():
     fns = [v for k, v in sorted(globals().items()) if k.startswith("test_") and callable(v)]
     failed = 0

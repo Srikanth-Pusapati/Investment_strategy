@@ -158,6 +158,17 @@ class Orchestrator:
         # variant. Feeds the HELD prompt lines and the rotation guard's
         # loss-cut release.
         self._falling_names: dict[str, str] = {}
+        # Breadth double-count guard (Aug 23): the falling-names map computed
+        # in cycle N is re-read by cycle N+1's TOP-of-cycle defense pass (the
+        # fresh map only exists once tech context lands mid-cycle), so the
+        # breadth re-arm counting it in cycle N and the stale re-read counting
+        # it again in cycle N+1 would satisfy auto_hedge_min_cycles=2 with ONE
+        # observation. Track which map (by decision-cycle sequence) was
+        # already counted toward the persistence bar; _market_falling's
+        # breadth-names leg ignores a stale, already-counted map.
+        self._cycle_seq = 0
+        self._breadth_map_cycle = -1
+        self._breadth_counted_cycle = -2
         if (
             cfg.risk.options_enabled
             and getattr(cfg.risk, "option_direction_gate", True)
@@ -817,6 +828,10 @@ class Orchestrator:
         # lands mid-cycle.
         if self._within_close_fence():
             return
+        # Advance the decision-cycle sequence (breadth double-count guard):
+        # anything stamped with an older seq — notably the falling-names map —
+        # is a STALE read from a previous cycle.
+        self._cycle_seq = getattr(self, "_cycle_seq", 0) + 1
         # Fresh Quiver data this cycle, but pulled once and shared by the signal
         # and screener layers (both read the same cached live feeds).
         self.quiver.new_cycle()
@@ -965,9 +980,19 @@ class Orchestrator:
         # for an index-wide day. Feeds the HELD prompt lines and the rotation
         # guard's loss-cut release below.
         self._falling_names = self._name_falling_reads(account, tech_ctx)
+        # Stamp the map with the cycle it was computed in: a map carried into
+        # the NEXT cycle's top-of-cycle defense pass is stale, and if the
+        # re-arm below already counted it toward the hedge persistence bar it
+        # must not count twice (see _market_falling's breadth-names leg).
+        self._breadth_map_cycle = self._cycle_seq
         for _s, _why in self._falling_names.items():
             log.info("NAME FALLING: %s %s — defense read armed "
                      "(loss-cut release + HELD-line note).", _s, _why)
+        # Aug-22 breadth trigger: the defenses above ran on LAST cycle's
+        # falling-names map (this one only exists once the tech context
+        # lands). If the fresh map alone crosses the breadth bar, re-run
+        # them now so an Aug-18-shaped day acts this hour, not next cycle.
+        self._breadth_rearm(account)
 
         # Expectancy gate input (Jul 30 review): signal families whose CITED
         # trailing realized expectancy is negative. Recomputed once per cycle
@@ -1165,6 +1190,10 @@ class Orchestrator:
             bear_detail = " [" + "; ".join(parts) + "]"
         h_etf = getattr(self.cfg, "hedge_etf", "")
         hedge_pos = account.position_for(h_etf) if h_etf else None
+        # Aug 22: the armed/holding state names its trigger source —
+        # (index) vs (breadth:N-names) vs (book:-X.X%) — so the daily log
+        # shows WHICH read armed the hedge sleeve, not just that one did.
+        _trig = getattr(self, "_falling_trigger", "")
         log.info(
             "BEARISH FUNNEL: slate_bearish=%d%s put_proposals=%d "
             "put_approved=%d auto_hedge=%s proxy_put=%s",
@@ -1174,8 +1203,10 @@ class Orchestrator:
             getattr(self, "_bear_puts_approved", 0),
             (
                 f"${max(0.0, hedge_pos.market_value):,.0f} {h_etf}"
+                + (f"({_trig})" if _trig else "")
                 if hedge_pos is not None else
-                ("armed" if self._falling_cycles > 0 and h_etf
+                (f"armed({_trig or 'clearing'})"
+                 if self._falling_cycles > 0 and h_etf
                  else ("off" if not h_etf else "flat"))
             ),
             getattr(self, "_proxy_put_state", "") or "none",
@@ -1207,7 +1238,18 @@ class Orchestrator:
     def _check_robinhood_health(self) -> list[str]:
         """Page ONCE per RH dead-auth latch event and return the DATA HEALTH
         notes for the decision prompt — so Claude can tell "RH says nothing"
-        apart from "RH is dead" instead of the signals silently vanishing."""
+        apart from "RH is dead" instead of the signals silently vanishing.
+
+        Aug-22 review (rank 8): RH OAuth died Aug 19 mid-window and 2 of 5
+        SCREENER_SOURCES silently vanished — the eval window was confounded
+        and nothing flagged it. Every decision cycle now also logs one FEEDS
+        line asserting the health of ALL configured screener sources."""
+        feeds = self._feed_health_line()
+        if feeds:
+            if "DEAD" in feeds:
+                log.warning("%s", feeds)
+            else:
+                log.info("%s", feeds)
         if not self.cfg.robinhood_enabled:
             return []
         since = RobinhoodReader.auth_dead_since()
@@ -1230,6 +1272,49 @@ class Orchestrator:
             "movers/scans and the RH earnings calendar are missing this cycle "
             "— their absence is an outage, not a neutral signal."
         ]
+
+    def _feed_health_line(self) -> str:
+        """Per-cycle screener-feed liveness summary: 'FEEDS: 5/5 healthy' or
+        'FEEDS: 3/5 — robinhood DEAD (oauth), ... — EVAL WINDOW VALIDITY AT
+        RISK'. Derived READ-ONLY from what the aggregator already exposes:
+        a configured source whose screener `enabled` gate is False is DEAD
+        this cycle (safe_scan skips it and its candidates silently vanish);
+        RH-backed sources report the dead-auth latch as (oauth). No new
+        probes, no network calls. Best-effort — never breaks a cycle."""
+        try:
+            sources = list(getattr(self.cfg.screener, "sources", ()) or ())
+            if not sources:
+                return "FEEDS: 0/0 configured"
+            by_name = {
+                s.name: s for s in getattr(self.screeners, "screeners", [])
+            }
+            rh_dead = RobinhoodReader.auth_dead()
+            dead: list[str] = []
+            for src in sources:
+                scr = by_name.get(src)
+                if scr is None:
+                    dead.append(f"{src} DEAD (unknown source)")
+                    continue
+                try:
+                    ok = bool(scr.enabled)
+                except Exception:
+                    ok = False
+                if ok:
+                    continue
+                if src in ("robinhood", "robinhood_scans") and rh_dead:
+                    dead.append(f"{src} DEAD (oauth)")
+                else:
+                    dead.append(f"{src} DEAD (disabled/no credentials)")
+            total = len(sources)
+            if not dead:
+                return f"FEEDS: {total}/{total} healthy"
+            return (
+                f"FEEDS: {total - len(dead)}/{total} — " + ", ".join(dead)
+                + " — EVAL WINDOW VALIDITY AT RISK"
+            )
+        except Exception as e:
+            log.debug("feed health line failed: %s", e)
+            return ""
 
     def _refresh_dashboard(self) -> None:
         """Regenerate the live dashboard HTML — and the public track-record page
@@ -1545,13 +1630,42 @@ class Orchestrator:
             # backfill (oldest fills first) so multiple exits in one batch each
             # see the lots the earlier ones left behind.
             open_lots, _ = build_lot_history(records)
+            # Once-per-oid skip memory (per process): orders we refuse to
+            # backfill stay in the broker's closed list every cycle — log the
+            # ERROR once, not hourly forever (Aug-23 measurement integrity).
+            skipped = getattr(self, "_backfill_skipped_oids", None)
+            if skipped is None:
+                skipped = self._backfill_skipped_oids = set()
             for o in sorted(closed, key=lambda x: x["filled_at"] or ""):
                 if not o["order_id"] or o["order_id"] in known:
                     continue
-                lots = open_lots.get(o["symbol"], [])
+                ts = None
+                if o["filled_at"]:
+                    try:
+                        ts = datetime.fromisoformat(o["filled_at"])
+                    except ValueError:
+                        pass
+                # Aug-23 fix: a multi-leg option (MLEG) parent order carries
+                # symbol=None at the broker; str()-ing it once wrote a SELL row
+                # with symbol="None", exit_price=-1.19 and no P&L (the Aug-17
+                # AMZN unwind). Never write a corrupt row — skip and log loud.
+                sym = (o["symbol"] or "").strip()
+                if not sym or sym == "None":
+                    if o["order_id"] not in skipped:
+                        skipped.add(o["order_id"])
+                        log.error(
+                            "Backfill SKIP (corrupt symbol): order %s has "
+                            "unresolvable symbol %r (MLEG parent?) — refusing "
+                            "to write a corrupt SELL row.",
+                            o["order_id"], o["symbol"],
+                        )
+                    continue
+                occ = parse_occ(sym)
+                instrument = "option" if occ else "equity"
+                lots = open_lots.get(sym, [])
                 basis, covered = fifo_basis(lots, o["qty"])
                 pl_pct = pl = None
-                if basis > 0 and o["price"] > 0:
+                if instrument == "equity" and basis > 0 and o["price"] > 0:
                     pl_pct = (o["price"] / basis - 1.0) * 100.0
                     pl = (o["price"] - basis) * covered
                     # Consume the shares this exit sold so the next backfilled
@@ -1563,6 +1677,31 @@ class Orchestrator:
                         remaining -= take
                         if lots[0].remaining <= 1e-9:
                             lots.pop(0)
+                if pl is None:
+                    # No FIFO basis: an option chunk fill whose group close the
+                    # watchdog already ledgered under another order id (the
+                    # 4-leg MLEG cap splits closes across orders), or an equity
+                    # sale of pre-ledger shares. A P&L-less SELL row is exactly
+                    # the corruption the ledger now rejects — skip, log once,
+                    # but still stamp the exit cooldown (the exit DID happen).
+                    if o["order_id"] not in skipped:
+                        skipped.add(o["order_id"])
+                        log.error(
+                            "Backfill SKIP (no ledger basis): %s %s %g @ %.2f "
+                            "order %s — not writing a P&L-less SELL row (group "
+                            "close already ledgered, or entry predates ledger).",
+                            instrument, sym, o["qty"], o["price"], o["order_id"],
+                        )
+                        # NEVER stamp an option fill's per-share PREMIUM as the
+                        # UNDERLYING's exit price: exit_prices["AMZN"]=1.19
+                        # would trip the price-aware re-entry guard on every
+                        # fresh equity buy for up to 7 days (the watchdog's own
+                        # option exits omit price for exactly this reason).
+                        self.state.register_exit(
+                            occ[0] if occ else sym, when=ts,
+                            price=None if occ else (o["price"] or None),
+                            pl_pct=None)
+                    continue
                 # A bracket's stop leg is a STOP order; its take-profit leg is a
                 # LIMIT. Anything else filled that we didn't place (market/other)
                 # was an outside actor — label it external, don't guess.
@@ -1570,29 +1709,24 @@ class Orchestrator:
                     "stop": "bracket_stop", "stop_limit": "bracket_stop",
                     "trailing_stop": "bracket_stop", "limit": "bracket_take",
                 }.get(o["type"], "external")
-                ts = None
-                if o["filled_at"]:
-                    try:
-                        ts = datetime.fromisoformat(o["filled_at"])
-                    except ValueError:
-                        pass
                 self.ledger.record(TradeRecord.for_sell(
-                    o["symbol"],
+                    sym,
                     f"exchange-side exit backfill ({o['type'] or 'unknown'} sell)",
                     o["order_id"], qty=o["qty"],
                     realized_pl_pct=pl_pct, realized_pl=pl,
                     exit_reason=reason, ts=ts, exit_price=o["price"] or None,
+                    instrument=instrument,
                 ))
                 log.info(
                     "Backfilled exchange exit: %s %g sh @ %.2f (%s -> %s%s).",
-                    o["symbol"], o["qty"], o["price"], o["type"] or "?", reason,
+                    sym, o["qty"], o["price"], o["type"] or "?", reason,
                     f", {pl_pct:+.1f}%" if pl_pct is not None else "",
                 )
                 # An exchange-side exit also starts the re-entry cooldown —
                 # stamped at the FILL time and price when known (price feeds the
                 # price-aware re-entry guard; realized % feeds the loss streak).
                 self.state.register_exit(
-                    o["symbol"], when=ts, price=o["price"] or None,
+                    occ[0] if occ else sym, when=ts, price=o["price"] or None,
                     pl_pct=pl_pct)
         except Exception as e:  # bookkeeping must never break a decision cycle
             log.warning("Exchange-exit backfill failed: %s", e)
@@ -2575,30 +2709,105 @@ class Orchestrator:
         )
 
     # -- falling-tape core defense (Jul 29) --------------------------------- #
-    def _market_falling(self) -> tuple[bool, str]:
-        """Deterministic "the market is falling" read for the core defense and
-        the index-put sanction. True when the regime label is risk-off, the
-        long-run trend is down (SPY below its 200dma), or TODAY'S benchmark
-        move breaches the intraday defense trigger. Fails closed to (False, '')
-        when the regime filter is off or the data is degraded."""
-        if not self.cfg.risk.regime_filter_enabled:
-            return False, ""
-        reg = self.regime.assess()
-        if reg.label == "risk-off":
-            return True, "regime is risk-off"
-        if reg.trend == "down":
-            return True, "SPY below its 200dma (long-run downtrend)"
-        drop = getattr(self.cfg, "market_drop_defense_pct", 0.0)
-        if (
-            drop > 0
-            and reg.day_change_pct is not None
-            and reg.day_change_pct <= -drop
-        ):
-            return True, (
-                f"SPY {reg.day_change_pct:+.1f}% today "
-                f"(<= -{drop:g}% intraday defense trigger)"
+    def _market_falling(self, account=None) -> tuple[bool, str]:
+        """Deterministic "the market is falling" read for the core defense,
+        the auto-hedge and the index-put sanction. True when the INDEX is
+        falling (regime risk-off, SPY under its 200dma, or TODAY'S benchmark
+        move breaching the intraday trigger) OR — Aug-22 breadth trigger
+        (Aug 18: -$26,844 at 3.9x SPY down-capture with ELEVEN per-name
+        falling reads while SPY never breached -1.1% intraday, so every
+        defense slept) — when the BOOK itself is falling: at least
+        breadth_falling_names_min held names carry a NAME FALLING read, or
+        the intraday book P/L (equity vs last_equity — the daily-loss
+        halt's own numbers) breaches breadth_book_drawdown_pct. The index
+        legs still fail closed when the regime filter is off or degraded;
+        the breadth legs need no regime feed. `account` defaults to the
+        snapshot the defense callers stash each cycle (kept optional so
+        zero-arg callers and test stubs still work). The winning trigger
+        source ("index" / "breadth:N-names" / "book:-X.X%") lands in
+        self._falling_trigger for the BEARISH FUNNEL line."""
+        acct = (
+            account if account is not None
+            else getattr(self, "_defense_account", None)
+        )
+        falling, why, source = False, "", ""
+        if self.cfg.risk.regime_filter_enabled:
+            reg = self.regime.assess()
+            if reg.label == "risk-off":
+                falling, why, source = True, "regime is risk-off", "index"
+            elif reg.trend == "down":
+                falling, why, source = (
+                    True, "SPY below its 200dma (long-run downtrend)", "index"
+                )
+            else:
+                drop = getattr(self.cfg, "market_drop_defense_pct", 0.0)
+                if (
+                    drop > 0
+                    and reg.day_change_pct is not None
+                    and reg.day_change_pct <= -drop
+                ):
+                    falling, why, source = True, (
+                        f"SPY {reg.day_change_pct:+.1f}% today "
+                        f"(<= -{drop:g}% intraday defense trigger)"
+                    ), "index"
+        if not falling:
+            names = getattr(self, "_falling_names", {}) or {}
+            names_min = int(
+                getattr(self.cfg, "breadth_falling_names_min", 0) or 0
             )
-        return False, ""
+            # Double-count guard: a map from a PREVIOUS cycle that the breadth
+            # re-arm already counted toward auto_hedge_min_cycles is one
+            # observation, not two — the top-of-cycle defense pass must wait
+            # for this cycle's fresh map instead of re-counting the stale one
+            # (otherwise the 2-cycle persistence bar is satisfied by a single
+            # one-hour blip and the hedge whipsaws).
+            map_cycle = getattr(self, "_breadth_map_cycle", -1)
+            stale_counted = (
+                map_cycle == getattr(self, "_breadth_counted_cycle", -2)
+                and map_cycle < getattr(self, "_cycle_seq", 0)
+            )
+            if names_min > 0 and len(names) >= names_min:
+                if stale_counted:
+                    if getattr(self, "_breadth_guard_logged", -1) != map_cycle:
+                        self._breadth_guard_logged = map_cycle
+                        log.info(
+                            "BREADTH COUNT GUARD: %d-name falling map from a "
+                            "prior cycle already counted toward the hedge "
+                            "persistence bar — awaiting this cycle's fresh "
+                            "breadth read.", len(names),
+                        )
+                else:
+                    falling = True
+                    source = f"breadth:{len(names)}-names"
+                    why = (
+                        f"{len(names)} held names falling at once (>= "
+                        f"{names_min}-name breadth bar: "
+                        + ", ".join(sorted(names)[:5]) + ")"
+                    )
+        if not falling:
+            raw = getattr(self.cfg, "breadth_book_drawdown_pct", 0.0) or 0.0
+            bar = -abs(float(raw))  # sign-agnostic: -1.25 == 1.25 (a loss)
+            if bar < 0 and acct is not None and getattr(acct, "last_equity", 0.0) > 0:
+                day = acct.day_pl_pct
+                if day <= bar:
+                    falling = True
+                    source = f"book:{day:+.1f}%"
+                    why = (
+                        f"book P/L {day:+.2f}% intraday "
+                        f"(<= {bar:g}% breadth drawdown trigger)"
+                    )
+        self._falling_read_last = falling
+        self._falling_trigger = source
+        # One distinctive line per trigger-source TRANSITION (this read runs
+        # several times per cycle — dedupe keeps the daily log greppable
+        # without a 3x echo); the per-cycle state lives in BEARISH FUNNEL.
+        if falling and source != getattr(self, "_falling_trigger_logged", ""):
+            log.info(
+                "FALLING-TAPE TRIGGER (%s): %s — core defense / auto-hedge / "
+                "index-put sanction keying on this read.", source, why,
+            )
+        self._falling_trigger_logged = source
+        return falling, why
 
     def _name_falling_reads(self, account, tech_ctx) -> dict[str, str]:
         """Per-NAME falling read (Jul 30 review, Phase-1 gap): every falling-
@@ -2640,6 +2849,33 @@ class Orchestrator:
                 )
         return out
 
+    def _breadth_rearm(self, account) -> None:
+        """Aug-22 breadth re-arm: the defense pass at the top of the cycle
+        runs BEFORE this cycle's falling-names map exists (the map needs the
+        signal bundles' tech context), so a breadth-armed read would
+        otherwise act a full cycle late. When the FRESH map alone crosses
+        the breadth bar and that earlier pass read clear, re-run the
+        defenses now — Aug 18 fired ELEVEN name-falling reads in one cycle
+        with zero defense trades. Whipsaw bounds hold: the earlier clear
+        pass only advanced _clear_cycles, and this re-run counts at most ONE
+        falling cycle, so the auto_hedge_min_cycles persistence and the
+        auto_hedge_max_pct ceiling apply unchanged."""
+        names_min = int(getattr(self.cfg, "breadth_falling_names_min", 0) or 0)
+        if names_min <= 0:
+            return
+        names = getattr(self, "_falling_names", {}) or {}
+        if len(names) < names_min:
+            return
+        if getattr(self, "_falling_read_last", False):
+            return  # the top-of-cycle pass already counted a falling read
+        log.info(
+            "BREADTH RE-ARM: %d name-falling reads >= %d-name bar — "
+            "re-running core defense + auto-hedge on this cycle's breadth.",
+            len(names), names_min,
+        )
+        self._apply_core_defense(account)
+        self._apply_auto_hedge(account)
+
     def _apply_core_defense(self, account) -> None:
         """When the market itself is falling, stop averaging INTO it and take
         risk OFF the core: pause the core-ETF fill for the cycle (the flag the
@@ -2650,6 +2886,9 @@ class Orchestrator:
         at catastrophe distance. A defensive trim is not a thesis exit: no
         re-entry cooldown / loss-streak stamp, and the fill resumes (DCA back
         in) as soon as the falling read clears."""
+        # Stash the snapshot for _market_falling's book-P/L breadth leg (the
+        # read itself stays zero-arg for its other callers).
+        self._defense_account = account
         etf = self.cfg.core_etf
         self._core_defense_active = False
         if not etf or not getattr(self.cfg, "core_defense_enabled", False):
@@ -2737,6 +2976,8 @@ class Orchestrator:
         OPTIONS_ENABLED off, and — unlike the index-put sanction, which asks
         the model — it never waits on discretion. The persistence requirement
         is the noise filter: a single red tick arms nothing."""
+        # Stash the snapshot for _market_falling's book-P/L breadth leg.
+        self._defense_account = account
         etf = getattr(self.cfg, "hedge_etf", "")
         if not etf:
             return
@@ -2744,6 +2985,15 @@ class Orchestrator:
         if falling:
             self._falling_cycles += 1
             self._clear_cycles = 0
+            # When BREADTH won this read, mark its falling-names map as
+            # counted: next cycle's top-of-cycle pass re-reads the same
+            # (by-then stale) map, and one observation must not satisfy the
+            # persistence bar twice (_market_falling skips a stale counted
+            # map on the breadth-names leg).
+            if str(getattr(self, "_falling_trigger", "")).startswith("breadth:"):
+                self._breadth_counted_cycle = getattr(
+                    self, "_breadth_map_cycle", -1
+                )
         else:
             self._clear_cycles += 1
         need = max(1, getattr(self.cfg, "auto_hedge_min_cycles", 2))
@@ -3444,6 +3694,11 @@ class Orchestrator:
             # momentum put carve-out — NU/NOK-shaped names break hard while
             # still reading name_trend="up" on their 200dma.
             name_ext_pct=tech.get("ext_pct_sma20") if tech else None,
+            # Full technicals dict for the bullish-option anti-chase gate
+            # (OPTION CHASE GATE): without it the gate fails open and an
+            # overextended equity reject re-expressed as a call debit walks
+            # straight past the read it was rejected on (the HL -67.6% chase).
+            tech=tech,
         )
         if is_put_play and decision.verdict != RiskVerdict.REJECTED:
             self._bear_puts_approved = getattr(self, "_bear_puts_approved", 0) + 1

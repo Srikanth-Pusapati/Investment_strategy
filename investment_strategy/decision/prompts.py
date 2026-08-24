@@ -141,7 +141,11 @@ premium cap). Pick expiries 2-8 weeks out \
 (the risk layer rejects <7 or >60 days), strikes at/near the money, both \
 vertical legs on ONE expiry. If the options_chain signal shows a HIGH ATM IV, \
 prefer a spread (the short leg offsets the rich premium); modest IV favors a \
-single long leg. Do not propose stop/take levels for options — exits are \
+single long leg. All else equal PREFER long_call over bull_call_spread when \
+both express the thesis: this book's spreads are 0-for-4 (-$33.8k) vs +$11.6k \
+on its lone long_call — at this size the short leg adds leg/quote fragility \
+worth more than the small debit it saves. Do not propose stop/take levels for \
+options — exits are \
 managed deterministically (premium stop/take and a forced close near expiry).
 - OPTION DIRECTION: when a "## Market regime" block is present, option debits \
 follow the LONG-RUN market trend it reports: calls belong in an up market (SPY \

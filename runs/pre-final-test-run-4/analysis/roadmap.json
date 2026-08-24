@@ -1,0 +1,87 @@
+{
+ "model_grade": "B-",
+ "grade_rationale": "Vs the Jul 30 C+ (A system / D strategy): strategy improved from D to roughly C \u2014 expectancy flipped from -$133/trade (July) to +$167/trade over 42 trips (PF 1.098), carried by genuinely working machinery (trail/bracket exits +$75.5k, expectancy-gate rejects saved ~$17k on Aug 18 alone), and the bot ran 9 days unattended without a blowup. But the exact problem the C+ review flagged is unchanged: down-capture is still broken (2.31 vs 1.19 up over Aug 3-21, 3.9x SPY on the -$26.8k Aug 18), the bearish sleeve executed literally zero trades (0/83 funnel, PSQ hedge flat, core defense 0 fires, IWM proxy killed by its own OI floor), and options are a -$22k loss engine with a documented gate bypass. Meanwhile the system grade slipped from A to A-/B+: ledger disagrees with broker by $1,065 (MLEG backfill wrote symbol=\"None\"), the postmortem labeled the day's biggest loser (IESC -$6.7k) as \"the winner\", a premium stop executed 17.6pp past its width on a junk open-auction quote, and both away-mode watchers (Claude babysit, RH auth) died silently. Net: B- \u2014 real, measured progress on expectancy and autonomy; no progress on the declared #1 problem; self-measurement got worse.",
+ "now_changes": [
+  {
+   "rank": 1,
+   "title": "Revert sizing to the documented defensive profile: KELLY_FRACTION 1.0->0.5, TARGET_ANNUAL_VOL_PCT 45->25",
+   "why": "The Jul 27 aggressive profile is the floor under every red day: worst day -$26,844 (2.7% of equity) on a -0.68% SPY day, down-capture 2.31. Size = min(LLM weight, vol-target/Kelly, 12%) in risk._evaluate_buy, so this de-levers mechanically without touching strategy. Research digest: vol-scaled sizing is significant precisely in the momentum subset this book belongs to, and de-grossing beats bought puts for down-capture.",
+   "how": "Edit .env:157-158 (comments literally say 'was 0.5' / 'was 25') back to KELLY_FRACTION=0.5, TARGET_ANNUAL_VOL_PCT=25.0; restart via the control-panel path. No code change.",
+   "measurement": "Median new-entry notional in state/trades.jsonl roughly halves where the vol-target binds; worst-day P/L as % of equity; next-window capture pair \u2014 success is down-capture <=1.3 with up-capture >=0.7.",
+   "effort": "S"
+  },
+  {
+   "rank": 2,
+   "title": "Pre-register a frozen 2-week eval window with a mechanical GO/NO-GO contract; ship ranks 3-8 before day 1, then zero changes",
+   "why": "Expectancy swung +$1,455 -> +$189/trade on pure sample noise (win-rate CI +/-21.5pp at N=20); every mid-window PR resets the ~24-trade clock needed for a 95% one-sided verdict. Without a committed contract the next run is as uninterpretable as the last two, and the away-window capture 'pass' (3 up / 4 down days) would again be misread as signal.",
+   "how": "Commit a contract file (e.g. state/eval_contract_2026-09.md) before day 1: pass = (a) N>=24 closed trades, (b) expectancy>0 at 95% one-sided on realized_pl, (c) combined up+down capture >1.0 only if >=6 up AND >=6 down SPY days, (d) max DD > -5%; recompute at close with the same plain-python method the verify agent used on trades.jsonl + equity_history.jsonl. Git log proves zero .env/risk.py/prompt commits inside the window. GO-to-live requires two consecutive passing windows.",
+   "measurement": "At window close the four contract stats are computed exactly as pre-registered; verdict is whatever the file says, no post-hoc metrics admitted.",
+   "effort": "S"
+  },
+  {
+   "rank": 3,
+   "title": "Harden watchdog option premium-stop marks: 2-tick confirmation + two-sided-quote sanity + first-5-minutes-after-open suppression",
+   "why": "All three planners converged here. The HL stop executed at -67.6% vs its -50% width 14 seconds after the open while the underlying traded UP \u2014 the Jul 23 junk one-sided-quote mode on EXIT marks (PR #40 hardened entries only). -$3,650 = 30% of Aug 20's loss, and it contaminates the entire options sample so no verdict on the sleeve is possible until exit marks are real.",
+   "how": "In monitor/watchdog.py premium-stop check (fires at :715 on a single 30s tick): require two consecutive 30s ticks beyond OPTION_STOP_LOSS_PCT (config default 50; .env:168 is commented out) AND a two-sided quote (bid>0, spread <= the existing 10% entry cap); suppress premium-stop fires in the first 5 minutes after open unless the underlying itself moved adversely. Keep the change inside the existing tick loop (Jul 27 watchdog-callback deadlock lesson).",
+   "measurement": "Next window: zero premium stops executing >5pp past the configured width; zero premium-stop fires in the first 15 minutes; every option-stop log line includes the validating quote.",
+   "effort": "M"
+  },
+  {
+   "rank": 4,
+   "title": "Close the options bypass: run the equity anti-chase gate inside risk.evaluate_option + cap per-underlying premium at 0.5% equity",
+   "why": "Two planners converged. HL documented its own bypass: equity blocked as overextended (RSI 70, 4.2xATR), identical thesis expressed as a $5,200 spread that lost -67.6% in 21h. Options are the cycle's loss engine (-$22,149 vs equity +$29,180; bull_call_spread 0-for-4, -$33,794) and AMZN concentrated ~$29.8k premium in one underlying (-$14,956). Autotune sweeps zero options knobs, so this channel is invisible to the self-tuner.",
+   "how": "In risk.evaluate_option (risk.py:903-1038), before the premium cap: run the underlying through the same anti-chase check _evaluate_buy uses (RSI>=65 AND >=2.0 ATR = haircut, >=3.0 ATR or >=15% gap = hard block); add a per-underlying premium cap of 0.5% equity summed across open lots (inside the existing MAX_OPTION_PREMIUM_PCT=1.0 path, .env:162); also gate the orchestrator option-fallback (orchestrator.py:2020) so an overextension-rejected BUY cannot re-express as a call. Add a prompt line preferring long_call over bull_call_spread.",
+   "measurement": "Zero option entries on names simultaneously rejected as overextended (paired REJECT/option log lines); max per-underlying premium <=0.5% equity in trades.jsonl; options sleeve P&L vs -$18,606 away baseline.",
+   "effort": "M"
+  },
+  {
+   "rank": 5,
+   "title": "Arm the dormant PSQ hedge and core defense on book-breadth triggers, not just SPY falling reads",
+   "why": "Aug 18 ran 3.9x down-capture with 11 NAME FALLING reads firing while core defense, PSQ auto-hedge, and puts all executed zero trades \u2014 _market_falling (orchestrator.py:2578) keys on an index read and SPY never fell past -1.1%. Calm-tape single-name reversal days are exactly the failure the 2.31 down-capture measures, and HEDGE_ETF=PSQ (.env:219) has never fired.",
+   "how": "Extend _market_falling / _apply_core_defense / _apply_auto_hedge (orchestrator.py:2578/2643/2731) with an OR-trigger: >=3 concurrent NAME FALLING reads this cycle OR intraday book P/L <= -1.25%. Keep the existing 2-cycle minimum and 15% hedge cap as whipsaw bounds. Log the trigger source in the BEARISH FUNNEL line.",
+   "measurement": "Grep BEARISH FUNNEL: auto_hedge shows armed/open on any day with >=3 NAME FALLING reads or day P/L <= -1.25%; down-capture on SPY-down days vs 2.306 baseline.",
+   "effort": "M"
+  },
+  {
+   "rank": 6,
+   "title": "Measurement-integrity bundle: fix MLEG exit-backfill rows, ledger options under OCC symbols, switch postmortem to close-to-close attribution, annotate corrupted curated.md lines",
+   "why": "Neither headline P&L is currently trustworthy (ledger +$7,031 vs broker-implied +$5,966; two null-P&L sells, one with symbol=\"None\" and exit_price -1.19), autotune is structurally blind to the two biggest losses because options ledger under the underlying ticker, and the nightly postmortem called IESC 'the winner +$1,194' on the day it was the biggest hit (-$6,693) \u2014 so every downstream lesson and plan inherits wrong data.",
+   "how": "Two reporting-only PRs before window day 1: (a) migrate the two bad AMZN backfill rows explicitly and make exchange-side MLEG backfill write real OCC symbols + realized_pl; ledger option trades under their OCC symbol so autotune/attribution see an options bucket; (b) postmortem attribution switches to close-to-close marks (the red_day_autopsy method); annotate curated.md lines 8/11/14 as superseded-with-reason rather than deleting. Zero trading-path risk.",
+   "measurement": "recon_null_pl_sell_records=0; abs(ledger-broker delta) < $5; day_pl telescoping gap < $1; next red day's lesson names the same worst contributor as an independent close-to-close recompute; autotune W36+ lists options as its own bucket.",
+   "effort": "M"
+  },
+  {
+   "rank": 7,
+   "title": "Corroboration gate in risk._evaluate_buy: haircut/block new-name buys cited on a single soft signal family",
+   "why": "Two planners converged; autotune's own conclusion is that conviction floors cannot express this fix (every sweep candidate affected 0 trades). Insider-cited entries lost -$18,681/13 trades; the uncorroborated single-signal cohort (QNT, LFTO, INTC, F, AVBC) lost ~-$6,675 and these are the same junk small-caps driving red-day marks (composite Q4 expectancy -$859/-$1,792). Corroborated names won (SMCI +$9,437, CDE +$15,860). Designed narrowly as haircut-first because n=13 is below the 21-trade MinTRL (Plan 3's caution).",
+   "how": "Insert after the new-name conviction floor in risk._evaluate_buy (risk.py:276-900): if a NEW name's cited set is exactly one soft family (insider, congress, or options_flow, with no fundamentals/news/technical corroboration), apply starter-haircut x0.5 and require composite >=1.25 to enter at all. Log every trigger with the would-have-been size so the counterfactual cohort is measurable. Check overlap with the expectancy gate to avoid double-haircuts.",
+   "measurement": "Next-window ledger: count gate triggers, compute realized P&L of the haircut/blocked cohort \u2014 gate succeeds if that cohort's expectancy is negative while total trade count drops <20%.",
+   "effort": "M"
+  },
+  {
+   "rank": 8,
+   "title": "Restore Robinhood screener auth and make 5/5 feed-liveness a pre-registered validity condition of the window",
+   "why": "The away window was silently confounded: RH OAuth died Aug 19, removing 2 of 5 SCREENER_SOURCES mid-sample, and nothing detected it (babysit auth-dead since Aug 17). A controlled window requires constant inputs or an automatic confounded flag.",
+   "how": "User action: run the RH browser re-auth runbook (commit 0998aac) before day 1. Code: one status line per decision cycle asserting all five SCREENER_SOURCES healthy (read robinhood_health.json), consumed by the eval contract; if RH stays dead, pre-declare the window as an RH-less configuration instead.",
+   "measurement": "Zero 'robinhood screener disabled' lines in window logs (or 8/8 days consistently RH-less as declared); robinhood_health.json alive every market day.",
+   "effort": "S"
+  }
+ ],
+ "later_track": [
+  "Winner-protection veto on Claude decision-SELLs of green positions below the 1.5R trail-arm (decision exits net -$24,695 vs mechanical +$75,516) \u2014 but instrument first: tag green-vs-red decision exits in the ledger this window, ship only if the drag persists with clean close-to-close attribution (IESC give-back is the counterexample risk).",
+  "Cadence halve DECISION_INTERVAL_SECONDS 3120->1560 AFTER the frozen window: precondition (cache_read>0) met since Jul 23, ~$30/mo cost, halves the measured 52-min read-to-exit latency (INTC -1.3pp) \u2014 but it resets the eval clock so it cannot ship mid-window; audit the impossible cache-ledger numbers (cache_read=7,297 constant, cache_write=0 at 52-60min spacing) first.",
+  "Open-auction hygiene for entries: defer the guaranteed open-bell cycle's NEW buys to ~10:00 ET with opening-range/RVOL confirmation (JFE 2018 + ORB 'stocks in play' evidence; the 13:30-14:30 UTC entry cluster is structural via _next_open_utc at orchestrator.py:806); sells/watchdog stay live.",
+  "RVOL >=1.5-2x deterministic 'in play' pre-filter on momentum/starter slate names before the LLM sees them \u2014 the single factor that carried the ORB paper's 41.6% IRR.",
+  "NAME_DROP_DEFENSE_PCT knob-add to .env at 2.5-3.0 (config default 4.0, config.py:474/830): defense reads arm 1-1.5pp earlier; track churn (re-buys within 48h of a defense cut) before and after.",
+  "Pyramiding release: waive TOPUP_MIN_CONVICTION_DELTA (0.05) when the lot is >=+5% unrealized and passes anti-chase \u2014 n=1 evidence (CDE, $7-12k foregone), so first instrument foregone top-ups for a window, then decide."
+ ],
+ "do_not_do": [
+  "Do not chase LLM put conversion (prompt persuasion, loosened put liquidity gates, or standing index puts): 82/83 declines cited genuine contradicting call flow, the one organic proposal (MARA) would have lost, and PPUT's 32-year record equals a 36.5/63.5 equity-cash mix \u2014 bought puts are pure drag; the down-capture fix is deterministic de-grossing + the PSQ breadth trigger (ranks 1 and 5).",
+  "Do not tighten equity stop widths per curated.md line 14: both 'stop failure' mega-losses (AMZN -$14,956, HL -$3,650) were watchdog OPTION premium stops misattributed by the broken postmortem; equity defense cuts landed 0.7-4.2pp BEFORE hard stops \u2014 DEFAULT_STOP_LOSS_PCT=8 is not the leak.",
+  "Do not arm COMPOSITE_GATE_ENABLED or raise MIN_COMPOSITE_SCORE / conviction floors: the composite is inverted at the TOP (Q4 >=2.02 loses in both windows, Q3 is the best bucket) and autotune proved every conviction-floor candidate affected 0 trades \u2014 floors gate the wrong tail; rank 7's corroboration gate is the correct expression.",
+  "Do not bump DECISION_INTERVAL_SECONDS, the decision model, or effort during the eval window (2 of 3 planners against): it resets the ~24-trade statistical clock, and the interval is tuned to the 1h prompt-cache TTL \u2014 cadence belongs in later_track after a clean window.",
+  "Do not act on any other sub-MinTRL subgroup finding this window (conviction-band flip n=5/13, REENTRY override 1.5 n=1, banning bull call spreads outright at 0-for-4 with 2 quote-contaminated exits): instrument them in the fixed ledger instead.",
+  "Do not import social-media patterns wholesale (ORB breakouts, 0DTE buying or selling, grid/martingale, copy-trading, prompt-'improved' LLM stock picking): each family is survivorship/fee-funnel/blow-up-shaped; the only evidence-backed transfers (RVOL gate, open avoidance, VWAP discipline, vol-scaled sizing) are already in this roadmap."
+ ],
+ "social_media_verdict": "The comparison is mostly an illusion, and the arithmetic kills it before strategy analysis: +40%/month compounds to 5,568%/year \u2014 84x Medallion's 66% gross, the best audited track record in history \u2014 and would turn $10k into trillions in five years, so the claim family is self-falsifying. The population you see is the survivor tail of a distribution where 97% of persistent Brazilian day traders and >99% of Taiwanese day traders lose money after costs, plus prop-firm marketing where only 7% of challenge buyers ever receive any payout, plus martingale/short-gamma equity curves screenshotted before the month that returns -100%. A $5k account also has structural moves a $1M book cannot copy: 100% concentration in one levered small-cap or a single 0DTE contract \u2014 and '+40% on $5k' is $2,000, less than one day's mark-to-market noise on this book. What IS real in that world: the celebrated ORB paper's 41.6% IRR came from the opening relative-volume 'stocks in play' filter (not the breakout pattern influencers teach), first-15-minute entry avoidance, VWAP-relative entry discipline, and vol-scaled sizing \u2014 all four transfer here and are in the now-list or later-track. The honest mirror: this bot's +0.67% on the cycle with PF 1.098 and a failing down-capture is not good yet either \u2014 but it is measured against a broker ledger with pre-registered stats, which none of the comparison set is. Beating the fantasy is impossible; beating the actual base rate (most comparable operations lose money) is what the bot is currently doing, barely, and the roadmap targets the one thing (red-day geometry) standing between 'barely' and 'credibly'."
+}

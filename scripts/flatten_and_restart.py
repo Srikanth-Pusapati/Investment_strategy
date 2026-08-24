@@ -41,6 +41,14 @@ ROOT = Path(__file__).resolve().parent.parent
 ENV = ROOT / ".env"
 PYTHON = ROOT / ".venv" / "bin" / "python"
 ET = ZoneInfo("America/New_York")
+# Dead-man hold-off marker: ops/deadman.py (5-min launchd ticks) auto-restarts
+# a dead bot through the control panel — mid-flatten that would resurrect the
+# bot to trade AGAINST the close-all. Touched when the flatten BEGINS (not at
+# script launch: the open-wait can be hours and the dead-man must keep guarding
+# until then), removed in a finally after the relaunch. deadman ignores markers
+# older than 2h, so even a flatten that dies before its finally cannot mute the
+# dead-man forever.
+HOLD_MARKER = ROOT / "state" / "flatten.hold"
 
 
 def say(msg: str) -> None:
@@ -164,6 +172,27 @@ def main() -> int:
     say(f"waiting for market open — will run at {target:%Y-%m-%d %H:%M ET}")
     wait_until(target)
 
+    # The flatten BEGINS here: raise the dead-man hold-off so ops/deadman.py
+    # does not auto-restart the bot we are about to stop (it would trade
+    # against the close-all). finally-cleanup covers every exit path below.
+    try:
+        HOLD_MARKER.parent.mkdir(parents=True, exist_ok=True)
+        HOLD_MARKER.touch()
+        say("FLATTEN-HOLD ON: touched state/flatten.hold — deadman stands down (auto-expires after 2h)")
+    except OSError as e:
+        say(f"WARNING: could not touch {HOLD_MARKER}: {e} — deadman may auto-restart mid-flatten")
+    try:
+        return _flatten_reset_restart()
+    finally:
+        try:
+            HOLD_MARKER.unlink(missing_ok=True)
+            say("FLATTEN-HOLD OFF: removed state/flatten.hold — deadman resumes")
+        except OSError as e:
+            say(f"WARNING: could not remove {HOLD_MARKER}: {e} — deadman ignores it after 2h anyway")
+
+
+def _flatten_reset_restart() -> int:
+    """The flatten itself — bot already waited-for-open; hold marker is up."""
     # Stop the old bot FIRST: it must not trade against the flatten, must not
     # rewrite state after the reset archives it, and must release the
     # single-instance flock or the fresh start below gets refused.

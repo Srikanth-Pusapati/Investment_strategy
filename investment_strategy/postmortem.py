@@ -28,11 +28,18 @@ _CURATED_FILE = _LESSONS_DIR / "curated.md"
 POSTMORTEM_PROMPT = """\
 You are reviewing ONE trading day of your own automated decisions. \
 The input below shows every equity buy decision (approved, resized, or rejected), \
-slate exclusions, the final ledger for executed trades, and the day's CLOSED \
-positions with their realized P&L, exit reason, and original entry thesis.
+slate exclusions, the final ledger for executed trades, the day's CLOSED \
+positions with their realized P&L, exit reason, and original entry thesis, and \
+(when price marks are available) a per-name DAY P&L block on CLOSE-TO-CLOSE \
+marks. When that block is present, judge each name's day — and pick the day's \
+winners and losers — by the CLOSE-TO-CLOSE number: the entry-basis realized \
+column is secondary context and hides give-back on held winners (a name can \
+"realize" a gain on a partial exit while losing far more on the shares still \
+held).
 
 Your task:
-1. FIRST: find the largest realized LOSERS and diagnose WHY each ENTRY failed — \
+1. FIRST: find the largest DAY losers (close-to-close when available, else \
+   realized) and diagnose WHY each ENTRY failed — \
    chased an extended move near a local high? entry thesis contradicted by the \
    exit (e.g. "bullish momentum" stopped out in 2 days)? conviction \
    miscalibrated (high conviction, bad outcome)? Dollar-loss patterns OUTRANK \
@@ -121,6 +128,126 @@ def _append_curated(lessons: list[str], max_lines: int = 15) -> None:
         log.warning("Could not update curated lessons: %s", e)
 
 
+def day_marks(
+    records, day: str, close_series, max_symbols: int = 25,
+) -> tuple[list[str], str, str]:
+    """Per-name DAY P&L on CLOSE-TO-CLOSE marks (Aug-23 measurement integrity).
+
+    The old nightly review judged names by ENTRY-basis realized P&L, which
+    named IESC 'the winner +$1,194' (a partial exit realized against a stale
+    entry) on the exact day IESC was the book's biggest hit close-to-close
+    (-$6.7k on the shares still held). This computes, per equity name active
+    on `day`, the mark-to-market identity
+
+        day_pl = qty_end*close_D - qty_start*close_{D-1} - buys_cost + sell_proceeds
+
+    from the corrected ledger stream plus dated daily closes, keeping the old
+    entry-basis realized number as a secondary column. Options have no equity
+    close series — their day line is realized-only and labeled as such.
+
+    `close_series(symbol, days)` -> [(iso_date, close), ...] ascending — the
+    signature of AlpacaClient.daily_close_series, injectable for tests.
+    Returns (lines, winner_line, loser_line); empty lines list = nothing to say.
+    """
+    start_qty: dict[str, float] = {}
+    day_buys: dict[str, list] = {}
+    day_sells: dict[str, list] = {}
+    opt_realized: dict[str, float] = {}
+    for r in sorted(records, key=lambda x: str(x.ts)):
+        d = str(r.ts)[:10]
+        if d > day:
+            continue
+        if (getattr(r, "instrument", "equity") or "equity") != "equity":
+            if r.action == "sell" and d == day and r.realized_pl is not None:
+                key = getattr(r, "underlying", None) or r.symbol
+                opt_realized[key] = opt_realized.get(key, 0.0) + r.realized_pl
+            continue
+        if r.action == "buy":
+            if d < day:
+                start_qty[r.symbol] = start_qty.get(r.symbol, 0.0) + float(r.qty or 0.0)
+            else:
+                day_buys.setdefault(r.symbol, []).append(r)
+        elif r.action == "sell":
+            if d < day:
+                held = start_qty.get(r.symbol, 0.0)
+                q = float(r.qty or 0.0)
+                # qty 0/unknown = full close (same rule as lots.py).
+                start_qty[r.symbol] = max(0.0, held - q) if q > 0 else 0.0
+            else:
+                day_sells.setdefault(r.symbol, []).append(r)
+
+    names = sorted(
+        {s for s, q in start_qty.items() if q > 1e-9}
+        | set(day_buys) | set(day_sells),
+        key=lambda s: (
+            -(1 if s in day_buys or s in day_sells else 0),
+            -start_qty.get(s, 0.0), s,
+        ),
+    )[:max_symbols]
+
+    marked: list[tuple[str, float, float, bool]] = []  # (sym, day_pl, realized, held_eod)
+    lines: list[str] = []
+    for sym in names:
+        q0 = start_qty.get(sym, 0.0)
+        buys = day_buys.get(sym, [])
+        sells = day_sells.get(sym, [])
+        buy_qty = sum(float(b.qty or 0.0) for b in buys)
+        buy_cost = sum(
+            float(b.qty or 0.0) * b.entry_price if (b.entry_price or 0) > 0
+            else float(b.cost_usd or 0.0)
+            for b in buys
+        )
+        sell_qty = proceeds = realized = 0.0
+        priced = True
+        for srec in sells:
+            q = float(srec.qty or 0.0) or max(0.0, q0 + buy_qty - sell_qty)
+            sell_qty += q
+            if srec.exit_price and srec.exit_price > 0:
+                proceeds += q * srec.exit_price
+            else:
+                priced = False
+            if srec.realized_pl is not None:
+                realized += srec.realized_pl
+        q1 = max(0.0, q0 + buy_qty - sell_qty)
+        try:
+            series = close_series(sym, 12) or []
+        except Exception:
+            series = []
+        day_close = next((c for dd, c in reversed(series) if dd == day), None)
+        prior_close = next((c for dd, c in reversed(series) if dd < day), None)
+        if (q0 > 1e-9 and prior_close is None) or (q1 > 1e-9 and day_close is None):
+            priced = False
+        if not priced:
+            lines.append(
+                f"  {sym:8} day P&L n/a (missing close/exit marks) | "
+                f"realized today (entry-basis): {realized:+,.0f} USD"
+            )
+            continue
+        day_pl = (
+            q1 * (day_close or 0.0) - q0 * (prior_close or 0.0)
+            - buy_cost + proceeds
+        )
+        marked.append((sym, day_pl, realized, q1 > 1e-9))
+        lines.append(
+            f"  {sym:8} day {day_pl:+,.0f} USD (close-to-close"
+            + (", held into close" if q1 > 1e-9 else ", flat at close")
+            + f") | realized today (entry-basis): {realized:+,.0f} USD"
+        )
+    for sym in sorted(opt_realized):
+        lines.append(
+            f"  {sym:8} (option) realized today (premium-basis): "
+            f"{opt_realized[sym]:+,.0f} USD — no close-to-close mark for options"
+        )
+    winner_line = loser_line = ""
+    if marked:
+        w = max(marked, key=lambda t: t[1])
+        l = min(marked, key=lambda t: t[1])
+        winner_line = f"Day WINNER by close-to-close: {w[0]} {w[1]:+,.0f} USD"
+        loser_line = f"Day LOSER by close-to-close: {l[0]} {l[1]:+,.0f} USD"
+        lines.append(f"  -> {winner_line}; {loser_line}")
+    return lines, winner_line, loser_line
+
+
 def run_postmortem(
     cfg,
     ledger,
@@ -128,6 +255,7 @@ def run_postmortem(
     day: str,
     dry_run: bool = False,
     max_lessons: int = 15,
+    broker=None,
 ) -> dict | None:
     """Core post-mortem logic. Returns parsed output dict or None on failure."""
     import json
@@ -166,6 +294,7 @@ def run_postmortem(
             )
     ledger_lines = []
     sell_lines = []
+    records = []
     try:
         records = ledger.effective()
         # Entry-rationale head per symbol (latest buy wins) so a closed trade
@@ -208,6 +337,35 @@ def run_postmortem(
     user_text += "\n".join(ledger_lines[:50]) or "  (none)"
     user_text += "\n\nClosed positions (realized P&L, worst first):\n"
     user_text += "\n".join(sell_lines) or "  (none)"
+
+    # Per-name CLOSE-TO-CLOSE day attribution (Aug-23): entry-basis realized
+    # P&L alone crowned IESC 'the winner +$1,194' on the day it was the book's
+    # biggest close-to-close hit (-$6.7k on the held shares). Best-effort: no
+    # broker / no marks -> the block is simply absent and the prompt says so.
+    marks_lines: list[str] = []
+    try:
+        b = broker
+        if b is None and cfg is not None:
+            from .execution.alpaca_client import AlpacaClient
+            b = AlpacaClient(cfg)
+        if b is not None and records:
+            marks_lines, winner_line, loser_line = day_marks(
+                records, day, b.daily_close_series)
+            if marks_lines:
+                log.info(
+                    "Postmortem day attribution (close-to-close): %d name(s); "
+                    "%s; %s", len(marks_lines),
+                    winner_line or "no winner", loser_line or "no loser",
+                )
+    except Exception as e:
+        log.warning("Postmortem close-to-close marks unavailable: %s", e)
+    if marks_lines:
+        user_text += (
+            "\n\nPer-name DAY P&L (CLOSE-TO-CLOSE marks: prior close -> "
+            "today's close/exit on today's position — judge winners/losers by "
+            "THIS number; the entry-basis realized column is secondary):\n"
+        )
+        user_text += "\n".join(marks_lines)
 
     # Deterministic behavior diagnostics — the numeric counterpart to the prose
     # diagnosis above (which only eyeballs these from raw trade lines).

@@ -37,6 +37,18 @@ _PDT_MIN_EQUITY = 25_000.0
 # stop (R.1) — the inverse of the annualization the vol input arrived with.
 _TRADING_DAYS_SQRT = 252 ** 0.5
 
+# Corroboration gate (Aug 12-21 forensic review): the SOFT signal families —
+# smart-money follows with no independent view of the business or the tape.
+# A fresh entry cited on exactly one of these, uncorroborated by
+# fundamentals/news/technical, was the run's worst cohort (insider-cited
+# -$18,681 across 13 trades; QNT/LFTO/INTC/F/AVBC all failed fast).
+_SOFT_FAMILIES = frozenset({"insider", "congress", "options_flow"})
+# Cited buckets that never COUNT as corroboration when judging soloness:
+# "discovery" is the scanner that surfaced the name (the Jul-27 congress->
+# DISCOVERY laundering — the same soft read wearing the scanner's label) and
+# "composite" is the LLM citing the deterministic index itself.
+_NON_CORROBORATING = frozenset({"discovery", "composite"})
+
 
 def trail_geometry(limits, stop_pct: float) -> tuple[float, float]:
     """(arm_threshold_pct, giveback_pct) for a position's trailing stop.
@@ -338,6 +350,27 @@ class RiskManager:
                 "— starter positions need better than coin-flip conviction.",
             )
 
+        # Corroboration gate, reject leg (Aug 12-21 forensic review): a FRESH
+        # name whose cited signal set is exactly ONE soft family (insider /
+        # congress / options_flow) with zero fundamentals/news/technical
+        # corroboration must clear the composite bar to enter at all — the
+        # single-soft cohort (QNT, LFTO, INTC, F, AVBC) failed fast, and the
+        # autotune sweeps proved conviction floors can't express this (0
+        # trades affected at every candidate). The size haircut lives in the
+        # sizing section below; fails open on a missing composite (best-
+        # effort feed) and on missing citations. Top-ups exempt.
+        soft_solo = self._solo_soft_family(proposal, account, entry_families)
+        if soft_solo:
+            bar = getattr(self.limits, "corroboration_min_composite", 0.0)
+            if composite_score is not None and composite_score < bar:
+                return self._reject(
+                    proposal,
+                    f"CORROBORATION GATE: single-soft-signal ({soft_solo}) "
+                    f"with no fundamentals/news/technical corroboration and "
+                    f"composite {composite_score:+.2f} < {bar:+.2f} bar — one "
+                    "soft family alone doesn't earn a fresh slot.",
+                )
+
         # Expectancy gate on signal families (Jul 30 review): a FRESH entry
         # whose cited thesis families are ALL losing money over the trailing
         # window is the same trade the ledger just paid to learn (NU/NOK/BEP
@@ -380,94 +413,32 @@ class RiskManager:
 
         # Anti-chasing overextension gate (week of 2026-07-13: 68% of realized
         # losses were momentum entries near local tops — CDW/SOFI/PATH — that
-        # ran straight to their stops). Two triggers:
-        #   (a) hot AND extended: RSI >= overext_rsi AND price >= overext_atr_mult
-        #       ATRs above the 20d SMA (% fallback when ATR is unavailable);
-        #   (b) EXTREME extension alone: >= overext_extreme_atr_mult ATRs over
-        #       the 20d SMA fires regardless of RSI — the actual Jul-13 losers
-        #       entered at RSI 61-64 (under any sane RSI floor) but 3.4-4.0 ATRs
-        #       extended; the RSI leg must not muzzle a screaming extension leg.
-        # Block it, or halve the size (haircut mode) so a wrong top costs half.
-        # Fails open on missing technicals — a yfinance outage must not freeze
-        # all buying.
+        # ran straight to their stops). The trigger logic lives in
+        # _overextension_read, SHARED with the bullish-option chase gate in
+        # evaluate_option (Aug 12-21: HL re-expressed a rejected equity chase
+        # as a bull_call_spread). Block it, or halve the size (haircut mode)
+        # so a wrong top costs half. Fails open on missing technicals — a
+        # yfinance outage must not freeze all buying.
         overext_note = ""
         overext_mult = 1.0
-        if self.limits.overextension_gate_enabled and tech:
-            rsi = tech.get("rsi14")
-            # Prefer the PRIOR-day ATR denominator when the feed provides it: a
-            # gap day's own huge bar inflates today's ATR and deflates the
-            # extension read (VRRM Jul 29: 4.1x true extension read as 2.93x —
-            # under the 3.0x extreme block — because the +28% gap bar had
-            # already fattened its own yardstick).
-            ext_atr = tech.get("ext_atr_prior")
-            if ext_atr is None:
-                ext_atr = tech.get("ext_atr")
-            ext_pct = tech.get("ext_pct_sma20")
-            extended = (
-                (ext_atr is not None and ext_atr >= self.limits.overext_atr_mult)
-                or (
-                    ext_atr is None
-                    and ext_pct is not None
-                    and ext_pct >= self.limits.overext_pct
+        overext_trigger, overext_why = self._overextension_read(price, tech)
+        if overext_trigger:
+            # The EXTREME leg has its own mode: a >=Nx-ATR screaming
+            # extension is a different risk than a mild hot-and-extended
+            # entry, and defaults to a hard block (the shared "haircut" mode
+            # only halved it — CVX still bought $2,799 at 3.2xATR Jul 17).
+            mode = (
+                self.limits.overext_extreme_mode if overext_trigger == "extreme"
+                else self.limits.overextension_mode
+            )
+            if mode == "block":
+                return self._reject(
+                    proposal,
+                    f"Overextended: {overext_why} — chasing a local top; wait "
+                    "for a pullback or base.",
                 )
-            )
-            hot_and_extended = (
-                rsi is not None and rsi >= self.limits.overext_rsi and extended
-            )
-            extreme = (
-                self.limits.overext_extreme_atr_mult > 0
-                and ext_atr is not None
-                and ext_atr >= self.limits.overext_extreme_atr_mult
-            )
-            # Gap-day trigger: RSI/ATR-vs-SMA never see a ONE-DAY move, so a
-            # +28% gap open (VRRM) walked through both legs. An entry this far
-            # above the PRIOR close is a chase by definition — fires the
-            # extreme leg's mode (hard block by default).
-            gap_pct = None
-            prev_close = tech.get("prev_close")
-            if (
-                self.limits.overext_gap_pct > 0
-                and prev_close and prev_close > 0 and price > 0
-            ):
-                gap_pct = (price / prev_close - 1.0) * 100.0
-                if gap_pct >= self.limits.overext_gap_pct:
-                    extreme = True
-            gapped = (
-                gap_pct is not None and self.limits.overext_gap_pct > 0
-                and gap_pct >= self.limits.overext_gap_pct
-            )
-            if hot_and_extended or extreme:
-                if ext_atr is not None:
-                    how_far = f"{ext_atr:.1f}xATR"
-                elif ext_pct is not None:
-                    how_far = f"{ext_pct:.1f}%"
-                else:
-                    how_far = "n/a"
-                if gapped:
-                    why = (
-                        f"+{gap_pct:.0f}% above the prior close (gap-day chase; "
-                        f"{how_far} over the 20d SMA)"
-                    )
-                elif extreme and not hot_and_extended:
-                    why = f"{how_far} above the 20d SMA (extreme extension)"
-                else:
-                    why = f"RSI {rsi:.0f} and {how_far} above the 20d SMA"
-                # The EXTREME leg has its own mode: a >=Nx-ATR screaming
-                # extension is a different risk than a mild hot-and-extended
-                # entry, and defaults to a hard block (the shared "haircut" mode
-                # only halved it — CVX still bought $2,799 at 3.2xATR Jul 17).
-                mode = (
-                    self.limits.overext_extreme_mode if extreme
-                    else self.limits.overextension_mode
-                )
-                if mode == "block":
-                    return self._reject(
-                        proposal,
-                        f"Overextended: {why} — chasing a local top; wait "
-                        "for a pullback or base.",
-                    )
-                overext_mult = max(0.0, min(1.0, self.limits.overext_haircut))
-                overext_note = f" Overextension haircut x{overext_mult:g} ({why})."
+            overext_mult = max(0.0, min(1.0, self.limits.overext_haircut))
+            overext_note = f" Overextension haircut x{overext_mult:g} ({overext_why})."
 
         # Churn guards (2026-07-06 log: LLY bought 10x in one day, every 30-min
         # cycle, while all other buys starved). (a) Top-up spacing: a name bought
@@ -700,6 +671,48 @@ class RiskManager:
                     bits.append(f"stop at the {stop_pct:.1f}% vol floor")
                 starter_note = f" Starter haircut x{mult:g} ({'; '.join(bits)})."
 
+        # 1a-iii) Corroboration haircut (Aug 12-21 forensic review): the
+        #     single-soft-signal starter flagged above deploys at the starter-
+        #     haircut fraction even when its composite clears the bar. Never
+        #     stacks with the starter haircut — the two express the same
+        #     "thin evidence = half size" idea, so the max reduction wins,
+        #     not the product. Logged with the would-have-been size so the
+        #     counterfactual cohort stays measurable in the daily logs.
+        corro_note = ""
+        if soft_solo:
+            mult = max(0.0, min(1.0, self.limits.starter_haircut_mult))
+            comp_txt = (
+                "composite n/a (fails open past the bar)"
+                if composite_score is None else
+                f"composite {composite_score:+.2f} >= "
+                f"{self.limits.corroboration_min_composite:+.2f}"
+            )
+            if starter_note:
+                log.info(
+                    "CORROBORATION GATE: %s single-soft-signal (%s) — starter "
+                    "haircut already took x%g; max reduction wins, not "
+                    "stacking (size stays $%s; %s).",
+                    proposal.symbol, soft_solo, mult,
+                    f"{target_notional:,.0f}", comp_txt,
+                )
+                corro_note = (
+                    f" Corroboration gate: single soft family ({soft_solo}); "
+                    "starter haircut already applied — not halving twice."
+                )
+            else:
+                would_be = target_notional
+                target_notional *= mult
+                log.info(
+                    "CORROBORATION GATE: %s single-soft-signal (%s) — size "
+                    "halved to $%s from $%s (%s).",
+                    proposal.symbol, soft_solo,
+                    f"{target_notional:,.0f}", f"{would_be:,.0f}", comp_txt,
+                )
+                corro_note = (
+                    f" Corroboration haircut x{mult:g} "
+                    f"(single soft family: {soft_solo})."
+                )
+
         # 1b) Market-regime scaling — shrink size in a risk-off backdrop (SPY below
         #     its 200dma / elevated VIX). 1.0 in a calm uptrend; clamped to [0,1]
         #     so it can only ever REDUCE size, never inflate it.
@@ -896,8 +909,119 @@ class RiskManager:
                 + (" Reduced from request." if resized else "")
                 + overext_note
                 + starter_note
+                + corro_note
             ),
         )
+
+    # -- shared anti-chase / overextension read ------------------------------ #
+    def _overextension_read(
+        self, price: float, tech: dict | None,
+    ) -> tuple[str, str]:
+        """The anti-chasing overextension read shared by equity buys and
+        BULLISH option debits (Aug 12-21 forensic: HL's equity buy was
+        rejected as overextended at RSI 70 / 4.2xATR, and the SAME thesis
+        re-expressed as a $5,200 bull_call_spread walked straight past the
+        gate to -67.6% in 21h — the two paths must read the same tape).
+
+        Returns (trigger, why):
+          ""        — clean, or no data (fails open: a yfinance outage must
+                      not freeze all buying), or the gate is disabled;
+          "hot"     — RSI >= overext_rsi AND price >= overext_atr_mult ATRs
+                      over the 20d SMA (% fallback when ATR is unavailable);
+          "extreme" — >= overext_extreme_atr_mult ATRs over the 20d SMA
+                      regardless of RSI (the Jul-13 losers entered at RSI
+                      61-64 but 3.4-4.0 ATRs extended), or a gap-day chase
+                      >= overext_gap_pct above the PRIOR close (VRRM Jul 29).
+
+        `price` feeds only the gap leg; pass 0 when unknown (that leg then
+        fails open like the rest)."""
+        if not self.limits.overextension_gate_enabled or not tech:
+            return "", ""
+        rsi = tech.get("rsi14")
+        # Prefer the PRIOR-day ATR denominator when the feed provides it: a
+        # gap day's own huge bar inflates today's ATR and deflates the
+        # extension read (VRRM Jul 29: 4.1x true extension read as 2.93x —
+        # under the 3.0x extreme block — because the +28% gap bar had
+        # already fattened its own yardstick).
+        ext_atr = tech.get("ext_atr_prior")
+        if ext_atr is None:
+            ext_atr = tech.get("ext_atr")
+        ext_pct = tech.get("ext_pct_sma20")
+        extended = (
+            (ext_atr is not None and ext_atr >= self.limits.overext_atr_mult)
+            or (
+                ext_atr is None
+                and ext_pct is not None
+                and ext_pct >= self.limits.overext_pct
+            )
+        )
+        hot_and_extended = (
+            rsi is not None and rsi >= self.limits.overext_rsi and extended
+        )
+        extreme = (
+            self.limits.overext_extreme_atr_mult > 0
+            and ext_atr is not None
+            and ext_atr >= self.limits.overext_extreme_atr_mult
+        )
+        # Gap-day trigger: RSI/ATR-vs-SMA never see a ONE-DAY move, so a
+        # +28% gap open (VRRM) walked through both legs. An entry this far
+        # above the PRIOR close is a chase by definition — fires the
+        # extreme leg's mode (hard block by default).
+        gap_pct = None
+        prev_close = tech.get("prev_close")
+        if (
+            self.limits.overext_gap_pct > 0
+            and prev_close and prev_close > 0 and price > 0
+        ):
+            gap_pct = (price / prev_close - 1.0) * 100.0
+            if gap_pct >= self.limits.overext_gap_pct:
+                extreme = True
+        gapped = (
+            gap_pct is not None and self.limits.overext_gap_pct > 0
+            and gap_pct >= self.limits.overext_gap_pct
+        )
+        if not (hot_and_extended or extreme):
+            return "", ""
+        if ext_atr is not None:
+            how_far = f"{ext_atr:.1f}xATR"
+        elif ext_pct is not None:
+            how_far = f"{ext_pct:.1f}%"
+        else:
+            how_far = "n/a"
+        if gapped:
+            why = (
+                f"+{gap_pct:.0f}% above the prior close (gap-day chase; "
+                f"{how_far} over the 20d SMA)"
+            )
+        elif extreme and not hot_and_extended:
+            why = f"{how_far} above the 20d SMA (extreme extension)"
+        else:
+            why = f"RSI {rsi:.0f} and {how_far} above the 20d SMA"
+        return ("extreme" if extreme else "hot"), why
+
+    # -- corroboration gate: solo-soft-family read --------------------------- #
+    def _solo_soft_family(
+        self, proposal: TradeProposal, account: AccountSnapshot,
+        entry_families: set[str] | None,
+    ) -> str:
+        """The soft family name when a FRESH entry's cited signal set boils
+        down to exactly ONE soft family (insider / congress / options_flow)
+        with zero fundamentals/news/technical corroboration; "" otherwise.
+        "discovery"/"composite" citations are ignored when judging soloness —
+        the scanner surfacing the name is the same soft read wearing another
+        label (Jul-27 congress->DISCOVERY laundering), and the composite is
+        the index citing itself. Fails open on missing citations; top-ups are
+        exempt (the position already earned its slot at entry)."""
+        if not getattr(self.limits, "corroboration_gate_enabled", False):
+            return ""
+        if not entry_families or account.position_for(proposal.symbol) is not None:
+            return ""
+        effective = set(entry_families) - _NON_CORROBORATING
+        if len(effective) == 1:
+            fam = next(iter(effective))
+            if fam in _SOFT_FAMILIES:
+                return fam
+        return ""
 
     # -- options: defined-risk premium gate -------------------------------- #
     def evaluate_option(
@@ -911,6 +1035,7 @@ class RiskManager:
         name_trend: str = "",
         sanctioned_hedge: bool = False,
         name_ext_pct: float | None = None,
+        tech: dict | None = None,
     ) -> RiskDecision:
         """Size a defined-risk options play by capped DEBIT. Max loss on a long
         option / debit spread is the premium paid, so we bound that premium to a
@@ -937,7 +1062,9 @@ class RiskManager:
         below) — a sharp short-term breakdown keeps its put candidacy even
         while the name still sits above its 200dma (Jul 30 review: NU/NOK
         broke hard yet read name_trend="up", so every put died at the
-        gate)."""
+        gate). `tech` is the UNDERLYING's technicals dict (rsi14 / ext_atr /
+        prev_close / price — the same dict _evaluate_buy's anti-chase gate
+        reads) for the bullish-option chase gate; None fails open."""
         if not self.limits.options_enabled:
             return self._reject(proposal, "Options trading disabled (OPTIONS_ENABLED=off).")
         # Same account-wide gate as equity buys: halt latch, kill switch, daily
@@ -998,6 +1125,45 @@ class RiskManager:
                 f"— sub-floor premium is a deep-OTM/illiquid lottery ticket.",
             )
 
+        # Anti-chase parity for BULLISH structures (Aug 12-21 forensic: HL's
+        # equity buy was rejected as overextended at RSI 70 / 4.2xATR, and the
+        # SAME thesis re-expressed as a $5,200 bull_call_spread bypassed the
+        # gate entirely and lost -67.6% in 21h). The UNDERLYING runs through
+        # the exact read _evaluate_buy uses: hot-and-extended haircuts the
+        # premium budget; an extreme extension / gap-day chase follows the
+        # extreme mode (hard block by default). Bearish structures are exempt
+        # — a put on a falling name is the OPPOSITE of an upside chase and
+        # must never be muzzled by upside overextension. Fails open on
+        # missing technicals, like the equity gate.
+        rights = {
+            "c" if leg.right.lower().startswith("c") else "p"
+            for leg in proposal.option_legs
+        }
+        chase_mult = 1.0
+        chase_note = ""
+        if rights == {"c"}:
+            under_price = float((tech or {}).get("price") or 0.0)
+            trigger, why = self._overextension_read(under_price, tech)
+            if trigger:
+                mode = (
+                    self.limits.overext_extreme_mode if trigger == "extreme"
+                    else self.limits.overextension_mode
+                )
+                if mode == "block":
+                    return self._reject(
+                        proposal,
+                        f"OPTION CHASE GATE: underlying overextended — {why} — "
+                        "a bullish option debit is the same chase the equity "
+                        "gate blocks; wait for a pullback or base.",
+                    )
+                chase_mult = max(0.0, min(1.0, self.limits.overext_haircut))
+                chase_note = f" Option chase haircut x{chase_mult:g} ({why})."
+                log.info(
+                    "OPTION CHASE GATE: %s bullish structure on an "
+                    "overextended underlying (%s) — premium budget x%g.",
+                    proposal.symbol, why, chase_mult,
+                )
+
         equity = account.equity
         cap = equity * (self.limits.max_option_premium_pct / 100.0)
         # Regime-scaled premium budget: equity sizing already shrinks with the
@@ -1006,11 +1172,66 @@ class RiskManager:
         # only — the model's own max_premium_usd stays an absolute ceiling.
         if self.limits.regime_filter_enabled:
             cap *= max(0.0, min(1.0, regime_multiplier))
+        # Anti-chase haircut (computed above): an overextended underlying's
+        # bullish debit deploys at the haircut fraction, like an equity buy.
+        cap *= chase_mult
         if proposal.max_premium_usd is not None:
             cap = min(cap, proposal.max_premium_usd)
 
         # premium quoted per share; one contract = 100 shares
         per_contract_cost = est_premium_per_contract * 100.0
+
+        # Per-underlying premium concentration cap (Aug 12-21 forensic: AMZN
+        # stacked ~$29.8k of open premium across structures on ONE underlying
+        # and lost -$14,956 — max_option_premium_pct bounds each PLAY, so
+        # nothing bounded the pile-up). Sum the OPEN option lots' net premium
+        # for this underlying (same basis math as the watchdog's premium
+        # exits: long legs debit, short legs negative qty credit) and keep
+        # existing + new debit under the cap: the budget is clamped into the
+        # remaining headroom, and rejected when one contract no longer fits.
+        # Sanctioned hedges are EXEMPT: the falling-market index put and the
+        # put-liquidity proxy route ALL crash protection through one or two
+        # fixed underlyings (core ETF / put_proxy_etf) by design, so a
+        # concentration cap on that venue would halve — then hard-block —
+        # further downside protection exactly in the falling tape it exists
+        # for. Each sanctioned play is still bounded by max_option_premium_pct
+        # and the direction gate's own sanction plumbing.
+        per_under_pct = getattr(self.limits, "per_underlying_premium_pct", 0.0)
+        if per_under_pct > 0 and sanctioned_hedge:
+            log.info(
+                "PER-UNDERLYING PREMIUM CAP: %s exempt (sanctioned hedge / "
+                "proxy put — venue concentration must not cap crash "
+                "protection).", proposal.symbol.upper(),
+            )
+        if per_under_pct > 0 and not sanctioned_hedge:
+            from .execution.options import parse_occ
+            under = proposal.symbol.upper()
+            open_premium = max(0.0, sum(
+                p.avg_entry_price * p.qty * 100.0
+                for p in account.positions if p.is_option
+                for occ in [parse_occ(p.symbol)] if occ and occ[0] == under
+            ))
+            under_cap = equity * (per_under_pct / 100.0)
+            under_room = under_cap - open_premium
+            if under_room < per_contract_cost:
+                return self._reject(
+                    proposal,
+                    f"PER-UNDERLYING PREMIUM CAP: ${open_premium:,.0f} open "
+                    f"option premium on {under} + "
+                    f"${per_contract_cost:,.0f}/contract new debit would "
+                    f"exceed ${under_cap:,.0f} ({per_under_pct:g}% of equity) "
+                    "— one underlying must not concentrate the option book "
+                    "(AMZN Aug-12).",
+                )
+            if cap > under_room:
+                log.info(
+                    "PER-UNDERLYING PREMIUM CAP: %s debit budget clamped "
+                    "$%s -> $%s (open premium $%s of $%s cap).",
+                    under, f"{cap:,.0f}", f"{under_room:,.0f}",
+                    f"{open_premium:,.0f}", f"{under_cap:,.0f}",
+                )
+                cap = under_room
+
         contracts = int(cap / per_contract_cost)
         if contracts < 1:
             return self._reject(
@@ -1034,7 +1255,10 @@ class RiskManager:
             verdict=RiskVerdict.APPROVED,
             approved_qty=float(contracts),
             approved_notional=spent,
-            reason=f"{contracts} contract(s), ${spent:,.0f} debit (cap ${cap:,.0f}).",
+            reason=(
+                f"{contracts} contract(s), ${spent:,.0f} debit "
+                f"(cap ${cap:,.0f})." + chase_note
+            ),
         )
 
     # -- option direction vs long-run market trend --------------------------- #
