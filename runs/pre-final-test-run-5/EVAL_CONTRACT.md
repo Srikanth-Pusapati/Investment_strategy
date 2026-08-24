@@ -5,8 +5,8 @@
 | | |
 |---|---|
 | Window | **Mon 2026-08-24 → Fri 2026-09-04** (10 trading days) |
-| Account | Alpaca paper `PA3IRR2BT9FT`, flattened at the 2026-08-24 open (`scripts/flatten_and_restart.py`), local state reset |
-| Starting equity | recorded in Todo-4.txt at day-1 post-flatten (~09:40 ET Aug 24) |
+| Account | Alpaca paper `PA394CJ4TNL5` — **brand-new account** (user-issued keys, pre-open Aug 24), options level 3, zero positions; local state fresh-cycled 00:16 ET Aug 24. Supersedes the flatten-at-open plan for old acct PA3IRR2BT9FT (amended pre-window, before day 1). |
+| Starting equity | **$1,000,000.00 exactly** (clean account, no flatten noise) |
 | Config | frozen at the run-5 ship commit on `feature/preview` (roadmap ranks 1–8); `.env`: KELLY_FRACTION=0.5, TARGET_ANNUAL_VOL_PCT=25.0, MAX_OPTION_POSITIONS=5, all new gates at config defaults |
 | Verdict tool | `scripts/eval_contract_check.py --start 2026-08-24 --end 2026-09-04` (plain-python recompute of trades.jsonl + equity_history.jsonl; no bot imports) |
 

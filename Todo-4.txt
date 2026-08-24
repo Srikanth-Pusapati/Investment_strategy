@@ -104,3 +104,11 @@ OBSERVATIONS LOG (append-only; date every entry; newest at the bottom)
             next probe + FEEDS: line at the open). claude-daily verified end-
             to-end (loaded, exit 0, headless auth OK). Flatten waiter armed
             (pid 95963) for 09:31 ET. Run-5 clock starts at today's open.
+2026-08-24  01:20 ET AMENDED PRE-WINDOW: user issued NEW paper account keys —
+            PA394CJ4TNL5, ACTIVE, options level 3, STARTING EQUITY EXACTLY
+            $1,000,000. Flatten waiter retired (nothing to flatten on a fresh
+            account); fresh_cycle ran 00:16 ET (old PA3IRR2BT9FT state archived
+            to state/archive/20260824T051638Z); bot relaunched pid 15598 on the
+            new code + new account; RH health latch clean (auth_dead=false);
+            deadman quiet through the swap (flatten.hold honored). Contract
+            updated with the new account + $1M start. Day 1 = today's open.
