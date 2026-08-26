@@ -117,6 +117,9 @@ them explicitly so the profile is self-describing. Never commit `.env`.
     AUTO_HEDGE_MAX_PCT=40            # CHANGE (live line 234 = 15)
     # item 8 — clean window
     RESET_CARRY_CHURN=off
+    # review fixes (Aug 26) — new keys, run-6 defaults
+    FINNHUB_INSIDER_LAG_DAYS=30      # Finnhub Form-4 keeps its pre-taxonomy weight (~0.23)
+    OPTIONS_BLACKOUT_PUTS=on         # single-name puts also blocked into a print
 
 Verify: `grep -nE '^(SCREENER_SOURCES|AUTO_HEDGE_MAX_PCT|EXPECTANCY_GATE)' .env`
 must show exactly the values above (and no `EXPECTANCY_GATE=on`).
@@ -167,3 +170,48 @@ Record the equity at the flatten in `Todo-4.txt` as day-0 equity.
         --beta-target 1.0 --beta-json state/risk_state.json
     # export spy/qqq/iwm csv with the snippet in the script's --help epilog
     # exit 0 GO / 2 NO-GO / 3 PENDING (expected for a single window: pooled N < 60)
+
+## Review fixes (Aug 26 review of the change-set)
+
+All behind the run-6 defaults; the two new `.env` keys are listed in section 1.
+
+- **Beta shrinkage toward sign(beta)** (`portfolio/beta.py::shrink`): an
+  inverse ETF now shrinks toward -1, so PSQ measures ~-1.1 in the book instead
+  of -0.76. The beta hedge no longer re-arms against its own under-measured
+  hedge, and the buy-path `BOOK BETA CAP` reads the true book beta.
+- **Bearish precheck without a composite** (`orchestrator._bear_precheck_names`):
+  a slate name whose bearish lean lives only in the DISCOVERY score (insider-sell
+  discovery, PR #41) now reaches `put_precheck` / `put_eligibility` via
+  `_bearish_lean`, so excluding DISCOVERY from the composite does not shrink
+  the bearish funnel.
+- **Finnhub insider lag preserved** (`signals/history.py::SOURCE_LAG_DAYS`,
+  `FINNHUB_INSIDER_LAG_DAYS=30`): the CONGRESS -> INSIDER taxonomy move no
+  longer re-weights the Finnhub Form-4 signal ~4x in the composite (contract:
+  no re-weighting before >= 60 IC dates). `lag_weight(kind, source)`; the
+  composite weights per signal (identical to before when one lag per kind).
+  sec-edgar insider signals unchanged (2d).
+- **Option fallback queue** (`orchestrator._option_fallback_allowed`): with
+  `OPTIONS_SINGLE_NAME_BULLISH=off` an overextended single-name buy no longer
+  queues a `decide_option_fallback` LLM call the risk layer would reject
+  unconditionally; index/configured-ETF underlyings still queue.
+- **Close row timing**: only the 16:xx ET closed tick mints `basis='close'`; a
+  later start writes ONE `basis='late'` row (visible to the checker, never
+  overwritten). A non-session day (Labor Day Sep 7) writes nothing
+  (`AlpacaClient.is_trading_day`, fails open on a calendar read error).
+- **Config enum validation** (`config._choice`): a typo in
+  `LLM_SELL_AUTHORITY` / `AUTO_HEDGE_MODE` logs a WARNING and uses the run-6
+  default (`events_only` / `beta`) instead of silently taking the legacy branch.
+- **Put blackout is explicit** (`OPTIONS_BLACKOUT_PUTS`, default on): single-
+  name puts stay blocked into a print (a long-vol debit loses to the IV crush
+  either way); `off` lets puts through while calls stay blocked.
+- **Rotation guard**: a loss-locking rotation sell that has REACHED its planned
+  stop goes through the release ladder again (it would be approved downstream
+  as "stop reached"); only the never-executes case (no event, stop not
+  reached) bypasses to the risk layer.
+- **Ops**: `signals/history.py` env reads can no longer raise at import;
+  reconcile does ONE `get_order_by_id` per FILLED order
+  (`AlpacaClient.order_fill_full`); `ledger.set_fill` writes `fill_ts=None`
+  when the broker gave no `filled_at` (never "now").
+
+Not changed (disagreements noted in the change-set result): none — every
+finding was applied.

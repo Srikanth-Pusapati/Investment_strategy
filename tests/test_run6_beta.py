@@ -134,7 +134,7 @@ def test_book_beta_reading_line_and_weights():
     r = bb.read(acct)
     assert r.available and not r.unknown
     hot = shrink(2.0)                  # 1.8
-    psq = shrink(-1.2)                 # -0.76
+    psq = shrink(-1.2)                 # -1.16 (toward -1: review fix)
     assert abs(r.spy - (0.3 * hot + 0.1 * psq)) < 1e-6
     assert abs(r.invested_pct - 40.0) < 1e-9
     line = r.line()

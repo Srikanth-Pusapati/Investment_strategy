@@ -93,18 +93,23 @@ def composite_score(
     line, the bearish-lean read still uses it.
     """
     perf_w = perf_w or {}
-    by_kind: dict[SignalKind, list[float]] = {}
+    # Per-kind list of (score, lag weight). The lag weight is per SIGNAL so a
+    # provider-level override (history.SOURCE_LAG_DAYS: the Finnhub insider
+    # feed keeps its pre-taxonomy 30d lag) can differ from the kind's; with
+    # one lag per kind this reduces exactly to mean(scores) x lag_weight(kind).
+    by_kind: dict[SignalKind, list[tuple[float, float]]] = {}
     for s in bundle.signals:
         if s.score is None:
             continue
         if s.kind is SignalKind.DISCOVERY and not include_discovery:
             continue
-        by_kind.setdefault(s.kind, []).append(s.score)
+        lw = lag_weight(s.kind, getattr(s, "source", None))
+        by_kind.setdefault(s.kind, []).append(
+            (s.score, lw if lw is not None else 1.0))
     if not by_kind:
         return None
     total = 0.0
-    for kind, scores in by_kind.items():
-        mean = sum(scores) / len(scores)
-        lw = lag_weight(kind)
-        total += mean * (lw if lw is not None else 1.0) * perf_w.get(kind.value, 1.0)
+    for kind, pairs in by_kind.items():
+        weighted_mean = sum(sc * lw for sc, lw in pairs) / len(pairs)
+        total += weighted_mean * perf_w.get(kind.value, 1.0)
     return round(total, 2)

@@ -343,9 +343,10 @@ class TradeLedger:
                             and obj.get("action") in ("buy", "sell")):
                         obj["fill_price"] = round(float(fill_price), 4)
                         obj["fill_qty"] = float(fill_qty)
+                        # No broker filled_at -> None, never "now": the
+                        # field means the FILL time or nothing (review fix).
                         obj["fill_ts"] = (
-                            fill_ts.isoformat() if fill_ts is not None
-                            else _now().isoformat()
+                            fill_ts.isoformat() if fill_ts is not None else None
                         )
                         out.append(json.dumps(obj))
                         hit = True

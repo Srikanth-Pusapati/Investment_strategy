@@ -172,10 +172,11 @@ class EquityHistory:
     def all(self) -> list[dict]:
         return sorted(self._read(), key=lambda r: r.get("date", ""))
 
-    def has_close_row(self, day: str) -> bool:
-        """True when `day` already has its fixed basis='close' row."""
+    def has_close_row(self, day: str, bases: tuple[str, ...] = ("close",)) -> bool:
+        """True when `day` already has its fixed post-bell row (basis in
+        `bases`; 'late' = stamped by a bot started after the 16:xx tick)."""
         return any(
-            r.get("date") == day and r.get("basis") == "close"
+            r.get("date") == day and r.get("basis") in bases
             for r in self._read()
         )
 

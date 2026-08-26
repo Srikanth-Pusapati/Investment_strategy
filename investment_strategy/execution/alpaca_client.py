@@ -28,6 +28,7 @@ from alpaca.data.timeframe import TimeFrame
 from alpaca.trading.client import TradingClient
 from alpaca.trading.enums import OrderClass, OrderSide, QueryOrderStatus, TimeInForce
 from alpaca.trading.requests import (
+    GetCalendarRequest,
     GetOrdersRequest,
     GetPortfolioHistoryRequest,
     LimitOrderRequest,
@@ -996,9 +997,19 @@ class AlpacaClient:
             log.warning("open_stop_sells(%s) failed: %s", symbol, e)
         return out
 
-    def order_fill(self, order_id: str) -> tuple[str, float, float]:
-        """(status, filled_qty, qty) for an order — for post-hoc fill reconciliation.
-        Returns ('unknown', 0, 0) if the order can't be fetched."""
+    @staticmethod
+    def _fill_detail_of(o) -> dict:
+        return {
+            "price": float(getattr(o, "filled_avg_price", 0) or 0),
+            "qty": float(getattr(o, "filled_qty", 0) or 0),
+            "filled_at": getattr(o, "filled_at", None),
+        }
+
+    def order_fill_full(self, order_id: str) -> tuple[str, float, float, dict]:
+        """(status, filled_qty, qty, fill_detail) from ONE get_order_by_id —
+        reconcile used to read the order twice (order_fill + order_fill_detail)
+        per FILLED order (review fix). ('unknown', 0, 0, {}) when the order
+        can't be fetched."""
         try:
             o = self.trading.get_order_by_id(order_id)
             status = getattr(o, "status", "")
@@ -1009,25 +1020,40 @@ class AlpacaClient:
                 str(status).lower(),
                 float(getattr(o, "filled_qty", 0) or 0),
                 float(getattr(o, "qty", 0) or 0),
+                self._fill_detail_of(o),
             )
         except Exception as e:
             log.warning("order_fill(%s) failed: %s", order_id, e)
-            return ("unknown", 0.0, 0.0)
+            return ("unknown", 0.0, 0.0, {})
+
+    def order_fill(self, order_id: str) -> tuple[str, float, float]:
+        """(status, filled_qty, qty) for an order — for post-hoc fill reconciliation.
+        Returns ('unknown', 0, 0) if the order can't be fetched."""
+        return self.order_fill_full(order_id)[:3]
 
     def order_fill_detail(self, order_id: str) -> dict:
         """Broker-reported fill facts for a FILLED order (run-6 item 1e):
         {'price': filled_avg_price, 'qty': filled_qty, 'filled_at': datetime|None}.
         Read-only; {} when the order can't be fetched."""
+        return self.order_fill_full(order_id)[3]
+
+    def is_trading_day(self, day) -> Optional[bool]:
+        """True/False when the exchange calendar says `day` (a date) is / is
+        not a session; None when the calendar read fails (callers fail open).
+        Feeds the fixed close stamp so a holiday (Labor Day inside the run-6
+        window) never mints a phantom basis='close' row."""
         try:
-            o = self.trading.get_order_by_id(order_id)
-            return {
-                "price": float(getattr(o, "filled_avg_price", 0) or 0),
-                "qty": float(getattr(o, "filled_qty", 0) or 0),
-                "filled_at": getattr(o, "filled_at", None),
-            }
+            cal = _retry_read(
+                lambda: self.trading.get_calendar(
+                    GetCalendarRequest(start=day, end=day)),
+                what="get_calendar",
+            )
+            return any(
+                str(getattr(c, "date", "")) == day.isoformat() for c in cal or []
+            )
         except Exception as e:
-            log.warning("order_fill_detail(%s) failed: %s", order_id, e)
-            return {}
+            log.warning("is_trading_day(%s) failed: %s", day, e)
+            return None
 
     def closed_sell_orders(self, limit: int = 500) -> list[dict]:
         """Recently CLOSED (terminal-state) SELL orders from the broker, newest

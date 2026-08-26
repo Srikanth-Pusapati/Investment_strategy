@@ -1107,12 +1107,8 @@ class Orchestrator:
         # and the funnel line. Only ON-SLATE names: the model must never be
         # asked to trade a name whose data was partitioned out of the prompt.
         self._bear_eligibility = {}
-        if self.options is not None and composites:
-            _bear_bar = self.cfg.screener.bearish_reserve_bar or 0.4
-            _slate_syms = {b.symbol for b in bundles}
-            for _sym, _comp in composites.items():
-                if _comp > -_bear_bar or _sym not in _slate_syms:
-                    continue
+        if self.options is not None:
+            for _sym in self._bear_precheck_names(bundles, composites or {}):
                 self._bear_eligibility[_sym] = self.risk.put_precheck(
                     _sym, account,
                     (_reg.trend if _reg else ""),
@@ -1456,7 +1452,15 @@ class Orchestrator:
                 if et.weekday() >= 5 or (et.hour * 60 + et.minute) < 16 * 60:
                     return
                 day = et.date().isoformat()
-                if self.equity_history.has_close_row(day):
+                if self.equity_history.has_close_row(day, ("close", "late")):
+                    return
+                # Review fix (Aug 26): a holiday inside the window (Labor Day
+                # Sep 7) is not a session — no row at all (a phantom
+                # day_pl=0 session would enter max_drawdown/worst_day).
+                # Calendar read failure = None = fail open (stamp).
+                is_day = getattr(self.broker, "is_trading_day", None)
+                if callable(is_day) and is_day(et.date()) is False:
+                    log.info("Equity close row skipped for %s (not a session).", day)
                     return
                 bb = getattr(self, "_book_beta_reading", None)
                 extra = (
@@ -1464,10 +1468,15 @@ class Orchestrator:
                     if bb is not None and getattr(bb, "spy", None) is not None
                     else None
                 )  # item 8: ex-ante beta on the close row (eval beta-adjust)
+                # Only the 16:xx ET tick may mint the immutable 'close' row;
+                # a bot (re)started later stamps after-hours marks and says
+                # so (basis='late') so the checker can see the row is not a
+                # bell mark. Also written once, never overwritten.
+                basis = "close" if et.hour == 16 else "late"
                 self.equity_history.snapshot(
-                    compute_status(self.broker), basis="close", day=day,
+                    compute_status(self.broker), basis=basis, day=day,
                     extra=extra)
-                log.info("Equity close row stamped for %s (basis=close).", day)
+                log.info("Equity close row stamped for %s (basis=%s).", day, basis)
                 return
             rows = self.equity_history.all()
             today = datetime.now(timezone.utc).date().isoformat()
@@ -1591,18 +1600,42 @@ class Orchestrator:
         )
         return True
 
-    def _stamp_fill(self, oid: str, symbol: str, filled: float) -> dict | None:
+    def _option_fallback_allowed(self, symbol: str) -> bool:
+        """Is a same-cycle CALL fallback on `symbol` even admissible under the
+        single-name bullish gate? True when the knob is on, or the underlying
+        is an index the gate exempts (SPY/QQQ/IWM/DIA + the configured
+        core/hedge/proxy/defensive ETFs)."""
+        r = getattr(getattr(self, "cfg", None), "risk", None)
+        if getattr(r, "options_single_name_bullish", True):
+            return True
+        from .risk import _INDEX_UNDERLYINGS
+        sym = (symbol or "").upper()
+        cfg = getattr(self, "cfg", None)
+        idx = {
+            str(x).upper() for x in (
+                getattr(cfg, "core_etf", ""), getattr(cfg, "hedge_etf", ""),
+                getattr(cfg, "put_proxy_etf", ""),
+                getattr(cfg, "defensive_core_etf", ""),
+                getattr(self, "_hedge_symbol", ""),
+            ) if x
+        }
+        return sym in _INDEX_UNDERLYINGS or sym in idx
+
+    def _stamp_fill(self, oid: str, symbol: str, filled: float,
+                    detail: dict | None = None) -> dict | None:
         """Run-6 item 1e: pull the broker's filled_avg_price / qty / time for a
         FILLED order and write them onto the ledger row (TradeLedger.set_fill).
-        Returns the fill dict (with 'stamped') or None when disabled / not
-        readable. Best-effort — never raises into reconcile."""
+        `detail` is the fill dict reconcile already got from order_fill_full
+        (one REST read per order — review fix); without it the legacy
+        order_fill_detail read runs. Returns the fill dict (with 'stamped')
+        or None when disabled / not readable. Best-effort — never raises."""
         if not getattr(self.cfg, "ledger_fill_prices", True):
             return None
         reader = getattr(self.broker, "order_fill_detail", None)
-        if not callable(reader):
+        if detail is None and not callable(reader):
             return None
         try:
-            fill = reader(oid) or {}
+            fill = dict(detail) if detail is not None else (reader(oid) or {})
             price = float(fill.get("price") or 0.0)
             if price <= 0:
                 return None
@@ -1642,7 +1675,12 @@ class Orchestrator:
         self._pending_oids = []
         mismatches: list[str] = []
         for oid, symbol in pending:
-            status, filled, qty = self.broker.order_fill(oid)
+            full = getattr(self.broker, "order_fill_full", None)
+            detail = None
+            if callable(full):
+                status, filled, qty, detail = full(oid)
+            else:
+                status, filled, qty = self.broker.order_fill(oid)
             # EXIT-side intents (watchdog stops/takes/flattens/option closes)
             # self-heal: the watchdog resubmits every tick until the position
             # is gone, and the correction below trues up the ledger. Their
@@ -1652,7 +1690,7 @@ class Orchestrator:
             # intents (the GA-2.1 phantom-BUY class) still halt.
             is_exit = self.state.exit_was_ledgered(symbol, oid)
             if status == "filled":
-                fill = self._stamp_fill(oid, symbol, filled)
+                fill = self._stamp_fill(oid, symbol, filled, detail=detail)
                 if fill:
                     log.info(
                         "Order %s (%s) FILLED (%g/%g) @ %.4f x %g%s.",
@@ -2089,6 +2127,16 @@ class Orchestrator:
             tags.append("regime_flip:risk-off")
         return tuple(tags)
 
+    def _reached_planned_stop(self, symbol: str, pos) -> bool:
+        """True when `pos` sits at/below the planned stop width recorded at
+        entry (state.get_stop_width) — the same read _evaluate_sell uses to
+        approve a loser under events-only authority. Unknown width = False."""
+        try:
+            w = float(self.state.get_stop_width(symbol) or 0.0)
+        except Exception:  # noqa: BLE001
+            return False
+        return w > 0 and float(getattr(pos, "unrealized_pl_pct", 0.0) or 0.0) <= -w
+
     def _apply_rotation_guard(self, proposals, account, composites):
         """Enforce the rotation edge the prompt only ASKS for: a SELL that locks
         in a real loss to free capital for a new name must be displaced by a
@@ -2155,9 +2203,14 @@ class Orchestrator:
             # edge) is moot for it. Pass it straight to the risk layer, which
             # rejects it with the one countable 'SELL AUTHORITY' line instead
             # of a rotation veto that would hide the counterfactual.
+            # Review fix (Aug 26): a loser that has REACHED its planned stop
+            # would be approved downstream as "stop reached", so it must
+            # still earn the release ladder here — only the never-executes
+            # case (no event AND stop not reached) skips it.
             if (
                 self._sell_authority() == "events_only"
                 and not self._sell_event_tags(p.symbol, account)
+                and not self._reached_planned_stop(p.symbol, pos)
             ):
                 kept.append(p)
                 continue
@@ -2572,6 +2625,30 @@ class Orchestrator:
                 )
                 log.warning("Bearish verdict: %s ELIGIBLE but IGNORED — %s.",
                             s, why)
+
+    def _bear_precheck_names(self, bundles, composites: dict) -> list[str]:
+        """ON-SLATE names that get a put-gate precheck: composite <= -bar, OR
+        (review fix, Aug 26) a bundle with NO composite whose bearish lean
+        lives in the DISCOVERY score — the run-6 composite excludes discovery,
+        so the insider-sell discovery path (PR #41) would otherwise never
+        reach put_precheck / put_eligibility and the 0/83 sleeve would shrink
+        structurally. `_bearish_lean` still reads discovery."""
+        bar = self.cfg.screener.bearish_reserve_bar or 0.4
+        out: list[str] = []
+        for b in bundles:
+            comp = composites.get(b.symbol)
+            if comp is None:
+                comp = getattr(b, "composite_score", None)
+            if comp is not None:
+                eligible = comp <= -bar
+            else:
+                try:
+                    eligible = self._bearish_lean(b)
+                except Exception:  # noqa: BLE001 — a precheck, never a blocker
+                    eligible = False
+            if eligible:
+                out.append(b.symbol)
+        return out
 
     def _bearish_lean(self, bundle) -> bool:
         """True when the bundle's evidence leans bearish enough to justify
@@ -3871,11 +3948,17 @@ class Orchestrator:
             # CHASE GATE re-reads the same tape (a hot-but-not-extreme name
             # deploys at the haircut; an extreme/gap chase is re-blocked).
             # Calls trade WITH the tape only, so skip in a down-trend market.
+            # Review fix (Aug 26): with OPTIONS_SINGLE_NAME_BULLISH=off the
+            # fallback is a CALL on a single name that evaluate_option will
+            # reject unconditionally — don't spend the LLM call (or a
+            # journal row against the per-day attempt cap) unless the knob
+            # is on or the underlying is an index the gate exempts.
             if (
                 is_buy
                 and self.options is not None
                 and self._regime_trend != "down"
                 and decision.reason.startswith("Overextended")
+                and self._option_fallback_allowed(proposal.symbol)
             ):
                 self._option_fallbacks.append((proposal, decision.reason))
             return 0.0

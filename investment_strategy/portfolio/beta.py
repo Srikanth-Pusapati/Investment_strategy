@@ -96,10 +96,17 @@ def raw_beta(
 
 
 def shrink(beta: float | None, factor: float = SHRINK) -> float | None:
-    """beta_shrunk = factor * beta + (1 - factor) * 1.0 (None passes through)."""
+    """beta_shrunk = factor * beta + (1 - factor) * sign(beta) (None passes
+    through). The prior is the market beta of the instrument's OWN SIGN: a
+    long name shrinks toward +1, an inverse ETF toward -1. Shrinking PSQ
+    (raw ~ -1.2) toward +1 read it at -0.76, so a hedge sized on a -1 beta
+    only moved the MEASURED book beta by 76% of the gap, re-armed the hedge
+    next cycle and overstated the buy-path BOOK BETA CAP reading (review
+    fix, Aug 26)."""
     if beta is None:
         return None
-    return factor * beta + (1.0 - factor) * 1.0
+    prior = -1.0 if beta < 0 else 1.0
+    return factor * beta + (1.0 - factor) * prior
 
 
 def aggregate(weights: dict[str, float], betas: dict[str, float | None]) -> float:

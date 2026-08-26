@@ -5,6 +5,7 @@ switch, and every hard risk limit. Nothing else should read os.environ directly.
 """
 from __future__ import annotations
 
+import logging
 import os
 from dataclasses import dataclass
 from enum import Enum
@@ -14,6 +15,24 @@ from dotenv import load_dotenv
 from .notify import AlertConfig, load_alert_config
 
 load_dotenv()  # populate os.environ from .env if present
+
+log = logging.getLogger("config")
+
+
+def _choice(name: str, default: str, allowed: tuple[str, ...]) -> str:
+    """Env enum -> one of `allowed` (case/whitespace-insensitive). A typo
+    (`LLM_SELL_AUTHORITY=event_only`, `AUTO_HEDGE_MODE=Beta `) used to fall
+    through to whichever branch the consumer treated as 'else' — i.e. the
+    LEGACY behaviour — with no log. Now it WARNs and uses the run-6 default."""
+    raw = os.getenv(name)
+    val = (raw or "").strip().lower() or default
+    if val not in allowed:
+        log.warning(
+            "%s=%r is not one of %s; using the default %r.",
+            name, raw, "/".join(allowed), default,
+        )
+        return default
+    return val
 
 
 class TradingMode(str, Enum):
@@ -368,6 +387,14 @@ class RiskLimits:
     # are untouched. Rejections log 'SELL AUTHORITY: ...' so the next review
     # can count the counterfactual. 'full' = legacy: any SELL is approved.
     llm_sell_authority: str = "events_only"
+    # Review fix (Aug 26): does the option earnings blackout also reject
+    # single-name PUTS (long_put / bear_put_spread) into a print? The run-6
+    # spec said "every debit structure" and a put is a long-vol debit that
+    # loses to the IV crush whichever way the print goes, so the DEFAULT is
+    # on (blocked). OPTIONS_BLACKOUT_PUTS=off lets puts through the blackout
+    # (calls stay blocked) if the bearish sleeve needs the print. Explicit
+    # decision, not an accident of the `bullish` branch.
+    earnings_blackout_puts: bool = True
     # Gap-day chase trigger: an entry more than this % above the PRIOR daily
     # close fires the overextension gate's extreme leg regardless of RSI/ATR
     # (VRRM Jul 29: bought +28% over prior close; the gap bar inflated its own
@@ -744,6 +771,14 @@ class Config:
     # >= 60 dates the review requires before any composite re-weighting.
     # Pure measurement — the trend annotation uses the same series.
     signal_history_retention_days: float = 120.0
+    # Review fix (Aug 26): lag (days) the Finnhub Form-4 provider's signals
+    # carry in the composite. The taxonomy change moved them from CONGRESS
+    # (30d, weight ~0.23) to INSIDER (2d, ~0.9) — a ~4x re-weighting the
+    # run-6 contract forbids before >= 60 IC dates. Run-6 DEFAULT 30.0 keeps
+    # the pre-taxonomy weight; lower to 2.0 once the IC read earns it.
+    # Mirrors signals.history.SOURCE_LAG_DAYS['finnhub-insider'] (env
+    # FINNHUB_INSIDER_LAG_DAYS, read there at import).
+    finnhub_insider_lag_days: float = 30.0
     signal_history_max_points: int = 480
     # C.4 options-chain positioning signal: per-name ATM IV, put-call IV skew
     # and put/call open-interest lean from Alpaca's option snapshots (the free
@@ -843,6 +878,7 @@ def load_config() -> Config:
         autotune_days=_i("AUTOTUNE_DAYS", 14),
         autotune_min_sample=_i("AUTOTUNE_MIN_SAMPLE", 5),
         signal_history_retention_days=_f("SIGNAL_HISTORY_RETENTION_DAYS", 120.0),
+        finnhub_insider_lag_days=_f("FINNHUB_INSIDER_LAG_DAYS", 30.0),
         signal_history_max_points=_i("SIGNAL_HISTORY_MAX_POINTS", 480),
         options_chain_signal=_flag("OPTIONS_CHAIN_SIGNAL"),
         options_chain_max_symbols=_i("OPTIONS_CHAIN_MAX_SYMBOLS", 25),
@@ -1011,8 +1047,11 @@ def load_config() -> Config:
             starter_haircut_mult=_f("STARTER_HAIRCUT_MULT", 0.5),
             stop_cover_extension=_flag("STOP_COVER_EXTENSION", "on"),
             # Run-6 item 2: 'events_only' (default) | 'full' (legacy).
-            llm_sell_authority=os.getenv(
-                "LLM_SELL_AUTHORITY", "events_only").strip().lower(),
+            llm_sell_authority=_choice(
+                "LLM_SELL_AUTHORITY", "events_only", ("events_only", "full")),
+            # Review fix (Aug 26): single-name PUTS into a print. Run-6
+            # DEFAULT on = puts blocked like every other single-name debit.
+            earnings_blackout_puts=_flag("OPTIONS_BLACKOUT_PUTS", "on"),
             overext_gap_pct=_f("OVEREXT_GAP_PCT", 15.0),
             loss_streak_guard=_i("LOSS_STREAK_GUARD", 2),
             # All-weather upgrades (Jul 30 review).
@@ -1081,9 +1120,7 @@ def load_config() -> Config:
         auto_hedge_min_cycles=_i("AUTO_HEDGE_MIN_CYCLES", 2),
         auto_hedge_max_pct=_f("AUTO_HEDGE_MAX_PCT", 40.0),
         book_beta_enabled=_flag("BOOK_BETA_ENABLED", "on"),
-        auto_hedge_mode=(
-            os.getenv("AUTO_HEDGE_MODE", "beta").strip().lower() or "beta"
-        ),
+        auto_hedge_mode=_choice("AUTO_HEDGE_MODE", "beta", ("beta", "falling")),
         hedge_beta_target=_f("HEDGE_BETA_TARGET", 1.0),
         hedge_beta_band=_f("HEDGE_BETA_BAND", 0.15),
         hedge_beta_falling_target=_f("HEDGE_BETA_FALLING_TARGET", 0.8),

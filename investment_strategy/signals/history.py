@@ -70,8 +70,37 @@ _LAG_HALF_LIFE_DAYS = 14.0
 # the constructor.
 _MIN_SPACING_HOURS = 2.0
 _RECORD_JUMP = 0.05
-_RETENTION_DAYS = float(os.getenv("SIGNAL_HISTORY_RETENTION_DAYS", "120"))
-_MAX_POINTS = int(os.getenv("SIGNAL_HISTORY_MAX_POINTS", "480"))
+
+
+def _env_num(name: str, default: float, cast=float) -> float:
+    """Import-time env read that can NOT take the process down: a malformed
+    .env value logs and falls back to the default (the orchestrator passes
+    the validated Config values to the constructor anyway)."""
+    raw = os.getenv(name)
+    if raw is None or not raw.strip():
+        return cast(default)
+    try:
+        return cast(raw.strip())
+    except (TypeError, ValueError):
+        logging.getLogger("signals.history").warning(
+            "%s=%r is not a number; using %s.", name, raw, default)
+        return cast(default)
+
+
+_RETENTION_DAYS = _env_num("SIGNAL_HISTORY_RETENTION_DAYS", 120.0)
+_MAX_POINTS = _env_num("SIGNAL_HISTORY_MAX_POINTS", 480, int)
+
+# Per-PROVIDER lag override (source string -> days), consulted before the
+# kind's lag. Run-6 review fix: the Finnhub Form-4 provider moved from kind
+# CONGRESS (lag 30d, weight ~0.23) to INSIDER (lag 2d, weight ~0.9) in the
+# taxonomy change — a silent ~4x composite re-weighting inside a window whose
+# contract forbids re-weighting before >= 60 IC dates. It keeps the old lag
+# here; FINNHUB_INSIDER_LAG_DAYS (Config finnhub_insider_lag_days) lowers it
+# once the IC harness has earned it. sec-edgar insider signals already
+# carried the 2d lag and are untouched.
+SOURCE_LAG_DAYS: dict[str, float] = {
+    "finnhub-insider": _env_num("FINNHUB_INSIDER_LAG_DAYS", 30.0),
+}
 
 # Trend classification: slope is score-units per day from a least-squares fit.
 # Below _MIN_OBS points or _MIN_SPAN_DAYS of span there is no trend, only noise.
@@ -81,10 +110,13 @@ _SLOPE_FLAT = 0.04         # |slope| under this = stable
 _INFLECTION_LEVEL = 0.10   # sign flip only counts when both sides are non-trivial
 
 
-def lag_weight(kind: SignalKind) -> float | None:
+def lag_weight(kind: SignalKind, source: str | None = None) -> float | None:
     """Freshness weight in (0, 1] for timing signals; None for thesis kinds
-    (fundamentals/macro/discovery), which don't decay by design."""
-    lag = KIND_LAG_DAYS.get(kind)
+    (fundamentals/macro/discovery), which don't decay by design. `source`
+    (the Signal's provider string) selects a SOURCE_LAG_DAYS override."""
+    lag = SOURCE_LAG_DAYS.get(source) if source else None
+    if lag is None:
+        lag = KIND_LAG_DAYS.get(kind)
     if lag is None:
         return None
     return round(0.5 ** (lag / _LAG_HALF_LIFE_DAYS), 2)

@@ -1234,8 +1234,13 @@ class RiskManager:
                 f"${debit:,.0f}/contract).",
             )
         blackout = self.limits.earnings_blackout_days
+        # Review fix (Aug 26): puts pass the blackout only when the operator
+        # turned OPTIONS_BLACKOUT_PUTS off; the default blocks every
+        # single-name debit into the print (calls AND puts).
+        blackout_applies = bullish or bool(
+            getattr(self.limits, "earnings_blackout_puts", True))
         if (
-            blackout > 0 and not is_index
+            blackout > 0 and not is_index and blackout_applies
             and days_to_earnings is not None
             and 0 <= days_to_earnings <= blackout
         ):
