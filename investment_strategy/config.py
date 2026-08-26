@@ -575,6 +575,22 @@ class Config:
     # and fold its one-line lessons back into the next day's decision prompt.
     postmortem_enabled: bool = True
     postmortem_max_lessons: int = 15
+    # Run-6 measurement plumbing (item 1 — no strategy effect). Each knob
+    # only changes what gets MEASURED/RECORDED; run-6 default = on.
+    #   POSTMORTEM_OPTION_MARKS: nightly post-mortem marks OPEN option groups
+    #     close-to-close from option daily bars (broker.option_close_series)
+    #     and reports 'unmarked' explicitly when it can't; off = legacy
+    #     realized-only option lines.
+    postmortem_option_marks: bool = True
+    #   EQUITY_CLOSE_FIXED_STAMP: write the day's equity_history row ONCE, at
+    #     the first closed-market tick after 16:00 ET, basis='close', and never
+    #     overwrite it (Aug 24/25 rows were re-stamped with after-hours marks
+    #     every closed tick). off = legacy overwrite-every-closed-tick.
+    equity_close_fixed_stamp: bool = True
+    #   LEDGER_FILL_PRICES: on FILLED confirmation, write the broker's
+    #     filled_avg_price / filled qty / fill time onto the ledger row
+    #     (fill_price / fill_qty / fill_ts) and log them in the FILLED line.
+    ledger_fill_prices: bool = True
     # Weekly ledger-driven auto-tune report (Jul 22 upgrade): a deterministic,
     # no-LLM replay of the ledger + decisions journal against the entry-quality
     # risk knobs, fired once per ET weekend. Report-only — writes
@@ -669,6 +685,9 @@ def load_config() -> Config:
         reconcile_halt_enabled=_flag("RECONCILE_HALT", "on"),
         postmortem_enabled=_flag("POSTMORTEM_ENABLED", "on"),
         postmortem_max_lessons=_i("POSTMORTEM_MAX_LESSONS", 15),
+        postmortem_option_marks=_flag("POSTMORTEM_OPTION_MARKS", "on"),
+        equity_close_fixed_stamp=_flag("EQUITY_CLOSE_FIXED_STAMP", "on"),
+        ledger_fill_prices=_flag("LEDGER_FILL_PRICES", "on"),
         autotune_enabled=_flag("AUTOTUNE_ENABLED", "on"),
         autotune_days=_i("AUTOTUNE_DAYS", 14),
         autotune_min_sample=_i("AUTOTUNE_MIN_SAMPLE", 5),

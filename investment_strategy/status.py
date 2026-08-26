@@ -103,16 +103,31 @@ class EquityHistory:
     def __init__(self, path: Path | str = DEFAULT_EQUITY_HISTORY_PATH):
         self.path = Path(path)
 
-    def snapshot(self, status: AccountStatus) -> None:
+    def snapshot(
+        self, status: AccountStatus, basis: Optional[str] = None,
+        day: Optional[str] = None,
+    ) -> None:
         """Record today's snapshot, replacing any earlier row for the same date.
-        Best-effort — never raises into the trade loop."""
+        Best-effort — never raises into the trade loop.
+
+        Run-6 item 1b: `basis` labels the row ('close' = the fixed post-bell
+        stamp, 'intraday' = an in-session read; missing = legacy row). A
+        'close' row is final: a later non-close snapshot for the same date
+        is dropped rather than overwriting it. `day` overrides the date key
+        (the ET trading day — after 20:00 ET the UTC date has rolled)."""
         try:
-            today = status.as_of.date().isoformat()
+            today = day or status.as_of.date().isoformat()
+            existing = self._read()
+            if basis != "close" and any(
+                r.get("date") == today and r.get("basis") == "close"
+                for r in existing
+            ):
+                return  # the day's close row is final
             rows = [
-                r for r in self._read()
+                r for r in existing
                 if r.get("date") != today  # drop an earlier same-day row
             ]
-            rows.append({
+            row = {
                 "date": today,
                 "ts": status.as_of.isoformat(),
                 "equity": status.equity,
@@ -121,7 +136,10 @@ class EquityHistory:
                 "realized_pl": status.realized_pl,
                 "total_return": status.total_return,
                 "day_pl": status.day_pl,
-            })
+            }
+            if basis:
+                row["basis"] = basis
+            rows.append(row)
             self.path.parent.mkdir(parents=True, exist_ok=True)
             tmp = self.path.with_suffix(".tmp")
             tmp.write_text(
@@ -147,6 +165,13 @@ class EquityHistory:
 
     def all(self) -> list[dict]:
         return sorted(self._read(), key=lambda r: r.get("date", ""))
+
+    def has_close_row(self, day: str) -> bool:
+        """True when `day` already has its fixed basis='close' row."""
+        return any(
+            r.get("date") == day and r.get("basis") == "close"
+            for r in self._read()
+        )
 
 
 # --------------------------------------------------------------------------- #

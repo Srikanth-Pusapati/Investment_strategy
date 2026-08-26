@@ -1385,18 +1385,33 @@ class Orchestrator:
         """Persist a once-per-day account P&L snapshot (true total return from the
         Alpaca account, not the ledger). Best-effort; never blocks a cycle."""
         try:
-            self.equity_history.snapshot(compute_status(self.broker))
+            self.equity_history.snapshot(compute_status(self.broker), basis="intraday")
         except Exception as e:
             log.warning("Could not record equity snapshot: %s", e)
 
-    def _refresh_closing_snapshot(self) -> None:
-        """Market-closed tick: overwrite today's equity row with the TRUE
-        post-close read. The in-session snapshot lands whenever the last open
-        cycle ran (Jul 28: stamped 46 min before the bell, overstating the
-        close by $498 — every day-P&L forensic then reconciles against a wrong
-        baseline). Only refreshes a row that already exists for today's UTC
-        date, so a post-midnight tick can't mint a phantom next-day row."""
+    def _refresh_closing_snapshot(self, now_et: datetime | None = None) -> None:
+        """Market-closed tick: stamp the day's CLOSE equity row.
+
+        Run-6 item 1b (EQUITY_CLOSE_FIXED_STAMP, default on): the row is
+        written ONCE, at the first closed tick at/after 16:00 ET on a weekday,
+        keyed by the ET date with basis='close', and never overwritten — the
+        legacy path re-stamped it on every closed tick with after-hours marks
+        (Aug 24 row moved $346 between the bell and 23:56Z; Aug 25 row moved
+        from $1,006,145 to $1,007,879), which broke day_pl telescoping.
+        Legacy path (knob off): overwrite today's UTC-dated row on every
+        closed tick, only when a row already exists for it."""
         try:
+            if getattr(self.cfg, "equity_close_fixed_stamp", True):
+                et = now_et or datetime.now(ZoneInfo("America/New_York"))
+                if et.weekday() >= 5 or (et.hour * 60 + et.minute) < 16 * 60:
+                    return
+                day = et.date().isoformat()
+                if self.equity_history.has_close_row(day):
+                    return
+                self.equity_history.snapshot(
+                    compute_status(self.broker), basis="close", day=day)
+                log.info("Equity close row stamped for %s (basis=close).", day)
+                return
             rows = self.equity_history.all()
             today = datetime.now(timezone.utc).date().isoformat()
             if rows and rows[-1].get("date") == today:
@@ -1478,6 +1493,33 @@ class Orchestrator:
         )
         return True
 
+    def _stamp_fill(self, oid: str, symbol: str, filled: float) -> dict | None:
+        """Run-6 item 1e: pull the broker's filled_avg_price / qty / time for a
+        FILLED order and write them onto the ledger row (TradeLedger.set_fill).
+        Returns the fill dict (with 'stamped') or None when disabled / not
+        readable. Best-effort — never raises into reconcile."""
+        if not getattr(self.cfg, "ledger_fill_prices", True):
+            return None
+        reader = getattr(self.broker, "order_fill_detail", None)
+        if not callable(reader):
+            return None
+        try:
+            fill = reader(oid) or {}
+            price = float(fill.get("price") or 0.0)
+            if price <= 0:
+                return None
+            fill_qty = float(fill.get("qty") or filled or 0.0)
+            fill["qty"] = fill_qty
+            setter = getattr(self.ledger, "set_fill", None)
+            fill["stamped"] = bool(
+                callable(setter)
+                and setter(oid, price, fill_qty, fill.get("filled_at"))
+            )
+            return fill
+        except Exception as e:  # noqa: BLE001 — bookkeeping only
+            log.warning("Fill-price stamp failed for %s (%s): %s", oid, symbol, e)
+            return None
+
     def _reconcile_fills(self) -> None:
         """Confirm last cycle's orders actually filled. A recorded order id is only
         an intent — rejects and partial fills mean the ledger and our risk picture
@@ -1512,7 +1554,15 @@ class Orchestrator:
             # intents (the GA-2.1 phantom-BUY class) still halt.
             is_exit = self.state.exit_was_ledgered(symbol, oid)
             if status == "filled":
-                log.info("Order %s (%s) FILLED (%g/%g).", oid, symbol, filled, qty)
+                fill = self._stamp_fill(oid, symbol, filled)
+                if fill:
+                    log.info(
+                        "Order %s (%s) FILLED (%g/%g) @ %.4f x %g%s.",
+                        oid, symbol, filled, qty, fill["price"], fill["qty"],
+                        " [ledger stamped]" if fill.get("stamped") else "",
+                    )
+                else:
+                    log.info("Order %s (%s) FILLED (%g/%g).", oid, symbol, filled, qty)
                 self._oid_retries.pop(oid, None)
                 continue
             if status == "replaced":

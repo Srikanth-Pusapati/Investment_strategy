@@ -11,7 +11,18 @@ network, no scipy. Run it with plain python3 against the bot's own ledgers:
 Usage:
   python3 scripts/eval_contract_check.py --start 2026-08-24 --end 2026-09-04
   python3 scripts/eval_contract_check.py --start ... --end ... --spy-csv spy.csv
+  python3 scripts/eval_contract_check.py --start ... --end ... --spy-csv spy.csv \
+      --bench-csv IWM=iwm.csv --bench-csv QQQ=qqq.csv
   python3 scripts/eval_contract_check.py --selftest
+
+Run-6 item 1c additions (report-only; the pass rules below are unchanged):
+  * telescoping check — sum(day_pl) over the window vs the equity difference
+    between consecutive equity rows; prints the max per-day gap and PASS/FAIL
+    against $1 (the contract's validity condition), NOT counted in the verdict
+  * the equity BASIS in use — rows carry basis='close' (fixed post-bell stamp)
+    or 'intraday'; rows without the field are 'legacy'
+  * capture vs extra benchmarks (IWM, QQQ, ...) via --bench-csv SYM=path,
+    informational only — SPY remains the contract's capture benchmark
 
 The contract (pre-registered BEFORE the window; do not move goalposts after):
   1. N >= 24 closed trades in the window
@@ -36,6 +47,7 @@ EQUITY_DEFAULT = ROOT / "state" / "equity_history.jsonl"
 
 # Contract thresholds — pre-registered, keep in one place.
 MIN_TRADES = 24
+TELESCOPE_MAX_GAP_USD = 1.0   # validity condition: |Δequity - day_pl| per day
 MAX_DD_FLOOR_PCT = -5.0
 CAPTURE_MIN_UP_DAYS = 6
 CAPTURE_MIN_DOWN_DAYS = 6
@@ -70,6 +82,9 @@ network:
       start=dt.datetime(2026, 8, 20))).data["SPY"]
   print("\\n".join(f"{b.timestamp:%Y-%m-%d},{b.close}" for b in bars))
   PY
+
+Repeat with "IWM" / "QQQ" for --bench-csv IWM=iwm.csv --bench-csv QQQ=qqq.csv
+(same read-only bars endpoint; those captures are printed, not judged).
 
 Daily returns are taken between consecutive daily equity closes INSIDE the
 window, so the csv only needs to cover the window's dates."""
@@ -109,9 +124,11 @@ def closed_pls_in_window(trade_rows: list[dict], start: str, end: str) -> list[f
 
 
 def equity_days_in_window(equity_rows: list[dict], start: str, end: str):
-    """[(date, equity, day_pl)] sorted by date; the LAST row per date wins
+    """[(date, equity, day_pl)] sorted by date; a basis='close' row wins
+    over any other row for the same date, else the LAST row per date wins
     (later rows are later snapshots of the same day's close)."""
     by_date: dict[str, tuple] = {}
+    is_close: dict[str, bool] = {}
     for row in equity_rows:
         date = str(row.get("date") or "")
         if not (start <= date <= end):
@@ -120,9 +137,50 @@ def equity_days_in_window(equity_rows: list[dict], start: str, end: str):
             eq = float(row["equity"])
         except (KeyError, TypeError, ValueError):
             continue
+        close_row = row.get("basis") == "close"
+        if is_close.get(date) and not close_row:
+            continue  # the fixed close stamp is final
         day_pl = row.get("day_pl")
         by_date[date] = (eq, None if day_pl is None else float(day_pl))
+        is_close[date] = close_row
     return [(d, by_date[d][0], by_date[d][1]) for d in sorted(by_date)]
+
+
+def equity_basis_summary(equity_rows: list[dict], start: str, end: str) -> dict[str, int]:
+    """{basis: row count} for in-window rows; rows without the field are
+    'legacy' (pre run-6 writer, re-stamped on every closed tick)."""
+    out: dict[str, int] = {}
+    for row in equity_rows:
+        date = str(row.get("date") or "")
+        if not (start <= date <= end):
+            continue
+        b = str(row.get("basis") or "legacy")
+        out[b] = out.get(b, 0) + 1
+    return out
+
+
+def telescoping(days) -> dict:
+    """Do the day_pl figures telescope into the equity curve? For each
+    consecutive pair of equity rows, gap = |(e1 - e0) - day_pl_1|. Reports
+    the max gap and its date, the sum of day_pl vs the end-to-end equity
+    difference, and PASS/FAIL against TELESCOPE_MAX_GAP_USD. Pairs where
+    day_pl is missing are skipped (counted in 'skipped'). Report-only."""
+    max_gap, max_date, n, skipped = 0.0, None, 0, 0
+    sum_pl = 0.0
+    for (d0, e0, _), (d1, e1, pl1) in zip(days, days[1:]):
+        if pl1 is None:
+            skipped += 1
+            continue
+        gap = abs((e1 - e0) - pl1)
+        sum_pl += pl1
+        n += 1
+        if gap > max_gap:
+            max_gap, max_date = gap, d1
+    eq_diff = (days[-1][1] - days[0][1]) if len(days) >= 2 else 0.0
+    return {"pairs": n, "skipped": skipped, "max_gap": max_gap,
+            "max_gap_date": max_date, "sum_day_pl": sum_pl,
+            "equity_diff": eq_diff,
+            "passed": n > 0 and max_gap < TELESCOPE_MAX_GAP_USD}
 
 
 def parse_spy_csv_lines(lines) -> dict[str, float]:
@@ -246,8 +304,10 @@ def _money(v) -> str:
 
 
 def render_report(start: str, end: str, trade_rows, equity_rows,
-                  spy_closes: dict[str, float] | None = None) -> bool:
-    """Print the full report; True means VERDICT: GO."""
+                  spy_closes: dict[str, float] | None = None,
+                  bench_closes: dict[str, dict[str, float]] | None = None) -> bool:
+    """Print the full report; True means VERDICT: GO. `bench_closes`
+    ({SYM: {date: close}}) adds informational capture lines per benchmark."""
     print(f"=== EVAL-CONTRACT pre-final-test-run-5 | window {start}..{end} ===")
 
     # (1) closed trades
@@ -284,6 +344,23 @@ def render_report(start: str, end: str, trade_rows, equity_rows,
         print("worst day: n/a (no day_pl in window)")
     else:
         print(f"worst day: {wd[0]} day_pl {_money(wd[1])}")
+    basis = equity_basis_summary(equity_rows, start, end)
+    print("equity basis: " + (", ".join(
+        f"{k}={v} row(s)" for k, v in sorted(basis.items())) or "n/a")
+        + ("  (close rows win per date)" if "close" in basis else ""))
+    tel = telescoping(days)
+    print("--- (3b) telescoping: sum(day_pl) vs equity difference (validity, "
+          "not a verdict check) ---")
+    if tel["pairs"] == 0:
+        print("telescoping: n/a (< 2 equity rows with day_pl)")
+    else:
+        print(f"sum day_pl: {_money(tel['sum_day_pl'])}   equity diff "
+              f"(first->last row): {_money(tel['equity_diff'])}   "
+              f"pairs={tel['pairs']} skipped={tel['skipped']}")
+        print(f"max per-day gap |Δequity - day_pl|: {_money(tel['max_gap'])} "
+              f"on {tel['max_gap_date']}  -> "
+              f"{'PASS' if tel['passed'] else 'FAIL'} (limit "
+              f"${TELESCOPE_MAX_GAP_USD:.2f})")
 
     # (4) capture
     print("--- (4) up/down capture vs SPY ---")
@@ -300,6 +377,17 @@ def render_report(start: str, end: str, trade_rows, equity_rows,
             print(f"INSUFFICIENT SAMPLE: need >={CAPTURE_MIN_UP_DAYS} up AND "
                   f">={CAPTURE_MIN_DOWN_DAYS} down SPY days "
                   f"(got {cap['up_days']} up / {cap['down_days']} down)")
+
+    for sym, closes in sorted((bench_closes or {}).items()):
+        c = capture_vs_spy(days, closes)
+        print(f"--- (4b) capture vs {sym} (informational, not judged) ---")
+        print(f"{sym} days in window: {c['up_days']} up / {c['down_days']} down")
+        if c["up_capture"] is not None and c["down_capture"] is not None:
+            print(f"up-capture: {c['up_capture']:.1f}%   "
+                  f"down-capture: {c['down_capture']:.1f}%"
+                  + ("" if c["qualified"] else "   (INSUFFICIENT SAMPLE)"))
+        else:
+            print("capture: n/a (no overlapping up/down days)")
 
     # (5) verdict
     print("--- (5) verdict: pre-final-test-run-5 contract ---")
@@ -399,6 +487,24 @@ def selftest() -> int:
     assert dd[1] == "2026-08-11" and dd[2] == "2026-08-12"
     wd = worst_day(days)
     assert wd == ("2026-08-12", -2040.0)
+    tel = telescoping(days)
+    assert tel["pairs"] == 3 and tel["passed"] and tel["max_gap"] < 1e-9
+    assert abs(tel["sum_day_pl"] - 1000.0) < 1e-9
+    assert abs(tel["equity_diff"] - 1000.0) < 1e-9
+    # a re-stamped (after-hours) row breaks telescoping and is reported
+    broken = days[:2] + [("2026-08-12", 99960.0 + 346.0, -2040.0)] + days[3:]
+    tel2 = telescoping(broken)
+    assert not tel2["passed"] and abs(tel2["max_gap"] - 346.0) < 1e-9
+    assert tel2["max_gap_date"] == "2026-08-12"
+    # basis: a 'close' row beats a later legacy/intraday row for the same date
+    mixed = parse_jsonl(_FIXTURE_EQUITY + [
+        '{"date":"2026-08-13","equity":101500.0,"day_pl":1540.0,"basis":"close"}',
+        '{"date":"2026-08-13","equity":101900.0,"day_pl":1940.0,"basis":"intraday"}',
+    ])
+    mdays = equity_days_in_window(mixed, start, end)
+    assert mdays[-1] == ("2026-08-13", 101500.0, 1540.0)
+    assert equity_basis_summary(mixed, start, end) == {
+        "legacy": 4, "close": 1, "intraday": 1}
 
     # capture: 3 return days -> INSUFFICIENT SAMPLE
     spy = parse_spy_csv_lines(_FIXTURE_SPY)
@@ -429,6 +535,9 @@ def selftest() -> int:
     verdict_nospy = render_report(start, end, trades,
                                   parse_jsonl(_FIXTURE_EQUITY))
     assert verdict_nospy is False
+    verdict_bench = render_report(start, end, trades, parse_jsonl(_FIXTURE_EQUITY),
+                                  spy_closes=spy, bench_closes={"IWM": spy, "QQQ": spy})
+    assert verdict_bench is False
 
     print("SELFTEST PASS")
     return 0
@@ -451,6 +560,10 @@ def main(argv=None) -> int:
     ap.add_argument("--spy-csv", default=None,
                     help="daily SPY closes, one 'YYYY-MM-DD,close' per line "
                          "(see the epilog below for how to export it)")
+    ap.add_argument("--bench-csv", action="append", default=[],
+                    metavar="SYM=path",
+                    help="extra benchmark closes (same csv format), e.g. "
+                         "IWM=iwm.csv; repeatable; informational only")
     ap.add_argument("--selftest", action="store_true",
                     help="run the embedded-fixture selftest and exit")
     args = ap.parse_args(argv)
@@ -469,8 +582,16 @@ def main(argv=None) -> int:
         spy_closes = parse_spy_csv_lines(
             Path(args.spy_csv).read_text(encoding="utf-8").splitlines())
 
+    bench: dict[str, dict[str, float]] = {}
+    for spec in args.bench_csv:
+        sym, _, path = spec.partition("=")
+        if not path:
+            ap.error(f"--bench-csv expects SYM=path, got {spec!r}")
+        bench[sym.strip().upper()] = parse_spy_csv_lines(
+            Path(path).read_text(encoding="utf-8").splitlines())
+
     verdict = render_report(args.start, args.end, trade_rows, equity_rows,
-                            spy_closes=spy_closes)
+                            spy_closes=spy_closes, bench_closes=bench or None)
     return 0 if verdict else 2
 
 

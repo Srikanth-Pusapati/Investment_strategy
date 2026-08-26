@@ -1014,6 +1014,21 @@ class AlpacaClient:
             log.warning("order_fill(%s) failed: %s", order_id, e)
             return ("unknown", 0.0, 0.0)
 
+    def order_fill_detail(self, order_id: str) -> dict:
+        """Broker-reported fill facts for a FILLED order (run-6 item 1e):
+        {'price': filled_avg_price, 'qty': filled_qty, 'filled_at': datetime|None}.
+        Read-only; {} when the order can't be fetched."""
+        try:
+            o = self.trading.get_order_by_id(order_id)
+            return {
+                "price": float(getattr(o, "filled_avg_price", 0) or 0),
+                "qty": float(getattr(o, "filled_qty", 0) or 0),
+                "filled_at": getattr(o, "filled_at", None),
+            }
+        except Exception as e:
+            log.warning("order_fill_detail(%s) failed: %s", order_id, e)
+            return {}
+
     def closed_sell_orders(self, limit: int = 500) -> list[dict]:
         """Recently CLOSED (terminal-state) SELL orders from the broker, newest
         first, as plain dicts — the raw material for the exchange-exit backfill
@@ -1125,6 +1140,38 @@ class AlpacaClient:
             ][-days:]
         except Exception as e:
             log.warning("daily_close_series(%s) failed: %s", symbol, e)
+            return []
+
+    _option_data = None  # lazily built OptionHistoricalDataClient
+
+    def option_close_series(self, symbol: str, days: int) -> list[tuple[str, float]]:
+        """(ISO-date, close) pairs of DAILY option bars for one OCC contract —
+        the option twin of daily_close_series, so the nightly post-mortem can
+        mark open option groups close-to-close (run-6 item 1a). Per-share
+        prices (x100 per contract). [] on any failure or when the contract
+        has no daily bars (thin names print no bar on a no-trade day)."""
+        try:
+            if self._option_data is None:
+                from alpaca.data.historical.option import OptionHistoricalDataClient
+                self._option_data = bound_client(OptionHistoricalDataClient(
+                    self.cfg.alpaca_api_key, self.cfg.alpaca_secret_key,
+                ))
+            from alpaca.data.requests import OptionBarsRequest
+            req = OptionBarsRequest(
+                symbol_or_symbols=symbol,
+                timeframe=TimeFrame.Day,
+                start=datetime.now(timezone.utc) - timedelta(days=days * 2),
+            )
+            resp = _retry_read(
+                lambda: self._option_data.get_option_bars(req),
+                what=f"option_close_series({symbol})",
+            )
+            bars = resp.data.get(symbol, [])
+            return [
+                (b.timestamp.date().isoformat(), float(b.close)) for b in bars
+            ][-days:]
+        except Exception as e:
+            log.warning("option_close_series(%s) failed: %s", symbol, e)
             return []
 
     def _daily_closes(self, symbol: str, days: int) -> list[float]:
