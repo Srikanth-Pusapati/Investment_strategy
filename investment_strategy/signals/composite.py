@@ -41,8 +41,13 @@ _PERF_SPAN = 10.0
 
 def perf_weights(
     ledger: TradeLedger, min_trips: int = COMPOSITE_PERF_MIN_TRIPS,
+    enabled: bool = True,
 ) -> dict[str, float]:
     """SignalKind-value -> 0.5..1.5 multiplier from realized attribution.
+
+    Run-6: `enabled=False` (Config COMPOSITE_PERF_WEIGHTS, default off)
+    returns {} so every term multiplies by 1.0 — the self-referential tilt
+    is frozen for the window; the computation is kept for later.
 
     weight = clamp(1.0 + avg_pl_pct / _PERF_SPAN, 0.5, 1.5) once a source has
     `min_trips` closed round-trips; 1.0 (inert) below that. Uses the same
@@ -56,6 +61,8 @@ def perf_weights(
     kind, so a flow perf weight now applies to the flow term (it was inert
     while flow emitted under kind=news).
     """
+    if not enabled:
+        return {}
     from ..attribution import attribute, round_trips
 
     stats = attribute(round_trips(ledger.effective()), basis="cited")

@@ -493,6 +493,10 @@ def render_lessons(
     Keep it terse: this lands in every decision prompt, so it costs output tokens
     each cycle (the Quiver notes warn about exactly this). Sources are sorted by
     realized avg P&L so the best/worst performers read first.
+
+    `min_source_trips` is Config TRACK_RECORD_MIN_TRIPS (run-6 default 20; the
+    old default of 2 showed two-trade coin flips as a prior). No source at the
+    bar = no block at all.
     """
     # effective(): reconcile corrections applied, so a rejected/partial order's
     # phantom intent can't count as a round-trip (GA-2.5).

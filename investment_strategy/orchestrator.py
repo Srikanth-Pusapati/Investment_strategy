@@ -948,8 +948,11 @@ class Orchestrator:
         composites: dict[str, float] = {}
         if self.cfg.risk.composite_enabled:
             try:
+                # Run-6: realized perf tilt frozen unless COMPOSITE_PERF_WEIGHTS.
                 pw = perf_weights(
-                    self.ledger, self.cfg.risk.composite_perf_min_trips
+                    self.ledger, self.cfg.risk.composite_perf_min_trips,
+                    enabled=bool(getattr(
+                        self.cfg.risk, "composite_perf_weights", False)),
                 )
                 # Run-6: the scanner's DISCOVERY line stays in the prompt but
                 # no longer scores into the index (COMPOSITE_INCLUDE_DISCOVERY).
@@ -1017,22 +1020,10 @@ class Orchestrator:
         # Expectancy gate input (Jul 30 review): signal families whose CITED
         # trailing realized expectancy is negative. Recomputed once per cycle
         # from the ledger; the risk layer blocks FRESH entries whose thesis
-        # rests entirely on these families. Best-effort — {} disarms the gate.
-        self._neg_families = {}
-        if self.cfg.risk.expectancy_gate_enabled:
-            self._neg_families = negative_expectancy_families(
-                self.ledger,
-                window_days=self.cfg.risk.expectancy_gate_window_days,
-                min_trips=self.cfg.risk.expectancy_gate_min_trips,
-            )
-            if self._neg_families:
-                log.info(
-                    "Expectancy gate armed against: %s",
-                    ", ".join(
-                        f"{k} {v.avg_pl_pct:+.1f}%/trip x{v.trips}"
-                        for k, v in sorted(self._neg_families.items())
-                    ),
-                )
+        # rests entirely on these families. Run-6 (item 6): with the gate
+        # OFF the read still happens and is logged as 'would have armed'
+        # (report-only) but {} is handed to the risk layer, so nothing rejects.
+        self._neg_families = self._expectancy_gate_read()
 
         bench_stats = self.benchmark.compute()
         bench_line = self.benchmark.context_line(bench_stats)
@@ -1463,12 +1454,47 @@ class Orchestrator:
         except Exception as e:
             log.warning("Closing equity snapshot failed: %s", e)
 
+    def _expectancy_gate_read(self) -> dict:
+        """Negative-expectancy family set for this cycle. Gate ON -> the set
+        (logged 'armed against'); gate OFF -> still computed and logged once
+        per cycle as 'would have armed against' so the next review can see
+        what it would have blocked, but {} is returned (never rejects).
+        Best-effort — any failure disarms."""
+        r = self.cfg.risk
+        try:
+            neg = negative_expectancy_families(
+                self.ledger,
+                window_days=r.expectancy_gate_window_days,
+                min_trips=r.expectancy_gate_min_trips,
+            )
+        except Exception as e:
+            log.warning("Expectancy gate read failed: %s", e)
+            return {}
+        if not neg:
+            return {}
+        desc = ", ".join(
+            f"{k} {v.avg_pl_pct:+.1f}%/trip x{v.trips}"
+            for k, v in sorted(neg.items())
+        )
+        if r.expectancy_gate_enabled:
+            log.info("Expectancy gate armed against: %s", desc)
+            return neg
+        log.info(
+            "Expectancy gate (off, report-only): would have armed against: %s",
+            desc,
+        )
+        return {}
+
     def _attribution_lessons(self) -> str:
         """Per-cycle track-record block (attribution.py) — recomputed every
         cycle and changes whenever a position closes, so it stays in the
         decision prompt's DYNAMIC half (see engine._render_dynamic)."""
         try:
-            return render_lessons(self.ledger)
+            return render_lessons(
+                self.ledger,
+                min_source_trips=int(getattr(
+                    self.cfg, "track_record_min_trips", 20)),
+            )
         except Exception as e:
             log.warning("Could not render track-record lessons: %s", e)
             return ""
@@ -1476,7 +1502,11 @@ class Orchestrator:
     def _curated_lessons(self) -> str:
         """Nightly post-mortem's curated lessons file — changes at most once a
         day, so it belongs in the decision prompt's STABLE/cached half (see
-        engine._render_stable), separate from _attribution_lessons above."""
+        engine._render_stable), separate from _attribution_lessons above.
+        Run-6: injected only when CURATED_LESSONS_INJECT is on (default off);
+        the nightly post-mortem keeps writing the file regardless."""
+        if not bool(getattr(self.cfg, "curated_lessons_inject", False)):
+            return ""
         try:
             from .postmortem import read_curated
             return read_curated(self.cfg.postmortem_max_lessons)

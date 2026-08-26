@@ -291,6 +291,13 @@ class RiskLimits:
     composite_gate_enabled: bool = False # opt-in deterministic buy floor (backtest first)
     min_composite_score: float = 0.0     # floor value when the gate is on
     composite_perf_min_trips: int = 3    # closed trips before a source's perf weight != 1.0
+    # COMPOSITE_PERF_WEIGHTS (run-6 default OFF): whether a source's realized
+    # track record in THIS book tilts its composite term (0.5..1.5). Run-6
+    # freezes the self-referential loops: with a handful of trips per family
+    # the weight chased noise (a family's own recent losses shrank its say,
+    # which shrank its entries, which starved the sample). Off = every perf
+    # weight is 1.0; the code path stays for a later, better-sampled window.
+    composite_perf_weights: bool = False
     # COMPOSITE_INCLUDE_DISCOVERY (run-6 default OFF): whether the scanner's
     # DISCOVERY score is a scored term of the composite. The discovery score
     # is the screener's own aggregate of the same soft feeds (congress/
@@ -379,7 +386,13 @@ class RiskLimits:
     # demonstrably losing money right now doesn't earn NEW starters; top-ups
     # are exempt (the position already cleared entry), and a family with
     # fewer than min_trips closed trips in the window is never judged. ---
-    expectancy_gate_enabled: bool = True   # EXPECTANCY_GATE (on/off)
+    # EXPECTANCY_GATE_ENABLED (run-6 default OFF; legacy alias EXPECTANCY_GATE):
+    # off = the orchestrator still COMPUTES the negative-family set each cycle
+    # and logs 'Expectancy gate (off): would have armed against ...' so the
+    # next review can see what it would have blocked, but nothing is rejected.
+    # Run-6 freezes the loop: the gate judged families off the same tiny,
+    # self-selected samples it was shaping (Aug-25 review, R3).
+    expectancy_gate_enabled: bool = False
     expectancy_gate_min_trips: int = 8     # closed trips before a family is judged
     expectancy_gate_window_days: int = 14  # trailing window for the read
     # --- corroboration gate (Aug 12-21 forensic review): insider-cited
@@ -634,6 +647,18 @@ class Config:
     # and fold its one-line lessons back into the next day's decision prompt.
     postmortem_enabled: bool = True
     postmortem_max_lessons: int = 15
+    # Run-6 item 6 — freeze the self-referential feedback loops.
+    #   CURATED_LESSONS_INJECT (run-6 default OFF): whether the nightly
+    #     post-mortem's curated lessons file is injected into the decision
+    #     prompt. Post-mortems keep WRITING the file either way; the LLM just
+    #     stops reading its own last-night verdicts (Aug-24's 'cap QQQ'
+    #     lesson argued with the core-position design). When ON, lines
+    #     already marked [SUPERSEDED ...] are not rendered.
+    #   TRACK_RECORD_MIN_TRIPS (run-6 default 20; was 2): closed round-trips
+    #     a cited source needs before it appears in the prompt's 'Track
+    #     record' block. Two trips is a coin flip presented as a prior.
+    curated_lessons_inject: bool = False
+    track_record_min_trips: int = 20
     # Run-6 measurement plumbing (item 1 — no strategy effect). Each knob
     # only changes what gets MEASURED/RECORDED; run-6 default = on.
     #   POSTMORTEM_OPTION_MARKS: nightly post-mortem marks OPEN option groups
@@ -759,6 +784,8 @@ def load_config() -> Config:
         reconcile_halt_enabled=_flag("RECONCILE_HALT", "on"),
         postmortem_enabled=_flag("POSTMORTEM_ENABLED", "on"),
         postmortem_max_lessons=_i("POSTMORTEM_MAX_LESSONS", 15),
+        curated_lessons_inject=_flag("CURATED_LESSONS_INJECT", "off"),
+        track_record_min_trips=_i("TRACK_RECORD_MIN_TRIPS", 20),
         postmortem_option_marks=_flag("POSTMORTEM_OPTION_MARKS", "on"),
         equity_close_fixed_stamp=_flag("EQUITY_CLOSE_FIXED_STAMP", "on"),
         ledger_fill_prices=_flag("LEDGER_FILL_PRICES", "on"),
@@ -915,6 +942,7 @@ def load_config() -> Config:
             min_composite_score=_f("MIN_COMPOSITE_SCORE", 0.0),
             composite_perf_min_trips=_i("COMPOSITE_PERF_MIN_TRIPS", 3),
             composite_include_discovery=_flag("COMPOSITE_INCLUDE_DISCOVERY", "off"),
+            composite_perf_weights=_flag("COMPOSITE_PERF_WEIGHTS", "off"),
             # Rotation loss guard (see the RiskLimits field notes).
             rotation_loss_guard_enabled=_flag("ROTATION_LOSS_GUARD_ENABLED", "on"),
             rotation_guard_min_loss_pct=_f("ROTATION_GUARD_MIN_LOSS_PCT", 4.0),
@@ -939,7 +967,12 @@ def load_config() -> Config:
             overext_gap_pct=_f("OVEREXT_GAP_PCT", 15.0),
             loss_streak_guard=_i("LOSS_STREAK_GUARD", 2),
             # All-weather upgrades (Jul 30 review).
-            expectancy_gate_enabled=_flag("EXPECTANCY_GATE", "on"),
+            # Run-6 item 6: default OFF (report-only). EXPECTANCY_GATE_ENABLED
+            # wins; the legacy EXPECTANCY_GATE name is honoured when the new
+            # one is absent so an old .env line still means what it said.
+            expectancy_gate_enabled=_flag(
+                "EXPECTANCY_GATE_ENABLED",
+                os.getenv("EXPECTANCY_GATE", "off")),
             expectancy_gate_min_trips=_i("EXPECTANCY_GATE_MIN_TRIPS", 8),
             expectancy_gate_window_days=_i("EXPECTANCY_GATE_WINDOW_DAYS", 14),
             # Corroboration gate on single-soft-signal starters (Aug 12-21

@@ -89,14 +89,22 @@ _POSTMORTEM_SCHEMA = {
 }
 
 
+_SUPERSEDED_MARK = "[SUPERSEDED"
+
+
 def read_curated(max_lines: int = 15) -> str:
-    """Read the curated lessons file for injection into the decision prompt."""
+    """Read the curated lessons file for injection into the decision prompt.
+
+    Lines the operator has struck by prefixing '[SUPERSEDED ...]' stay in the
+    file (history) but are never rendered. Whether the result is injected at
+    all is the caller's knob (Config CURATED_LESSONS_INJECT, run-6 off).
+    """
     try:
         if not _CURATED_FILE.exists():
             return ""
         lines = [
             l for l in _CURATED_FILE.read_text(encoding="utf-8").splitlines()
-            if l.strip()
+            if l.strip() and not l.lstrip().startswith(_SUPERSEDED_MARK)
         ]
         if not lines:
             return ""
