@@ -121,6 +121,17 @@ class RiskLimits:
     # must never be fought by its own gate). Inert unless
     # regime_filter_enabled — the trend is only read under that flag.
     option_direction_gate: bool = True    # OPTION_DIRECTION_GATE (on/off)
+    # Run-6 (Aug 25 review, item 3): single-name BULLISH option debits
+    # (long_call / bull_call_spread / any all-calls structure on a non-index
+    # underlying) were the loss engine of runs 4-5 (-$24.8k net, one +$11.6k
+    # winner) and rode an explicit bypass of the earnings blackout and the
+    # anti-chase gate. OFF for the run-6 window: evaluate_option rejects them
+    # outright (logging the counterfactual debit); puts, bear spreads, the
+    # sanctioned index-put path, the proxy put and calls on index
+    # underlyings (SPY/QQQ/IWM/DIA + the configured core/hedge/proxy ETFs)
+    # keep working. Run-6 DEFAULT: off. OPTIONS_SINGLE_NAME_BULLISH=on
+    # restores the legacy behaviour.
+    options_single_name_bullish: bool = False
     # Per-underlying premium concentration cap (Aug 12-21 forensic review):
     # max_option_premium_pct bounds each PLAY's debit, but nothing bounded the
     # PILE — AMZN stacked ~$29.8k of open premium across structures on one
@@ -557,6 +568,18 @@ class Config:
     # Deterministic like the auto-hedge; every other option gate (DTE,
     # premium caps, slots, the proxy's own liquidity) still applies. "" = off.
     put_proxy_etf: str = "IWM"             # PUT_PROXY_ETF ("" = off)
+    # Run-6 (Aug 25 review, item 3e): the proxy put re-expresses a SINGLE-
+    # NAME bearish read as an INDEX short, which is only sound when the
+    # thesis transfers. With this on, _propose_proxy_put requires one of:
+    # the proxy ETF below its 50-day SMA, the breadth trigger armed this
+    # cycle, or >= 2 bearish slate names in the blocked name's sector;
+    # otherwise the spread is sized at 0.25% of equity (max_premium_usd
+    # clamp). The proxy also loses its per-underlying premium-cap exemption
+    # (it sits under PER_UNDERLYING_PREMIUM_PCT like every other debit; the
+    # falling-market index put keeps its exemption). Run-6 DEFAULT: on.
+    # PROXY_PUT_THESIS_GATE=off restores the Aug-14 behaviour.
+    proxy_put_thesis_gate: bool = True     # PROXY_PUT_THESIS_GATE
+    proxy_put_untransferred_pct: float = 0.25  # PROXY_PUT_UNTRANSFERRED_PCT (% equity when the thesis does not transfer)
     # --- DEFENSIVE CORE (Jul 30 review): while the core defense is active the
     # QQQ fill pauses — but the freed/idle cash then earns nothing. Redirect
     # the core fill into a short-duration T-bill ETF instead (SGOV/BIL), and
@@ -792,6 +815,7 @@ def load_config() -> Config:
             min_option_premium=_f("MIN_OPTION_PREMIUM", 0.10),
             max_option_contracts=int(_f("MAX_OPTION_CONTRACTS", 50.0)),
             option_direction_gate=_flag("OPTION_DIRECTION_GATE", "on"),
+            options_single_name_bullish=_flag("OPTIONS_SINGLE_NAME_BULLISH", "off"),
             # Per-underlying premium concentration cap (Aug 12-21: AMZN piled
             # ~$29.8k of premium into ONE underlying, -$14,956).
             per_underlying_premium_pct=_f("PER_UNDERLYING_PREMIUM_PCT", 0.5),
@@ -929,6 +953,8 @@ def load_config() -> Config:
         breadth_falling_names_min=_i("BREADTH_FALLING_NAMES_MIN", 3),
         breadth_book_drawdown_pct=_f("BREADTH_BOOK_DRAWDOWN_PCT", -1.25),
         put_proxy_etf=os.getenv("PUT_PROXY_ETF", "IWM").strip().upper(),
+        proxy_put_thesis_gate=_flag("PROXY_PUT_THESIS_GATE", "on"),
+        proxy_put_untransferred_pct=_f("PROXY_PUT_UNTRANSFERRED_PCT", 0.25),
         defensive_core_etf=os.getenv("DEFENSIVE_CORE_ETF", "").strip().upper(),
         track_record_file=os.getenv("TRACK_RECORD_FILE", "").strip(),
     )

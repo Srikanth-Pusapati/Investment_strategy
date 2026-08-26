@@ -3596,18 +3596,21 @@ class Orchestrator:
                 0.0,
                 decision.reason, proposal.rationale[:120] if proposal.rationale else "",
             )
-            # Same-cycle option fallback (Jul 28): a buy that died at an
-            # EQUITY-only gate (overextension / earnings blackout) is the
-            # sanctioned capped-debit call setup — evaluate_option exempts
-            # both gates. Queue it for a scoped follow-up decision AFTER the
-            # main proposal loop; next-cycle journal memory alone never
-            # converted (slate rotates, idea decays, model picks fresh names).
+            # Same-cycle option fallback (Jul 28): a buy that died at the
+            # overextension gate gets a scoped follow-up option decision
+            # AFTER the main proposal loop. Run-6 item 3: the earnings
+            # blackout now applies to option debits too (evaluate_option
+            # rejects them), so "Earnings in" no longer feeds the queue;
+            # "Overextended" stays ONLY because the fallback hands the
+            # underlying's technicals to _handle_option, where the OPTION
+            # CHASE GATE re-reads the same tape (a hot-but-not-extreme name
+            # deploys at the haircut; an extreme/gap chase is re-blocked).
             # Calls trade WITH the tape only, so skip in a down-trend market.
             if (
                 is_buy
                 and self.options is not None
                 and self._regime_trend != "down"
-                and decision.reason.startswith(("Overextended", "Earnings in"))
+                and decision.reason.startswith("Overextended")
             ):
                 self._option_fallbacks.append((proposal, decision.reason))
             return 0.0
@@ -3791,6 +3794,28 @@ class Orchestrator:
         )
         if is_put_play:
             self._bear_puts_proposed = getattr(self, "_bear_puts_proposed", 0) + 1
+        # Run-6 item 3: the option path gets the SAME earnings read the
+        # equity path gets (fails open on a calendar miss, like equities);
+        # the configured core/hedge/proxy ETFs join the broad-index exemption.
+        days_to_earnings = None
+        if not proxy_for:
+            try:
+                cal = getattr(self, "earnings", None)
+                if cal is not None:
+                    days_to_earnings = cal.days_until_earnings(proposal.symbol)
+            except Exception as e:  # noqa: BLE001 — fail open, never block on a feed error
+                log.warning("Option earnings read for %s failed: %s", proposal.symbol, e)
+                days_to_earnings = None
+        _cfg = getattr(self, "cfg", None)
+        index_symbols = frozenset(
+            str(x).upper() for x in (
+                getattr(_cfg, "core_etf", ""),
+                getattr(_cfg, "hedge_etf", ""),
+                getattr(_cfg, "put_proxy_etf", ""),
+                getattr(_cfg, "defensive_core_etf", ""),
+                getattr(self, "_hedge_symbol", ""),
+            ) if x
+        )
         decision = self.risk.evaluate_option(
             proposal, account, premium, leg_liquidity=liquidity,
             min_leg_premium=min_leg,
@@ -3814,6 +3839,11 @@ class Orchestrator:
             # overextended equity reject re-expressed as a call debit walks
             # straight past the read it was rejected on (the HL -67.6% chase).
             tech=tech,
+            days_to_earnings=days_to_earnings,
+            index_symbols=index_symbols,
+            proxy_put=bool(proxy_for) and bool(
+                getattr(_cfg, "proxy_put_thesis_gate", True)
+            ),
         )
         if is_put_play and decision.verdict != RiskVerdict.REJECTED:
             self._bear_puts_approved = getattr(self, "_bear_puts_approved", 0) + 1
@@ -3866,6 +3896,46 @@ class Orchestrator:
                 proposal.symbol, decision.approved_notional,
             )
 
+    def _proxy_thesis_transfers(
+        self, etf: str, spot: float, blocked: TradeProposal,
+    ) -> tuple[bool, str]:
+        """Does a single-name bearish read transfer to an index short on
+        `etf`? True on any of: the ETF below its 50-day SMA (daily closes
+        from the broker), the breadth trigger armed this cycle
+        (_market_falling's winning source was "breadth:N-names"), or >= 2
+        bearish slate names (this cycle's put-precheck set) in the blocked
+        name's sector. Every read fails CLOSED (no data = no transfer) —
+        the consequence is the small size, never a skipped hedge."""
+        # 1) proxy ETF under its 50-day SMA
+        try:
+            series = self.broker.daily_close_series(etf, 60)
+            closes = [float(c) for _, c in series if c]
+            if len(closes) >= 50 and spot > 0:
+                sma50 = sum(closes[-50:]) / 50.0
+                if spot < sma50:
+                    return True, f"{etf} {spot:.2f} below its 50d SMA {sma50:.2f}"
+        except Exception as e:  # noqa: BLE001 — a bar-feed miss is not a thesis
+            log.debug("Proxy thesis: 50d SMA read for %s failed: %s", etf, e)
+        # 2) breadth trigger armed this cycle
+        trigger = str(getattr(self, "_falling_trigger", "") or "")
+        if trigger.startswith("breadth"):
+            return True, f"breadth trigger armed ({trigger})"
+        # 3) >= 2 bearish slate names in the same sector
+        try:
+            sectors = getattr(self, "sectors", None)
+            bearish = set(getattr(self, "_bear_eligibility", {}) or {})
+            bearish.add(blocked.symbol.upper())
+            sec = sectors.sector_for(blocked.symbol) if sectors else None
+            if sec:
+                same = sorted(
+                    s for s in bearish if sectors.sector_for(s) == sec
+                )
+                if len(same) >= 2:
+                    return True, f"{len(same)} bearish slate names in {sec} ({', '.join(same[:4])})"
+        except Exception as e:  # noqa: BLE001
+            log.debug("Proxy thesis: sector read failed: %s", e)
+        return False, "no index/breadth/sector confirmation"
+
     def _propose_proxy_put(
         self, blocked: TradeProposal, account,
         signal_kinds: list[str] | None,
@@ -3903,6 +3973,24 @@ class Orchestrator:
             self._proxy_put_state = f"{etf} skipped: no workable chain pair"
             log.info("Proxy put for %s: no workable %s chain pair.", blocked.symbol, etf)
             return
+        # Run-6 item 3e: a single-name bearish read only transfers to an
+        # INDEX short when something index-wide backs it. Otherwise the
+        # proxy is a token-sized hedge, not a thesis.
+        max_premium = blocked.max_premium_usd
+        thesis_note = ""
+        if getattr(self.cfg, "proxy_put_thesis_gate", True):
+            transfers, why = self._proxy_thesis_transfers(etf, spot, blocked)
+            if transfers:
+                thesis_note = f" Transferable thesis: {why}."
+            else:
+                pct = float(getattr(self.cfg, "proxy_put_untransferred_pct", 0.25) or 0.0)
+                small = account.equity * (pct / 100.0)
+                max_premium = small if max_premium is None else min(max_premium, small)
+                thesis_note = (
+                    f" Thesis does not transfer to {etf} ({why}) — sized at "
+                    f"{pct:g}% of equity (${small:,.0f})."
+                )
+            log.info("PROXY PUT THESIS: %s -> %s:%s", blocked.symbol, etf, thesis_note)
         proxy = TradeProposal(
             symbol=etf,
             action=Action.BUY,
@@ -3911,13 +3999,14 @@ class Orchestrator:
             rationale=(
                 f"SYSTEM PROXY PUT for {blocked.symbol}: its own chain failed "
                 f"the liquidity floor, re-expressing the bearish read on "
-                f"liquid {etf}. Original thesis: {blocked.rationale[:150]}"
+                f"liquid {etf}.{thesis_note} Original thesis: "
+                f"{blocked.rationale[:150]}"
             ),
             key_signals=blocked.key_signals,
             instrument=Instrument.OPTION,
             option_strategy=OptionStrategy.BEAR_PUT_SPREAD,
             option_legs=legs,
-            max_premium_usd=blocked.max_premium_usd,
+            max_premium_usd=max_premium,
         )
         log.info(
             "PROXY PUT: %s put blocked on liquidity -> proposing %s %s/%s %s.",

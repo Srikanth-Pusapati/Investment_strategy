@@ -125,15 +125,11 @@ one long + one short leg. Default to equity unless options clearly fit better.
 name — you cannot short stock, so a long_put or bear_put_spread is the ONLY way \
 to profit from an expected fall; (b) a high-conviction bullish thesis with a \
 defined near-term catalyst where a capped-debit long_call/bull_call_spread \
-expresses it with less capital at risk than shares; (c) a high-conviction \
-bullish name the EQUITY gates would block — the anti-chase overextension gate \
-(hot RSI / stretched over the 20d SMA) and the earnings blackout apply to \
-equity buys ONLY, and option debits are exempt from both: max loss is the \
-capped ~1%-of-equity premium and there is no stop to gap through. An \
-overextended or earnings-imminent name you'd otherwise chase with shares is \
-precisely where a capped-debit long_call/bull_call_spread is the sanctioned \
-vehicle (options still pass their own gates: direction, DTE, liquidity, \
-premium cap). Pick expiries 2-8 weeks out \
+expresses it with less capital at risk than shares. The same gates apply to \
+every instrument: the anti-chase overextension gate and the earnings blackout \
+reject an option debit exactly as they reject the equity buy (plus the \
+option-only gates: direction, DTE, liquidity, premium cap), so an option is \
+never a way around an equity rejection. Pick expiries 2-8 weeks out \
 (the risk layer rejects <7 or >60 days), strikes at/near the money, both \
 vertical legs on ONE expiry. If the options_chain signal shows a HIGH ATM IV, \
 prefer a spread (the short leg offsets the rich premium); modest IV favors a \

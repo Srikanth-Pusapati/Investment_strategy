@@ -23,6 +23,11 @@ from .state import PortfolioState
 
 log = logging.getLogger("risk")
 
+# Broad-index option underlyings (run-6 item 3): exempt from the single-name
+# option gates (earnings blackout, OPTIONS_SINGLE_NAME_BULLISH). The
+# configured core / hedge / proxy ETFs are added per call via `index_symbols`.
+_INDEX_UNDERLYINGS = frozenset({"SPY", "QQQ", "IWM", "DIA"})
+
 # When realized volatility is unavailable we must NOT default to the largest
 # allowed size — a data outage is exactly when to be cautious. Size as if the
 # name were quite volatile so vol-targeting shrinks the position.
@@ -1075,6 +1080,9 @@ class RiskManager:
         sanctioned_hedge: bool = False,
         name_ext_pct: float | None = None,
         tech: dict | None = None,
+        days_to_earnings: int | None = None,
+        index_symbols: frozenset[str] | set[str] | None = None,
+        proxy_put: bool = False,
     ) -> RiskDecision:
         """Size a defined-risk options play by capped DEBIT. Max loss on a long
         option / debit spread is the premium paid, so we bound that premium to a
@@ -1103,7 +1111,16 @@ class RiskManager:
         broke hard yet read name_trend="up", so every put died at the
         gate). `tech` is the UNDERLYING's technicals dict (rsi14 / ext_atr /
         prev_close / price — the same dict _evaluate_buy's anti-chase gate
-        reads) for the bullish-option chase gate; None fails open."""
+        reads) for the bullish-option chase gate; None fails open.
+
+        Run-6 item 3 (close the options bypass): `days_to_earnings` is the
+        same calendar read the equity path gets — a single-name debit inside
+        earnings_blackout_days is rejected (None fails open, like equities).
+        `index_symbols` extends the broad-index exemption set (core / hedge /
+        proxy ETFs from config). `proxy_put` marks the put-liquidity proxy
+        re-proposal: it keeps the direction-gate sanction but NOT the
+        per-underlying premium-cap exemption when PROXY_PUT_THESIS_GATE is
+        on."""
         if not self.limits.options_enabled:
             return self._reject(proposal, "Options trading disabled (OPTIONS_ENABLED=off).")
         # Same account-wide gate as equity buys: halt latch, kill switch, daily
@@ -1129,6 +1146,49 @@ class RiskManager:
         ok, why = self._legs_dte_sane(proposal)
         if not ok:
             return self._reject(proposal, why)
+        # ---- run-6 item 3: single-name gates (index underlyings exempt) ----
+        under = proposal.symbol.upper()
+        is_index = (
+            under in _INDEX_UNDERLYINGS
+            or under in {str(x).upper() for x in (index_symbols or ())}
+        )
+        rights = {
+            "c" if leg.right.lower().startswith("c") else "p"
+            for leg in proposal.option_legs
+        }
+        bullish = rights == {"c"}
+        if (
+            bullish and not is_index
+            and not getattr(self.limits, "options_single_name_bullish", True)
+        ):
+            debit = max(0.0, est_premium_per_contract) * 100.0
+            budget = account.equity * (self.limits.max_option_premium_pct / 100.0)
+            log.warning(
+                "OPTIONS SINGLE-NAME BULLISH: %s %s rejected "
+                "(OPTIONS_SINGLE_NAME_BULLISH=off) — counterfactual debit "
+                "$%s/contract, budget $%s.",
+                under, proposal.option_strategy, f"{debit:,.0f}",
+                f"{budget:,.0f}",
+            )
+            return self._reject(
+                proposal,
+                "single-name bullish option debits disabled for this window "
+                f"(OPTIONS_SINGLE_NAME_BULLISH=off; counterfactual debit "
+                f"${debit:,.0f}/contract).",
+            )
+        blackout = self.limits.earnings_blackout_days
+        if (
+            blackout > 0 and not is_index
+            and days_to_earnings is not None
+            and 0 <= days_to_earnings <= blackout
+        ):
+            return self._reject(
+                proposal,
+                f"Earnings in {days_to_earnings}d (<= {blackout}d blackout) — "
+                "a single-name option debit gaps through the print exactly "
+                "like shares (run-6: the equity blackout applies to every "
+                "instrument).",
+            )
         ok, why = self._direction_fits_market(
             proposal, account, market_trend, regime_label, name_trend,
             sanctioned_hedge=sanctioned_hedge, name_ext_pct=name_ext_pct,
@@ -1174,13 +1234,9 @@ class RiskManager:
         # — a put on a falling name is the OPPOSITE of an upside chase and
         # must never be muzzled by upside overextension. Fails open on
         # missing technicals, like the equity gate.
-        rights = {
-            "c" if leg.right.lower().startswith("c") else "p"
-            for leg in proposal.option_legs
-        }
         chase_mult = 1.0
         chase_note = ""
-        if rights == {"c"}:
+        if bullish:
             under_price = float((tech or {}).get("price") or 0.0)
             trigger, why = self._overextension_read(under_price, tech)
             if trigger:
@@ -1235,16 +1291,20 @@ class RiskManager:
         # further downside protection exactly in the falling tape it exists
         # for. Each sanctioned play is still bounded by max_option_premium_pct
         # and the direction gate's own sanction plumbing.
+        # Run-6 item 3e: the put-liquidity PROXY is no longer exempt — an
+        # index short re-expressing a single-name read sits under the same
+        # 0.5% cap as every other debit; only the falling-market index put
+        # (sanctioned_hedge without proxy_put) keeps the exemption.
         per_under_pct = getattr(self.limits, "per_underlying_premium_pct", 0.0)
-        if per_under_pct > 0 and sanctioned_hedge:
+        cap_exempt = sanctioned_hedge and not proxy_put
+        if per_under_pct > 0 and cap_exempt:
             log.info(
-                "PER-UNDERLYING PREMIUM CAP: %s exempt (sanctioned hedge / "
-                "proxy put — venue concentration must not cap crash "
-                "protection).", proposal.symbol.upper(),
+                "PER-UNDERLYING PREMIUM CAP: %s exempt (sanctioned hedge — "
+                "venue concentration must not cap crash protection).",
+                proposal.symbol.upper(),
             )
-        if per_under_pct > 0 and not sanctioned_hedge:
+        if per_under_pct > 0 and not cap_exempt:
             from .execution.options import parse_occ
-            under = proposal.symbol.upper()
             open_premium = max(0.0, sum(
                 p.avg_entry_price * p.qty * 100.0
                 for p in account.positions if p.is_option
