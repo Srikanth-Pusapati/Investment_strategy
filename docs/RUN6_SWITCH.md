@@ -26,3 +26,19 @@ the strike matters the day injection is turned back on.
     EXPECTANCY_GATE_ENABLED=off      # remove/flip any legacy EXPECTANCY_GATE=on line
     TRACK_RECORD_MIN_TRIPS=20
     CURATED_LESSONS_INJECT=off
+
+## Item 7 env keys (book beta + beta cap + beta-sized hedge; run-6 defaults)
+
+The live `.env` (line 234) pins `AUTO_HEDGE_MAX_PCT=15`, which would cap the
+beta-sized hedge below its target — change it. The others are new keys
+(defaults win unless a line exists); write them explicitly so the profile is
+self-describing.
+
+    BOOK_BETA_ENABLED=on             # one 'BOOK BETA:' line per cycle + risk_state.json book_beta
+    MAX_BOOK_BETA_SPY=1.2            # buy-path cap; 0 = off
+    AUTO_HEDGE_MODE=beta             # 'falling' = the Jul-30 behaviour
+    HEDGE_BETA_TARGET=1.0
+    HEDGE_BETA_BAND=0.15             # arm above target+band, unwind below target-band
+    HEDGE_BETA_FALLING_TARGET=0.8    # target while the falling-tape read holds
+    AUTO_HEDGE_MAX_PCT=40            # was 15 in the live .env
+    HEDGE_ETF=PSQ                    # unchanged (already set)

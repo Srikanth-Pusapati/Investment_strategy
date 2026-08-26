@@ -430,6 +430,18 @@ class RiskLimits:
     exposure_ladder_enabled: bool = True
     exposure_neutral_pct: float = 60.0     # gross-exposure cap in a neutral regime
     exposure_risk_off_pct: float = 30.0    # gross-exposure cap in risk-off
+    # --- BOOK BETA CAP (run-6 item 7b, Aug 25 review §6.6): the gross cap
+    # bounds dollars, not exposure — a 60%-invested book of beta-2 names is
+    # 1.2x the market. Next to the gross cap the buy path now computes the
+    # POST-TRADE book SPY-beta (portfolio/beta.py: 60-day, shrunk 0.8 toward
+    # 1.0, sum(w_i * beta_i)) and RESIZES the buy so it stays <= this cap,
+    # rejecting when even the min order breaches; logs 'BOOK BETA CAP: SYM
+    # 6.0% -> 3.2% (book 1.31 -> 1.20)' with the counterfactual. An unknown
+    # candidate beta is assumed 1.0 (logged). 0 = off; the gate is also
+    # inert when the orchestrator has no book reading this cycle (fail
+    # open — data outages must not freeze buying). Run-6 DEFAULT 1.2.
+    # MAX_BOOK_BETA_SPY
+    max_book_beta_spy: float = 1.2
 
 
 @dataclass(frozen=True)
@@ -577,7 +589,31 @@ class Config:
     hedge_etf: str = ""                    # HEDGE_ETF (e.g. PSQ / SH; "" = off)
     auto_hedge_ratio: float = 0.30         # hedge notional / net long exposure
     auto_hedge_min_cycles: int = 2         # falling cycles before arming (and clearing)
-    auto_hedge_max_pct: float = 15.0       # hedge ceiling as % of equity
+    # Hedge ceiling as % of equity. Run-6 (item 7c) raised the DEFAULT from
+    # 15 to 40: a beta-sized hedge on a 1.4-beta, 75%-invested book needs
+    # ~40% of equity in a 1x inverse ETF to reach target 1.0; at 15% the
+    # sizer could never close the gap. AUTO_HEDGE_MAX_PCT
+    auto_hedge_max_pct: float = 40.0
+    # --- Run-6 item 7 (Aug 25 review §6.6): BOOK BETA measurement + beta-
+    # sized hedge. book_beta_enabled: measure the book's SPY/QQQ/IWM beta
+    # each decision cycle (ONE 'BOOK BETA:' log line, persisted in
+    # risk_state.json as `book_beta`), feed the buy-path beta cap and the
+    # beta hedge; off = no reading, cap and beta hedge inert. BOOK_BETA_ENABLED
+    book_beta_enabled: bool = True
+    # auto_hedge_mode: 'falling' = the Jul-30 behaviour (arm on the
+    # falling-tape read after auto_hedge_min_cycles, size auto_hedge_ratio x
+    # net-long); 'beta' (run-6 DEFAULT) = size the inverse ETF to
+    # max(0, beta_book_spy - hedge_beta_target) x equity, arming when the
+    # book beta exceeds the target by more than hedge_beta_band for ONE
+    # cycle and unwinding below target - band (hysteresis); the falling-
+    # tape read is kept as a 'tighten the target to hedge_beta_falling_
+    # target' condition. Instrument stays HEDGE_ETF (PSQ vs the QQQ-heavy
+    # book; its SPY-beta ~ -1.1 slightly over-hedges the gap, inside the
+    # band). auto_hedge_max_pct caps both modes. AUTO_HEDGE_MODE
+    auto_hedge_mode: str = "beta"
+    hedge_beta_target: float = 1.0         # HEDGE_BETA_TARGET (book SPY-beta the hedge sizes to)
+    hedge_beta_band: float = 0.15          # HEDGE_BETA_BAND (arm above target+band, unwind below target-band)
+    hedge_beta_falling_target: float = 0.8  # HEDGE_BETA_FALLING_TARGET (target while the tape is falling)
     # --- BREADTH trigger for the falling-tape defenses (Aug 18 forensic:
     # -$26,844 at 3.9x SPY down-capture with ELEVEN per-name NAME FALLING
     # reads in one cycle while every defense slept — _market_falling keyed
@@ -985,6 +1021,7 @@ def load_config() -> Config:
             put_breakdown_ext_pct=_f("PUT_BREAKDOWN_EXT_PCT", 5.0),
             exposure_ladder_enabled=_flag("EXPOSURE_LADDER", "on"),
             exposure_neutral_pct=_f("EXPOSURE_NEUTRAL_PCT", 60.0),
+            max_book_beta_spy=_f("MAX_BOOK_BETA_SPY", 1.2),
             exposure_risk_off_pct=_f("EXPOSURE_RISK_OFF_PCT", 30.0),
         ),
         screener=ScreenerConfig(
@@ -1029,7 +1066,14 @@ def load_config() -> Config:
         hedge_etf=os.getenv("HEDGE_ETF", "").strip().upper(),
         auto_hedge_ratio=_f("AUTO_HEDGE_RATIO", 0.30),
         auto_hedge_min_cycles=_i("AUTO_HEDGE_MIN_CYCLES", 2),
-        auto_hedge_max_pct=_f("AUTO_HEDGE_MAX_PCT", 15.0),
+        auto_hedge_max_pct=_f("AUTO_HEDGE_MAX_PCT", 40.0),
+        book_beta_enabled=_flag("BOOK_BETA_ENABLED", "on"),
+        auto_hedge_mode=(
+            os.getenv("AUTO_HEDGE_MODE", "beta").strip().lower() or "beta"
+        ),
+        hedge_beta_target=_f("HEDGE_BETA_TARGET", 1.0),
+        hedge_beta_band=_f("HEDGE_BETA_BAND", 0.15),
+        hedge_beta_falling_target=_f("HEDGE_BETA_FALLING_TARGET", 0.8),
         breadth_falling_names_min=_i("BREADTH_FALLING_NAMES_MIN", 3),
         breadth_book_drawdown_pct=_f("BREADTH_BOOK_DRAWDOWN_PCT", -1.25),
         put_proxy_etf=os.getenv("PUT_PROXY_ETF", "IWM").strip().upper(),

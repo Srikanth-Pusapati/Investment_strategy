@@ -122,6 +122,11 @@ class PortfolioState:
         # Last ET trading day the core-defense trim fired, so a falling tape
         # trims the core at most once per day instead of every hourly cycle.
         self.core_defense_day: str = ""
+        # Last BOOK BETA reading (run-6 item 7a: portfolio/beta.py dict —
+        # spy/qqq/iwm/invested_pct/betas/weights/unknown/at). Persisted so
+        # the nightly post-mortem and scripts/eval_contract_check.py can
+        # read the ex-ante exposure the cycle traded against. Informational.
+        self.book_beta: dict = {}
         # The watchdog (its own thread) and the decision/risk path both touch this
         # state. A reentrant lock keeps reads/writes and the file save consistent.
         self._lock = threading.RLock()
@@ -189,6 +194,8 @@ class PortfolioState:
                 k: str(v) for k, v in d.get("streak_times", {}).items()
             }
             self.core_defense_day = str(d.get("core_defense_day", ""))
+            bb = d.get("book_beta", {})
+            self.book_beta = dict(bb) if isinstance(bb, dict) else {}
             if self.halted:
                 log.warning("Loaded LATCHED HALT from state: %s", self.halt_reason)
         except Exception as e:  # corrupt state must not crash startup
@@ -225,6 +232,7 @@ class PortfolioState:
                         "loss_streaks": self.loss_streaks,
                         "streak_times": self.streak_times,
                         "core_defense_day": self.core_defense_day,
+                        "book_beta": self.book_beta,
                     },
                     indent=2,
                 ),
@@ -630,6 +638,15 @@ class PortfolioState:
     # -- last regime label (for the risk-off trim transition, 1B.6) --------- #
     def get_regime_label(self) -> str:
         return self.regime_label
+
+    def get_book_beta(self) -> dict:
+        return dict(self.book_beta)
+
+    def set_book_beta(self, reading: dict) -> None:
+        """Persist the cycle's BOOK BETA reading (run-6 item 7a)."""
+        with self._lock:
+            self.book_beta = dict(reading or {})
+            self._save()
 
     def set_regime_label(self, label: str) -> None:
         with self._lock:

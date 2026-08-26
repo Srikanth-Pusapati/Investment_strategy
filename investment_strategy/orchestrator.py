@@ -28,6 +28,7 @@ from .journal import DecisionJournal, DecisionRecord
 from .benchmark import BenchmarkTracker
 from .config import Config
 from .correlation import CorrelationGuard
+from .portfolio.beta import BookBeta, hedge_signal, hedge_target_notional
 from .decision import DecisionEngine
 from .earnings import EarningsCalendar
 from .execution import AlpacaClient, OptionsHelper
@@ -111,6 +112,13 @@ class Orchestrator:
         # NEW buy is effectively a duplicate of something already held; the
         # RiskManager enforces the cap on the number computed here.
         self.corr_guard = CorrelationGuard(self.broker)
+        # Book-beta reader (run-6 item 7): shares the correlation guard's
+        # per-cycle return cache (no double fetch); ONE 'BOOK BETA:' line per
+        # decision cycle, persisted to risk_state.json; feeds the buy-path
+        # beta cap and the beta-sized auto-hedge.
+        self.book_beta = BookBeta(self.broker, self.corr_guard)
+        self._book_beta_reading = None
+        self._hedge_reason = ""   # 'beta:1.31' while the beta hedge is armed
         # Per-cycle market-regime read; scales position size down in risk-off, and
         # DOWN (not full) when its yfinance feed is degraded — since that same
         # outage blinds the sector cap too (1B.7).
@@ -845,6 +853,8 @@ class Orchestrator:
         self.earnings.new_cycle()
         self.sectors.new_cycle()
         self.corr_guard.new_cycle()
+        if getattr(self, "book_beta", None) is not None:
+            self.book_beta.new_cycle()
         self.regime.new_cycle()
         if self.cfg.risk.regime_filter_enabled:
             regime = self.regime.assess()
@@ -871,6 +881,9 @@ class Orchestrator:
             self._regime_flipped_off = False
         self._record_equity_snapshot()
         account = self.broker.get_account()
+        # Ex-ante exposure read (run-6 item 7a) — before any defense acts, so
+        # the line records what the book carried INTO the cycle.
+        self._read_book_beta(account)
 
         # De-risk the EXISTING book on a flip into risk-off (the regime multiplier
         # otherwise only shrinks NEW buys). Runs before new proposals so the trimmed
@@ -1204,7 +1217,9 @@ class Orchestrator:
         # Aug 22: the armed/holding state names its trigger source —
         # (index) vs (breadth:N-names) vs (book:-X.X%) — so the daily log
         # shows WHICH read armed the hedge sleeve, not just that one did.
-        _trig = getattr(self, "_falling_trigger", "")
+        _trig = getattr(self, "_falling_trigger", "") or getattr(
+            self, "_hedge_reason", ""
+        )
         log.info(
             "BEARISH FUNNEL: slate_bearish=%d%s put_proposals=%d "
             "put_approved=%d auto_hedge=%s proxy_put=%s",
@@ -3153,6 +3168,9 @@ class Orchestrator:
         etf = getattr(self.cfg, "hedge_etf", "")
         if not etf:
             return
+        if str(getattr(self.cfg, "auto_hedge_mode", "falling")).lower() == "beta":
+            self._apply_beta_hedge(account, etf)
+            return
         falling, why = self._market_falling()
         if falling:
             self._falling_cycles += 1
@@ -3175,31 +3193,14 @@ class Orchestrator:
             if self._clear_cycles >= need:
                 self._falling_cycles = 0
                 if pos is not None and pos.qty > 0:
-                    with self._trade_lock:
-                        self.broker.cancel_open_orders_for(etf)
-                        oid = self.broker.close_position(etf)
-                    if oid:
-                        log.warning(
-                            "AUTO-HEDGE UNWIND: falling read clear %d cycles — "
-                            "closing %g %s (%+.1f%%).",
-                            self._clear_cycles, pos.qty, etf,
-                            pos.unrealized_pl_pct,
-                        )
-                        self.ledger.record(TradeRecord.for_sell(
-                            etf, "auto-hedge unwind: falling read cleared",
-                            oid, qty=pos.qty,
-                            realized_pl_pct=pos.unrealized_pl_pct,
-                            realized_pl=pos.unrealized_pl,
-                            exit_reason="hedge_unwind",
-                            exit_price=pos.current_price or None,
-                        ))
-                        self._pending_oids.append((oid, etf))
-                        self.state.add_pending_order(oid, etf)
-                        # Keep the cycle's snapshot honest: hedge is cash now.
-                        account.cash += held_val
-                        account.buying_power += held_val
-                        pos.qty = 0.0
-                        pos.market_value = 0.0
+                    self._hedge_close(
+                        account, etf, pos, held_val,
+                        "auto-hedge unwind: falling read cleared",
+                        "AUTO-HEDGE UNWIND: falling read clear %d cycles — "
+                        "closing %g %s (%+.1f%%).",
+                        self._clear_cycles, pos.qty, etf,
+                        pos.unrealized_pl_pct,
+                    )
             return
         if self._falling_cycles < need:
             log.info(
@@ -3238,11 +3239,11 @@ class Orchestrator:
                 "after the cash buffer.", gap, etf, spendable,
             )
             return
-        price = self.broker.latest_price(etf)
-        with self._trade_lock:
-            oid = self.broker.submit_notional_buy(etf, notional)
-        if not oid:
-            log.warning("Auto-hedge buy of %s failed to submit — next cycle.", etf)
+        if not self._hedge_submit(
+            account, etf, notional, f"auto-hedge: {why}",
+            f"deterministic inverse-ETF hedge, {ratio:.0%} of net-long, "
+            f"ceiling {getattr(self.cfg, 'auto_hedge_max_pct', 0.0):.0f}% equity",
+        ):
             return
         log.warning(
             "AUTO-HEDGE: %s (cycle %d) — bought $%.0f of %s "
@@ -3250,16 +3251,200 @@ class Orchestrator:
             why, self._falling_cycles, notional, etf, held_val + notional,
             target, ratio * 100.0, net_long,
         )
+
+    # -- run-6 item 7: book-beta reading + beta-sized hedge ---------------- #
+    def _read_book_beta(self, account) -> None:
+        """ONE 'BOOK BETA:' line per decision cycle (run-6 item 7a); the
+        reading is kept for the buy-path cap and the beta hedge and
+        persisted to risk_state.json. Never blocks trading."""
+        self._book_beta_reading = None
+        if not getattr(self.cfg, "book_beta_enabled", False):
+            return
+        reader = getattr(self, "book_beta", None)
+        if reader is None:
+            log.info("BOOK BETA: unavailable (no reader)")
+            return
+        try:
+            reading = reader.read(account)
+        except Exception as e:  # noqa: BLE001 — a measurement, never a blocker
+            log.info("BOOK BETA: unavailable (%s: %s)", type(e).__name__, e)
+            return
+        log.info("%s", reading.line())
+        if not reading.available:
+            return
+        self._book_beta_reading = reading
+        try:
+            self.state.set_book_beta(reading.to_dict())
+        except Exception as e:  # noqa: BLE001
+            log.warning("BOOK BETA: state persist failed: %s", e)
+
+    def _beta_context(self, symbol: str, account) -> tuple[float | None, float | None]:
+        """(book SPY-beta right now, candidate's shrunk SPY-beta) for the
+        buy-path beta cap; (None, None) = reader off / blind -> gate skipped.
+        The book is re-read against the (mutated) cycle snapshot so a buy
+        submitted earlier this cycle already counts; the per-symbol series
+        are cycle-cached so this costs at most one fetch (the candidate)."""
+        if getattr(self, "_book_beta_reading", None) is None:
+            return None, None
+        try:
+            cur = self.book_beta.read(account)
+            book = cur.spy if cur.available else self._book_beta_reading.spy
+            return book, self.book_beta.beta_of(symbol, "SPY")
+        except Exception as e:  # noqa: BLE001 — fail open
+            log.warning("BOOK BETA: context for %s failed: %s", symbol, e)
+            return None, None
+
+    def _apply_beta_hedge(self, account, etf: str) -> None:
+        """AUTO_HEDGE_MODE=beta (run-6 item 7c): size the inverse ETF to
+        max(0, beta_book_spy - target) x equity. Arms when the book's SPY-
+        beta exceeds hedge_beta_target by more than hedge_beta_band for ONE
+        cycle; unwinds when it falls below target - band (hysteresis);
+        holds in between. The falling-tape read is kept as a 'tighten the
+        target to hedge_beta_falling_target' condition (its own persistence
+        rules no longer gate the hedge). The measured beta INCLUDES a held
+        hedge, so the gap is the ADDITIONAL notional; auto_hedge_max_pct
+        caps the total. An unavailable reading holds whatever is on."""
+        falling, why = self._market_falling()
+        target = float(getattr(self.cfg, "hedge_beta_target", 1.0))
+        band = max(0.0, float(getattr(self.cfg, "hedge_beta_band", 0.15)))
+        if falling:
+            target = min(
+                target, float(getattr(self.cfg, "hedge_beta_falling_target", target)),
+            )
+        beta = None
+        if getattr(self.cfg, "book_beta_enabled", False):
+            try:
+                cur = self.book_beta.read(account)
+                beta = cur.spy if cur.available else None
+            except Exception as e:  # noqa: BLE001
+                log.warning("Auto-hedge: beta re-read failed: %s", e)
+        if beta is None:
+            base = getattr(self, "_book_beta_reading", None)
+            beta = base.spy if base is not None else None
+        pos = account.position_for(etf)
+        held_val = max(0.0, pos.market_value) if pos is not None else 0.0
+        held = pos is not None and pos.qty > 0
+        if beta is None:
+            log.info(
+                "AUTO-HEDGE: beta: book beta unavailable this cycle — "
+                "holding %s ($%.0f).", etf, held_val,
+            )
+            return
+        sig = hedge_signal(beta, target, band, held)
+        tag = f"beta:{beta:.2f}"
+        if sig == "unwind":
+            self._falling_cycles = 0
+            self._hedge_reason = ""
+            self._hedge_close(
+                account, etf, pos, held_val,
+                f"auto-hedge unwind: beta {beta:.2f} < target {target:.2f} - {band:.2f}",
+                "AUTO-HEDGE UNWIND: beta: book spy-beta %.2f < target %.2f - "
+                "%.2f band — closing %g %s (%+.1f%%).",
+                beta, target, band, pos.qty, etf, pos.unrealized_pl_pct,
+            )
+            return
+        if sig == "hold":
+            self._hedge_reason = tag if held else ""
+            self._falling_cycles = 1 if held else 0
+            if held:
+                log.info(
+                    "Auto-hedge: beta: book spy-beta %.2f within %.2f +/- %.2f "
+                    "— holding $%.0f %s.", beta, target, band, held_val, etf,
+                )
+            return
+        # arm
+        self._falling_cycles = 1
+        self._hedge_reason = tag
+        halted, halt_why = self.risk.trading_halted(account)
+        if halted:
+            log.info("Auto-hedge skipped: %s", halt_why)
+            return
+        max_pct = max(0.0, float(getattr(self.cfg, "auto_hedge_max_pct", 0.0)))
+        gap = hedge_target_notional(beta, target, account.equity, max_pct)
+        ceiling = account.equity * max_pct / 100.0
+        gap = min(gap, max(0.0, ceiling - held_val))
+        r = self.cfg.risk
+        min_fill = max(
+            r.min_order_usd, account.equity * (r.min_order_pct / 100.0), 1.0
+        )
+        if gap < min_fill:
+            if ceiling - held_val < min_fill:
+                log.info(
+                    "Auto-hedge: beta: book spy-beta %.2f > target %.2f but %s "
+                    "already at the %.0f%% ceiling ($%.0f).",
+                    beta, target, etf, max_pct, held_val,
+                )
+            return
+        min_cash = account.equity * (r.min_cash_buffer_pct / 100.0)
+        spendable = max(0.0, min(account.cash - min_cash, account.buying_power))
+        notional = round(min(gap, spendable), 2)
+        if notional < min_fill:
+            log.info(
+                "Auto-hedge: want $%.0f more %s but only $%.0f spendable "
+                "after the cash buffer.", gap, etf, spendable,
+            )
+            return
+        reason = (
+            f"beta: book spy-beta {beta:.2f} > target {target:.2f} + {band:.2f} band"
+            + (f" (tape falling: {why})" if falling else "")
+        )
+        if not self._hedge_submit(
+            account, etf, notional, f"auto-hedge: {reason}",
+            f"beta-sized inverse-ETF hedge to target {target:.2f}, "
+            f"ceiling {max_pct:.0f}% equity",
+        ):
+            return
+        log.warning(
+            "AUTO-HEDGE: %s — bought $%.0f of %s (hedge $%.0f/$%.0f, "
+            "ceiling %.0f%% of equity).",
+            reason, notional, etf, held_val + notional,
+            min(held_val + gap, ceiling), max_pct,
+        )
+
+    def _hedge_close(
+        self, account, etf: str, pos, held_val: float, rationale: str,
+        msg: str, *args,
+    ) -> None:
+        """Close the hedge ETF, ledger the unwind, keep the snapshot honest."""
+        with self._trade_lock:
+            self.broker.cancel_open_orders_for(etf)
+            oid = self.broker.close_position(etf)
+        if not oid:
+            return
+        log.warning(msg, *args)
+        self.ledger.record(TradeRecord.for_sell(
+            etf, rationale, oid, qty=pos.qty,
+            realized_pl_pct=pos.unrealized_pl_pct,
+            realized_pl=pos.unrealized_pl,
+            exit_reason="hedge_unwind",
+            exit_price=pos.current_price or None,
+        ))
+        self._pending_oids.append((oid, etf))
+        self.state.add_pending_order(oid, etf)
+        # Keep the cycle's snapshot honest: hedge is cash now.
+        account.cash += held_val
+        account.buying_power += held_val
+        pos.qty = 0.0
+        pos.market_value = 0.0
+
+    def _hedge_submit(
+        self, account, etf: str, notional: float, rationale: str, risk_note: str,
+    ) -> bool:
+        """Submit a notional hedge buy + ledger/state bookkeeping. False when
+        the broker declined (caller logs nothing; next cycle retries)."""
+        price = self.broker.latest_price(etf)
+        with self._trade_lock:
+            oid = self.broker.submit_notional_buy(etf, notional)
+        if not oid:
+            log.warning("Auto-hedge buy of %s failed to submit — next cycle.", etf)
+            return False
         self.ledger.record(TradeRecord(
             symbol=etf, action="buy", instrument="equity",
             qty=round(notional / price, 6) if price and price > 0 else 0.0,
             entry_price=price or 0.0, cost_usd=round(notional, 2),
-            rationale=f"auto-hedge: {why}",
+            rationale=rationale,
             entry_signals=["auto_hedge"], verdict="approved",
-            risk_note=(
-                f"deterministic inverse-ETF hedge, {ratio:.0%} of net-long, "
-                f"ceiling {getattr(self.cfg, 'auto_hedge_max_pct', 0.0):.0f}% equity"
-            ),
+            risk_note=risk_note,
             order_id=oid,
         ))
         self._pending_oids.append((oid, etf))
@@ -3269,6 +3454,7 @@ class Orchestrator:
             account, etf, notional, price,
             notional / price if price and price > 0 else 0.0,
         )
+        return True
 
     def _apply_defensive_rotation(self, account) -> None:
         """Rotate the defensive T-bill core (SGOV/BIL) back to cash once the
@@ -3622,6 +3808,13 @@ class Orchestrator:
         is_sell = proposal.action.value == "sell"
         sell_events = self._sell_event_tags(proposal.symbol, account) if is_sell else None
         stop_width = self.state.get_stop_width(proposal.symbol) if is_sell else None
+        # Book-beta cap context (run-6 item 7b): the book's CURRENT SPY-beta
+        # (re-read against the snapshot so earlier buys this cycle count)
+        # and the candidate's own beta; both None when the reader is off or
+        # blind this cycle (the gate then fails open).
+        book_spy, cand_beta = (
+            self._beta_context(proposal.symbol, account) if is_buy else (None, None)
+        )
         decision = self.risk.evaluate(
             proposal, account, price, vol, pending, days_to_earnings,
             sector, sector_exposure, self._regime_mult,
@@ -3636,6 +3829,7 @@ class Orchestrator:
                 max(0.0, d_pos.market_value) if d_pos is not None else 0.0
             ),
             sell_events=sell_events, stop_width_pct=stop_width,
+            book_beta_spy=book_spy, candidate_beta=cand_beta,
         )
         if proposal.action.value == "hold":
             # A HOLD is the model saying "no action" — the risk layer returns

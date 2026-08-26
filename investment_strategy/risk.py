@@ -173,6 +173,8 @@ class RiskManager:
         defensive_exempt_usd: float = 0.0,
         sell_events: tuple[str, ...] | None = None,
         stop_width_pct: float | None = None,
+        book_beta_spy: float | None = None,
+        candidate_beta: float | None = None,
     ) -> RiskDecision:
         """`price` is the current market price for proposal.symbol. `volatility`
         is the symbol's annualized realized vol (fraction, e.g. 0.45) used for
@@ -206,7 +208,11 @@ class RiskManager:
         orchestrator attached to a SELL (name-falling read, earnings, halt,
         regime flip — from code, never the model) and `stop_width_pct` is the
         position's planned stop width; both feed the LLM sell-authority gate
-        (llm_sell_authority='events_only')."""
+        (llm_sell_authority='events_only'). `book_beta_spy` is the book's
+        current SPY-beta (portfolio/beta.py, None = no reading -> the beta
+        cap is skipped) and `candidate_beta` the candidate's own shrunk
+        SPY-beta (None = unknown -> assumed 1.0) for the book-beta cap
+        (run-6 item 7b)."""
         if proposal.action is Action.HOLD:
             # Same REJECTED verdict (nothing downstream may execute a HOLD),
             # but without _reject's "REJECT hold X" log line — a no-op HOLD is
@@ -227,6 +233,7 @@ class RiskManager:
             tech, composite_score, regime_label=regime_label,
             entry_families=entry_families, neg_families=neg_families,
             defensive_exempt_usd=defensive_exempt_usd,
+            book_beta_spy=book_beta_spy, candidate_beta=candidate_beta,
         )
 
     # -- survival-first sizing: vol-targeted, fractional-Kelly -------------- #
@@ -344,6 +351,8 @@ class RiskManager:
         entry_families: set[str] | None = None,
         neg_families: dict | None = None,
         defensive_exempt_usd: float = 0.0,
+        book_beta_spy: float | None = None,
+        candidate_beta: float | None = None,
     ) -> RiskDecision:
         halted, why = self.trading_halted(account)
         if halted:
@@ -873,6 +882,54 @@ class RiskManager:
                 "no leverage).",
             )
         target_notional = min(target_notional, gross_room)
+
+        # 2c'') BOOK BETA CAP (run-6 item 7b): the gross cap bounds dollars,
+        #     not exposure. With a book reading this cycle, the post-trade
+        #     SPY-beta (book + w_new * beta_new) must stay <= max_book_beta_spy:
+        #     the buy is RESIZED to the room, rejected when even the min order
+        #     breaches. Unknown candidate beta = 1.0 (logged); no book reading
+        #     = fail open (an outage must not freeze buying). Negative-beta
+        #     buys (an inverse ETF) can't breach and pass untouched.
+        cap = float(getattr(self.limits, "max_book_beta_spy", 0.0) or 0.0)
+        if cap > 0 and book_beta_spy is not None and equity > 0:
+            if candidate_beta is None:
+                cand_beta = 1.0
+                log.info(
+                    "BOOK BETA CAP: %s beta unknown — assuming 1.0.",
+                    proposal.symbol,
+                )
+            else:
+                cand_beta = float(candidate_beta)
+            post = book_beta_spy + (target_notional / equity) * cand_beta
+            if cand_beta > 0 and post > cap + 1e-9:
+                room = max(0.0, (cap - book_beta_spy) * equity / cand_beta)
+                min_order = max(
+                    self.limits.min_order_usd,
+                    equity * (getattr(self.limits, "min_order_pct", 0.0) / 100.0),
+                    price if self.limits.whole_shares_only else 0.0,
+                )
+                req_pct = target_notional / equity * 100.0
+                if room < min_order:
+                    log.warning(
+                        "BOOK BETA CAP: %s %.1f%% -> rejected (book %.2f -> "
+                        "%.2f > cap %.2f; beta %.2f; room $%.0f < min order "
+                        "$%.0f).", proposal.symbol, req_pct, book_beta_spy,
+                        post, cap, cand_beta, room, min_order,
+                    )
+                    return self._reject(
+                        proposal,
+                        f"Book beta cap: post-trade SPY-beta {post:.2f} > "
+                        f"{cap:.2f} cap (book {book_beta_spy:.2f}, "
+                        f"{proposal.symbol} beta {cand_beta:.2f}) and even the "
+                        f"min order (${min_order:,.0f}) breaches it.",
+                    )
+                new_post = book_beta_spy + (room / equity) * cand_beta
+                log.warning(
+                    "BOOK BETA CAP: %s %.1f%% -> %.1f%% (book %.2f -> %.2f)",
+                    proposal.symbol, req_pct, room / equity * 100.0,
+                    post, new_post,
+                )
+                target_notional = min(target_notional, room)
 
         # 2d) Per-trade $-loss cap — bound the ABSOLUTE dollars at risk if the stop
         #     fires, independent of the % weight. The classic "risk 1% per trade"
