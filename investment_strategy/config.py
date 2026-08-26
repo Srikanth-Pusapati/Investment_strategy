@@ -718,6 +718,18 @@ class Config:
     #     403 (Aug 25: FEEDS said 5/5 while news was VADER all run and EDGAR
     #     returned 0 filings twice). off = legacy enabled-only line.
     feeds_degraded_modes: bool = True
+    #   RESET_CARRY_CHURN (run-6 default off): whether a reset / fresh cycle
+    #     carries the OLD account's churn memory (exit clocks + exit prices,
+    #     buy clocks + convictions, loss streaks) into the fresh risk state.
+    #     The carry was added Jul 27-28 (NU: the reset wiped its exit clock
+    #     and price, the next day's re-buy sailed through the cooldown and
+    #     the price guard into a -4.1% stop). Under a PRE-REGISTERED clean
+    #     window that protection is a confound: run-5 day 1 carried run-4
+    #     cooldowns/exit prices into a brand-new $1M account (SOFI/SMCI/NOK
+    #     slate-excluded all day, SPCX rejected day 2 against a run-4 exit).
+    #     off = a fresh cycle starts with EMPTY clocks, exit prices and
+    #     streaks; on = the Jul-28 carry behaviour.
+    reset_carry_churn: bool = False
     # Weekly ledger-driven auto-tune report (Jul 22 upgrade): a deterministic,
     # no-LLM replay of the ledger + decisions journal against the entry-quality
     # risk knobs, fired once per ET weekend. Report-only — writes
@@ -826,6 +838,7 @@ def load_config() -> Config:
         equity_close_fixed_stamp=_flag("EQUITY_CLOSE_FIXED_STAMP", "on"),
         ledger_fill_prices=_flag("LEDGER_FILL_PRICES", "on"),
         feeds_degraded_modes=_flag("FEEDS_DEGRADED_MODES", "on"),
+        reset_carry_churn=_flag("RESET_CARRY_CHURN", "off"),
         autotune_enabled=_flag("AUTOTUNE_ENABLED", "on"),
         autotune_days=_i("AUTOTUNE_DAYS", 14),
         autotune_min_sample=_i("AUTOTUNE_MIN_SAMPLE", 5),

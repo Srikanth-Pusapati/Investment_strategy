@@ -1458,8 +1458,15 @@ class Orchestrator:
                 day = et.date().isoformat()
                 if self.equity_history.has_close_row(day):
                     return
+                bb = getattr(self, "_book_beta_reading", None)
+                extra = (
+                    {"book_beta_spy": bb.spy}
+                    if bb is not None and getattr(bb, "spy", None) is not None
+                    else None
+                )  # item 8: ex-ante beta on the close row (eval beta-adjust)
                 self.equity_history.snapshot(
-                    compute_status(self.broker), basis="close", day=day)
+                    compute_status(self.broker), basis="close", day=day,
+                    extra=extra)
                 log.info("Equity close row stamped for %s (basis=close).", day)
                 return
             rows = self.equity_history.all()

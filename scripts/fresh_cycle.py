@@ -95,6 +95,16 @@ def main() -> int:
             print("Aborted — nothing changed.")
             return 1
 
+    try:
+        from investment_strategy.config import load_config
+        carry = bool(load_config().reset_carry_churn)
+    except Exception as e:  # noqa: BLE001 — reset.py prints the authoritative note
+        print(f"  (could not read config for the churn-carry mode: {e})")
+        carry = None
+    mode = ("ON — cooldowns/exit prices/loss streaks carried from the old state"
+            if carry else "OFF — clean state: empty clocks, exit prices, streaks"
+            if carry is not None else "unknown")
+    print(f"  churn carry (RESET_CARRY_CHURN): {mode}")
     print("\n[1/4] Stopping the bot")
     _stop_bot()
     print("[2/4] Archiving + clearing local state")

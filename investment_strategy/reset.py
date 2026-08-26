@@ -48,7 +48,14 @@ def _churn_carryover(cfg: Config) -> dict:
     Positions still OPEN at reset get a SYNTHESIZED exit stamped at reset
     time (no price — the price guard fails open), so the re-entry cooldown
     still applies to names the reset flattened. Best-effort: an unreadable
-    state file carries nothing."""
+    state file carries nothing.
+
+    Run-6 item 8b: gated by Config.reset_carry_churn (RESET_CARRY_CHURN,
+    default OFF). A pre-registered clean window means clean STATE — run-5
+    day 1 was dirtied by run-4 cooldowns/exit prices carried into a
+    brand-new account. Off -> {} (empty clocks, prices and streaks)."""
+    if not getattr(cfg, "reset_carry_churn", False):
+        return {}
     try:
         d = json.loads(Path(cfg.state_file).read_text(encoding="utf-8"))
     except Exception:
@@ -108,6 +115,12 @@ def reset_local_state(cfg: Config, archive: bool = True) -> list[str]:
     notes: list[str] = []
     dest = None
     carry = _churn_carryover(cfg)
+    notes.append(
+        "churn carry: "
+        + ("ON (RESET_CARRY_CHURN=on — cooldowns/exit prices/streaks re-seeded)"
+           if getattr(cfg, "reset_carry_churn", False)
+           else "OFF (clean state — RESET_CARRY_CHURN=off, run-6 default)")
+    )
     if archive:
         dest = _state_dir(cfg) / "archive" / datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
     for p in per_account_paths(cfg):
