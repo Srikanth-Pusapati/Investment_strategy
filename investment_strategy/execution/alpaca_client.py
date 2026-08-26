@@ -1120,6 +1120,68 @@ class AlpacaClient:
             limit_price=o.limit_price, stop_price=o.stop_price, **common
         )
 
+    def latest_prices(self, symbols: list[str]) -> dict[str, float]:
+        """Last trade price for MANY symbols in ONE data call (run-6 screener
+        hygiene: the aggregator prices the whole merged candidate set before
+        the slate cap). Missing / failed symbols are simply absent from the
+        result so callers fail open. Empty dict on any error."""
+        syms = sorted({s.upper() for s in symbols if s})
+        if not syms:
+            return {}
+        try:
+            req = StockLatestTradeRequest(symbol_or_symbols=syms)
+            trades = _retry_read(
+                lambda: self.data.get_stock_latest_trade(req),
+                what=f"latest_prices({len(syms)})",
+            )
+            out: dict[str, float] = {}
+            for sym, t in (trades or {}).items():
+                try:
+                    px = float(t.price)
+                except (TypeError, ValueError, AttributeError):
+                    continue
+                if px > 0:
+                    out[sym] = px
+            return out
+        except Exception as e:
+            log.warning("latest_prices(%d) failed: %s", len(syms), e)
+            return {}
+
+    def avg_dollar_volume(
+        self, symbols: list[str], days: int = 20
+    ) -> dict[str, float]:
+        """Mean close*volume over the last `days` daily bars, for MANY symbols
+        in ONE batched bars call (screener ADV floor). Symbols with no bars
+        are absent. Empty dict on any error."""
+        syms = sorted({s.upper() for s in symbols if s})
+        if not syms:
+            return {}
+        try:
+            req = StockBarsRequest(
+                symbol_or_symbols=syms,
+                timeframe=TimeFrame.Day,
+                start=datetime.now(timezone.utc) - timedelta(days=days * 2),
+            )
+            resp = _retry_read(
+                lambda: self.data.get_stock_bars(req),
+                what=f"avg_dollar_volume({len(syms)})",
+            )
+            out: dict[str, float] = {}
+            for sym in syms:
+                bars = list(resp.data.get(sym, []) or [])[-days:]
+                vals = []
+                for b in bars:
+                    try:
+                        vals.append(float(b.close) * float(b.volume))
+                    except (TypeError, ValueError, AttributeError):
+                        continue
+                if vals:
+                    out[sym] = sum(vals) / len(vals)
+            return out
+        except Exception as e:
+            log.warning("avg_dollar_volume(%d) failed: %s", len(syms), e)
+            return {}
+
     def daily_close_series(self, symbol: str, days: int) -> list[tuple[str, float]]:
         """(ISO-date, close) pairs for the last `days` trading days — the dated
         variant of _daily_closes. The dates are what lets the backtest glue align

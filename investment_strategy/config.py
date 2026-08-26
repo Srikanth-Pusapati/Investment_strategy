@@ -437,6 +437,19 @@ class ScreenerConfig:
     # names are never forced in. reserve=0 → pure |score| ranking (old behavior).
     bearish_reserve: int = 4
     bearish_reserve_bar: float = 0.4
+    # Run-6 universe hygiene (Aug 25 review): 48% of slate exclusions were
+    # sub-$5 names that had already consumed a capped slot, per-symbol signal
+    # fetches and prompt tokens before the orchestrator's liquidity floor
+    # rejected them. With price_floor_pre_cap ON the aggregator batch-reads
+    # last prices for the merged candidate set (ONE broker call) and drops
+    # names under risk.min_trade_price_usd BEFORE the max_candidates cap and
+    # the bearish reserve. Unknown prices fail open (the later floor still
+    # applies). Run-6 default = on.  SCREENER_PRICE_FLOOR_PRE_CAP
+    price_floor_pre_cap: bool = True
+    # Optional average-dollar-volume floor (last 20 daily bars, ONE batched
+    # bars call) applied at the same point; 0 = off (run-6 default).
+    # SCREENER_MIN_ADV_USD
+    min_adv_usd: float = 0.0
 
 
 @dataclass(frozen=True)
@@ -637,6 +650,13 @@ class Config:
     #     filled_avg_price / filled qty / fill time onto the ledger row
     #     (fill_price / fill_qty / fill_ts) and log them in the FILLED line.
     ledger_fill_prices: bool = True
+    #   FEEDS_DEGRADED_MODES: the per-cycle FEEDS line reports degraded modes
+    #     explicitly — an EDGAR Form-4 pull that returned 0 rows after a
+    #     timeout/HTTP error counts as UNHEALTHY for that cycle, and the line
+    #     carries 'news=vader-fallback' once news.py has latched the Finnhub
+    #     403 (Aug 25: FEEDS said 5/5 while news was VADER all run and EDGAR
+    #     returned 0 filings twice). off = legacy enabled-only line.
+    feeds_degraded_modes: bool = True
     # Weekly ledger-driven auto-tune report (Jul 22 upgrade): a deterministic,
     # no-LLM replay of the ledger + decisions journal against the entry-quality
     # risk knobs, fired once per ET weekend. Report-only — writes
@@ -742,6 +762,7 @@ def load_config() -> Config:
         postmortem_option_marks=_flag("POSTMORTEM_OPTION_MARKS", "on"),
         equity_close_fixed_stamp=_flag("EQUITY_CLOSE_FIXED_STAMP", "on"),
         ledger_fill_prices=_flag("LEDGER_FILL_PRICES", "on"),
+        feeds_degraded_modes=_flag("FEEDS_DEGRADED_MODES", "on"),
         autotune_enabled=_flag("AUTOTUNE_ENABLED", "on"),
         autotune_days=_i("AUTOTUNE_DAYS", 14),
         autotune_min_sample=_i("AUTOTUNE_MIN_SAMPLE", 5),
@@ -935,6 +956,10 @@ def load_config() -> Config:
         ),
         screener=ScreenerConfig(
             enabled=_flag("SCREENER_ENABLED", "on"),
+            # Default deliberately EXCLUDES robinhood_scans (still registered;
+            # a .env SCREENER_SOURCES may re-enable it): with no saved RH scans
+            # it logs 'Robinhood scans: none saved' every cycle and was counted
+            # as a healthy feed (run-6 hygiene, Aug 25 review).
             sources=tuple(
                 s.strip().lower()
                 for s in os.getenv(
@@ -953,6 +978,8 @@ def load_config() -> Config:
             insider_scan_limit=_i("INSIDER_SCAN_LIMIT", 100),
             bearish_reserve=_i("BEARISH_RESERVE", 4),
             bearish_reserve_bar=_f("BEARISH_RESERVE_BAR", 0.4),
+            price_floor_pre_cap=_flag("SCREENER_PRICE_FLOOR_PRE_CAP", "on"),
+            min_adv_usd=_f("SCREENER_MIN_ADV_USD", 0.0),
         ),
         alerts=load_alert_config(os.getenv),
         # Core-satellite fill (Todo 1.6). CORE_ETF unset/"" disables it entirely;

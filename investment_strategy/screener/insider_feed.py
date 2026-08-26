@@ -49,15 +49,24 @@ _OWNERSHIP_RE = re.compile(r"<ownershipDocument>.*?</ownershipDocument>", re.DOT
 class InsiderFeedScreener(Screener):
     name = "insider"
 
+    # An EDGAR pull that fails or times out (>= this many seconds with 0 rows)
+    # is a feed OUTAGE for the cycle, not "no insider activity".
+    _DEGRADED_AFTER_S = 15.0
+
     def __init__(self, cfg: Config):
         self.cfg = cfg
         self._headers = {"User-Agent": cfg.sec_user_agent}
+        # Set per scan when the feed pull failed; read by the orchestrator's
+        # FEEDS line so the cycle reports 'insider UNHEALTHY (edgar: timeout)'
+        # instead of a silent 0-candidate healthy feed (run-6, Aug 25 review).
+        self.degraded: str | None = None
 
     @property
     def enabled(self) -> bool:
         return bool(self.cfg.sec_user_agent)
 
     def scan(self) -> list[Candidate]:
+        self.degraded = None
         filings = self._recent_form4_filings()
         limit = self.cfg.screener.insider_scan_limit
         # Surface the raw feed size so an empty/blocked EDGAR pull is visible
@@ -117,16 +126,20 @@ class InsiderFeedScreener(Screener):
     # -- EDGAR "latest filings" feed --------------------------------------- #
     def _recent_form4_filings(self) -> list[tuple[str, str, str]]:
         """Return (cik, accession_nodash, accession_dashed) for the newest Form 4s."""
+        t0 = time.monotonic()
         try:
             r = requests.get(_CURRENT_URL, headers=self._headers, timeout=20, params={
                 "action": "getcurrent", "type": "4", "owner": "include",
                 "count": "100", "output": "atom",
             })
             if r.status_code != 200:
-                log.debug("EDGAR getcurrent HTTP %s", r.status_code)
+                self._mark_degraded(f"http {r.status_code}", t0)
                 return []
         except Exception as e:
-            log.debug("EDGAR getcurrent failed: %s", e)
+            self._mark_degraded(
+                "timeout" if isinstance(e, requests.exceptions.Timeout) else "error",
+                t0, detail=str(e),
+            )
             return []
 
         out: list[tuple[str, str, str]] = []
@@ -137,7 +150,19 @@ class InsiderFeedScreener(Screener):
                 continue
             seen.add(acc_dash)
             out.append((cik, accno, acc_dash))
+        if not out and (time.monotonic() - t0) >= self._DEGRADED_AFTER_S:
+            self._mark_degraded("timeout", t0)   # slow 200 with an empty body
         return out
+
+    def _mark_degraded(self, reason: str, t0: float, detail: str = "") -> None:
+        """Latch the per-cycle outage reason and say so at WARNING — an empty
+        EDGAR pull must surface as a feed failure, never as 'no insiders'."""
+        self.degraded = f"edgar: {reason}"
+        log.warning(
+            "EDGAR Form-4 feed returned 0 filings after %.0fs (%s)%s — insider "
+            "screener UNHEALTHY this cycle.",
+            time.monotonic() - t0, reason, f": {detail}" if detail else "",
+        )
 
     # -- per-filing parse (ticker + buy/sell shares straight from the XML) -- #
     def _parse_submission(

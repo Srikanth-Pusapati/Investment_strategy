@@ -95,7 +95,7 @@ class Orchestrator:
             retention_days=getattr(cfg, "signal_history_retention_days", None),
             max_points=getattr(cfg, "signal_history_max_points", None),
         )
-        self.screeners = ScreenerAggregator(cfg, self.quiver)
+        self.screeners = ScreenerAggregator(cfg, self.quiver, broker=self.broker)
         self.robinhood = RobinhoodReader(cfg)
         # A restart clears the in-memory dead-auth latch; clear a stale
         # AUTH DEAD health file too, or the panel shows a phantom outage.
@@ -1266,7 +1266,7 @@ class Orchestrator:
         line asserting the health of ALL configured screener sources."""
         feeds = self._feed_health_line()
         if feeds:
-            if "DEAD" in feeds:
+            if "DEAD" in feeds or "UNHEALTHY" in feeds:
                 log.warning("%s", feeds)
             else:
                 log.info("%s", feeds)
@@ -1300,11 +1300,18 @@ class Orchestrator:
         a configured source whose screener `enabled` gate is False is DEAD
         this cycle (safe_scan skips it and its candidates silently vanish);
         RH-backed sources report the dead-auth latch as (oauth). No new
-        probes, no network calls. Best-effort — never breaks a cycle."""
+        probes, no network calls. Best-effort — never breaks a cycle.
+
+        Run-6 (FEEDS_DEGRADED_MODES on): a source that is enabled but whose
+        pull FAILED this cycle (screener.degraded, e.g. the EDGAR Form-4 feed
+        timing out with 0 rows) counts as 'UNHEALTHY (<reason>)' in the n/n,
+        and 'news=vader-fallback' is appended once news.py has latched the
+        Finnhub 403 — so 'FEEDS: 5/5 healthy' means what it says."""
         try:
             sources = list(getattr(self.cfg.screener, "sources", ()) or ())
             if not sources:
                 return "FEEDS: 0/0 configured"
+            degraded_modes = bool(getattr(self.cfg, "feeds_degraded_modes", False))
             by_name = {
                 s.name: s for s in getattr(self.screeners, "screeners", [])
             }
@@ -1320,21 +1327,38 @@ class Orchestrator:
                 except Exception:
                     ok = False
                 if ok:
+                    why = getattr(scr, "degraded", None) if degraded_modes else None
+                    if why:
+                        dead.append(f"{src} UNHEALTHY ({why})")
                     continue
                 if src in ("robinhood", "robinhood_scans") and rh_dead:
                     dead.append(f"{src} DEAD (oauth)")
                 else:
                     dead.append(f"{src} DEAD (disabled/no credentials)")
+            suffix = " news=vader-fallback" if (
+                degraded_modes and self._news_vader_fallback()
+            ) else ""
             total = len(sources)
             if not dead:
-                return f"FEEDS: {total}/{total} healthy"
+                return f"FEEDS: {total}/{total} healthy{suffix}"
             return (
                 f"FEEDS: {total - len(dead)}/{total} — " + ", ".join(dead)
-                + " — EVAL WINDOW VALIDITY AT RISK"
+                + " — EVAL WINDOW VALIDITY AT RISK" + suffix
             )
         except Exception as e:
             log.debug("feed health line failed: %s", e)
             return ""
+
+    def _news_vader_fallback(self) -> bool:
+        """True once the news provider has latched the Finnhub 403 (sentiment
+        = VADER for the rest of the process). Read-only; fails False."""
+        try:
+            for p in getattr(self.signals, "per_symbol", []) or []:
+                if getattr(p, "name", "") == "news":
+                    return bool(getattr(p, "_finnhub_gated", False))
+        except Exception:
+            pass
+        return False
 
     def _refresh_dashboard(self) -> None:
         """Regenerate the live dashboard HTML — and the public track-record page
