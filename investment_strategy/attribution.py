@@ -41,13 +41,13 @@ from .ledger import TradeLedger, TradeRecord
 # consistently prefixes each key_signals citation with its source ("insider
 # Form4 +1.00", "options_chain +0.39"), but the text is free-form, so this is
 # substring matching over curated tables — extend them when unparsed idioms
-# show up in the ledger. Buckets are SignalKind values plus two REPORT-ONLY
-# extras that deliberately aren't kinds: "options_flow" (the flow provider
-# emits under kind=news, but its citations behave differently — Jul-24:
-# flow-cited trips -0.8% vs news-cited -3.0% — so folding them together would
-# launder the news number) and "composite" (the LLM citing the deterministic
-# index itself). Non-kind buckets never collide with a SignalKind value, so
-# composite perf-weight lookups simply never see them.
+# show up in the ledger. Buckets are SignalKind values plus one REPORT-ONLY
+# extra that deliberately isn't a kind: "composite" (the LLM citing the
+# deterministic index itself). "options_flow" was a report-only bucket while
+# the flow provider emitted under kind=news (Jul-24: flow-cited trips -0.8%
+# vs news-cited -3.0%, so folding them would launder the news number); since
+# run-6 it is a real SignalKind and the same bucket name keeps every older
+# ledger citation ("news options flow C/P +0.76") mapping to it.
 #
 # STRONG patterns are the source being NAMED. WEAK patterns are metric/
 # indicator vocabulary that only implies a source ("margin", "RSI", "upgrade").
@@ -103,9 +103,10 @@ def parse_cited(texts: list[str] | None) -> set[str]:
     hits only count when the string named no source at all. Match-ALL among
     strong hits — "congress+insider net buying" credits both sources. One
     suppression: when a flow bucket matched, a same-string "news" hit is
-    dropped, because the flow signal emits under the news kind and its
-    kind-prefix ("news options flow C/P +0.76", "news flow +0.61 call
-    imbalance") is an artifact of that, not a second source being cited.
+    dropped, because the flow signal USED to emit under the news kind
+    (pre run-6) and its kind-prefix ("news options flow C/P +0.76", "news
+    flow +0.61 call imbalance") is an artifact of that, not a second source
+    being cited — kept so old ledger rows parse the same way.
     """
     out: set[str] = set()
     for t in texts or []:

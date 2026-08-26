@@ -37,6 +37,7 @@ class SignalKind(str, Enum):
     FUNDAMENTALS = "fundamentals"
     TECHNICAL = "technical"   # price-action indicators (RSI, MACD, trend)
     NEWS = "news"
+    OPTIONS_FLOW = "options_flow"  # call/put volume imbalance (run-6: own kind, was NEWS)
     INSIDER = "insider"
     CONGRESS = "congress"
     OFFEXCHANGE = "offexchange"  # dark-pool / off-exchange short volume (~1d lag)

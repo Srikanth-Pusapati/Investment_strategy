@@ -104,9 +104,13 @@ def test_unscored_and_marketwide_signals_are_skipped():
 def test_retention_prunes_old_points_and_empty_symbols():
     h = SignalHistory(path=_tmp())
     h.record([_bundle("OLD", SignalKind.NEWS, 0.5)], now=_T0)
-    # 20 days later a different name records; OLD's lone point ages out.
+    # Run-6: retention is 120 days (was 14). 20 days later OLD is still
+    # retained; 130 days later its lone point ages out.
     h.record([_bundle("NEW", SignalKind.NEWS, 0.5)],
              now=_T0 + timedelta(days=20))
+    assert "OLD" in h.series
+    h.record([_bundle("NEW", SignalKind.NEWS, 0.5)],
+             now=_T0 + timedelta(days=130))
     assert "OLD" not in h.series
     assert "NEW" in h.series
 

@@ -57,7 +57,7 @@ class InsiderProvider(SignalProvider):
                 continue
             score = round((buy_sh - sell_sh) / total, 3)
             signals.append(Signal(
-                kind=SignalKind.CONGRESS,  # shares the "smart-money" reasoning bucket
+                kind=SignalKind.INSIDER,  # run-6: Form 4 is insider, not congress (was CONGRESS)
                 symbol=symbol,
                 summary=f"Insider net (90d): {buy_sh:,} sh bought / {sell_sh:,} sold.",
                 score=score,

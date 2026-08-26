@@ -291,6 +291,15 @@ class RiskLimits:
     composite_gate_enabled: bool = False # opt-in deterministic buy floor (backtest first)
     min_composite_score: float = 0.0     # floor value when the gate is on
     composite_perf_min_trips: int = 3    # closed trips before a source's perf weight != 1.0
+    # COMPOSITE_INCLUDE_DISCOVERY (run-6 default OFF): whether the scanner's
+    # DISCOVERY score is a scored term of the composite. The discovery score
+    # is the screener's own aggregate of the same soft feeds (congress/
+    # insider/flow) that already enter the composite as kinds, so counting
+    # it double-weighted the softest evidence at full (thesis) weight — the
+    # Jul-27 congress->DISCOVERY laundering. The discovery line is still
+    # rendered to the LLM (score + reason) and still drives the bearish-lean
+    # read; it just stops moving the index. on = legacy behaviour.
+    composite_include_discovery: bool = False
     # --- rotation loss guard (Jul-13 week: UNH -$204 / HUBB -$158 realized
     # purely to free a slot). Enforces the +0.10 edge the prompt only asks
     # for, ONLY on cap-forced sells that lock in a real loss. ---
@@ -635,6 +644,14 @@ class Config:
     autotune_enabled: bool = True
     autotune_days: int = 14
     autotune_min_sample: int = 5
+    # Run-6 item 4b: per-(symbol, kind) signal score history retention.
+    # SIGNAL_HISTORY_RETENTION_DAYS (default 120, was 14) and
+    # SIGNAL_HISTORY_MAX_POINTS (default 480 = ~4 points/day, was 48) size
+    # state/signal_history.json so scripts/signal_ic.py can accumulate the
+    # >= 60 dates the review requires before any composite re-weighting.
+    # Pure measurement — the trend annotation uses the same series.
+    signal_history_retention_days: float = 120.0
+    signal_history_max_points: int = 480
     # C.4 options-chain positioning signal: per-name ATM IV, put-call IV skew
     # and put/call open-interest lean from Alpaca's option snapshots (the free
     # 'indicative' feed the execution path already uses — no extra key). Feeds
@@ -728,6 +745,8 @@ def load_config() -> Config:
         autotune_enabled=_flag("AUTOTUNE_ENABLED", "on"),
         autotune_days=_i("AUTOTUNE_DAYS", 14),
         autotune_min_sample=_i("AUTOTUNE_MIN_SAMPLE", 5),
+        signal_history_retention_days=_f("SIGNAL_HISTORY_RETENTION_DAYS", 120.0),
+        signal_history_max_points=_i("SIGNAL_HISTORY_MAX_POINTS", 480),
         options_chain_signal=_flag("OPTIONS_CHAIN_SIGNAL"),
         options_chain_max_symbols=_i("OPTIONS_CHAIN_MAX_SYMBOLS", 25),
         state_file=os.getenv("STATE_FILE", "state/risk_state.json"),
@@ -874,6 +893,7 @@ def load_config() -> Config:
             composite_gate_enabled=_flag("COMPOSITE_GATE_ENABLED", "off"),
             min_composite_score=_f("MIN_COMPOSITE_SCORE", 0.0),
             composite_perf_min_trips=_i("COMPOSITE_PERF_MIN_TRIPS", 3),
+            composite_include_discovery=_flag("COMPOSITE_INCLUDE_DISCOVERY", "off"),
             # Rotation loss guard (see the RiskLimits field notes).
             rotation_loss_guard_enabled=_flag("ROTATION_LOSS_GUARD_ENABLED", "on"),
             rotation_guard_min_loss_pct=_f("ROTATION_GUARD_MIN_LOSS_PCT", 4.0),

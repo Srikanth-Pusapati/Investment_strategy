@@ -27,6 +27,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import threading
 from datetime import datetime, timezone
 from pathlib import Path
@@ -46,6 +47,7 @@ DEFAULT_HISTORY_PATH = Path("state") / "signal_history.json"
 KIND_LAG_DAYS: dict[SignalKind, float] = {
     SignalKind.TECHNICAL: 0.0,
     SignalKind.NEWS: 0.5,
+    SignalKind.OPTIONS_FLOW: 0.0,
     SignalKind.OPTIONS_CHAIN: 0.0,
     SignalKind.OFFEXCHANGE: 1.0,
     SignalKind.INSIDER: 2.0,
@@ -60,12 +62,16 @@ _LAG_HALF_LIFE_DAYS = 14.0
 # Series shape: at most one point per (symbol, kind) per _MIN_SPACING_HOURS
 # unless the score moved by _RECORD_JUMP (inflections must land immediately);
 # points older than the retention window are pruned, series capped at
-# _MAX_POINTS. At the 30-60 min cycle cadence this holds roughly two weeks
-# of trading history in a few points per day.
+# _MAX_POINTS. Run-6: retention 14 -> 120 days and the cap scaled to ~4
+# points/day (2h spacing over a 6.5h session) so scripts/signal_ic.py has
+# enough dates for a standing IC read (>= 60 dates before any re-weighting).
+# Both are env-overridable (SIGNAL_HISTORY_RETENTION_DAYS /
+# SIGNAL_HISTORY_MAX_POINTS; mirrored as Config fields) and can be passed to
+# the constructor.
 _MIN_SPACING_HOURS = 2.0
 _RECORD_JUMP = 0.05
-_RETENTION_DAYS = 14.0
-_MAX_POINTS = 48
+_RETENTION_DAYS = float(os.getenv("SIGNAL_HISTORY_RETENTION_DAYS", "120"))
+_MAX_POINTS = int(os.getenv("SIGNAL_HISTORY_MAX_POINTS", "480"))
 
 # Trend classification: slope is score-units per day from a least-squares fit.
 # Below _MIN_OBS points or _MIN_SPAN_DAYS of span there is no trend, only noise.
@@ -91,8 +97,13 @@ class SignalHistory:
     clean start, an RLock around mutation + save (gather runs on the decision
     thread but the file also gets read by tests/tools)."""
 
-    def __init__(self, path: Path | str = DEFAULT_HISTORY_PATH):
+    def __init__(self, path: Path | str = DEFAULT_HISTORY_PATH,
+                 retention_days: float | None = None,
+                 max_points: int | None = None):
         self.path = Path(path)
+        self.retention_days = float(
+            retention_days if retention_days is not None else _RETENTION_DAYS)
+        self.max_points = int(max_points if max_points is not None else _MAX_POINTS)
         # symbol -> kind value -> list of [iso_ts, score]
         self.series: dict[str, dict[str, list[list]]] = {}
         self._lock = threading.RLock()
@@ -160,8 +171,8 @@ class SignalHistory:
                     and abs(score - last_score) < _RECORD_JUMP):
                 return
         pts.append([now.isoformat(), round(float(score), 4)])
-        if len(pts) > _MAX_POINTS:
-            del pts[: len(pts) - _MAX_POINTS]
+        if len(pts) > self.max_points:
+            del pts[: len(pts) - self.max_points]
 
     def _prune(self, now: datetime) -> None:
         """Drop points past retention and any emptied series/symbols."""
@@ -171,7 +182,7 @@ class SignalHistory:
                 kinds[kind_value] = [
                     p for p in kinds[kind_value]
                     if (h := self._hours_between(p[0], now)) is not None
-                    and h <= _RETENTION_DAYS * 24.0
+                    and h <= self.retention_days * 24.0
                 ]
                 if not kinds[kind_value]:
                     del kinds[kind_value]

@@ -91,7 +91,10 @@ class Orchestrator:
         self.signals = SignalAggregator(cfg, self.quiver)
         # Per-(symbol, kind) score series persisted across cycles (E.1+R.4):
         # feeds the freshness/trend annotations rendered on each signal line.
-        self.signal_history = SignalHistory()
+        self.signal_history = SignalHistory(
+            retention_days=getattr(cfg, "signal_history_retention_days", None),
+            max_points=getattr(cfg, "signal_history_max_points", None),
+        )
         self.screeners = ScreenerAggregator(cfg, self.quiver)
         self.robinhood = RobinhoodReader(cfg)
         # A restart clears the in-memory dead-auth latch; clear a stale
@@ -948,8 +951,13 @@ class Orchestrator:
                 pw = perf_weights(
                     self.ledger, self.cfg.risk.composite_perf_min_trips
                 )
+                # Run-6: the scanner's DISCOVERY line stays in the prompt but
+                # no longer scores into the index (COMPOSITE_INCLUDE_DISCOVERY).
+                inc_disc = bool(getattr(
+                    self.cfg.risk, "composite_include_discovery", False))
                 for b in bundles:
-                    b.composite_score = composite_score(b, pw)
+                    b.composite_score = composite_score(
+                        b, pw, include_discovery=inc_disc)
                 composites = {
                     b.symbol: b.composite_score
                     for b in bundles if b.composite_score is not None
@@ -1456,7 +1464,9 @@ class Orchestrator:
     ) -> None:
         """Attach each scanner candidate's 'why' as a leading DISCOVERY signal so
         Claude sees why a name surfaced. Names that gathered no other signals get
-        a fresh bundle (gather drops empty ones) so they're still evaluated."""
+        a fresh bundle (gather drops empty ones) so they're still evaluated.
+        Run-6: the line is prompt text + bearish-lean input only — it is no
+        longer a scored term of the composite (see composite_score)."""
         if not discovered:
             return
         by_symbol = {b.symbol: b for b in bundles}
