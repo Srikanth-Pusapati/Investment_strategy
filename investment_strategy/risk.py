@@ -166,6 +166,8 @@ class RiskManager:
         entry_families: set[str] | None = None,
         neg_families: dict | None = None,
         defensive_exempt_usd: float = 0.0,
+        sell_events: tuple[str, ...] | None = None,
+        stop_width_pct: float | None = None,
     ) -> RiskDecision:
         """`price` is the current market price for proposal.symbol. `volatility`
         is the symbol's annualized realized vol (fraction, e.g. 0.45) used for
@@ -195,7 +197,11 @@ class RiskManager:
         risk. `entry_families` are the cited signal families behind this
         proposal and `neg_families` maps family -> SourceStats for families
         with negative trailing expectancy (the expectancy gate); all default
-        inert."""
+        inert. `sell_events` are the deterministic event tags the
+        orchestrator attached to a SELL (name-falling read, earnings, halt,
+        regime flip — from code, never the model) and `stop_width_pct` is the
+        position's planned stop width; both feed the LLM sell-authority gate
+        (llm_sell_authority='events_only')."""
         if proposal.action is Action.HOLD:
             # Same REJECTED verdict (nothing downstream may execute a HOLD),
             # but without _reject's "REJECT hold X" log line — a no-op HOLD is
@@ -205,7 +211,10 @@ class RiskManager:
                 reason="HOLD — no action.",
             )
         if proposal.action is Action.SELL:
-            return self._evaluate_sell(proposal, account)
+            return self._evaluate_sell(
+                proposal, account, sell_events=sell_events,
+                stop_width_pct=stop_width_pct,
+            )
         return self._evaluate_buy(
             proposal, account, price, volatility, pending_buy_notional,
             days_to_earnings, sector, sector_exposure_usd, regime_multiplier,
@@ -269,13 +278,43 @@ class RiskManager:
             proposal.take_profit_pct or lim.default_take_profit_pct,
         )
 
-    # -- sells: always allowed (risk reduction), size = what we hold -------- #
+    # -- sells: size = what we hold; losers gated by sell authority --------- #
     def _evaluate_sell(
-        self, proposal: TradeProposal, account: AccountSnapshot
+        self, proposal: TradeProposal, account: AccountSnapshot,
+        sell_events: tuple[str, ...] | None = None,
+        stop_width_pct: float | None = None,
     ) -> RiskDecision:
         pos = account.position_for(proposal.symbol)
         if not pos or pos.qty <= 0:
             return self._reject(proposal, "No long position to sell.")
+        # Run-6 item 2 — LLM sell authority. Under 'events_only' the model may
+        # not cut a LOSER short of its stop on a re-argued thesis: the
+        # mechanical stack (bracket/vol stop, R-trail, time-stop, name-falling
+        # defense) owns losing positions unless CODE attached a concrete event
+        # tag. Winners and stop-reached positions pass exactly as before.
+        authority = getattr(self.limits, "llm_sell_authority", "full") or "full"
+        pl_pct = float(pos.unrealized_pl_pct or 0.0)
+        if authority == "events_only" and pl_pct < 0:
+            stop_w = float(stop_width_pct or 0.0)
+            reached_stop = stop_w > 0 and pl_pct <= -stop_w
+            if not reached_stop and not sell_events:
+                reason = (
+                    f"SELL AUTHORITY: {proposal.symbol} decision-sell rejected "
+                    f"(unrealized {pl_pct:+.1f}%, "
+                    f"stop {('-%.1f%%' % stop_w) if stop_w > 0 else 'n/a'}, "
+                    "no event) — held to the mechanical stack"
+                )
+                log.warning("%s", reason)
+                return RiskDecision(
+                    proposal=proposal, verdict=RiskVerdict.REJECTED,
+                    reason=reason,
+                )
+            if sell_events and not reached_stop:
+                log.info(
+                    "SELL AUTHORITY: %s decision-sell allowed on event(s) %s "
+                    "(unrealized %+.1f%%).",
+                    proposal.symbol, ", ".join(sell_events), pl_pct,
+                )
         return RiskDecision(
             proposal=proposal,
             verdict=RiskVerdict.APPROVED,

@@ -327,6 +327,20 @@ class RiskLimits:
     # that at least reaches back to the mean is not tagged by noise; the
     # per-trade $-risk cap shrinks SIZE to keep dollar risk flat.
     stop_cover_extension: bool = True
+    # --- Run-6 item 2: LLM sell authority (Aug 25 review §6.1). Decision
+    # SELLs on LOSING equity positions were the run-4/5 loss engine: the model
+    # cut losers short of their stops on re-argued theses, with no evidence
+    # the cuts beat the mechanical stack (bracket/vol stop, R-scaled trail,
+    # time-stop, name-falling defense). 'events_only' (run-6 DEFAULT): a model
+    # SELL on a position with unrealized P/L < 0 that has NOT reached its
+    # planned stop is REJECTED unless the orchestrator attaches a
+    # deterministic event tag from CODE (never the model): an active NAME
+    # FALLING read for the symbol, earnings inside the blackout window, an
+    # account halt, or a regime flip into risk-off this cycle. Winners
+    # (unrealized >= 0), partial trims of winners, and every mechanical exit
+    # are untouched. Rejections log 'SELL AUTHORITY: ...' so the next review
+    # can count the counterfactual. 'full' = legacy: any SELL is approved.
+    llm_sell_authority: str = "events_only"
     # Gap-day chase trigger: an entry more than this % above the PRIOR daily
     # close fires the overextension gate's extreme leg regardless of RSI/ATR
     # (VRRM Jul 29: bought +28% over prior close; the gap bar inflated its own
@@ -854,6 +868,9 @@ def load_config() -> Config:
             starter_full_conviction=_f("STARTER_FULL_CONVICTION", 0.65),
             starter_haircut_mult=_f("STARTER_HAIRCUT_MULT", 0.5),
             stop_cover_extension=_flag("STOP_COVER_EXTENSION", "on"),
+            # Run-6 item 2: 'events_only' (default) | 'full' (legacy).
+            llm_sell_authority=os.getenv(
+                "LLM_SELL_AUTHORITY", "events_only").strip().lower(),
             overext_gap_pct=_f("OVEREXT_GAP_PCT", 15.0),
             loss_streak_guard=_i("LOSS_STREAK_GUARD", 2),
             # All-weather upgrades (Jul 30 review).

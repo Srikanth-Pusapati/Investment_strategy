@@ -117,6 +117,10 @@ class Orchestrator:
         # multiplier each cycle — they drive the option call/put direction gate.
         self._regime_trend = ""
         self._regime_label = ""
+        # True only on the cycle the regime label flipped INTO risk-off
+        # (computed before the trim persists the new label) — a deterministic
+        # event tag for the LLM sell-authority gate (run-6 item 2).
+        self._regime_flipped_off = False
         # Buys rejected at EQUITY-only gates this cycle, queued for the scoped
         # same-cycle option fallback (reset each _execute_proposals pass).
         self._option_fallbacks: list[tuple[TradeProposal, str]] = []
@@ -844,6 +848,13 @@ class Orchestrator:
             self._regime_mult = regime.multiplier
             self._regime_trend = regime.trend
             self._regime_label = regime.label
+            try:
+                self._regime_flipped_off = (
+                    regime.label == "risk-off"
+                    and self.state.get_regime_label() != "risk-off"
+                )
+            except Exception:  # noqa: BLE001 — a tag, never a cycle blocker
+                self._regime_flipped_off = False
             # A degraded ("unknown") read means we're flying blind on BOTH regime
             # and the sector cap — surface that at WARNING, not INFO (1B.7).
             if regime.label == "unknown":
@@ -854,6 +865,7 @@ class Orchestrator:
             self._regime_mult = 1.0
             self._regime_trend = ""
             self._regime_label = ""
+            self._regime_flipped_off = False
         self._record_equity_snapshot()
         account = self.broker.get_account()
 
@@ -1957,6 +1969,40 @@ class Orchestrator:
             log.debug("Ledger entry-conviction lookup failed for %s: %s", symbol, e)
         return None
 
+    # -- LLM sell authority: deterministic event tags (run-6 item 2) -------- #
+    def _sell_authority(self) -> str:
+        return (
+            getattr(self.cfg.risk, "llm_sell_authority", "full") or "full"
+        ).strip().lower()
+
+    def _sell_event_tags(self, symbol: str, account) -> tuple[str, ...]:
+        """Event tags that license a model SELL on a LOSING equity position
+        under llm_sell_authority='events_only'. Every tag comes from CODE —
+        the model cannot assert one: this cycle's NAME FALLING read for the
+        symbol, earnings inside the blackout window, an account-wide halt,
+        or the regime flipping into risk-off this cycle. Empty tuple = no
+        event; each read fails closed (no tag) on error."""
+        tags: list[str] = []
+        why = (getattr(self, "_falling_names", {}) or {}).get(symbol, "")
+        if why:
+            tags.append(f"name_falling:{why}")
+        try:
+            blackout = int(getattr(self.cfg.risk, "earnings_blackout_days", 0) or 0)
+            d = self.earnings.days_until_earnings(symbol) if blackout > 0 else None
+            if d is not None and 0 <= d <= blackout:
+                tags.append(f"earnings:{d}d")
+        except Exception:  # noqa: BLE001
+            pass
+        try:
+            halted, halt_why = self.risk.trading_halted(account)
+            if halted:
+                tags.append(f"halt:{halt_why[:40]}")
+        except Exception:  # noqa: BLE001
+            pass
+        if getattr(self, "_regime_flipped_off", False):
+            tags.append("regime_flip:risk-off")
+        return tuple(tags)
+
     def _apply_rotation_guard(self, proposals, account, composites):
         """Enforce the rotation edge the prompt only ASKS for: a SELL that locks
         in a real loss to free capital for a new name must be displaced by a
@@ -2016,6 +2062,18 @@ class Orchestrator:
             pos = account.position_for(p.symbol)
             if pos is None or pos.unrealized_pl_pct > -r.rotation_guard_min_loss_pct:
                 kept.append(p)  # not a loss-locking sell
+                continue
+            # Run-6 item 2: under events-only sell authority a loss-locking
+            # rotation sell with NO deterministic event never executes — the
+            # release ladder below (red day, depth, persistence, conviction
+            # edge) is moot for it. Pass it straight to the risk layer, which
+            # rejects it with the one countable 'SELL AUTHORITY' line instead
+            # of a rotation veto that would hide the counterfactual.
+            if (
+                self._sell_authority() == "events_only"
+                and not self._sell_event_tags(p.symbol, account)
+            ):
+                kept.append(p)
                 continue
             # Red-day release (Jul 29: NOK's -4.8% exit was vetoed at 16:09
             # and only closed at 18:00 — the guard held a sinking loser open
@@ -3494,6 +3552,12 @@ class Orchestrator:
         fams = parse_cited(proposal.key_signals) if is_buy else set()
         d_etf = getattr(self.cfg, "defensive_core_etf", "")
         d_pos = account.position_for(d_etf) if d_etf else None
+        # LLM sell authority (run-6 item 2): deterministic event tags + the
+        # planned stop width travel with every SELL so the risk layer can
+        # hold a loser to the mechanical stack unless code named an event.
+        is_sell = proposal.action.value == "sell"
+        sell_events = self._sell_event_tags(proposal.symbol, account) if is_sell else None
+        stop_width = self.state.get_stop_width(proposal.symbol) if is_sell else None
         decision = self.risk.evaluate(
             proposal, account, price, vol, pending, days_to_earnings,
             sector, sector_exposure, self._regime_mult,
@@ -3507,6 +3571,7 @@ class Orchestrator:
             defensive_exempt_usd=(
                 max(0.0, d_pos.market_value) if d_pos is not None else 0.0
             ),
+            sell_events=sell_events, stop_width_pct=stop_width,
         )
         if proposal.action.value == "hold":
             # A HOLD is the model saying "no action" — the risk layer returns

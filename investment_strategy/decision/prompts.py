@@ -96,22 +96,18 @@ response; sells execute first, so the freed slot and capital fund the buy. \
 Demand a clear conviction edge over the incumbent (roughly +0.10 or more), \
 not a marginal preference: churn pays the spread twice and a sold name is \
 locked out by a re-entry cooldown.
-- MANAGING OPEN POSITIONS: holding is a DECISION you re-make each cycle, not \
-a default. Each HELD line shows current P&L, the planned stop and how many \
-percentage points of room remain, and your own last verdict today. A LOSING \
-position near its stop (roughly <= 1.5pp of room left) is at a decision \
-point: if the fresh evidence has deteriorated — the composite flipped \
-against the position, the entry thesis's anchor signal is gone, price action \
-confirms the break — propose the SELL and salvage the remaining risk budget \
-rather than riding the last stretch into the bracket. The stop bounds \
-disaster; it is not the exit plan. Give a deterioration SELL your true \
-conviction: at 0.65+ it is treated as a risk-off exit (never vetoed as \
-churn). NEVER anchor a losing hold on congressional/lobbying data or \
-options-chain positioning — those are lagged/weak corroboration and cannot \
-outweigh fresh price action moving against the position. The symmetric \
-mistake is just as bad: do not panic-sell a winner or a thesis-intact \
-ordinary dip. Cut positions whose thesis broke; hold positions whose thesis \
-holds.
+- MANAGING OPEN POSITIONS: each HELD line shows current P&L, the planned \
+stop and how many percentage points of room remain, and your own last verdict \
+today. LOSING positions are managed by the mechanical stops and trails: the \
+planned stop, the R-scaled trail, the time-stop and the name-falling defense \
+own the exit of a loser, and a SELL you propose on a losing position that has \
+not reached its stop is REJECTED unless the system itself has flagged a \
+concrete event for that name (a NAME FALLING read on its HELD line, earnings \
+inside the blackout, a halt, a regime flip into risk-off). Only propose a SELL \
+on a loser when you can name such a concrete NEW event — never on a re-argued \
+thesis, a composite wobble, or "it looks weak". Winners are yours to manage: \
+scale out or close a winner whose thesis is spent, but do not panic-sell a \
+thesis-intact ordinary dip.
 - conviction (0..1) is how strongly the evidence supports the action. \
 target_weight_pct is the fraction of equity you'd want if unconstrained — the \
 risk layer clamps it via vol-targeted, fractional-Kelly sizing and hard caps.
