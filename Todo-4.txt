@@ -182,3 +182,93 @@ OBSERVATIONS LOG (append-only; date every entry; newest at the bottom)
             with ~80-90% probability even if the true mean is positive (P(pass)
             ~0.06-0.17 at N=24) -> treat FAIL/CONFOUNDED as uninformative and
             pre-register contract v2 for run-6. No code/knob/prompt touched.
+
+
+Report: 
+https://claude.ai/code/artifact/9099ad65-64b1-495c-82b9-db7226a1bbbf
+2026-08-26  10:10 CT DECISION (Claude, pending user go): stop run-5 under the
+            contract's CONFOUNDED clause (validity breaches already on record:
+            equity basis telescoping $346 vs <$1; state not fresh; adaptive
+            weights re-arm mid-window; postmortem blind to options) — NOT a
+            FAIL. Rationale: verdict already uninformative (P(pass crit 2)
+            ~0.06-0.17 at N=24; N<24 base case), and known -EV paths (LLM
+            loss-cuts, options bypass) keep running. Run-6 change-set being
+            built in an isolated worktree branch feature/run6-changeset (one
+            commit per item + tests + review): measurement plumbing, LLM sells
+            events-only, options bypass closed, signal taxonomy + IC harness,
+            screener hygiene, frozen loops, book-beta cap/hedge, contract v2 +
+            clean-state reset. Live bot untouched. Proposed switch: flatten +
+            fresh-cycle (RESET_CARRY_CHURN=off) + relaunch 09:31 ET Mon Aug 31;
+            window Aug 31 -> Sep 14. Awaiting user confirmation for the
+            irreversible part (stop/flatten/restart date).
+2026-08-26  11:45 CT run-6 change-set BUILT (not merged, live bot untouched):
+            branch feature/run6-changeset, PR #55 -> feature/preview,
+            https://github.com/Srikanth-Pusapati/Investment_stratergy/pull/55
+            9 commits (items 1-8 + review fixes), 1221 tests pass (was 1059),
+            adversarial review: 0 blockers, 4 majors fixed (beta shrink sign for
+            inverse ETFs, bearish precheck w/o composite, Finnhub insider lag
+            preserved so taxonomy != re-weighting, fallback-queue LLM spend).
+            Operator checklist: docs/RUN6_SWITCH.md (in the branch). Two LIVE
+            .env lines MUST change at switch: AUTO_HEDGE_MAX_PCT 15->40,
+            SCREENER_SOURCES drop robinhood,robinhood_scans; ~28 new keys
+            listed there. Contract v2 DRAFT: runs/pre-final-test-run-6/
+            EVAL_CONTRACT.md (pre-register before the flatten). Run-5 verdict
+            draft: runs/pre-final-test-run-5/VERDICT.md = CONFOUNDED.
+            STILL PENDING USER GO: stop/flatten/restart date (proposed Mon
+            Aug 31 09:31 ET; window Aug 31 -> Sep 11, extend to Sep 18).
+
+2026-08-27  17:45 CT AWAY-MODE HEADLESS FALLBACK ran the daily checklist (the
+            primary session was parked, not dead — see below). Read-only checks
+            plus 3 writes: archived logs, status page, this entry. No knob,
+            gate, prompt, .env or PR touched; nothing flattened; bot untouched.
+            LIVENESS: fallback fired on 47h-no-commit. Re-verified before
+            writing — status_page.html 13d stale, no operator file edit for 30h
+            (Todo-4 @ Aug 26 11:28), and the resident session's transcript ends
+            with "still waiting on your call: go Monday / Sep 8 / continue
+            run-5". So: alive as a process, parked awaiting your decision, doing
+            no work. That is a THIRD false-negative class for the liveness
+            check (Aug 13 = alive+uncommitted; Aug 25 = alive+mid-flight;
+            Aug 27 = alive+parked). Net effect: Aug 26 got NO evening session
+            from either side and nobody noticed.
+            HEALTH: bot pid 15598 up since Aug 24, tick fresh, no KILL,
+            halted=false, RH auth_dead=false, FEEDS 5/5, deadman green (no
+            restart since Jul 13), 8 cycles today, zero CRITICAL/ERROR/halt/
+            FAILED across Aug 25/26/27. All 15 equity names have working sell
+            orders; no unprotected positions.
+            NUMBERS (live /v2/account, acct PA394CJ4TNL5): equity $1,009,051
+            +$6,922 (+0.69%) today vs SPY +0.68%; cash $301,201; 70.6%
+            invested; unrealized +$8,525 (equity +$9,160, options -$635).
+            Run-5 to date +0.91% vs SPY +0.72% / QQQ +1.09% / IWM -0.04%
+            (Aug 21 close basis). Closed trips 2 (SNAP +$136, SOFI +$453),
+            +$590 realized, expectancy +$295 at N=2 = uninformative; does not
+            move the CONFOUNDED verdict. LLM $5.93/41 calls window-to-date;
+            cache_read 52,990 tok today (caching is finally landing).
+            OPEN OPTIONS: IWM Sep-30 295P/280P x30 bear spread, net $8,040,
+            uP/L -$1,950 (IWM closed 299.81, long put OTM, bleeding while
+            small caps hold). NVDA Oct-16 180C x1, uP/L +$1,315 (the
+            pre-earnings exemption buy; that risk has passed, now green).
+            FINDING - NEXA falling-knife entry (process bug, not a loss):
+            09:23 screener surfaced NEXA from Robinhood Daily Movers as
+            "today's biggest movers - momentum" (+0.60); 09:25 composite ranked
+            it #2 (+2.33); 09:26 bought $25,241; 10:16 the bot's own NAME
+            FALLING armed on the 50-min-old position; NEXA closed -11.1% vs SPY
+            +0.6% on the Votorantim control-sale headline. The mover screener
+            does not separate up-movers from down-movers, so a crash scores as
+            momentum. Damage small (bought near the lows, -0.50% from entry).
+            This is live corroboration for run-6 item "screener hygiene: drop
+            robinhood,robinhood_scans from SCREENER_SOURCES".
+            BEARISH SLEEVE: still 0 approvals Aug 25-27; every cycle a cited
+            decline (0 IGNORED, schema forcing holds). This week's recurring
+            killer is "RSI 8/9 extreme oversold - bounce risk"; two proxy
+            attempts died as "structure already open" - the IWM spread blocks
+            its own successor. Run-5 bearish fills to date: 1 (the IWM proxy).
+            MINOR: QQQ protective stop covers 212 of 212.81 sh; 0.81 sh
+            (~$583) rides bare on the bracket-flooring remainder. Not worth a
+            fix, logging it so it is not rediscovered.
+            STILL PENDING USER GO (unchanged): stop/flatten/restart date for
+            run-6 (PR #55, proposed Mon Aug 31 09:31 ET) + the two live .env
+            edits in docs/RUN6_SWITCH.md. Live bot is still running run-5.
+            ARTIFACT IS STALE: headless has no artifact tool, so the phone URL
+            still shows Aug 14 data and the OLD account number. ops/
+            status_page.html in this repo is the current one; re-publish the
+            artifact from your resident session when you are back.
