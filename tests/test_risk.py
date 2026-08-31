@@ -40,6 +40,13 @@ def _rm(limits, *, kill_switch=False, state=None) -> RiskManager:
 
 def _limits(**over) -> RiskLimits:
     base = dict(
+        # Run-6 item 3: single-name bullish option debits are OFF by default
+        # for the window; the legacy fixtures exercise the bullish gates
+        # (chase / merge / cap) on AAPL/AMZN calls, so opt back in here.
+        options_single_name_bullish=True,
+        # Run-6 item 6: the expectancy gate is OFF (report-only) by default;
+        # the legacy gate fixtures here and in test_all_weather opt back in.
+        expectancy_gate_enabled=True,
         max_position_pct=5.0,
         max_symbol_exposure_pct=10.0,
         max_gross_exposure_pct=100.0,

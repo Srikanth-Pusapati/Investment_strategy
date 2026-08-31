@@ -18,6 +18,7 @@ from __future__ import annotations
 import json
 import logging
 import re
+import threading
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
@@ -97,6 +98,18 @@ class TradeRecord(BaseModel):
     # underlying ticker survives here and every leg lives in occ_symbols.
     underlying: Optional[str] = None
     occ_symbols: list[str] = Field(default_factory=list)
+    # Leg direction per occ_symbols entry ("buy" | "sell"), same order (run-6
+    # item 1a): lets the post-mortem sign each leg when marking a spread
+    # close-to-close. Empty on rows predating the field (then a multi-leg
+    # group is reported 'unmarked' rather than guessed).
+    occ_sides: list[str] = Field(default_factory=list)
+    # Broker-confirmed fill (run-6 item 1e): entry_price is the DECISION quote;
+    # these are what the broker actually reported when the order was seen
+    # FILLED at reconcile (filled_avg_price, filled qty, filled_at). None until
+    # confirmed / on rows predating the field. realized_pl semantics unchanged.
+    fill_price: Optional[float] = None
+    fill_qty: Optional[float] = None
+    fill_ts: Optional[datetime] = None
     # Set only by repair scripts on rows they rewrote (e.g.
     # scripts/repair_mleg_ledger_rows.py) — documents why a row's numbers were
     # changed and marks informational duplicates. Never set by live code.
@@ -155,11 +168,16 @@ class TradeRecord(BaseModel):
         # single-leg structure is keyed by its contract; a spread keeps the
         # underlying as the key (see the field comment on `underlying`).
         occs: list[str] = []
+        sides: list[str] = []
         for leg in p.option_legs:
             try:
                 occs.append(_occ_symbol(p.symbol, leg.expiry, leg.strike, leg.right))
+                side = getattr(leg, "side", None)
+                sides.append(str(getattr(side, "value", side) or "buy").lower())
             except (ValueError, AttributeError, TypeError):
                 pass  # malformed leg spec — keep the row keyed by underlying
+        if len(sides) != len(occs):
+            sides = []
         symbol = occs[0] if (len(occs) == 1 and len(p.option_legs) == 1) else p.symbol
         return cls(
             symbol=symbol, action=p.action.value, instrument="option",
@@ -172,7 +190,7 @@ class TradeRecord(BaseModel):
             entry_signals=entry_signals or [],
             verdict=decision.verdict.value, risk_note=decision.reason,
             option_strategy=p.option_strategy.value if p.option_strategy else None,
-            underlying=p.symbol, occ_symbols=occs,
+            underlying=p.symbol, occ_symbols=occs, occ_sides=sides,
             order_id=order_id,
         )
 
@@ -265,6 +283,11 @@ class TradeRecord(BaseModel):
 class TradeLedger:
     """Append-only JSON-Lines ledger. One file, one record per line."""
 
+    # One process-wide lock: record() appends from the decision AND watchdog
+    # threads, and set_fill() rewrites the file in place — the two must not
+    # interleave (a torn append inside a rewrite would lose a row).
+    _io_lock = threading.Lock()
+
     def __init__(self, path: Path | str = DEFAULT_LEDGER_PATH):
         self.path = Path(path)
 
@@ -275,7 +298,7 @@ class TradeLedger:
                 return  # rejected — the loud log already fired
             rec = checked
             self.path.parent.mkdir(parents=True, exist_ok=True)
-            with self.path.open("a", encoding="utf-8") as fh:
+            with self._io_lock, self.path.open("a", encoding="utf-8") as fh:
                 fh.write(rec.model_dump_json() + "\n")
             # Sells carry no cost_usd; show the exit proceeds instead so the log
             # doesn't read "SELL MXL qty=12 $0" for a $1,200 close.
@@ -286,6 +309,58 @@ class TradeLedger:
                      rec.action.upper(), rec.symbol, rec.qty, value)
         except Exception as e:  # never let logging break the trade loop
             log.warning("Ledger write failed for %s: %s", rec.symbol, e)
+
+    def set_fill(
+        self, order_id: str, fill_price: float, fill_qty: float,
+        fill_ts: Optional[datetime] = None,
+    ) -> bool:
+        """Stamp the broker-confirmed fill (run-6 item 1e) onto the buy/sell
+        row(s) carrying `order_id`. The ONLY in-place edit the ledger makes:
+        it touches nothing but fill_price / fill_qty / fill_ts, so every
+        realized/qty/cost number (and effective()'s corrections) stands.
+        Rewrites atomically (tmp + replace) under the append lock. Returns
+        True when at least one row was stamped; False (never raises) when
+        the order id is unknown or the file can't be rewritten."""
+        if not order_id or not (fill_price and fill_price > 0):
+            return False
+        try:
+            with self._io_lock:
+                if not self.path.exists():
+                    return False
+                lines = self.path.read_text(encoding="utf-8").splitlines()
+                hit = False
+                out: list[str] = []
+                for line in lines:
+                    raw = line.strip()
+                    if not raw:
+                        continue
+                    try:
+                        obj = json.loads(raw)
+                    except json.JSONDecodeError:
+                        out.append(line)
+                        continue
+                    if (obj.get("order_id") == order_id
+                            and obj.get("action") in ("buy", "sell")):
+                        obj["fill_price"] = round(float(fill_price), 4)
+                        obj["fill_qty"] = float(fill_qty)
+                        # No broker filled_at -> None, never "now": the
+                        # field means the FILL time or nothing (review fix).
+                        obj["fill_ts"] = (
+                            fill_ts.isoformat() if fill_ts is not None else None
+                        )
+                        out.append(json.dumps(obj))
+                        hit = True
+                    else:
+                        out.append(line)
+                if not hit:
+                    return False
+                tmp = self.path.with_suffix(".tmp")
+                tmp.write_text("".join(l + "\n" for l in out), encoding="utf-8")
+                tmp.replace(self.path)
+                return True
+        except Exception as e:  # never let bookkeeping break the trade loop
+            log.warning("Ledger set_fill failed for order %s: %s", order_id, e)
+            return False
 
     def _validate_sell(self, rec: TradeRecord) -> Optional[TradeRecord]:
         """Append-path integrity gate (Aug-23). The Aug-17 MLEG unwind wrote

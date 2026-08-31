@@ -250,7 +250,10 @@ def test_reset_carries_churn_memory_and_synthesizes_exits():
             "exit_prices": {"OLD": 14.17},
             "loss_streaks": {"NU": 1},
         }, f)
-    cfg = SimpleNamespace(state_file=state_file, core_etf="QQQ")
+    # Run-6 item 8b: the carry is behind RESET_CARRY_CHURN (default off);
+    # this legacy test exercises the ON path.
+    cfg = SimpleNamespace(state_file=state_file, core_etf="QQQ",
+                          reset_carry_churn=True)
     carry = _churn_carryover(cfg)
     # Open positions at reset get a synthesized exit (the re-entry cooldown
     # applies to what the reset flattened) — but never the passive core.

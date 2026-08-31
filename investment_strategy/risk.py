@@ -23,6 +23,11 @@ from .state import PortfolioState
 
 log = logging.getLogger("risk")
 
+# Broad-index option underlyings (run-6 item 3): exempt from the single-name
+# option gates (earnings blackout, OPTIONS_SINGLE_NAME_BULLISH). The
+# configured core / hedge / proxy ETFs are added per call via `index_symbols`.
+_INDEX_UNDERLYINGS = frozenset({"SPY", "QQQ", "IWM", "DIA"})
+
 # When realized volatility is unavailable we must NOT default to the largest
 # allowed size — a data outage is exactly when to be cautious. Size as if the
 # name were quite volatile so vol-targeting shrinks the position.
@@ -166,6 +171,10 @@ class RiskManager:
         entry_families: set[str] | None = None,
         neg_families: dict | None = None,
         defensive_exempt_usd: float = 0.0,
+        sell_events: tuple[str, ...] | None = None,
+        stop_width_pct: float | None = None,
+        book_beta_spy: float | None = None,
+        candidate_beta: float | None = None,
     ) -> RiskDecision:
         """`price` is the current market price for proposal.symbol. `volatility`
         is the symbol's annualized realized vol (fraction, e.g. 0.45) used for
@@ -195,7 +204,15 @@ class RiskManager:
         risk. `entry_families` are the cited signal families behind this
         proposal and `neg_families` maps family -> SourceStats for families
         with negative trailing expectancy (the expectancy gate); all default
-        inert."""
+        inert. `sell_events` are the deterministic event tags the
+        orchestrator attached to a SELL (name-falling read, earnings, halt,
+        regime flip — from code, never the model) and `stop_width_pct` is the
+        position's planned stop width; both feed the LLM sell-authority gate
+        (llm_sell_authority='events_only'). `book_beta_spy` is the book's
+        current SPY-beta (portfolio/beta.py, None = no reading -> the beta
+        cap is skipped) and `candidate_beta` the candidate's own shrunk
+        SPY-beta (None = unknown -> assumed 1.0) for the book-beta cap
+        (run-6 item 7b)."""
         if proposal.action is Action.HOLD:
             # Same REJECTED verdict (nothing downstream may execute a HOLD),
             # but without _reject's "REJECT hold X" log line — a no-op HOLD is
@@ -205,7 +222,10 @@ class RiskManager:
                 reason="HOLD — no action.",
             )
         if proposal.action is Action.SELL:
-            return self._evaluate_sell(proposal, account)
+            return self._evaluate_sell(
+                proposal, account, sell_events=sell_events,
+                stop_width_pct=stop_width_pct,
+            )
         return self._evaluate_buy(
             proposal, account, price, volatility, pending_buy_notional,
             days_to_earnings, sector, sector_exposure_usd, regime_multiplier,
@@ -213,6 +233,7 @@ class RiskManager:
             tech, composite_score, regime_label=regime_label,
             entry_families=entry_families, neg_families=neg_families,
             defensive_exempt_usd=defensive_exempt_usd,
+            book_beta_spy=book_beta_spy, candidate_beta=candidate_beta,
         )
 
     # -- survival-first sizing: vol-targeted, fractional-Kelly -------------- #
@@ -269,13 +290,43 @@ class RiskManager:
             proposal.take_profit_pct or lim.default_take_profit_pct,
         )
 
-    # -- sells: always allowed (risk reduction), size = what we hold -------- #
+    # -- sells: size = what we hold; losers gated by sell authority --------- #
     def _evaluate_sell(
-        self, proposal: TradeProposal, account: AccountSnapshot
+        self, proposal: TradeProposal, account: AccountSnapshot,
+        sell_events: tuple[str, ...] | None = None,
+        stop_width_pct: float | None = None,
     ) -> RiskDecision:
         pos = account.position_for(proposal.symbol)
         if not pos or pos.qty <= 0:
             return self._reject(proposal, "No long position to sell.")
+        # Run-6 item 2 — LLM sell authority. Under 'events_only' the model may
+        # not cut a LOSER short of its stop on a re-argued thesis: the
+        # mechanical stack (bracket/vol stop, R-trail, time-stop, name-falling
+        # defense) owns losing positions unless CODE attached a concrete event
+        # tag. Winners and stop-reached positions pass exactly as before.
+        authority = getattr(self.limits, "llm_sell_authority", "full") or "full"
+        pl_pct = float(pos.unrealized_pl_pct or 0.0)
+        if authority == "events_only" and pl_pct < 0:
+            stop_w = float(stop_width_pct or 0.0)
+            reached_stop = stop_w > 0 and pl_pct <= -stop_w
+            if not reached_stop and not sell_events:
+                reason = (
+                    f"SELL AUTHORITY: {proposal.symbol} decision-sell rejected "
+                    f"(unrealized {pl_pct:+.1f}%, "
+                    f"stop {('-%.1f%%' % stop_w) if stop_w > 0 else 'n/a'}, "
+                    "no event) — held to the mechanical stack"
+                )
+                log.warning("%s", reason)
+                return RiskDecision(
+                    proposal=proposal, verdict=RiskVerdict.REJECTED,
+                    reason=reason,
+                )
+            if sell_events and not reached_stop:
+                log.info(
+                    "SELL AUTHORITY: %s decision-sell allowed on event(s) %s "
+                    "(unrealized %+.1f%%).",
+                    proposal.symbol, ", ".join(sell_events), pl_pct,
+                )
         return RiskDecision(
             proposal=proposal,
             verdict=RiskVerdict.APPROVED,
@@ -300,6 +351,8 @@ class RiskManager:
         entry_families: set[str] | None = None,
         neg_families: dict | None = None,
         defensive_exempt_usd: float = 0.0,
+        book_beta_spy: float | None = None,
+        candidate_beta: float | None = None,
     ) -> RiskDecision:
         halted, why = self.trading_halted(account)
         if halted:
@@ -830,6 +883,54 @@ class RiskManager:
             )
         target_notional = min(target_notional, gross_room)
 
+        # 2c'') BOOK BETA CAP (run-6 item 7b): the gross cap bounds dollars,
+        #     not exposure. With a book reading this cycle, the post-trade
+        #     SPY-beta (book + w_new * beta_new) must stay <= max_book_beta_spy:
+        #     the buy is RESIZED to the room, rejected when even the min order
+        #     breaches. Unknown candidate beta = 1.0 (logged); no book reading
+        #     = fail open (an outage must not freeze buying). Negative-beta
+        #     buys (an inverse ETF) can't breach and pass untouched.
+        cap = float(getattr(self.limits, "max_book_beta_spy", 0.0) or 0.0)
+        if cap > 0 and book_beta_spy is not None and equity > 0:
+            if candidate_beta is None:
+                cand_beta = 1.0
+                log.info(
+                    "BOOK BETA CAP: %s beta unknown — assuming 1.0.",
+                    proposal.symbol,
+                )
+            else:
+                cand_beta = float(candidate_beta)
+            post = book_beta_spy + (target_notional / equity) * cand_beta
+            if cand_beta > 0 and post > cap + 1e-9:
+                room = max(0.0, (cap - book_beta_spy) * equity / cand_beta)
+                min_order = max(
+                    self.limits.min_order_usd,
+                    equity * (getattr(self.limits, "min_order_pct", 0.0) / 100.0),
+                    price if self.limits.whole_shares_only else 0.0,
+                )
+                req_pct = target_notional / equity * 100.0
+                if room < min_order:
+                    log.warning(
+                        "BOOK BETA CAP: %s %.1f%% -> rejected (book %.2f -> "
+                        "%.2f > cap %.2f; beta %.2f; room $%.0f < min order "
+                        "$%.0f).", proposal.symbol, req_pct, book_beta_spy,
+                        post, cap, cand_beta, room, min_order,
+                    )
+                    return self._reject(
+                        proposal,
+                        f"Book beta cap: post-trade SPY-beta {post:.2f} > "
+                        f"{cap:.2f} cap (book {book_beta_spy:.2f}, "
+                        f"{proposal.symbol} beta {cand_beta:.2f}) and even the "
+                        f"min order (${min_order:,.0f}) breaches it.",
+                    )
+                new_post = book_beta_spy + (room / equity) * cand_beta
+                log.warning(
+                    "BOOK BETA CAP: %s %.1f%% -> %.1f%% (book %.2f -> %.2f)",
+                    proposal.symbol, req_pct, room / equity * 100.0,
+                    post, new_post,
+                )
+                target_notional = min(target_notional, room)
+
         # 2d) Per-trade $-loss cap — bound the ABSOLUTE dollars at risk if the stop
         #     fires, independent of the % weight. The classic "risk 1% per trade"
         #     rule: notional * stop% must stay under equity * MAX_TRADE_RISK_PCT.
@@ -1036,6 +1137,9 @@ class RiskManager:
         sanctioned_hedge: bool = False,
         name_ext_pct: float | None = None,
         tech: dict | None = None,
+        days_to_earnings: int | None = None,
+        index_symbols: frozenset[str] | set[str] | None = None,
+        proxy_put: bool = False,
     ) -> RiskDecision:
         """Size a defined-risk options play by capped DEBIT. Max loss on a long
         option / debit spread is the premium paid, so we bound that premium to a
@@ -1064,7 +1168,16 @@ class RiskManager:
         broke hard yet read name_trend="up", so every put died at the
         gate). `tech` is the UNDERLYING's technicals dict (rsi14 / ext_atr /
         prev_close / price — the same dict _evaluate_buy's anti-chase gate
-        reads) for the bullish-option chase gate; None fails open."""
+        reads) for the bullish-option chase gate; None fails open.
+
+        Run-6 item 3 (close the options bypass): `days_to_earnings` is the
+        same calendar read the equity path gets — a single-name debit inside
+        earnings_blackout_days is rejected (None fails open, like equities).
+        `index_symbols` extends the broad-index exemption set (core / hedge /
+        proxy ETFs from config). `proxy_put` marks the put-liquidity proxy
+        re-proposal: it keeps the direction-gate sanction but NOT the
+        per-underlying premium-cap exemption when PROXY_PUT_THESIS_GATE is
+        on."""
         if not self.limits.options_enabled:
             return self._reject(proposal, "Options trading disabled (OPTIONS_ENABLED=off).")
         # Same account-wide gate as equity buys: halt latch, kill switch, daily
@@ -1090,6 +1203,54 @@ class RiskManager:
         ok, why = self._legs_dte_sane(proposal)
         if not ok:
             return self._reject(proposal, why)
+        # ---- run-6 item 3: single-name gates (index underlyings exempt) ----
+        under = proposal.symbol.upper()
+        is_index = (
+            under in _INDEX_UNDERLYINGS
+            or under in {str(x).upper() for x in (index_symbols or ())}
+        )
+        rights = {
+            "c" if leg.right.lower().startswith("c") else "p"
+            for leg in proposal.option_legs
+        }
+        bullish = rights == {"c"}
+        if (
+            bullish and not is_index
+            and not getattr(self.limits, "options_single_name_bullish", True)
+        ):
+            debit = max(0.0, est_premium_per_contract) * 100.0
+            budget = account.equity * (self.limits.max_option_premium_pct / 100.0)
+            log.warning(
+                "OPTIONS SINGLE-NAME BULLISH: %s %s rejected "
+                "(OPTIONS_SINGLE_NAME_BULLISH=off) — counterfactual debit "
+                "$%s/contract, budget $%s.",
+                under, proposal.option_strategy, f"{debit:,.0f}",
+                f"{budget:,.0f}",
+            )
+            return self._reject(
+                proposal,
+                "single-name bullish option debits disabled for this window "
+                f"(OPTIONS_SINGLE_NAME_BULLISH=off; counterfactual debit "
+                f"${debit:,.0f}/contract).",
+            )
+        blackout = self.limits.earnings_blackout_days
+        # Review fix (Aug 26): puts pass the blackout only when the operator
+        # turned OPTIONS_BLACKOUT_PUTS off; the default blocks every
+        # single-name debit into the print (calls AND puts).
+        blackout_applies = bullish or bool(
+            getattr(self.limits, "earnings_blackout_puts", True))
+        if (
+            blackout > 0 and not is_index and blackout_applies
+            and days_to_earnings is not None
+            and 0 <= days_to_earnings <= blackout
+        ):
+            return self._reject(
+                proposal,
+                f"Earnings in {days_to_earnings}d (<= {blackout}d blackout) — "
+                "a single-name option debit gaps through the print exactly "
+                "like shares (run-6: the equity blackout applies to every "
+                "instrument).",
+            )
         ok, why = self._direction_fits_market(
             proposal, account, market_trend, regime_label, name_trend,
             sanctioned_hedge=sanctioned_hedge, name_ext_pct=name_ext_pct,
@@ -1135,13 +1296,9 @@ class RiskManager:
         # — a put on a falling name is the OPPOSITE of an upside chase and
         # must never be muzzled by upside overextension. Fails open on
         # missing technicals, like the equity gate.
-        rights = {
-            "c" if leg.right.lower().startswith("c") else "p"
-            for leg in proposal.option_legs
-        }
         chase_mult = 1.0
         chase_note = ""
-        if rights == {"c"}:
+        if bullish:
             under_price = float((tech or {}).get("price") or 0.0)
             trigger, why = self._overextension_read(under_price, tech)
             if trigger:
@@ -1196,16 +1353,20 @@ class RiskManager:
         # further downside protection exactly in the falling tape it exists
         # for. Each sanctioned play is still bounded by max_option_premium_pct
         # and the direction gate's own sanction plumbing.
+        # Run-6 item 3e: the put-liquidity PROXY is no longer exempt — an
+        # index short re-expressing a single-name read sits under the same
+        # 0.5% cap as every other debit; only the falling-market index put
+        # (sanctioned_hedge without proxy_put) keeps the exemption.
         per_under_pct = getattr(self.limits, "per_underlying_premium_pct", 0.0)
-        if per_under_pct > 0 and sanctioned_hedge:
+        cap_exempt = sanctioned_hedge and not proxy_put
+        if per_under_pct > 0 and cap_exempt:
             log.info(
-                "PER-UNDERLYING PREMIUM CAP: %s exempt (sanctioned hedge / "
-                "proxy put — venue concentration must not cap crash "
-                "protection).", proposal.symbol.upper(),
+                "PER-UNDERLYING PREMIUM CAP: %s exempt (sanctioned hedge — "
+                "venue concentration must not cap crash protection).",
+                proposal.symbol.upper(),
             )
-        if per_under_pct > 0 and not sanctioned_hedge:
+        if per_under_pct > 0 and not cap_exempt:
             from .execution.options import parse_occ
-            under = proposal.symbol.upper()
             open_premium = max(0.0, sum(
                 p.avg_entry_price * p.qty * 100.0
                 for p in account.positions if p.is_option

@@ -95,7 +95,7 @@ class OptionsFlowProvider(SignalProvider):
                 else:
                     oi_txt = f", vol {vol_oi:.2f}x OI"
             signals.append(Signal(
-                kind=SignalKind.NEWS,  # treated as a near-term catalyst/flow signal
+                kind=SignalKind.OPTIONS_FLOW,  # run-6: its own kind (was NEWS)
                 symbol=symbol,
                 summary=f"Options flow: {call_vol:,} call vol / {put_vol:,} put vol "
                         f"(C/P imbalance {score:+.2f}{oi_txt}).",

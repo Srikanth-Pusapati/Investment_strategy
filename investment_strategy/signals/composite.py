@@ -41,8 +41,13 @@ _PERF_SPAN = 10.0
 
 def perf_weights(
     ledger: TradeLedger, min_trips: int = COMPOSITE_PERF_MIN_TRIPS,
+    enabled: bool = True,
 ) -> dict[str, float]:
     """SignalKind-value -> 0.5..1.5 multiplier from realized attribution.
+
+    Run-6: `enabled=False` (Config COMPOSITE_PERF_WEIGHTS, default off)
+    returns {} so every term multiplies by 1.0 — the self-referential tilt
+    is frozen for the window; the computation is kept for later.
 
     weight = clamp(1.0 + avg_pl_pct / _PERF_SPAN, 0.5, 1.5) once a source has
     `min_trips` closed round-trips; 1.0 (inert) below that. Uses the same
@@ -50,10 +55,14 @@ def perf_weights(
     on the CITED basis (Jul-24): presence-based stats were bunched within
     ~0.9pp — every source got the same mild haircut and the weights
     differentiated nothing — while cited stats spread ~6pp and actually
-    separate earners from bleeders. Report-only cited buckets that aren't
-    SignalKind values ("options_flow", "composite") land in the dict harmlessly:
-    composite_score() looks up by kind.value and never sees them.
+    separate earners from bleeders. The report-only cited bucket "composite"
+    (not a SignalKind value) lands in the dict harmlessly: composite_score()
+    looks up by kind.value and never sees it. Since run-6 "options_flow" IS a
+    kind, so a flow perf weight now applies to the flow term (it was inert
+    while flow emitted under kind=news).
     """
+    if not enabled:
+        return {}
     from ..attribution import attribute, round_trips
 
     stats = attribute(round_trips(ledger.effective()), basis="cited")
@@ -67,24 +76,40 @@ def perf_weights(
 
 def composite_score(
     bundle: SignalBundle, perf_w: dict[str, float] | None = None,
+    include_discovery: bool = False,
 ) -> float | None:
     """The bundle's deterministic weighted index, or None if nothing is scored.
 
     Sum over kinds of mean(kind scores) x lag_weight x perf_weight. Bounded in
     practice by the number of signal kinds (~7 active), each term in [-1.5, 1.5];
     typical values land in roughly -2..+2 with corroborated names near the top.
+
+    Run-6: the scanner's DISCOVERY signal is EXCLUDED unless
+    `include_discovery` (Config COMPOSITE_INCLUDE_DISCOVERY, default off) —
+    its score is the screener's own aggregate of soft feeds that already enter
+    as kinds, so it double-counted them at full thesis weight. A bundle whose
+    only scored signal is discovery therefore has no composite (None), exactly
+    like a bundle with nothing scored: the prompt still shows the discovery
+    line, the bearish-lean read still uses it.
     """
     perf_w = perf_w or {}
-    by_kind: dict[SignalKind, list[float]] = {}
+    # Per-kind list of (score, lag weight). The lag weight is per SIGNAL so a
+    # provider-level override (history.SOURCE_LAG_DAYS: the Finnhub insider
+    # feed keeps its pre-taxonomy 30d lag) can differ from the kind's; with
+    # one lag per kind this reduces exactly to mean(scores) x lag_weight(kind).
+    by_kind: dict[SignalKind, list[tuple[float, float]]] = {}
     for s in bundle.signals:
         if s.score is None:
             continue
-        by_kind.setdefault(s.kind, []).append(s.score)
+        if s.kind is SignalKind.DISCOVERY and not include_discovery:
+            continue
+        lw = lag_weight(s.kind, getattr(s, "source", None))
+        by_kind.setdefault(s.kind, []).append(
+            (s.score, lw if lw is not None else 1.0))
     if not by_kind:
         return None
     total = 0.0
-    for kind, scores in by_kind.items():
-        mean = sum(scores) / len(scores)
-        lw = lag_weight(kind)
-        total += mean * (lw if lw is not None else 1.0) * perf_w.get(kind.value, 1.0)
+    for kind, pairs in by_kind.items():
+        weighted_mean = sum(sc * lw for sc, lw in pairs) / len(pairs)
+        total += weighted_mean * perf_w.get(kind.value, 1.0)
     return round(total, 2)
