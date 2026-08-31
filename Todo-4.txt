@@ -353,3 +353,38 @@ https://claude.ai/code/artifact/9099ad65-64b1-495c-82b9-db7226a1bbbf
             WINDOW: Aug 31 -> Sep 11 (Labor Day Sep 7 closed), extend Sep 18
             if N<24. Verify after 16:00 ET today: "Equity close row stamped
             for 2026-08-31 (basis=close)" carrying book_beta_spy.
+            16:19 ET CLOSE-ROW VERIFIED: "Equity close row stamped for
+            2026-08-31 (basis=close)"; row carries book_beta_spy=0.63.
+            Day-0 close $991,189.29 = +$1,943 (+0.20%) vs flatten baseline
+            $989,246.22. (Row's day_pl/realized include run-5's morning +
+            flatten losses — window curve reads from the baseline.) All
+            step-4 checks now complete; next: daily eval-contract watch.
+
+2026-08-31  EVENING — RUN-6 RE-BASED TO A FRESH ACCOUNT (user request; full
+            text = Amendment 1 in run-6 EVAL_CONTRACT.md). New paper acct
+            PA3B09IK4MGS, $1,000,000, options L3 (user said "100000" but the
+            account reads $1M — flagged to user, proceeding with reality).
+            Old acct PA394CJ4TNL5 abandoned; its run-6 half-day (+$1,943, BE
+            entry) DISCARDED, archived state/archive/20260831T221813Z.
+            WINDOW NOW: Tue Sep 1 -> Fri Sep 11 (9 sessions), Sep 18 N<24
+            extension unchanged. DAY-0 BASELINE: $1,000,000. The fresh
+            account VOIDS the day-0 backfill erratum (no order history ->
+            exit clocks truly empty; fresh-state condition holds literally).
+            SEQUENCE: bot 73580 stopped (needed TERM->KILL escalation after
+            SIGINT 30s — watch this on future stops), .env keys swapped
+            (credential only, no knob), reset --yes (churn carry OFF line
+            printed), preflight 5/6 green, bot restarted pid 7536 via panel,
+            confirmed bound to PA3B09IK4MGS $1M, idle (market closed), one
+            basis='late' row stamped for Aug 31 (by design; curve starts at
+            Sep 1 close row).
+            PREFLIGHT ❌ = ROBINHOOD ONLY: OAuth refresh token DIED 11:52 CT
+            (auth_dead latched, CRITICAL email sent). NOT a window dependency
+            (RH is not among the 3 contract feeds since run-6 dropped it) —
+            bot trades fine without RH context. Re-login handshake launched
+            from resident session; user must complete browser step
+            (localhost:8765) + possible phone push-approve. Latch self-heals
+            ~1 min after the new token lands, no restart needed.
+            VERIFY TOMORROW AT OPEN (09:35-10:30 ET): FEEDS 3/3 vader-
+            fallback, BOOK BETA line, first buys on the new account, single
+            instance; after 16:00: Sep 1 close row basis='close' with
+            book_beta_spy.
