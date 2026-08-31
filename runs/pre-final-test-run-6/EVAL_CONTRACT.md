@@ -1,13 +1,13 @@
-# EVAL CONTRACT — pre-final-test-run-6 — **DRAFT**
+# EVAL CONTRACT — pre-final-test-run-6
 
-**Status: DRAFT (written 2026-08-26 with the run-6 change-set). The operator pre-registers it — replaces this header with "Pre-registered <date>, BEFORE day 1" and commits — before the 09:31 ET Aug 31 flatten. No post-hoc metrics are admitted after that commit.**
+**Status: Pre-registered 2026-08-31, BEFORE day 1. Committed before the Aug 31 flatten; no post-hoc metrics are admitted after this commit. Deviation from the drafted plan, recorded at pre-registration: the operator's GO arrived Monday morning, so the flatten runs mid-session ~12:00 ET Aug 31 instead of 09:31 ET (same session; day-0 equity = equity at the actual flatten; Aug 31's `basis='close'` row is still the curve's first point).**
 
 | | |
 |---|---|
 | Window | **Mon 2026-08-31 → Fri 2026-09-11** (Labor Day Mon Sep 7 closed; **10 sessions**: Aug 31, Sep 1–4, Sep 8–11). Sample-floor extension (below) may run it to Fri Sep 18. |
 | Account | Alpaca paper `PA394CJ4TNL5` (the run-5 account). **Flattened at 09:31 ET Aug 31** by `scripts/flatten_and_restart.py` (cancels + closes everything, then `reset --yes` + preflight + relaunch), then fresh-cycled with **`RESET_CARRY_CHURN=off`** — empty exit/buy clocks, exit prices and loss streaks (clean window = clean state; run-5 day 1 was dirtied by run-4 carry). |
 | Starting equity | the account's equity at the 09:31 flatten (record it in `Todo-4.txt` as day-0 equity; the first `basis='close'` row of Aug 31 is the curve's first point) |
-| Config | **frozen at the run-6 change-set commit** (branch `feature/run6-changeset` merged into `feature/preview`; record the SHA here at pre-registration) + the `.env` keys in `docs/RUN6_SWITCH.md`. All 8 items ship together. |
+| Config | **frozen at the run-6 change-set commit** — merge `580915de5a1c1e14837d27d66c389f3d70d0b61d` (`feature/run6-changeset` → `feature/preview`, merged 2026-08-31, 1221 tests passed) + the `.env` keys in `docs/RUN6_SWITCH.md`. All 8 items ship together. |
 | Verdict tool | `scripts/eval_contract_check.py --contract v2 --start 2026-08-31 --end 2026-09-11 --spy-csv spy.csv --bench-csv QQQ=qqq.csv --bench-csv IWM=iwm.csv --beta-target 1.0 --beta-json state/risk_state.json` (offline stdlib recompute of `trades.jsonl` + `equity_history.jsonl`; exit 0 GO / 2 NO-GO / 3 PENDING). |
 | Equity basis | **`basis='close'` rows only** (fixed post-bell stamp, `EQUITY_CLOSE_FIXED_STAMP=on`). The checker prints the basis line; a window whose verdict rows are `legacy`/`intraday` is measured on the wrong basis → CONFOUNDED. |
 
