@@ -302,3 +302,54 @@ https://claude.ai/code/artifact/9099ad65-64b1-495c-82b9-db7226a1bbbf
             STILL PENDING USER GO (unchanged): run-6 switch, proposed Mon
             Aug 31 09:31 ET — that is TOMORROW MORNING. PR #55 + two .env
             edits per docs/RUN6_SWITCH.md need your word tonight/early am.
+
+2026-08-31  RUN-6 SWITCH EXECUTED (user GO ~11:30 ET; mid-session, not 09:31 —
+            deviation recorded in the pre-registered contract header).
+            SEQUENCE: merged feature/run6-changeset -> feature/preview
+            (580915d, --no-ff), 1221 tests passed (one sandboxed-run false
+            fail: RH callback test needs localhost bind). Contract
+            pre-registered BEFORE flatten (545fe7e). .env: SCREENER_SOURCES
+            robinhood entries dropped + AUTO_HEDGE_MAX_PCT 15->40 in place,
+            full run-6 key block appended, no dup keys. Curated QQQ lesson
+            struck (text-matched; file had drifted to line 11). User merged
+            preview -> main same morning.
+            FLATTEN 11:41 ET: equity at flatten start $989,679.12; 15 orders
+            cancelled, 17 positions closed — EXCEPT long IWM260930P00295000
+            x30: Alpaca refused the long-leg sell while the short 280P it
+            covered was still open (naked-short guard) and the script never
+            retried after the short leg filled -> "Could not fully flatten",
+            script aborted (correctly, no relaunch). LESSON for the flatten
+            script: close SHORT option legs first, or retry long legs after.
+            Manual fix 11:57 ET: sell-to-close 30 @ limit 6.20, filled 6.34
+            ($19,020; quote was tight two-sided 6.25/6.29). Re-ran script:
+            reset printed "churn carry: OFF (clean state — RESET_CARRY_CHURN=
+            off, run-6 default)", preflight OK, bot relaunched pid 73580 at
+            11:58 ET. DAY-0 EQUITY (flat, all cash): $989,246.22.
+            COSMETIC: old bot pid 25071 showed "survived SIGKILL" in the
+            script log — it was a zombie (panel is unreaping parent); lock
+            was free. Also 13 one-time "Backfill SKIP (no ledger basis)"
+            ERROR lines at first reconcile — flatten fills predate the fresh
+            ledger; correctly skipped, run-5's own ledger was archived before
+            they could be written there (its realized P&L misses the flatten
+            closes; run-5 is CONFOUNDED regardless).
+            DAY-0 ERRATUM (full text in run-6 EVAL_CONTRACT.md): the first
+            reconcile's exchange-exit backfill re-stamped exit_times/
+            exit_prices from run-5's broker sell fills (last-500 closed
+            orders, no time filter, per-process skip memory) — deterministic
+            on any restart, would have hit the 09:31 flow too; clearing is
+            futile, fixing = patching frozen code. Accepted as frozen-code
+            behavior: 24h LLM re-entry cooldown on run-5 names (visible in
+            Buy-excluded lines), price guard <=7d, loss_streaks EMPTY, core
+            fill + beta hedge unaffected (verified live). Freeze holds.
+            FIRST CYCLE (12:00 ET): FEEDS 3/3 healthy news=vader-fallback
+            (as pre-declared); BOOK BETA line live (0.00 on empty book);
+            core fill bought $49,462 QQQ (10%->15%, target 75%); 3 proposals,
+            BE 121sh entered with working protective sell; bearish funnel
+            citing (CPAY/LTH gate-blocked); cooldown exclusions cited (NOK,
+            SPCX). Expectancy report-only line correctly absent (empty
+            ledger has no negative families — prints once trips exist).
+            Run-5 state archived: state/archive/20260831T155810Z/ copied to
+            runs/pre-final-test-run-5/state/ (this commit).
+            WINDOW: Aug 31 -> Sep 11 (Labor Day Sep 7 closed), extend Sep 18
+            if N<24. Verify after 16:00 ET today: "Equity close row stamped
+            for 2026-08-31 (basis=close)" carrying book_beta_spy.

@@ -1,0 +1,6 @@
+{"date": "2026-08-24", "ts": "2026-08-24T23:56:06.755079+00:00", "equity": 1000109.73, "cash": 678865.05, "unrealized_pl": 111.23, "realized_pl": null, "total_return": null, "day_pl": 109.73}
+{"date": "2026-08-25", "ts": "2026-08-25T23:56:18.593656+00:00", "equity": 1007025.74, "cash": 504884.99, "unrealized_pl": 7028.41, "realized_pl": -2.67, "total_return": 7025.74, "day_pl": 6569.9}
+{"date": "2026-08-26", "ts": "2026-08-26T23:57:11.555466+00:00", "equity": 1009811.78, "cash": 371512.35, "unrealized_pl": 9723.52, "realized_pl": 88.26, "total_return": 9811.78, "day_pl": 2920.02}
+{"date": "2026-08-27", "ts": "2026-08-27T23:56:22.826724+00:00", "equity": 1008091.53, "cash": 301200.5, "unrealized_pl": 7564.83, "realized_pl": 526.7, "total_return": 8091.53, "day_pl": 5962.36}
+{"date": "2026-08-28", "ts": "2026-08-28T23:56:44.915284+00:00", "equity": 992267.95, "cash": 192794.48, "unrealized_pl": -7740.87, "realized_pl": 8.82, "total_return": -7732.05, "day_pl": -18706.92}
+{"date": "2026-08-31", "ts": "2026-08-31T15:14:29.224093+00:00", "equity": 990050.68, "cash": 320294.86, "unrealized_pl": -4751.05, "realized_pl": -5198.27, "total_return": -9949.32, "day_pl": -1767.24}
