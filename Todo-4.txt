@@ -272,3 +272,33 @@ https://claude.ai/code/artifact/9099ad65-64b1-495c-82b9-db7226a1bbbf
             still shows Aug 14 data and the OLD account number. ops/
             status_page.html in this repo is the current one; re-publish the
             artifact from your resident session when you are back.
+
+2026-08-30  ~23:00 CT RESTART SWEEP (resident session, user back). Mac was
+            rebooted Sun 13:56 CT; bot died with it (last tick 13:52) and
+            stayed down ~9h — deadman skips outside market hours by design, so
+            a weekend reboot leaves the bot down until Monday open (harmless,
+            market closed; now written down). launchd auto-restored panel/
+            awake/backup/claude-daily/deadman. Bot restarted 22:54 via panel
+            /api/restart, pid 25071 — tick+lock fresh, RH latch clean, run-5
+            config untouched.
+            FRIDAY AUG 28 (last trading day): equity closed $992,268, day
+            -$18,707 (-1.85%) vs SPY -0.25%. Operationally clean: 0 CRITICAL/
+            ERROR, no halt, 11 fills, protections standing. Cash $301k->$193k
+            (bought the dip; dip kept dipping). Live weekend marks: equity
+            $990,095, uPL -$9,909 (equity -$11,454 / options +$1,545); drags
+            HOOD -$6,263, AFRM -$3,486, SMCI -$2,663. WINDOW now -0.77% (Fri
+            close) vs SPY +0.48% / QQQ +0.42% / IWM -1.40% (Aug 21 basis) —
+            flipped from +0.19pp ahead to -1.25pp behind SPY in one session.
+            IWM 295/280 bear spread flipped GREEN (+$990, IWM 295.75); NVDA
+            180C +$555. Recurring wart: latest_price 400s on the NVDA option
+            symbol every cycle (stock endpoint) — run-6 candidate, not touched
+            (frozen window).
+            DONE: bot restart, status artifact REPUBLISHED (first since Aug 14
+            — phone URL now current, account PA394CJ4TNL5), artifact watch
+            re-armed, Aug 27-29 logs archived (this commit). No knob/gate/
+            prompt/.env change. Session crons: none re-armed (away mode over);
+            claude-daily launchd fallback still loaded — unload it if you
+            don't want evening headless runs now that you're back.
+            STILL PENDING USER GO (unchanged): run-6 switch, proposed Mon
+            Aug 31 09:31 ET — that is TOMORROW MORNING. PR #55 + two .env
+            edits per docs/RUN6_SWITCH.md need your word tonight/early am.
