@@ -68,7 +68,11 @@ def _put_proposal(symbol="EXTR", legs=None, expiry_days=35) -> TradeProposal:
 # --------------------------------------------------------------------------- #
 def _rm() -> RiskManager:
     from tests.test_risk import _limits, _rm as _mk
-    return _mk(_limits(options_enabled=True))
+    # per_underlying_premium_pct=0: the AMZN fixtures here hold ~$900 of open
+    # premium on one underlying, which the (default-on) concentration cap of
+    # test_run5_gates.py would reject before the MERGE guard under test ever
+    # answers.
+    return _mk(_limits(options_enabled=True, per_underlying_premium_pct=0.0))
 
 
 def _amzn_sym(strike: int, e: str) -> str:

@@ -1,0 +1,304 @@
+================================================================================
+ACTIVE TODO  (supersedes Todo-3.txt; completed items live in completed.txt)
+Opened 2026-08-23 around the ROAD TO LIVE: pre-final test runs -> real money.
+THIS IS THE LIVING FILE: every session (human or Claude) READS this before
+touching strategy and APPENDS observations to the log at the bottom. The
+per-run pass/fail rules live in runs/pre-final-test-run-5/EVAL_CONTRACT.md.
+================================================================================
+
+WHY THIS FILE EXISTS (the 2026-08-23 diagnosis)
+  Run-4 (Jul 27 - Aug 21) graded B-: expectancy finally positive (+$167/trade,
+  PF 1.10) but down-capture still broken (2.31 vs SPY), the bearish sleeve
+  executed 0 trades in 83 chances, options bled -$22k through a documented gate
+  bypass, and the self-measurement loop (ledger/postmortem/autotune) was feeding
+  itself wrong data. Full autopsy: runs/pre-final-test-run-4/RUN_SUMMARY.md
+  Root process problem: WEEKLY strategy changes meant no configuration ever
+  accumulated the ~24 trades a statistical verdict needs. The fix is contract-
+  gated, frozen windows from here to live money. No more vibes-driven knobs.
+
+--------------------------------------------------------------------------------
+TIMELINE TO LIVE MONEY (the neat version; dates slip only by contract rules)
+--------------------------------------------------------------------------------
+  2026-08-23  [DONE] Ship roadmap ranks 1-8 (sizing revert, eval contract,
+              option-stop hardening, options bypass close, breadth hedge
+              trigger, measurement integrity, corroboration gate, feed
+              liveness). Archive run-4 to runs/pre-final-test-run-4/.
+  2026-08-23  [DONE] Arm flatten_and_restart waiter -> fires Mon 09:31 ET:
+              flatten book, reset local state, relaunch on new code.
+  2026-08-24  RUN-5 DAY 1 (Mon). USER ACTIONS before/at open:
+                [x] Robinhood browser re-auth — DONE 00:06 ET Aug 24; bot prober
+                    confirms "Robinhood OAuth: authorized"
+                [x] claude-daily babysit — plist was already installed; verified
+                    loaded + kickstarted clean (exit 0, "primary healthy — skip")
+                    and headless CLI auth probe returns AUTH-OK
+                [ ] (optional) Alpaca dashboard reset to a round $1,000,000
+                    BEFORE 09:31 ET if preferred over continuing from ~$1.007M;
+                    either way the contract pins starting equity = post-flatten
+                [ ] Record starting equity in the OBSERVATIONS LOG below
+  2026-08-24 -> 09-04  PRE-FINAL-TEST-RUN-5. Config FROZEN (validity condition).
+              Recording: nightly postmortems (now close-to-close), weekly
+              autotune W35/W36 (read-only), observations appended here.
+  2026-09-04  Window close (extend to 09-11 if closed trades < 24).
+  2026-09-05  Verdict: scripts/eval_contract_check.py --start 2026-08-24
+              --end 2026-09-04. PASS/FAIL/CONFOUNDED per the contract.
+              PASS -> RUN-6 same config Sep 8-19 (second consecutive window).
+              FAIL -> one diagnostic, ONE change-set, fresh window.
+  ~2026-09-22 If two consecutive PASSES: LIVE PILOT GO decision.
+              Live pilot shape (from the solo small-float plan):
+                - $500-1,000 real money, fractional shares, Alpaca live keys
+                - OPTIONS OFF for the pilot (paper keeps running them in
+                  parallel; options earn live access by passing on paper)
+                - Risk caps scaled down: MAX_DAILY_LOSS_PCT 2, single-name cap
+                  tightened, kill-switch drilled before day 1
+                - Paper bot keeps running side-by-side as the control arm
+  ~2026-10-20 Live pilot review after ~4 weeks: scale to $2-5k, hold, or pull
+              back to paper. Scale rule: live tracks paper within noise AND
+              paper keeps passing its windows.
+  Parked: GA/multi-user ambitions stay parked (~1yr per goGA.txt decision).
+
+--------------------------------------------------------------------------------
+STANDING RULES (learned the hard way, run-4 receipts in RUN_SUMMARY.md)
+--------------------------------------------------------------------------------
+  R1  No strategy/prompt/knob commits inside an eval window. Breakage fixes
+      only, logged below.
+  R2  No verdicts below 24 closed trades. Extend the window instead.
+  R3  Every new gate logs its trigger + the counterfactual size so the next
+      review can measure what it did (grep: CORROBORATION GATE, breadth:,
+      FEEDS:, premium mark unreliable).
+  R4  Do-not-do list from the Aug 23 review stays binding: no put-persuasion
+      prompts, no equity stop tightening, no composite floor arming, no
+      conviction floor raises, no ORB/0DTE/grid imports wholesale.
+  R5  Postmortem/autotune conclusions are inputs, not orders — cross-check
+      against the ledger before acting (they misattributed the two biggest
+      run-4 losses).
+
+--------------------------------------------------------------------------------
+OPEN ITEMS (non-window work, allowed anytime)
+--------------------------------------------------------------------------------
+  [ ] Aug 24: verify FEEDS: line shows 5/5 after RH re-auth
+  [ ] Aug 24: confirm flatten completed + starting equity recorded
+  [ ] Sep 5: run the contract checker + write the verdict below
+  [ ] Later-track (post run-5, only between windows):
+      - winner-protection veto on green decision-sells below 1.5R trail-arm
+        (ship only if run-5 instrumentation confirms the drag)
+      - cadence 3120s -> 1560s after the cache-ledger audit
+      - open-auction hygiene: defer open-bell NEW buys to ~10:00 ET with
+        RVOL/opening-range confirmation
+      - RVOL >= 1.5-2x "in play" pre-filter before the LLM sees the slate
+      - NAME_DROP_DEFENSE_PCT 4.0 -> 2.5-3.0 (add to .env, watch churn)
+      - pyramiding release on winners >= +5% that pass anti-chase
+  [ ] Status artifact still shows the old account id (PA3HBZ8ODAMD) — fix to
+      PA3IRR2BT9FT next time the status page is touched.
+  [ ] Aug 25 review (runs/pre-final-test-run-5/REVIEW_2026-08-25.md) — Track 0,
+      MEASUREMENT-ONLY, allowed mid-window, log here when shipped:
+      - postmortem.day_marks: mark open option groups (IWM spread, NVDA call),
+        exclude core_fill rows, fix the "N name(s)" off-by-one
+      - strike the Aug-24 QQQ "cap aggregate exposure" line from
+        state/lessons/curated.md (written by frozen code about the system core)
+      - eval_contract_check: name the equity basis (snapshot vs broker day_pl),
+        add a telescoping check, stamp equity_history at a fixed time
+        (Aug 24 row $1,000,110 vs Alpaca close $1,000,456 — gap $346 already
+        breaches the "< $1" validity condition)
+      - export Alpaca fill prices (none are logged; slippage is unauditable)
+      - log ex-ante BOOK BETA per cycle (logging only)
+  [ ] Run-6 change-set (ONE PR train, between windows) — see REVIEW §6 Track 1:
+      LLM sell authority -> events-only; options bypass closed (earnings +
+      anti-chase in evaluate_option, single-name bullish debits off); signal
+      taxonomy (OPTIONS_FLOW kind, INSIDER kind, discovery out of composite,
+      retention 14 -> 120d, scripts/signal_ic.py); screener price/ADV floor
+      before the cap + dead sources out; freeze perf-weights/expectancy gate/
+      lesson injection; BOOK BETA cap + hedge sized to measured beta;
+      eval contract v2 (pooled N>=60, alpha/beta/DD, basis named).
+  [ ] Status artifact: account is now PA394CJ4TNL5 (not PA3IRR2BT9FT either).
+
+--------------------------------------------------------------------------------
+OBSERVATIONS LOG (append-only; date every entry; newest at the bottom)
+--------------------------------------------------------------------------------
+2026-08-23  Run-4 closed and archived. B- grade. Roadmap ranks 1-8 shipped;
+            .env sizing reverted to half-Kelly/25% vol; flatten waiter armed
+            for Mon 09:31 ET. Eval contract pre-registered for Aug 24 - Sep 4.
+            Away-mode postmortem: bot ran clean 9 days unattended, but both
+            watchers (claude-daily, RH auth) died silently — feed liveness is
+            now a logged validity condition rather than an assumption.
+2026-08-24  00:15 ET pre-open: RH re-auth landed (token file rewritten 00:06,
+            prober says authorized — watch robinhood_health.json flip on the
+            next probe + FEEDS: line at the open). claude-daily verified end-
+            to-end (loaded, exit 0, headless auth OK). Flatten waiter armed
+            (pid 95963) for 09:31 ET. Run-5 clock starts at today's open.
+2026-08-24  01:20 ET AMENDED PRE-WINDOW: user issued NEW paper account keys —
+            PA394CJ4TNL5, ACTIVE, options level 3, STARTING EQUITY EXACTLY
+            $1,000,000. Flatten waiter retired (nothing to flatten on a fresh
+            account); fresh_cycle ran 00:16 ET (old PA3IRR2BT9FT state archived
+            to state/archive/20260824T051638Z); bot relaunched pid 15598 on the
+            new code + new account; RH health latch clean (auth_dead=false);
+            deadman quiet through the swap (flatten.hold honored). Contract
+            updated with the new account + $1M start. Day 1 = today's open.
+2026-08-24  14:50 ET run-4 winner re-check (PATH/CDE/SMCI/AXTI/MSFT/NVDA/ORCL/
+            DOCS/IBIT/IESC vs live RH quotes). Buy-shaped today: CDE (px>20>50,
+            RSI 66, -1.6% off 20d high), PATH (RSI 71, at highs — anti-chase
+            territory), MSFT (RSI 64, -3.6% off high), DOCS (RSI 57, -7.9%
+            off high, ATR 8.5%). Not buy-shaped: SMCI -7.5%/5d, NVDA below
+            20dma, ORCL/AXTI/IESC BELOW 50dma (AXTI -31%/5d, IESC -17.5%/5d
+            post-split), IBIT RSI 81 (+23%/5d, parabolic). WATCHLIST= is empty
+            so none can reach the slate unless a screener re-surfaces them;
+            seeding WATCHLIST mid-window = R1 violation — NOT done; left as a
+            user decision (run-6 candidate: "prior-winner re-scan" source).
+            Day-1 bot health: FEEDS 5/5, 5 decisions, ~$0.10/decision,
+            equity $1,001,722 (+0.17%), positions AAPL/HOOD/SNDK/ELMT/QQQ/IWM.
+2026-08-25  DAY-2 REVIEW (logs + all-history backtest + signal study + arch
+            audit, 14-agent adversarial verification). Full text:
+            runs/pre-final-test-run-5/REVIEW_2026-08-25.md; report page:
+            https://claude.ai/code/artifact/9099ad65-64b1-495c-82b9-db7226a1bbbf
+            Verified headline:
+            129 closed trips since Jun 26 = -$2,292 (PF 0.97); equity-only
+            +$22.6k, options -$24.8k/6; mechanical profit exits +$77.0k/44
+            (WR 86%) vs LLM decision exits -$26.1k/48 (WR 15%, median bail at
+            0.40x stop; ~45% would have been stopped within 5 sessions anyway,
+            so the recovery is +$16-29k and 3-trade concentrated). Pooled
+            capture 0.70 up / 1.54 down = ~1x beta + a constant ~-0.2%/day
+            drag (symmetric; NOT convexity, NOT under-hedging; hedging a
+            negative-alpha book locks in the loss). Every completed run lagged
+            SPY. Bearish funnel all-time: 227 declined / 5 LLM-approved puts
+            gate-blocked / 1 fill (the IWM proxy). The "missed setup" = no
+            forecast target/horizon, no beta measurement, LLM holds the two
+            loss-making authorities (sell, options). NOT findings (voided by
+            refuters): technical-score inversion (effective N=1), "news"
+            positive IC (blend of VADER + options_flow emitted as kind NEWS;
+            suggestive only), midday-is-bad (options artifact), "$5.8k open
+            slippage" (stale decision quotes; no fill prices logged).
+            Basis note: the 2.31 down-capture baseline = broker day_pl basis
+            (1.19/2.31 reproduces); snapshot basis is 1.35/2.05. Name the
+            basis in the verdict.
+            Run-5 days 1-2: clean ops (16/16 cycles, FEEDS 5/5, no halts,
+            positions protected, $1,007,879 +0.79%, 49.8% invested). Caveats
+            for the verdict (R2/R5): run-4 churn memory carried into the fresh
+            account (SOFI/SMCI/NOK excluded day 1, SPCX day 2 — documented
+            reset.py design); postmortem blind to option P&L and wrote a wrong
+            QQQ-concentration lesson into curated.md; adaptive weights
+            (expectancy gate / perf-weights / track-record) will re-arm ~Sep
+            1-3 without a commit; NVDA call bought 1d pre-earnings via the
+            option exemption; IWM spread = biotech thesis as a ~20% IWM delta.
+            Expectation: N<24 by Sep 4 -> extend to Sep 11; criterion 2 fails
+            with ~80-90% probability even if the true mean is positive (P(pass)
+            ~0.06-0.17 at N=24) -> treat FAIL/CONFOUNDED as uninformative and
+            pre-register contract v2 for run-6. No code/knob/prompt touched.
+
+
+Report: 
+https://claude.ai/code/artifact/9099ad65-64b1-495c-82b9-db7226a1bbbf
+2026-08-26  10:10 CT DECISION (Claude, pending user go): stop run-5 under the
+            contract's CONFOUNDED clause (validity breaches already on record:
+            equity basis telescoping $346 vs <$1; state not fresh; adaptive
+            weights re-arm mid-window; postmortem blind to options) — NOT a
+            FAIL. Rationale: verdict already uninformative (P(pass crit 2)
+            ~0.06-0.17 at N=24; N<24 base case), and known -EV paths (LLM
+            loss-cuts, options bypass) keep running. Run-6 change-set being
+            built in an isolated worktree branch feature/run6-changeset (one
+            commit per item + tests + review): measurement plumbing, LLM sells
+            events-only, options bypass closed, signal taxonomy + IC harness,
+            screener hygiene, frozen loops, book-beta cap/hedge, contract v2 +
+            clean-state reset. Live bot untouched. Proposed switch: flatten +
+            fresh-cycle (RESET_CARRY_CHURN=off) + relaunch 09:31 ET Mon Aug 31;
+            window Aug 31 -> Sep 14. Awaiting user confirmation for the
+            irreversible part (stop/flatten/restart date).
+2026-08-26  11:45 CT run-6 change-set BUILT (not merged, live bot untouched):
+            branch feature/run6-changeset, PR #55 -> feature/preview,
+            https://github.com/Srikanth-Pusapati/Investment_stratergy/pull/55
+            9 commits (items 1-8 + review fixes), 1221 tests pass (was 1059),
+            adversarial review: 0 blockers, 4 majors fixed (beta shrink sign for
+            inverse ETFs, bearish precheck w/o composite, Finnhub insider lag
+            preserved so taxonomy != re-weighting, fallback-queue LLM spend).
+            Operator checklist: docs/RUN6_SWITCH.md (in the branch). Two LIVE
+            .env lines MUST change at switch: AUTO_HEDGE_MAX_PCT 15->40,
+            SCREENER_SOURCES drop robinhood,robinhood_scans; ~28 new keys
+            listed there. Contract v2 DRAFT: runs/pre-final-test-run-6/
+            EVAL_CONTRACT.md (pre-register before the flatten). Run-5 verdict
+            draft: runs/pre-final-test-run-5/VERDICT.md = CONFOUNDED.
+            STILL PENDING USER GO: stop/flatten/restart date (proposed Mon
+            Aug 31 09:31 ET; window Aug 31 -> Sep 11, extend to Sep 18).
+
+2026-08-27  17:45 CT AWAY-MODE HEADLESS FALLBACK ran the daily checklist (the
+            primary session was parked, not dead — see below). Read-only checks
+            plus 3 writes: archived logs, status page, this entry. No knob,
+            gate, prompt, .env or PR touched; nothing flattened; bot untouched.
+            LIVENESS: fallback fired on 47h-no-commit. Re-verified before
+            writing — status_page.html 13d stale, no operator file edit for 30h
+            (Todo-4 @ Aug 26 11:28), and the resident session's transcript ends
+            with "still waiting on your call: go Monday / Sep 8 / continue
+            run-5". So: alive as a process, parked awaiting your decision, doing
+            no work. That is a THIRD false-negative class for the liveness
+            check (Aug 13 = alive+uncommitted; Aug 25 = alive+mid-flight;
+            Aug 27 = alive+parked). Net effect: Aug 26 got NO evening session
+            from either side and nobody noticed.
+            HEALTH: bot pid 15598 up since Aug 24, tick fresh, no KILL,
+            halted=false, RH auth_dead=false, FEEDS 5/5, deadman green (no
+            restart since Jul 13), 8 cycles today, zero CRITICAL/ERROR/halt/
+            FAILED across Aug 25/26/27. All 15 equity names have working sell
+            orders; no unprotected positions.
+            NUMBERS (live /v2/account, acct PA394CJ4TNL5): equity $1,009,051
+            +$6,922 (+0.69%) today vs SPY +0.68%; cash $301,201; 70.6%
+            invested; unrealized +$8,525 (equity +$9,160, options -$635).
+            Run-5 to date +0.91% vs SPY +0.72% / QQQ +1.09% / IWM -0.04%
+            (Aug 21 close basis). Closed trips 2 (SNAP +$136, SOFI +$453),
+            +$590 realized, expectancy +$295 at N=2 = uninformative; does not
+            move the CONFOUNDED verdict. LLM $5.93/41 calls window-to-date;
+            cache_read 52,990 tok today (caching is finally landing).
+            OPEN OPTIONS: IWM Sep-30 295P/280P x30 bear spread, net $8,040,
+            uP/L -$1,950 (IWM closed 299.81, long put OTM, bleeding while
+            small caps hold). NVDA Oct-16 180C x1, uP/L +$1,315 (the
+            pre-earnings exemption buy; that risk has passed, now green).
+            FINDING - NEXA falling-knife entry (process bug, not a loss):
+            09:23 screener surfaced NEXA from Robinhood Daily Movers as
+            "today's biggest movers - momentum" (+0.60); 09:25 composite ranked
+            it #2 (+2.33); 09:26 bought $25,241; 10:16 the bot's own NAME
+            FALLING armed on the 50-min-old position; NEXA closed -11.1% vs SPY
+            +0.6% on the Votorantim control-sale headline. The mover screener
+            does not separate up-movers from down-movers, so a crash scores as
+            momentum. Damage small (bought near the lows, -0.50% from entry).
+            This is live corroboration for run-6 item "screener hygiene: drop
+            robinhood,robinhood_scans from SCREENER_SOURCES".
+            BEARISH SLEEVE: still 0 approvals Aug 25-27; every cycle a cited
+            decline (0 IGNORED, schema forcing holds). This week's recurring
+            killer is "RSI 8/9 extreme oversold - bounce risk"; two proxy
+            attempts died as "structure already open" - the IWM spread blocks
+            its own successor. Run-5 bearish fills to date: 1 (the IWM proxy).
+            MINOR: QQQ protective stop covers 212 of 212.81 sh; 0.81 sh
+            (~$583) rides bare on the bracket-flooring remainder. Not worth a
+            fix, logging it so it is not rediscovered.
+            STILL PENDING USER GO (unchanged): stop/flatten/restart date for
+            run-6 (PR #55, proposed Mon Aug 31 09:31 ET) + the two live .env
+            edits in docs/RUN6_SWITCH.md. Live bot is still running run-5.
+            ARTIFACT IS STALE: headless has no artifact tool, so the phone URL
+            still shows Aug 14 data and the OLD account number. ops/
+            status_page.html in this repo is the current one; re-publish the
+            artifact from your resident session when you are back.
+
+2026-08-30  ~23:00 CT RESTART SWEEP (resident session, user back). Mac was
+            rebooted Sun 13:56 CT; bot died with it (last tick 13:52) and
+            stayed down ~9h — deadman skips outside market hours by design, so
+            a weekend reboot leaves the bot down until Monday open (harmless,
+            market closed; now written down). launchd auto-restored panel/
+            awake/backup/claude-daily/deadman. Bot restarted 22:54 via panel
+            /api/restart, pid 25071 — tick+lock fresh, RH latch clean, run-5
+            config untouched.
+            FRIDAY AUG 28 (last trading day): equity closed $992,268, day
+            -$18,707 (-1.85%) vs SPY -0.25%. Operationally clean: 0 CRITICAL/
+            ERROR, no halt, 11 fills, protections standing. Cash $301k->$193k
+            (bought the dip; dip kept dipping). Live weekend marks: equity
+            $990,095, uPL -$9,909 (equity -$11,454 / options +$1,545); drags
+            HOOD -$6,263, AFRM -$3,486, SMCI -$2,663. WINDOW now -0.77% (Fri
+            close) vs SPY +0.48% / QQQ +0.42% / IWM -1.40% (Aug 21 basis) —
+            flipped from +0.19pp ahead to -1.25pp behind SPY in one session.
+            IWM 295/280 bear spread flipped GREEN (+$990, IWM 295.75); NVDA
+            180C +$555. Recurring wart: latest_price 400s on the NVDA option
+            symbol every cycle (stock endpoint) — run-6 candidate, not touched
+            (frozen window).
+            DONE: bot restart, status artifact REPUBLISHED (first since Aug 14
+            — phone URL now current, account PA394CJ4TNL5), artifact watch
+            re-armed, Aug 27-29 logs archived (this commit). No knob/gate/
+            prompt/.env change. Session crons: none re-armed (away mode over);
+            claude-daily launchd fallback still loaded — unload it if you
+            don't want evening headless runs now that you're back.
+            STILL PENDING USER GO (unchanged): run-6 switch, proposed Mon
+            Aug 31 09:31 ET — that is TOMORROW MORNING. PR #55 + two .env
+            edits per docs/RUN6_SWITCH.md need your word tonight/early am.

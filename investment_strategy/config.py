@@ -5,6 +5,7 @@ switch, and every hard risk limit. Nothing else should read os.environ directly.
 """
 from __future__ import annotations
 
+import logging
 import os
 from dataclasses import dataclass
 from enum import Enum
@@ -14,6 +15,24 @@ from dotenv import load_dotenv
 from .notify import AlertConfig, load_alert_config
 
 load_dotenv()  # populate os.environ from .env if present
+
+log = logging.getLogger("config")
+
+
+def _choice(name: str, default: str, allowed: tuple[str, ...]) -> str:
+    """Env enum -> one of `allowed` (case/whitespace-insensitive). A typo
+    (`LLM_SELL_AUTHORITY=event_only`, `AUTO_HEDGE_MODE=Beta `) used to fall
+    through to whichever branch the consumer treated as 'else' — i.e. the
+    LEGACY behaviour — with no log. Now it WARNs and uses the run-6 default."""
+    raw = os.getenv(name)
+    val = (raw or "").strip().lower() or default
+    if val not in allowed:
+        log.warning(
+            "%s=%r is not one of %s; using the default %r.",
+            name, raw, "/".join(allowed), default,
+        )
+        return default
+    return val
 
 
 class TradingMode(str, Enum):
@@ -121,6 +140,36 @@ class RiskLimits:
     # must never be fought by its own gate). Inert unless
     # regime_filter_enabled — the trend is only read under that flag.
     option_direction_gate: bool = True    # OPTION_DIRECTION_GATE (on/off)
+    # Run-6 (Aug 25 review, item 3): single-name BULLISH option debits
+    # (long_call / bull_call_spread / any all-calls structure on a non-index
+    # underlying) were the loss engine of runs 4-5 (-$24.8k net, one +$11.6k
+    # winner) and rode an explicit bypass of the earnings blackout and the
+    # anti-chase gate. OFF for the run-6 window: evaluate_option rejects them
+    # outright (logging the counterfactual debit); puts, bear spreads, the
+    # sanctioned index-put path, the proxy put and calls on index
+    # underlyings (SPY/QQQ/IWM/DIA + the configured core/hedge/proxy ETFs)
+    # keep working. Run-6 DEFAULT: off. OPTIONS_SINGLE_NAME_BULLISH=on
+    # restores the legacy behaviour.
+    options_single_name_bullish: bool = False
+    # Per-underlying premium concentration cap (Aug 12-21 forensic review):
+    # max_option_premium_pct bounds each PLAY's debit, but nothing bounded the
+    # PILE — AMZN stacked ~$29.8k of open premium across structures on one
+    # underlying and lost -$14,956. Cap the TOTAL open net premium per
+    # underlying (existing lots + the new debit) at this % of equity; a new
+    # entry is clamped into the remaining headroom and rejected when even one
+    # contract no longer fits. Sanctioned hedges (falling-market index put /
+    # put-liquidity proxy) are exempt — they concentrate on a fixed venue by
+    # design. 0 = off.
+    per_underlying_premium_pct: float = 0.5
+    # Exit-side mark hardening (Aug 12-21 forensic: HL premium-stopped -67.6%
+    # 14s after the open on a junk one-sided auction quote while the underlying
+    # traded UP — the Jul-23 failure mode, which PR #40 hardened on ENTRIES
+    # only). The watchdog's premium stop/take must never fire off one bad tick:
+    # require consecutive breach ticks, refuse one-sided/absurd NBBOs as
+    # countable evidence, and distrust marks in the open-auction minutes.
+    option_exit_max_spread_pct: float = 10.0  # exit-mark NBBO spread ceiling for a countable breach tick (0=no ceiling; same number as the entry-side cap)
+    option_stop_confirm_ticks: int = 2        # consecutive watchdog ticks (~30s apart) a premium stop/take breach must persist (1=old single-tick behavior)
+    option_stop_open_mute_min: float = 5.0    # minutes after 09:30 ET to suppress premium-stop closes unless the UNDERLYING gapped adversely (0=off)
     # --- R.1 vol-scaled ("ATR-style") dynamic stops ---
     # One fixed stop % is too tight for volatile names (chopped out by normal
     # noise — the exact failure D.1 measured on the old 5% stop) and too loose
@@ -261,6 +310,22 @@ class RiskLimits:
     composite_gate_enabled: bool = False # opt-in deterministic buy floor (backtest first)
     min_composite_score: float = 0.0     # floor value when the gate is on
     composite_perf_min_trips: int = 3    # closed trips before a source's perf weight != 1.0
+    # COMPOSITE_PERF_WEIGHTS (run-6 default OFF): whether a source's realized
+    # track record in THIS book tilts its composite term (0.5..1.5). Run-6
+    # freezes the self-referential loops: with a handful of trips per family
+    # the weight chased noise (a family's own recent losses shrank its say,
+    # which shrank its entries, which starved the sample). Off = every perf
+    # weight is 1.0; the code path stays for a later, better-sampled window.
+    composite_perf_weights: bool = False
+    # COMPOSITE_INCLUDE_DISCOVERY (run-6 default OFF): whether the scanner's
+    # DISCOVERY score is a scored term of the composite. The discovery score
+    # is the screener's own aggregate of the same soft feeds (congress/
+    # insider/flow) that already enter the composite as kinds, so counting
+    # it double-weighted the softest evidence at full (thesis) weight — the
+    # Jul-27 congress->DISCOVERY laundering. The discovery line is still
+    # rendered to the LLM (score + reason) and still drives the bearish-lean
+    # read; it just stops moving the index. on = legacy behaviour.
+    composite_include_discovery: bool = False
     # --- rotation loss guard (Jul-13 week: UNH -$204 / HUBB -$158 realized
     # purely to free a slot). Enforces the +0.10 edge the prompt only asks
     # for, ONLY on cap-forced sells that lock in a real loss. ---
@@ -308,6 +373,28 @@ class RiskLimits:
     # that at least reaches back to the mean is not tagged by noise; the
     # per-trade $-risk cap shrinks SIZE to keep dollar risk flat.
     stop_cover_extension: bool = True
+    # --- Run-6 item 2: LLM sell authority (Aug 25 review §6.1). Decision
+    # SELLs on LOSING equity positions were the run-4/5 loss engine: the model
+    # cut losers short of their stops on re-argued theses, with no evidence
+    # the cuts beat the mechanical stack (bracket/vol stop, R-scaled trail,
+    # time-stop, name-falling defense). 'events_only' (run-6 DEFAULT): a model
+    # SELL on a position with unrealized P/L < 0 that has NOT reached its
+    # planned stop is REJECTED unless the orchestrator attaches a
+    # deterministic event tag from CODE (never the model): an active NAME
+    # FALLING read for the symbol, earnings inside the blackout window, an
+    # account halt, or a regime flip into risk-off this cycle. Winners
+    # (unrealized >= 0), partial trims of winners, and every mechanical exit
+    # are untouched. Rejections log 'SELL AUTHORITY: ...' so the next review
+    # can count the counterfactual. 'full' = legacy: any SELL is approved.
+    llm_sell_authority: str = "events_only"
+    # Review fix (Aug 26): does the option earnings blackout also reject
+    # single-name PUTS (long_put / bear_put_spread) into a print? The run-6
+    # spec said "every debit structure" and a put is a long-vol debit that
+    # loses to the IV crush whichever way the print goes, so the DEFAULT is
+    # on (blocked). OPTIONS_BLACKOUT_PUTS=off lets puts through the blackout
+    # (calls stay blocked) if the bearish sleeve needs the print. Explicit
+    # decision, not an accident of the `bullish` branch.
+    earnings_blackout_puts: bool = True
     # Gap-day chase trigger: an entry more than this % above the PRIOR daily
     # close fires the overextension gate's extreme leg regardless of RSI/ATR
     # (VRRM Jul 29: bought +28% over prior close; the gap bar inflated its own
@@ -326,9 +413,28 @@ class RiskLimits:
     # demonstrably losing money right now doesn't earn NEW starters; top-ups
     # are exempt (the position already cleared entry), and a family with
     # fewer than min_trips closed trips in the window is never judged. ---
-    expectancy_gate_enabled: bool = True   # EXPECTANCY_GATE (on/off)
+    # EXPECTANCY_GATE_ENABLED (run-6 default OFF; legacy alias EXPECTANCY_GATE):
+    # off = the orchestrator still COMPUTES the negative-family set each cycle
+    # and logs 'Expectancy gate (off): would have armed against ...' so the
+    # next review can see what it would have blocked, but nothing is rejected.
+    # Run-6 freezes the loop: the gate judged families off the same tiny,
+    # self-selected samples it was shaping (Aug-25 review, R3).
+    expectancy_gate_enabled: bool = False
     expectancy_gate_min_trips: int = 8     # closed trips before a family is judged
     expectancy_gate_window_days: int = 14  # trailing window for the read
+    # --- corroboration gate (Aug 12-21 forensic review): insider-cited
+    # entries ran -$18,681 across 13 trades, and every single-soft-signal
+    # starter (QNT, LFTO, INTC, F, AVBC) failed fast. Conviction floors
+    # provably cannot express this — the autotune sweeps moved 0 trades at
+    # every candidate floor. A FRESH name whose cited signal set is exactly
+    # ONE soft family (insider / congress / options_flow) with zero
+    # fundamentals/news/technical corroboration deploys at the starter-
+    # haircut fraction AND needs the composite at/above the bar to enter at
+    # all (fails open on a missing composite — best-effort feed, not a
+    # required one). Top-ups exempt; the expectancy gate stays the family-
+    # level backstop. ---
+    corroboration_gate_enabled: bool = True   # CORROBORATION_GATE_ENABLED
+    corroboration_min_composite: float = 1.25 # composite bar for a solo soft signal
     # Red-day rotation release (Jul 29: the guard held NOK's -4.8% exit open
     # ~2h into a losing session). On a day the BOOK is losing, a loss-cut the
     # model asks for is defense, not lukewarm churn — the guard yields to any
@@ -351,6 +457,18 @@ class RiskLimits:
     exposure_ladder_enabled: bool = True
     exposure_neutral_pct: float = 60.0     # gross-exposure cap in a neutral regime
     exposure_risk_off_pct: float = 30.0    # gross-exposure cap in risk-off
+    # --- BOOK BETA CAP (run-6 item 7b, Aug 25 review §6.6): the gross cap
+    # bounds dollars, not exposure — a 60%-invested book of beta-2 names is
+    # 1.2x the market. Next to the gross cap the buy path now computes the
+    # POST-TRADE book SPY-beta (portfolio/beta.py: 60-day, shrunk 0.8 toward
+    # 1.0, sum(w_i * beta_i)) and RESIZES the buy so it stays <= this cap,
+    # rejecting when even the min order breaches; logs 'BOOK BETA CAP: SYM
+    # 6.0% -> 3.2% (book 1.31 -> 1.20)' with the counterfactual. An unknown
+    # candidate beta is assumed 1.0 (logged). 0 = off; the gate is also
+    # inert when the orchestrator has no book reading this cycle (fail
+    # open — data outages must not freeze buying). Run-6 DEFAULT 1.2.
+    # MAX_BOOK_BETA_SPY
+    max_book_beta_spy: float = 1.2
 
 
 @dataclass(frozen=True)
@@ -371,6 +489,19 @@ class ScreenerConfig:
     # names are never forced in. reserve=0 → pure |score| ranking (old behavior).
     bearish_reserve: int = 4
     bearish_reserve_bar: float = 0.4
+    # Run-6 universe hygiene (Aug 25 review): 48% of slate exclusions were
+    # sub-$5 names that had already consumed a capped slot, per-symbol signal
+    # fetches and prompt tokens before the orchestrator's liquidity floor
+    # rejected them. With price_floor_pre_cap ON the aggregator batch-reads
+    # last prices for the merged candidate set (ONE broker call) and drops
+    # names under risk.min_trade_price_usd BEFORE the max_candidates cap and
+    # the bearish reserve. Unknown prices fail open (the later floor still
+    # applies). Run-6 default = on.  SCREENER_PRICE_FLOOR_PRE_CAP
+    price_floor_pre_cap: bool = True
+    # Optional average-dollar-volume floor (last 20 daily bars, ONE batched
+    # bars call) applied at the same point; 0 = off (run-6 default).
+    # SCREENER_MIN_ADV_USD
+    min_adv_usd: float = 0.0
 
 
 @dataclass(frozen=True)
@@ -485,7 +616,46 @@ class Config:
     hedge_etf: str = ""                    # HEDGE_ETF (e.g. PSQ / SH; "" = off)
     auto_hedge_ratio: float = 0.30         # hedge notional / net long exposure
     auto_hedge_min_cycles: int = 2         # falling cycles before arming (and clearing)
-    auto_hedge_max_pct: float = 15.0       # hedge ceiling as % of equity
+    # Hedge ceiling as % of equity. Run-6 (item 7c) raised the DEFAULT from
+    # 15 to 40: a beta-sized hedge on a 1.4-beta, 75%-invested book needs
+    # ~40% of equity in a 1x inverse ETF to reach target 1.0; at 15% the
+    # sizer could never close the gap. AUTO_HEDGE_MAX_PCT
+    auto_hedge_max_pct: float = 40.0
+    # --- Run-6 item 7 (Aug 25 review §6.6): BOOK BETA measurement + beta-
+    # sized hedge. book_beta_enabled: measure the book's SPY/QQQ/IWM beta
+    # each decision cycle (ONE 'BOOK BETA:' log line, persisted in
+    # risk_state.json as `book_beta`), feed the buy-path beta cap and the
+    # beta hedge; off = no reading, cap and beta hedge inert. BOOK_BETA_ENABLED
+    book_beta_enabled: bool = True
+    # auto_hedge_mode: 'falling' = the Jul-30 behaviour (arm on the
+    # falling-tape read after auto_hedge_min_cycles, size auto_hedge_ratio x
+    # net-long); 'beta' (run-6 DEFAULT) = size the inverse ETF to
+    # max(0, beta_book_spy - hedge_beta_target) x equity, arming when the
+    # book beta exceeds the target by more than hedge_beta_band for ONE
+    # cycle and unwinding below target - band (hysteresis); the falling-
+    # tape read is kept as a 'tighten the target to hedge_beta_falling_
+    # target' condition. Instrument stays HEDGE_ETF (PSQ vs the QQQ-heavy
+    # book; its SPY-beta ~ -1.1 slightly over-hedges the gap, inside the
+    # band). auto_hedge_max_pct caps both modes. AUTO_HEDGE_MODE
+    auto_hedge_mode: str = "beta"
+    hedge_beta_target: float = 1.0         # HEDGE_BETA_TARGET (book SPY-beta the hedge sizes to)
+    hedge_beta_band: float = 0.15          # HEDGE_BETA_BAND (arm above target+band, unwind below target-band)
+    hedge_beta_falling_target: float = 0.8  # HEDGE_BETA_FALLING_TARGET (target while the tape is falling)
+    # --- BREADTH trigger for the falling-tape defenses (Aug 18 forensic:
+    # -$26,844 at 3.9x SPY down-capture with ELEVEN per-name NAME FALLING
+    # reads in one cycle while every defense slept — _market_falling keyed
+    # ONLY on the index and SPY never breached the intraday trigger). The
+    # core defense / auto-hedge / index-put sanction now ALSO arm when the
+    # BOOK itself is falling: >= breadth_falling_names_min held names carry
+    # the cycle's falling read, or intraday book P/L is at or below
+    # breadth_book_drawdown_pct (% of equity, equity vs last_equity — the
+    # same numbers as the risk layer's daily-loss halt). Whipsaw bounds are
+    # unchanged: auto_hedge_min_cycles persistence and the auto_hedge_max_pct
+    # ceiling apply to whichever source arms the read. 0 disables a leg;
+    # the drawdown knob is sign-agnostic (-1.25 and 1.25 both mean a 1.25%
+    # intraday loss). ---
+    breadth_falling_names_min: int = 3     # BREADTH_FALLING_NAMES_MIN (0 = off)
+    breadth_book_drawdown_pct: float = -1.25  # BREADTH_BOOK_DRAWDOWN_PCT (0 = off)
     # --- PUT LIQUIDITY PROXY (Aug 14, window-end ship): the bearish slate
     # surfaces micro-caps whose own chains fail the OI/spread liquidity floor
     # — in the Aug 3-14 window every model-proposed put (EXTR, TDC) died on
@@ -496,6 +666,18 @@ class Config:
     # Deterministic like the auto-hedge; every other option gate (DTE,
     # premium caps, slots, the proxy's own liquidity) still applies. "" = off.
     put_proxy_etf: str = "IWM"             # PUT_PROXY_ETF ("" = off)
+    # Run-6 (Aug 25 review, item 3e): the proxy put re-expresses a SINGLE-
+    # NAME bearish read as an INDEX short, which is only sound when the
+    # thesis transfers. With this on, _propose_proxy_put requires one of:
+    # the proxy ETF below its 50-day SMA, the breadth trigger armed this
+    # cycle, or >= 2 bearish slate names in the blocked name's sector;
+    # otherwise the spread is sized at 0.25% of equity (max_premium_usd
+    # clamp). The proxy also loses its per-underlying premium-cap exemption
+    # (it sits under PER_UNDERLYING_PREMIUM_PCT like every other debit; the
+    # falling-market index put keeps its exemption). Run-6 DEFAULT: on.
+    # PROXY_PUT_THESIS_GATE=off restores the Aug-14 behaviour.
+    proxy_put_thesis_gate: bool = True     # PROXY_PUT_THESIS_GATE
+    proxy_put_untransferred_pct: float = 0.25  # PROXY_PUT_UNTRANSFERRED_PCT (% equity when the thesis does not transfer)
     # --- DEFENSIVE CORE (Jul 30 review): while the core defense is active the
     # QQQ fill pauses — but the freed/idle cash then earns nothing. Redirect
     # the core fill into a short-duration T-bill ETF instead (SGOV/BIL), and
@@ -528,6 +710,53 @@ class Config:
     # and fold its one-line lessons back into the next day's decision prompt.
     postmortem_enabled: bool = True
     postmortem_max_lessons: int = 15
+    # Run-6 item 6 — freeze the self-referential feedback loops.
+    #   CURATED_LESSONS_INJECT (run-6 default OFF): whether the nightly
+    #     post-mortem's curated lessons file is injected into the decision
+    #     prompt. Post-mortems keep WRITING the file either way; the LLM just
+    #     stops reading its own last-night verdicts (Aug-24's 'cap QQQ'
+    #     lesson argued with the core-position design). When ON, lines
+    #     already marked [SUPERSEDED ...] are not rendered.
+    #   TRACK_RECORD_MIN_TRIPS (run-6 default 20; was 2): closed round-trips
+    #     a cited source needs before it appears in the prompt's 'Track
+    #     record' block. Two trips is a coin flip presented as a prior.
+    curated_lessons_inject: bool = False
+    track_record_min_trips: int = 20
+    # Run-6 measurement plumbing (item 1 — no strategy effect). Each knob
+    # only changes what gets MEASURED/RECORDED; run-6 default = on.
+    #   POSTMORTEM_OPTION_MARKS: nightly post-mortem marks OPEN option groups
+    #     close-to-close from option daily bars (broker.option_close_series)
+    #     and reports 'unmarked' explicitly when it can't; off = legacy
+    #     realized-only option lines.
+    postmortem_option_marks: bool = True
+    #   EQUITY_CLOSE_FIXED_STAMP: write the day's equity_history row ONCE, at
+    #     the first closed-market tick after 16:00 ET, basis='close', and never
+    #     overwrite it (Aug 24/25 rows were re-stamped with after-hours marks
+    #     every closed tick). off = legacy overwrite-every-closed-tick.
+    equity_close_fixed_stamp: bool = True
+    #   LEDGER_FILL_PRICES: on FILLED confirmation, write the broker's
+    #     filled_avg_price / filled qty / fill time onto the ledger row
+    #     (fill_price / fill_qty / fill_ts) and log them in the FILLED line.
+    ledger_fill_prices: bool = True
+    #   FEEDS_DEGRADED_MODES: the per-cycle FEEDS line reports degraded modes
+    #     explicitly — an EDGAR Form-4 pull that returned 0 rows after a
+    #     timeout/HTTP error counts as UNHEALTHY for that cycle, and the line
+    #     carries 'news=vader-fallback' once news.py has latched the Finnhub
+    #     403 (Aug 25: FEEDS said 5/5 while news was VADER all run and EDGAR
+    #     returned 0 filings twice). off = legacy enabled-only line.
+    feeds_degraded_modes: bool = True
+    #   RESET_CARRY_CHURN (run-6 default off): whether a reset / fresh cycle
+    #     carries the OLD account's churn memory (exit clocks + exit prices,
+    #     buy clocks + convictions, loss streaks) into the fresh risk state.
+    #     The carry was added Jul 27-28 (NU: the reset wiped its exit clock
+    #     and price, the next day's re-buy sailed through the cooldown and
+    #     the price guard into a -4.1% stop). Under a PRE-REGISTERED clean
+    #     window that protection is a confound: run-5 day 1 carried run-4
+    #     cooldowns/exit prices into a brand-new $1M account (SOFI/SMCI/NOK
+    #     slate-excluded all day, SPCX rejected day 2 against a run-4 exit).
+    #     off = a fresh cycle starts with EMPTY clocks, exit prices and
+    #     streaks; on = the Jul-28 carry behaviour.
+    reset_carry_churn: bool = False
     # Weekly ledger-driven auto-tune report (Jul 22 upgrade): a deterministic,
     # no-LLM replay of the ledger + decisions journal against the entry-quality
     # risk knobs, fired once per ET weekend. Report-only — writes
@@ -535,6 +764,22 @@ class Config:
     autotune_enabled: bool = True
     autotune_days: int = 14
     autotune_min_sample: int = 5
+    # Run-6 item 4b: per-(symbol, kind) signal score history retention.
+    # SIGNAL_HISTORY_RETENTION_DAYS (default 120, was 14) and
+    # SIGNAL_HISTORY_MAX_POINTS (default 480 = ~4 points/day, was 48) size
+    # state/signal_history.json so scripts/signal_ic.py can accumulate the
+    # >= 60 dates the review requires before any composite re-weighting.
+    # Pure measurement — the trend annotation uses the same series.
+    signal_history_retention_days: float = 120.0
+    # Review fix (Aug 26): lag (days) the Finnhub Form-4 provider's signals
+    # carry in the composite. The taxonomy change moved them from CONGRESS
+    # (30d, weight ~0.23) to INSIDER (2d, ~0.9) — a ~4x re-weighting the
+    # run-6 contract forbids before >= 60 IC dates. Run-6 DEFAULT 30.0 keeps
+    # the pre-taxonomy weight; lower to 2.0 once the IC read earns it.
+    # Mirrors signals.history.SOURCE_LAG_DAYS['finnhub-insider'] (env
+    # FINNHUB_INSIDER_LAG_DAYS, read there at import).
+    finnhub_insider_lag_days: float = 30.0
+    signal_history_max_points: int = 480
     # C.4 options-chain positioning signal: per-name ATM IV, put-call IV skew
     # and put/call open-interest lean from Alpaca's option snapshots (the free
     # 'indicative' feed the execution path already uses — no extra key). Feeds
@@ -622,9 +867,19 @@ def load_config() -> Config:
         reconcile_halt_enabled=_flag("RECONCILE_HALT", "on"),
         postmortem_enabled=_flag("POSTMORTEM_ENABLED", "on"),
         postmortem_max_lessons=_i("POSTMORTEM_MAX_LESSONS", 15),
+        curated_lessons_inject=_flag("CURATED_LESSONS_INJECT", "off"),
+        track_record_min_trips=_i("TRACK_RECORD_MIN_TRIPS", 20),
+        postmortem_option_marks=_flag("POSTMORTEM_OPTION_MARKS", "on"),
+        equity_close_fixed_stamp=_flag("EQUITY_CLOSE_FIXED_STAMP", "on"),
+        ledger_fill_prices=_flag("LEDGER_FILL_PRICES", "on"),
+        feeds_degraded_modes=_flag("FEEDS_DEGRADED_MODES", "on"),
+        reset_carry_churn=_flag("RESET_CARRY_CHURN", "off"),
         autotune_enabled=_flag("AUTOTUNE_ENABLED", "on"),
         autotune_days=_i("AUTOTUNE_DAYS", 14),
         autotune_min_sample=_i("AUTOTUNE_MIN_SAMPLE", 5),
+        signal_history_retention_days=_f("SIGNAL_HISTORY_RETENTION_DAYS", 120.0),
+        finnhub_insider_lag_days=_f("FINNHUB_INSIDER_LAG_DAYS", 30.0),
+        signal_history_max_points=_i("SIGNAL_HISTORY_MAX_POINTS", 480),
         options_chain_signal=_flag("OPTIONS_CHAIN_SIGNAL"),
         options_chain_max_symbols=_i("OPTIONS_CHAIN_MAX_SYMBOLS", 25),
         state_file=os.getenv("STATE_FILE", "state/risk_state.json"),
@@ -712,6 +967,13 @@ def load_config() -> Config:
             min_option_premium=_f("MIN_OPTION_PREMIUM", 0.10),
             max_option_contracts=int(_f("MAX_OPTION_CONTRACTS", 50.0)),
             option_direction_gate=_flag("OPTION_DIRECTION_GATE", "on"),
+            options_single_name_bullish=_flag("OPTIONS_SINGLE_NAME_BULLISH", "off"),
+            # Per-underlying premium concentration cap (Aug 12-21: AMZN piled
+            # ~$29.8k of premium into ONE underlying, -$14,956).
+            per_underlying_premium_pct=_f("PER_UNDERLYING_PREMIUM_PCT", 0.5),
+            option_exit_max_spread_pct=_f("OPTION_EXIT_MAX_SPREAD_PCT", 10.0),
+            option_stop_confirm_ticks=int(_f("OPTION_STOP_CONFIRM_TICKS", 2.0)),
+            option_stop_open_mute_min=_f("OPTION_STOP_OPEN_MUTE_MIN", 5.0),
             # R.1 vol-scaled stops: off until the --sweep-stops evidence says
             # otherwise for this account's basket; flip in .env when it does.
             vol_stops_enabled=_flag("VOL_STOPS_ENABLED"),
@@ -764,6 +1026,8 @@ def load_config() -> Config:
             composite_gate_enabled=_flag("COMPOSITE_GATE_ENABLED", "off"),
             min_composite_score=_f("MIN_COMPOSITE_SCORE", 0.0),
             composite_perf_min_trips=_i("COMPOSITE_PERF_MIN_TRIPS", 3),
+            composite_include_discovery=_flag("COMPOSITE_INCLUDE_DISCOVERY", "off"),
+            composite_perf_weights=_flag("COMPOSITE_PERF_WEIGHTS", "off"),
             # Rotation loss guard (see the RiskLimits field notes).
             rotation_loss_guard_enabled=_flag("ROTATION_LOSS_GUARD_ENABLED", "on"),
             rotation_guard_min_loss_pct=_f("ROTATION_GUARD_MIN_LOSS_PCT", 4.0),
@@ -782,22 +1046,42 @@ def load_config() -> Config:
             starter_full_conviction=_f("STARTER_FULL_CONVICTION", 0.65),
             starter_haircut_mult=_f("STARTER_HAIRCUT_MULT", 0.5),
             stop_cover_extension=_flag("STOP_COVER_EXTENSION", "on"),
+            # Run-6 item 2: 'events_only' (default) | 'full' (legacy).
+            llm_sell_authority=_choice(
+                "LLM_SELL_AUTHORITY", "events_only", ("events_only", "full")),
+            # Review fix (Aug 26): single-name PUTS into a print. Run-6
+            # DEFAULT on = puts blocked like every other single-name debit.
+            earnings_blackout_puts=_flag("OPTIONS_BLACKOUT_PUTS", "on"),
             overext_gap_pct=_f("OVEREXT_GAP_PCT", 15.0),
             loss_streak_guard=_i("LOSS_STREAK_GUARD", 2),
             # All-weather upgrades (Jul 30 review).
-            expectancy_gate_enabled=_flag("EXPECTANCY_GATE", "on"),
+            # Run-6 item 6: default OFF (report-only). EXPECTANCY_GATE_ENABLED
+            # wins; the legacy EXPECTANCY_GATE name is honoured when the new
+            # one is absent so an old .env line still means what it said.
+            expectancy_gate_enabled=_flag(
+                "EXPECTANCY_GATE_ENABLED",
+                os.getenv("EXPECTANCY_GATE", "off")),
             expectancy_gate_min_trips=_i("EXPECTANCY_GATE_MIN_TRIPS", 8),
             expectancy_gate_window_days=_i("EXPECTANCY_GATE_WINDOW_DAYS", 14),
+            # Corroboration gate on single-soft-signal starters (Aug 12-21
+            # forensic review; see the RiskLimits field notes).
+            corroboration_gate_enabled=_flag("CORROBORATION_GATE_ENABLED", "on"),
+            corroboration_min_composite=_f("CORROBORATION_MIN_COMPOSITE", 1.25),
             rotation_guard_red_day_release=_flag(
                 "ROTATION_GUARD_RED_DAY_RELEASE", "on"
             ),
             put_breakdown_ext_pct=_f("PUT_BREAKDOWN_EXT_PCT", 5.0),
             exposure_ladder_enabled=_flag("EXPOSURE_LADDER", "on"),
             exposure_neutral_pct=_f("EXPOSURE_NEUTRAL_PCT", 60.0),
+            max_book_beta_spy=_f("MAX_BOOK_BETA_SPY", 1.2),
             exposure_risk_off_pct=_f("EXPOSURE_RISK_OFF_PCT", 30.0),
         ),
         screener=ScreenerConfig(
             enabled=_flag("SCREENER_ENABLED", "on"),
+            # Default deliberately EXCLUDES robinhood_scans (still registered;
+            # a .env SCREENER_SOURCES may re-enable it): with no saved RH scans
+            # it logs 'Robinhood scans: none saved' every cycle and was counted
+            # as a healthy feed (run-6 hygiene, Aug 25 review).
             sources=tuple(
                 s.strip().lower()
                 for s in os.getenv(
@@ -816,6 +1100,8 @@ def load_config() -> Config:
             insider_scan_limit=_i("INSIDER_SCAN_LIMIT", 100),
             bearish_reserve=_i("BEARISH_RESERVE", 4),
             bearish_reserve_bar=_f("BEARISH_RESERVE_BAR", 0.4),
+            price_floor_pre_cap=_flag("SCREENER_PRICE_FLOOR_PRE_CAP", "on"),
+            min_adv_usd=_f("SCREENER_MIN_ADV_USD", 0.0),
         ),
         alerts=load_alert_config(os.getenv),
         # Core-satellite fill (Todo 1.6). CORE_ETF unset/"" disables it entirely;
@@ -832,8 +1118,17 @@ def load_config() -> Config:
         hedge_etf=os.getenv("HEDGE_ETF", "").strip().upper(),
         auto_hedge_ratio=_f("AUTO_HEDGE_RATIO", 0.30),
         auto_hedge_min_cycles=_i("AUTO_HEDGE_MIN_CYCLES", 2),
-        auto_hedge_max_pct=_f("AUTO_HEDGE_MAX_PCT", 15.0),
+        auto_hedge_max_pct=_f("AUTO_HEDGE_MAX_PCT", 40.0),
+        book_beta_enabled=_flag("BOOK_BETA_ENABLED", "on"),
+        auto_hedge_mode=_choice("AUTO_HEDGE_MODE", "beta", ("beta", "falling")),
+        hedge_beta_target=_f("HEDGE_BETA_TARGET", 1.0),
+        hedge_beta_band=_f("HEDGE_BETA_BAND", 0.15),
+        hedge_beta_falling_target=_f("HEDGE_BETA_FALLING_TARGET", 0.8),
+        breadth_falling_names_min=_i("BREADTH_FALLING_NAMES_MIN", 3),
+        breadth_book_drawdown_pct=_f("BREADTH_BOOK_DRAWDOWN_PCT", -1.25),
         put_proxy_etf=os.getenv("PUT_PROXY_ETF", "IWM").strip().upper(),
+        proxy_put_thesis_gate=_flag("PROXY_PUT_THESIS_GATE", "on"),
+        proxy_put_untransferred_pct=_f("PROXY_PUT_UNTRANSFERRED_PCT", 0.25),
         defensive_core_etf=os.getenv("DEFENSIVE_CORE_ETF", "").strip().upper(),
         track_record_file=os.getenv("TRACK_RECORD_FILE", "").strip(),
     )

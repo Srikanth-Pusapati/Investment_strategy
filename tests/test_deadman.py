@@ -134,6 +134,148 @@ def test_attempt_restart_panel_down_reports_failure(monkeypatch):
     assert out is not None and "auto-restart FAILED" in out
 
 
+def test_flatten_hold_missing_fresh_stale():
+    marker = Path(tempfile.mkdtemp()) / "flatten.hold"
+    assert deadman.flatten_hold_active(marker) is False        # missing
+    marker.touch()
+    assert deadman.flatten_hold_active(marker) is True         # fresh
+    old = time.time() - (deadman.FLATTEN_HOLD_STALE_S + 60)
+    os.utime(marker, (old, old))
+    assert deadman.flatten_hold_active(marker) is False        # >2h = debris
+    # boundary via injected clock: 1s under the cutoff is still active
+    marker.touch()
+    assert deadman.flatten_hold_active(
+        marker, now_ts=marker.stat().st_mtime + deadman.FLATTEN_HOLD_STALE_S - 1
+    ) is True
+
+
+def test_main_stands_down_during_flatten_hold(monkeypatch):
+    # Marker fresh -> deadman must NOT diagnose/kill/restart/page, just log
+    # its 'skip (flatten hold)' heartbeat and exit 0.
+    def _must_not_run(*a, **k):
+        raise AssertionError("must not diagnose/restart during a flatten hold")
+
+    monkeypatch.setattr(deadman, "market_hours", lambda now=None: True)
+    monkeypatch.setattr(deadman, "flatten_hold_active", lambda *a, **k: True)
+    monkeypatch.setattr(deadman, "diagnose", _must_not_run)
+    monkeypatch.setattr(deadman, "attempt_restart", _must_not_run)
+    lines = []
+    import builtins
+    real_print = builtins.print
+    monkeypatch.setattr(
+        builtins, "print",
+        lambda *a, **k: lines.append(" ".join(str(x) for x in a)),
+    )
+    try:
+        rc = deadman.main()
+    finally:
+        builtins.print = real_print
+    assert rc == 0
+    assert any("skip (flatten hold)" in ln for ln in lines)
+
+
+def test_main_proceeds_when_no_flatten_hold(monkeypatch):
+    # No (or stale) marker -> normal healthy path still prints 'ok'.
+    monkeypatch.setattr(deadman, "market_hours", lambda now=None: True)
+    monkeypatch.setattr(deadman, "flatten_hold_active", lambda *a, **k: False)
+    monkeypatch.setattr(deadman, "diagnose", lambda *a, **k: None)
+    lines = []
+    import builtins
+    real_print = builtins.print
+    monkeypatch.setattr(
+        builtins, "print",
+        lambda *a, **k: lines.append(" ".join(str(x) for x in a)),
+    )
+    try:
+        rc = deadman.main()
+    finally:
+        builtins.print = real_print
+    assert rc == 0
+    assert any(ln.endswith(" ok") for ln in lines)
+
+
+def test_hold_marker_path_matches_flatten_script():
+    # deadman and flatten_and_restart must agree on the marker location or
+    # the hold-off silently never engages.
+    scripts_dir = os.path.join(
+        os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "scripts")
+    if scripts_dir not in sys.path:
+        sys.path.insert(0, scripts_dir)
+    import flatten_and_restart  # noqa: E402
+    assert flatten_and_restart.HOLD_MARKER == deadman.FLATTEN_HOLD_FILE
+    assert deadman.FLATTEN_HOLD_FILE.name == "flatten.hold"
+    assert deadman.FLATTEN_HOLD_FILE.parent.name == "state"
+
+
+def _flatten_mod(monkeypatch):
+    """Import flatten_and_restart with the marker redirected to a temp path
+    (NEVER the real state/flatten.hold — touching that would stand the live
+    dead-man down) and the .env / clock / wait dependencies stubbed inert."""
+    scripts_dir = os.path.join(
+        os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "scripts")
+    if scripts_dir not in sys.path:
+        sys.path.insert(0, scripts_dir)
+    import flatten_and_restart as fr  # noqa: E402
+    marker = Path(tempfile.mkdtemp()) / "flatten.hold"
+    monkeypatch.setattr(fr, "HOLD_MARKER", marker)
+    monkeypatch.setattr(
+        fr, "env_val", lambda n: "https://paper-api.alpaca.markets/v2")
+    monkeypatch.setattr(fr, "next_run_time", lambda: dt.datetime.now(fr.ET))
+    return fr, marker
+
+
+def test_flatten_hold_marker_choreography(monkeypatch):
+    # The marker must NOT exist during the (possibly hours-long) open-wait —
+    # the dead-man keeps guarding until the flatten actually begins — and
+    # MUST exist while the flatten work runs, and be gone after the return.
+    fr, marker = _flatten_mod(monkeypatch)
+    seen = {}
+
+    def _wait(target):
+        seen["during_wait"] = marker.exists()
+
+    def _work():
+        seen["during_work"] = marker.exists()
+        return 0
+
+    monkeypatch.setattr(fr, "wait_until", _wait)
+    monkeypatch.setattr(fr, "_flatten_reset_restart", _work)
+    rc = fr.main()
+    assert rc == 0
+    assert seen["during_wait"] is False    # deadman still armed for the wait
+    assert seen["during_work"] is True     # hold raised when the flatten began
+    assert not marker.exists()             # removed on the normal return path
+
+
+def test_flatten_hold_marker_removed_when_flatten_raises(monkeypatch):
+    # A flatten that dies mid-work must still drop the marker in its finally —
+    # otherwise the dead-man is muted for 2h with the bot down.
+    fr, marker = _flatten_mod(monkeypatch)
+
+    def _boom():
+        assert marker.exists()
+        raise RuntimeError("mid-flatten crash")
+
+    monkeypatch.setattr(fr, "wait_until", lambda target: None)
+    monkeypatch.setattr(fr, "_flatten_reset_restart", _boom)
+    try:
+        fr.main()
+        raise AssertionError("main() swallowed the flatten crash")
+    except RuntimeError:
+        pass
+    assert not marker.exists()             # finally removed it anyway
+
+
+def test_flatten_hold_marker_removed_on_failure_exit_code(monkeypatch):
+    # Non-zero return (could-not-flatten path) is still a normal exit — the
+    # marker must not survive it either.
+    fr, marker = _flatten_mod(monkeypatch)
+    monkeypatch.setattr(fr, "wait_until", lambda target: None)
+    monkeypatch.setattr(fr, "_flatten_reset_restart", lambda: 1)
+    assert fr.main() == 1
+    assert not marker.exists()
+
+
 def _run_all():
     import types
     monkey = types.SimpleNamespace(_saved=[])

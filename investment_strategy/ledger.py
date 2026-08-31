@@ -17,6 +17,8 @@ from __future__ import annotations
 
 import json
 import logging
+import re
+import threading
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
@@ -29,6 +31,21 @@ log = logging.getLogger("ledger")
 
 # state/ is already gitignored — local trade history never gets committed.
 DEFAULT_LEDGER_PATH = Path("state") / "trades.jsonl"
+
+# OCC contract symbols (AMZN260918C00230000) — used by the Aug-23 measurement-
+# integrity fix to key option rows by their contract instead of laundering
+# premium P&L into the underlying ticker's history. Kept local instead of
+# importing execution.options.occ_symbol, which would drag the alpaca SDK into
+# every ledger consumer (tests, scripts, dashboard).
+_OCC_RE = re.compile(r"\b([A-Z][A-Z0-9.]{0,5}\d{6}[CP]\d{8})\b")
+
+
+def _occ_symbol(underlying: str, expiry: str, strike: float, right: str) -> str:
+    """OCC contract symbol (AAPL, 2026-01-16, 150, call -> AAPL260116C00150000).
+    Mirror of execution.options.occ_symbol — see _OCC_RE note for why."""
+    d = datetime.strptime(expiry, "%Y-%m-%d")
+    cp = "C" if right.lower().startswith("c") else "P"
+    return f"{underlying.upper()}{d:%y%m%d}{cp}{int(round(strike * 1000)):08d}"
 
 
 def _now() -> datetime:
@@ -72,6 +89,31 @@ class TradeRecord(BaseModel):
                                       # | time | thesis_decay | regime_trim | scale
                                       # | bracket_stop | bracket_take | external (F.1 backfill)
     option_strategy: Optional[str] = None
+    # OCC ledgering (Aug-23 measurement integrity): option rows key `symbol`
+    # by the OCC contract when the structure is a single leg, so attribution /
+    # autotune see options as their own bucket instead of blending premium P&L
+    # into the underlying's equity history. Multi-leg structures keep the
+    # underlying as the row key (no single OCC names a spread, and the
+    # watchdog ledgers group exits under the underlying). Either way the
+    # underlying ticker survives here and every leg lives in occ_symbols.
+    underlying: Optional[str] = None
+    occ_symbols: list[str] = Field(default_factory=list)
+    # Leg direction per occ_symbols entry ("buy" | "sell"), same order (run-6
+    # item 1a): lets the post-mortem sign each leg when marking a spread
+    # close-to-close. Empty on rows predating the field (then a multi-leg
+    # group is reported 'unmarked' rather than guessed).
+    occ_sides: list[str] = Field(default_factory=list)
+    # Broker-confirmed fill (run-6 item 1e): entry_price is the DECISION quote;
+    # these are what the broker actually reported when the order was seen
+    # FILLED at reconcile (filled_avg_price, filled qty, filled_at). None until
+    # confirmed / on rows predating the field. realized_pl semantics unchanged.
+    fill_price: Optional[float] = None
+    fill_qty: Optional[float] = None
+    fill_ts: Optional[datetime] = None
+    # Set only by repair scripts on rows they rewrote (e.g.
+    # scripts/repair_mleg_ledger_rows.py) — documents why a row's numbers were
+    # changed and marks informational duplicates. Never set by live code.
+    repair_note: Optional[str] = None
     order_id: Optional[str] = None
     # Deterministic weighted signal index at entry (buys; signals/composite.py).
     # None on sells and on records predating the composite — lets future
@@ -121,8 +163,24 @@ class TradeRecord(BaseModel):
         entry_signals: Optional[list[str]] = None,
     ) -> "TradeRecord":
         p = decision.proposal
+        # OCC ledgering (Aug-23): resolve every leg's OCC symbol from the
+        # proposal so the row itself says WHICH contracts were bought. A
+        # single-leg structure is keyed by its contract; a spread keeps the
+        # underlying as the key (see the field comment on `underlying`).
+        occs: list[str] = []
+        sides: list[str] = []
+        for leg in p.option_legs:
+            try:
+                occs.append(_occ_symbol(p.symbol, leg.expiry, leg.strike, leg.right))
+                side = getattr(leg, "side", None)
+                sides.append(str(getattr(side, "value", side) or "buy").lower())
+            except (ValueError, AttributeError, TypeError):
+                pass  # malformed leg spec — keep the row keyed by underlying
+        if len(sides) != len(occs):
+            sides = []
+        symbol = occs[0] if (len(occs) == 1 and len(p.option_legs) == 1) else p.symbol
         return cls(
-            symbol=p.symbol, action=p.action.value, instrument="option",
+            symbol=symbol, action=p.action.value, instrument="option",
             qty=decision.approved_qty, entry_price=premium,
             cost_usd=decision.approved_notional,
             conviction=p.conviction,
@@ -132,6 +190,7 @@ class TradeRecord(BaseModel):
             entry_signals=entry_signals or [],
             verdict=decision.verdict.value, risk_note=decision.reason,
             option_strategy=p.option_strategy.value if p.option_strategy else None,
+            underlying=p.symbol, occ_symbols=occs, occ_sides=sides,
             order_id=order_id,
         )
 
@@ -161,6 +220,8 @@ class TradeRecord(BaseModel):
         exit_reason: str = "decision", instrument: str = "equity",
         ts: Optional[datetime] = None, exit_price: Optional[float] = None,
         composite_score: Optional[float] = None,
+        underlying: Optional[str] = None,
+        occ_symbols: Optional[list[str]] = None,
     ) -> "TradeRecord":
         """`ts` overrides the record time — the exchange-exit backfill (F.1)
         stamps the order's actual FILL time so attribution's chronological
@@ -168,13 +229,30 @@ class TradeRecord(BaseModel):
         backfill noticed it. `exit_price` is the sell's fill/quote price —
         record it whenever known so FIFO lot P&L (GA-2.5) has a real basis.
         `composite_score` is the name's weighted composite at exit — recorded so
-        sell rows aren't blind to it (buys already carry it)."""
+        sell rows aren't blind to it (buys already carry it).
+
+        Option sells (Aug-23 OCC ledgering): callers that don't pass
+        `occ_symbols` explicitly (the watchdog predates the field) get them
+        parsed out of the rationale, whose fixed format lists the group's OCC
+        contracts — so option exit rows always name their contracts, and
+        TradeLedger.record() can re-key a single-leg exit onto the same OCC
+        symbol its entry was ledgered under."""
+        if instrument == "option":
+            if occ_symbols is None:
+                occ_symbols = _OCC_RE.findall((rationale or "").upper())
+            if underlying is None:
+                # An OCC symbol is <underlying> + 15 chars (yymmdd C/P strike).
+                underlying = (
+                    symbol[:-15] if symbol and _OCC_RE.fullmatch(symbol.strip())
+                    else symbol
+                )
         kwargs: dict = dict(
             symbol=symbol, action="sell", instrument=instrument, qty=qty,
             rationale=rationale, key_signals=key_signals or [], order_id=order_id,
             realized_pl_pct=realized_pl_pct, realized_pl=realized_pl,
             exit_reason=exit_reason, exit_price=exit_price,
             composite_score=composite_score,
+            underlying=underlying, occ_symbols=occ_symbols or [],
         )
         if ts is not None:
             kwargs["ts"] = ts
@@ -205,13 +283,22 @@ class TradeRecord(BaseModel):
 class TradeLedger:
     """Append-only JSON-Lines ledger. One file, one record per line."""
 
+    # One process-wide lock: record() appends from the decision AND watchdog
+    # threads, and set_fill() rewrites the file in place — the two must not
+    # interleave (a torn append inside a rewrite would lose a row).
+    _io_lock = threading.Lock()
+
     def __init__(self, path: Path | str = DEFAULT_LEDGER_PATH):
         self.path = Path(path)
 
     def record(self, rec: TradeRecord) -> None:
         try:
+            checked = self._validate_sell(rec)
+            if checked is None:
+                return  # rejected — the loud log already fired
+            rec = checked
             self.path.parent.mkdir(parents=True, exist_ok=True)
-            with self.path.open("a", encoding="utf-8") as fh:
+            with self._io_lock, self.path.open("a", encoding="utf-8") as fh:
                 fh.write(rec.model_dump_json() + "\n")
             # Sells carry no cost_usd; show the exit proceeds instead so the log
             # doesn't read "SELL MXL qty=12 $0" for a $1,200 close.
@@ -222,6 +309,132 @@ class TradeLedger:
                      rec.action.upper(), rec.symbol, rec.qty, value)
         except Exception as e:  # never let logging break the trade loop
             log.warning("Ledger write failed for %s: %s", rec.symbol, e)
+
+    def set_fill(
+        self, order_id: str, fill_price: float, fill_qty: float,
+        fill_ts: Optional[datetime] = None,
+    ) -> bool:
+        """Stamp the broker-confirmed fill (run-6 item 1e) onto the buy/sell
+        row(s) carrying `order_id`. The ONLY in-place edit the ledger makes:
+        it touches nothing but fill_price / fill_qty / fill_ts, so every
+        realized/qty/cost number (and effective()'s corrections) stands.
+        Rewrites atomically (tmp + replace) under the append lock. Returns
+        True when at least one row was stamped; False (never raises) when
+        the order id is unknown or the file can't be rewritten."""
+        if not order_id or not (fill_price and fill_price > 0):
+            return False
+        try:
+            with self._io_lock:
+                if not self.path.exists():
+                    return False
+                lines = self.path.read_text(encoding="utf-8").splitlines()
+                hit = False
+                out: list[str] = []
+                for line in lines:
+                    raw = line.strip()
+                    if not raw:
+                        continue
+                    try:
+                        obj = json.loads(raw)
+                    except json.JSONDecodeError:
+                        out.append(line)
+                        continue
+                    if (obj.get("order_id") == order_id
+                            and obj.get("action") in ("buy", "sell")):
+                        obj["fill_price"] = round(float(fill_price), 4)
+                        obj["fill_qty"] = float(fill_qty)
+                        # No broker filled_at -> None, never "now": the
+                        # field means the FILL time or nothing (review fix).
+                        obj["fill_ts"] = (
+                            fill_ts.isoformat() if fill_ts is not None else None
+                        )
+                        out.append(json.dumps(obj))
+                        hit = True
+                    else:
+                        out.append(line)
+                if not hit:
+                    return False
+                tmp = self.path.with_suffix(".tmp")
+                tmp.write_text("".join(l + "\n" for l in out), encoding="utf-8")
+                tmp.replace(self.path)
+                return True
+        except Exception as e:  # never let bookkeeping break the trade loop
+            log.warning("Ledger set_fill failed for order %s: %s", order_id, e)
+            return False
+
+    def _validate_sell(self, rec: TradeRecord) -> Optional[TradeRecord]:
+        """Append-path integrity gate (Aug-23). The Aug-17 MLEG unwind wrote
+        SELL rows with symbol="None" (str() of a broker MLEG parent's null
+        symbol) and realized_pl=null — corrupt records that silently skewed
+        every realized-P&L read. Rules, applied to SELL rows only:
+
+        - symbol None/'None'/'' -> REJECT (return None), loud ERROR log.
+        - realized_pl null but derivable (realized_pl_pct + exit_price + qty
+          all present) -> derive it against the pct's own basis, x100 for
+          option contracts. Regime trims / core-defense sells deliberately
+          send realized_pl=None with pct set — deriving keeps those rows AND
+          makes the dollar ledger complete.
+        - realized_pl AND realized_pl_pct both null -> REJECT: a SELL with no
+          outcome at all poisons sum(realized_pl) and attribution.
+        - option sell whose rationale/occ_symbols name exactly ONE contract,
+          when that contract's BUY was ledgered under its OCC symbol -> re-key
+          the row to the OCC so the round-trip pairs (entry rows moved to OCC
+          keys on Aug-23; older entries under the underlying keep pairing
+          because the re-key only fires when an OCC-keyed BUY exists).
+
+        Returns the (possibly updated) record, or None when rejected."""
+        if rec.action != "sell":
+            return rec
+        sym = (rec.symbol or "").strip()
+        if not sym or sym == "None":
+            log.error(
+                "LEDGER REJECT: SELL row with corrupt symbol %r "
+                "(order %s, exit_reason %s) — record refused; fix the caller.",
+                rec.symbol, rec.order_id, rec.exit_reason,
+            )
+            return None
+        if (rec.instrument or "equity") == "option":
+            occs = rec.occ_symbols or _OCC_RE.findall((rec.rationale or "").upper())
+            if occs and len(occs) == 1 and occs[0] != sym:
+                try:
+                    entry_keys = {
+                        r.symbol for r in self.all() if r.action == "buy"
+                    }
+                except Exception:
+                    entry_keys = set()
+                if occs[0] in entry_keys:
+                    log.info(
+                        "Ledger: option SELL %s re-keyed to OCC %s "
+                        "(entry is OCC-ledgered).", sym, occs[0],
+                    )
+                    rec = rec.model_copy(update={
+                        "symbol": occs[0],
+                        "underlying": rec.underlying or sym,
+                        "occ_symbols": occs,
+                    })
+        if rec.realized_pl is None:
+            pct, px, qty = rec.realized_pl_pct, rec.exit_price, rec.qty
+            # (1 + pct/100) must be positive: at pct <= -100 the implied basis
+            # is zero/negative (junk-quote territory) — don't fabricate a $.
+            if (pct is not None and px and px > 0 and qty and qty > 0
+                    and (1.0 + pct / 100.0) > 1e-9):
+                mult = 100.0 if (rec.instrument or "equity") == "option" else 1.0
+                basis = px / (1.0 + pct / 100.0)
+                derived = round((px - basis) * qty * mult, 2)
+                log.info(
+                    "Ledger: derived realized_pl $%.2f for SELL %s from "
+                    "pct/price/qty (caller sent None).", derived, rec.symbol,
+                )
+                rec = rec.model_copy(update={"realized_pl": derived})
+        if rec.realized_pl is None and rec.realized_pl_pct is None:
+            log.error(
+                "LEDGER REJECT: SELL %s (order %s, exit_reason %s) carries no "
+                "realized outcome (realized_pl AND realized_pl_pct null) — "
+                "record refused to protect measurement integrity.",
+                rec.symbol, rec.order_id, rec.exit_reason,
+            )
+            return None
+        return rec
 
     def all(self) -> list[TradeRecord]:
         if not self.path.exists():

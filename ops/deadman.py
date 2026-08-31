@@ -57,6 +57,15 @@ PANEL_RESTART_URL = "http://127.0.0.1:8787/api/restart"
 # minutes even while the 24/7 watchdog keeps logs/bot.log warm. Tighter than the
 # log-mtime threshold; only consulted when the stamp file exists.
 TICK_STAMP_STALE_MINUTES = 5.0
+# scripts/flatten_and_restart.py touches this marker when it BEGINS the flatten
+# (bot intentionally stopped, orders cancelling, positions closing) and removes
+# it after the relaunch. While the marker is fresh the dead-man must stand down
+# completely — an auto-restart mid-flatten would resurrect the bot to trade
+# AGAINST the close-all. A marker older than FLATTEN_HOLD_STALE_S is debris
+# from a crashed flatten (its try/finally never ran) and is ignored, so a
+# failed flatten can never mute the dead-man forever.
+FLATTEN_HOLD_FILE = ROOT / "state" / "flatten.hold"
+FLATTEN_HOLD_STALE_S = 7200.0
 
 
 def stale_log_minutes() -> float:
@@ -129,6 +138,21 @@ def tick_stamp_age_minutes(
         return None
     now = now or dt.datetime.now(dt.timezone.utc)
     return (now.timestamp() - written) / 60.0
+
+
+def flatten_hold_active(marker: Path = FLATTEN_HOLD_FILE,
+                        now_ts: float | None = None) -> bool:
+    """True while a flatten-and-restart is in progress: the marker exists and
+    is younger than FLATTEN_HOLD_STALE_S. A stale marker (crashed flatten that
+    never reached its finally-cleanup) is treated as absent."""
+    import time
+
+    try:
+        mtime = marker.stat().st_mtime
+    except OSError:
+        return False
+    age = (now_ts if now_ts is not None else time.time()) - mtime
+    return age < FLATTEN_HOLD_STALE_S
 
 
 def diagnose(now: dt.datetime | None = None) -> str | None:
@@ -224,8 +248,16 @@ def main() -> int:
         # a launchd job that never fired (the old silent return looked the same).
         print(f"[{now:%Y-%m-%d %H:%M:%S ET}] skip (market closed)", flush=True)
         return 0
-    problem = diagnose()
     stamp = f"[{now:%Y-%m-%d %H:%M:%S ET}]"
+    if flatten_hold_active():
+        # scripts/flatten_and_restart.py is mid-flatten: the bot is down ON
+        # PURPOSE while orders cancel and positions close. Do not kill,
+        # restart, or page — a resurrection here would trade against the
+        # close-all. The heartbeat line below keeps this run distinguishable
+        # from a launchd job that never fired.
+        print(f"{stamp} skip (flatten hold)", flush=True)
+        return 0
+    problem = diagnose()
     if problem is None:
         print(f"{stamp} ok", flush=True)
         return 0

@@ -46,6 +46,12 @@ class _FakeBroker:
         self.option_close_fails = option_close_fails
         self.option_groups_closed: list[list[str]] = []
         self.priced: list[str] = []      # every latest_price() lookup
+        # Exit-mark NBBO per OCC symbol; unset -> a healthy tight two-sided
+        # quote so pre-hardening fixtures count every breach tick.
+        self.option_quotes: dict[str, tuple[float, float]] = {}
+        # Underlying prior-session close per symbol (default 50.0 == the
+        # latest_price stub -> a flat 0% day move for the open-mute gate).
+        self.prior_closes: dict[str, float] = {}
 
     def get_account(self):
         if self.account is None:
@@ -88,6 +94,14 @@ class _FakeBroker:
 
     def is_market_open(self):
         return getattr(self, "market_open", True)
+
+    def option_quote(self, symbol):
+        return self.option_quotes.get(symbol, (1.0, 1.05))
+
+    def daily_close_series(self, symbol, days):
+        from datetime import date, timedelta
+        prior = self.prior_closes.get(symbol, 50.0)
+        return [((date.today() - timedelta(days=2)).isoformat(), prior)]
 
 
 def _cfg(pct, max_hold_days=0.0, time_stop_min_gain_pct=2.0,
@@ -633,12 +647,22 @@ class _FakeLedger:
         self.records.append(rec)
 
 
+def _pin_open_clock(wd, minutes=120.0):
+    """Pin the watchdog's minutes-since-09:30-ET read so premium-stop tests are
+    deterministic no matter when the suite runs (a real 09:3x ET run would
+    otherwise trip the open-mute window)."""
+    wd._minutes_since_open_et = lambda: minutes
+    return wd
+
+
 def test_option_premium_stop_closes_group_and_ledgers_under_underlying():
     state, broker, led = _state(), _FakeBroker([]), _FakeLedger()
-    wd = Watchdog(_cfg(0.0), broker, state=state, ledger=led)
+    wd = _pin_open_clock(Watchdog(_cfg(0.0), broker, state=state, ledger=led))
     put = _opt_leg(occ_symbol("LLY", _exp(30), 700, "put"), qty=2, basis=3.0,
                    price=1.2)                                  # -60% of premium
     wd._check_option_positions([put])
+    assert broker.option_groups_closed == []      # breach tick 1/2: logged only
+    wd._check_option_positions([put])             # consecutive tick 2 confirms
     assert broker.option_groups_closed == [[put.symbol]]
     rec = led.records[-1]
     assert rec.symbol == "LLY"                    # pairs with the entry record
@@ -653,7 +677,8 @@ def test_option_spread_take_closes_both_legs_as_one_group():
     long_put = _opt_leg(occ_symbol("AMD", exp, 160, "put"), qty=2, basis=3.0, price=6.5)
     short_put = _opt_leg(occ_symbol("AMD", exp, 150, "put"), qty=-2, basis=1.0, price=1.5)
     # net premium 600-200=400; net P&L 700-100=600 -> +150% >= +100% take
-    wd._check_option_positions([long_put, short_put])
+    wd._check_option_positions([long_put, short_put])   # take breach tick 1/2
+    wd._check_option_positions([long_put, short_put])   # tick 2 confirms
     assert len(broker.option_groups_closed) == 1               # ONE close order
     assert sorted(broker.option_groups_closed[0]) == sorted(
         [long_put.symbol, short_put.symbol])
@@ -682,10 +707,12 @@ def test_option_within_bounds_left_alone():
 def test_option_close_failure_pages_and_keeps_retrying():
     state, broker = _state(), _FakeBroker([], option_close_fails=True)
     alerts = []
-    wd = Watchdog(_cfg(0.0), broker, state=state,
-                  alerter=SimpleNamespace(critical=lambda k, s, b: alerts.append(k)))
+    wd = _pin_open_clock(Watchdog(
+        _cfg(0.0), broker, state=state,
+        alerter=SimpleNamespace(critical=lambda k, s, b: alerts.append(k))))
     put = _opt_leg(occ_symbol("LLY", _exp(30), 700, "put"), qty=1, basis=3.0, price=1.0)
-    wd._check_option_positions([put])
+    wd._check_option_positions([put])             # breach tick 1/2
+    wd._check_option_positions([put])             # confirmed -> close attempted
     assert alerts == ["option-exit-fail:LLY"]
     assert state.hours_since_exit("LLY") is None    # nothing recorded as closed
 
@@ -700,11 +727,13 @@ def test_option_close_already_resting_skips_redundant_retry_and_no_alert():
     # must read as "already protected," not "failed."
     state, broker = _state(), _FakeBroker([], option_close_fails=True)
     alerts = []
-    wd = Watchdog(_cfg(0.0), broker, state=state,
-                  alerter=SimpleNamespace(critical=lambda k, s, b: alerts.append(k)))
+    wd = _pin_open_clock(Watchdog(
+        _cfg(0.0), broker, state=state,
+        alerter=SimpleNamespace(critical=lambda k, s, b: alerts.append(k))))
     put = _opt_leg(occ_symbol("LLY", _exp(30), 700, "put"), qty=1, basis=3.0, price=1.0)
     put.qty_available = 0.0    # fully reserved by an already-resting close order
-    wd._check_option_positions([put])
+    wd._check_option_positions([put])             # breach tick 1/2
+    wd._check_option_positions([put])             # confirmed -> exit path runs
     assert alerts == []                          # no false page
     assert broker.option_groups_closed == []      # no redundant close attempt
 
@@ -719,7 +748,8 @@ def test_option_close_attempts_when_only_some_legs_are_resting():
     long_put = _opt_leg(occ_symbol("AMD", exp, 160, "put"), qty=2, basis=3.0, price=6.5)
     short_put = _opt_leg(occ_symbol("AMD", exp, 150, "put"), qty=-2, basis=1.0, price=1.5)
     long_put.qty_available = 0.0   # only this leg is reserved so far
-    wd._check_option_positions([long_put, short_put])
+    wd._check_option_positions([long_put, short_put])   # take breach tick 1/2
+    wd._check_option_positions([long_put, short_put])   # tick 2 confirms
     assert len(broker.option_groups_closed) == 1
 
 
@@ -756,6 +786,191 @@ def test_flatten_all_closes_mixed_book_options_first_as_groups():
     assert broker.closed == ["AAPL"]                            # equity flattened
     assert len(broker.option_groups_closed) == 1                # spread as ONE order
     assert sorted(broker.option_groups_closed[0]) == sorted([l.symbol for l in legs])
+
+
+# -- premium-stop mark hardening (Aug 12-21 forensic: HL junk auction quote) -- #
+
+def _breach_call(under="HL", price=1.0):
+    # Long call at -66.7% of premium vs the default -50% stop width.
+    return _opt_leg(occ_symbol(under, _exp(30), 6, "call"), qty=1, basis=3.0,
+                    price=price)
+
+
+def test_option_stop_breach_inside_breach_does_not_fire():
+    # breach -> inside -> breach: the inside tick resets the streak, so the
+    # third tick is a fresh 1/2 and nothing closes — one junk mark can never
+    # fire the stop on its own.
+    state, broker = _state(), _FakeBroker([])
+    wd = _pin_open_clock(Watchdog(_cfg(0.0), broker, state=state))
+    breach, inside = _breach_call(), _breach_call(price=2.9)   # -3.3% = inside
+    wd._check_option_positions([breach])
+    wd._check_option_positions([inside])                       # streak reset
+    wd._check_option_positions([breach])                       # fresh tick 1/2
+    assert broker.option_groups_closed == []
+    wd._check_option_positions([breach])                       # consecutive 2/2
+    assert broker.option_groups_closed == [[breach.symbol]]
+
+
+def test_option_stop_one_sided_quote_ticks_dont_count_or_reset():
+    # A one-sided NBBO (the HL/T junk-quote shape) neither counts as a breach
+    # tick nor launders a prior VALID tick into a reset: once the quote is
+    # two-sided again, the very next breach tick completes the streak.
+    state, broker = _state(), _FakeBroker([])
+    wd = _pin_open_clock(Watchdog(_cfg(0.0), broker, state=state))
+    leg = _breach_call()
+    wd._check_option_positions([leg])                     # valid breach tick 1/2
+    broker.option_quotes[leg.symbol] = (0.0, 1.2)         # bid vanished
+    wd._check_option_positions([leg])                     # skipped, held at 1/2
+    wd._check_option_positions([leg])                     # still skipped
+    assert broker.option_groups_closed == []
+    broker.option_quotes[leg.symbol] = (1.0, 1.05)        # real market is back
+    wd._check_option_positions([leg])                     # tick 2/2 -> fires
+    assert broker.option_groups_closed == [[leg.symbol]]
+
+
+def test_option_stop_junk_inside_mark_does_not_reset_streak():
+    # The reverse laundering direction (Aug-23 review): after a VALID breach
+    # tick, a junk one-sided quote whose broker mark reads back INSIDE the
+    # stop must HOLD the streak, not reset it — otherwise oscillating
+    # auction junk (breach / junk-inside / breach ...) defers the options'
+    # only hard exit indefinitely while a real collapse bleeds. The next
+    # valid breach tick completes 2/2 and the group closes.
+    state, broker = _state(), _FakeBroker([])
+    wd = _pin_open_clock(Watchdog(_cfg(0.0), broker, state=state))
+    breach, inside = _breach_call(), _breach_call(price=2.9)   # -3.3% = inside
+    wd._check_option_positions([breach])                  # valid breach 1/2
+    broker.option_quotes[inside.symbol] = (0.0, 3.0)      # one-sided junk mark
+    wd._check_option_positions([inside])                  # held at 1/2, NOT reset
+    assert broker.option_groups_closed == []
+    broker.option_quotes[inside.symbol] = (1.0, 1.05)     # real market is back
+    wd._check_option_positions([breach])                  # tick 2/2 -> fires
+    assert broker.option_groups_closed == [[breach.symbol]]
+
+
+def test_option_stop_absurd_inside_spread_holds_streak_too():
+    # Same laundering guard for the technically-two-sided-but-absurd NBBO
+    # (> OPTION_EXIT_MAX_SPREAD_PCT): an inside mark it backs is junk
+    # evidence and must not reset a valid breach tick.
+    state, broker = _state(), _FakeBroker([])
+    wd = _pin_open_clock(Watchdog(_cfg(0.0), broker, state=state))
+    breach, inside = _breach_call(), _breach_call(price=2.9)
+    wd._check_option_positions([breach])                  # valid breach 1/2
+    broker.option_quotes[inside.symbol] = (0.10, 1.00)    # ~164% rel spread
+    wd._check_option_positions([inside])                  # held, NOT reset
+    broker.option_quotes[inside.symbol] = (1.0, 1.05)
+    wd._check_option_positions([breach])                  # tick 2/2 -> fires
+    assert broker.option_groups_closed == [[breach.symbol]]
+
+
+def test_option_stop_sane_inside_mark_still_resets_streak():
+    # The reset path itself must survive the new guard: a two-sided, tight
+    # NBBO backing an inside mark IS real evidence — streak resets and the
+    # next two breach ticks are needed again.
+    state, broker = _state(), _FakeBroker([])
+    wd = _pin_open_clock(Watchdog(_cfg(0.0), broker, state=state))
+    breach, inside = _breach_call(), _breach_call(price=2.9)
+    broker.option_quotes[inside.symbol] = (1.0, 1.05)     # sane market
+    wd._check_option_positions([breach])                  # breach 1/2
+    wd._check_option_positions([inside])                  # RESET (sane quote)
+    wd._check_option_positions([breach])                  # fresh 1/2
+    assert broker.option_groups_closed == []
+    wd._check_option_positions([breach])                  # 2/2 -> fires
+    assert broker.option_groups_closed == [[breach.symbol]]
+
+
+def test_option_stop_absurd_spread_quote_ticks_dont_count():
+    # A technically two-sided but absurdly wide NBBO (> OPTION_EXIT_MAX_
+    # SPREAD_PCT) is junk evidence too — no breach tick is counted off it.
+    state, broker = _state(), _FakeBroker([])
+    wd = _pin_open_clock(Watchdog(_cfg(0.0), broker, state=state))
+    leg = _breach_call()
+    broker.option_quotes[leg.symbol] = (0.10, 1.00)       # ~164% relative spread
+    wd._check_option_positions([leg])
+    wd._check_option_positions([leg])
+    assert broker.option_groups_closed == []              # never counted
+    broker.option_quotes[leg.symbol] = (1.0, 1.05)
+    wd._check_option_positions([leg])                     # tick 1/2
+    wd._check_option_positions([leg])                     # tick 2/2 -> fires
+    assert broker.option_groups_closed == [[leg.symbol]]
+
+
+def test_option_stop_open_mute_suppresses_when_underlying_not_adverse():
+    # 2 min after the open with the underlying FLAT vs prior close (fake
+    # broker: last 50.0 vs prior 50.0): a confirmed premium stop stays muted —
+    # the HL scenario (stopped 14s after the open while the underlying was UP).
+    # Once the mute window passes, the already-confirmed streak fires.
+    state, broker = _state(), _FakeBroker([])
+    wd = _pin_open_clock(Watchdog(_cfg(0.0), broker, state=state), minutes=2.0)
+    leg = _breach_call()
+    wd._check_option_positions([leg])
+    wd._check_option_positions([leg])                     # confirmed but MUTED
+    assert broker.option_groups_closed == []
+    _pin_open_clock(wd, minutes=6.0)                      # mute window over
+    wd._check_option_positions([leg])
+    assert broker.option_groups_closed == [[leg.symbol]]
+
+
+def test_option_stop_open_mute_overridden_by_real_gap_down():
+    # Same open window, but the UNDERLYING itself gapped down 16.7% vs prior
+    # close (adverse beyond -2% for a bullish call) — a real gap must still
+    # exit within ~2 ticks, mute or not.
+    state, broker = _state(), _FakeBroker([])
+    broker.prior_closes["HL"] = 60.0                      # last 50.0 -> -16.7%
+    wd = _pin_open_clock(Watchdog(_cfg(0.0), broker, state=state), minutes=2.0)
+    leg = _breach_call()
+    wd._check_option_positions([leg])
+    wd._check_option_positions([leg])
+    assert broker.option_groups_closed == [[leg.symbol]]
+
+
+def test_option_stop_open_mute_bearish_put_needs_underlying_up():
+    # Bearish structure (put): adverse is the underlying UP beyond +2%. Down
+    # moves (with the put) stay muted; an up-gap fires through the window.
+    state, broker = _state(), _FakeBroker([])
+    put = _opt_leg(occ_symbol("XYZ", _exp(30), 60, "put"), qty=1, basis=3.0,
+                   price=1.0)                             # -66.7% of premium
+    broker.prior_closes["XYZ"] = 60.0                     # last 50.0 = -16.7% DOWN
+    wd = _pin_open_clock(Watchdog(_cfg(0.0), broker, state=state), minutes=2.0)
+    wd._check_option_positions([put])
+    wd._check_option_positions([put])
+    assert broker.option_groups_closed == []              # with the put -> muted
+    broker.prior_closes["XYZ"] = 40.0                     # last 50.0 = +25% UP
+    wd._check_option_positions([put])
+    assert broker.option_groups_closed == [[put.symbol]]
+
+
+def test_option_take_not_open_muted():
+    # The open mute applies to premium STOPS only — a confirmed take inside
+    # the window still banks the win.
+    state, broker = _state(), _FakeBroker([])
+    call = _opt_leg(occ_symbol("TSM", _exp(30), 250, "call"), qty=1, basis=2.0,
+                    price=4.5)                            # +125% >= +100% take
+    wd = _pin_open_clock(Watchdog(_cfg(0.0), broker, state=state), minutes=2.0)
+    wd._check_option_positions([call])
+    wd._check_option_positions([call])
+    assert broker.option_groups_closed == [[call.symbol]]
+
+
+def test_option_stop_confirm_ticks_one_restores_single_tick_behavior():
+    cfg = _cfg(0.0)
+    cfg.risk.option_stop_confirm_ticks = 1
+    state, broker = _state(), _FakeBroker([])
+    wd = _pin_open_clock(Watchdog(cfg, broker, state=state))
+    leg = _breach_call()
+    wd._check_option_positions([leg])
+    assert broker.option_groups_closed == [[leg.symbol]]
+
+
+def test_option_unconfirmed_stop_still_falls_through_to_expiry_close():
+    # Expiry time-stops are untouched by the confirmation logic: a breach on
+    # tick 1 that is also <= OPTION_CLOSE_DTE closes NOW, as option_expiry.
+    state, broker, led = _state(), _FakeBroker([]), _FakeLedger()
+    wd = _pin_open_clock(Watchdog(_cfg(0.0), broker, state=state, ledger=led))
+    call = _opt_leg(occ_symbol("TSM", _exp(2), 250, "call"), qty=1, basis=3.0,
+                    price=1.0)                            # -66.7% AND 2 DTE
+    wd._check_option_positions([call])
+    assert broker.option_groups_closed == [[call.symbol]]
+    assert led.records[-1].exit_reason == "option_expiry"
 
 
 # -- exit-via-replace bookkeeping (supersede + reconcile queue) --------------- #
@@ -925,21 +1140,24 @@ def test_option_exit_queues_close_order_for_reconcile():
     # fill was invisible (postmortem read "no closed positions"). The close
     # oid must land in the persisted pending queue the reconcile pass drains.
     state, broker, led = _state(), _FakeBroker([]), _FakeLedger()
-    wd = Watchdog(_cfg(0.0), broker, state=state, ledger=led)
+    wd = _pin_open_clock(Watchdog(_cfg(0.0), broker, state=state, ledger=led))
     put = _opt_leg(occ_symbol("LLY", _exp(30), 700, "put"), qty=2, basis=3.0,
                    price=1.2)                                  # -60% premium stop
-    wd._check_option_positions([put])
+    wd._check_option_positions([put])             # breach tick 1/2
+    wd._check_option_positions([put])             # tick 2 confirms
     assert broker.option_groups_closed == [[put.symbol]]
     assert ("opt-close-1", "LLY") in state.get_pending_orders()
 
 
 def test_option_exit_failure_queues_nothing():
     state, broker = _state(), _FakeBroker([], option_close_fails=True)
-    wd = Watchdog(_cfg(0.0), broker, state=state,
-                  alerter=SimpleNamespace(critical=lambda k, s, b: None))
+    wd = _pin_open_clock(Watchdog(
+        _cfg(0.0), broker, state=state,
+        alerter=SimpleNamespace(critical=lambda k, s, b: None)))
     put = _opt_leg(occ_symbol("LLY", _exp(30), 700, "put"), qty=1, basis=3.0,
                    price=1.0)
-    wd._check_option_positions([put])
+    wd._check_option_positions([put])             # breach tick 1/2
+    wd._check_option_positions([put])             # confirmed -> close FAILS
     assert state.get_pending_orders() == []
 
 
@@ -949,8 +1167,9 @@ def test_option_exit_marks_oid_as_exit_ledgered():
     # a self-healing exit (correction only), not a phantom-BUY divergence
     # (halt + page).
     state, broker, led = _state(), _FakeBroker([]), _FakeLedger()
-    wd = Watchdog(_cfg(0.0), broker, state=state, ledger=led)
+    wd = _pin_open_clock(Watchdog(_cfg(0.0), broker, state=state, ledger=led))
     put = _opt_leg(occ_symbol("LLY", _exp(30), 700, "put"), qty=2, basis=3.0,
                    price=1.2)
-    wd._check_option_positions([put])
+    wd._check_option_positions([put])             # breach tick 1/2
+    wd._check_option_positions([put])             # tick 2 confirms
     assert state.exit_was_ledgered("LLY", "opt-close-1")

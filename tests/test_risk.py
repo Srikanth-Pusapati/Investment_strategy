@@ -40,6 +40,13 @@ def _rm(limits, *, kill_switch=False, state=None) -> RiskManager:
 
 def _limits(**over) -> RiskLimits:
     base = dict(
+        # Run-6 item 3: single-name bullish option debits are OFF by default
+        # for the window; the legacy fixtures exercise the bullish gates
+        # (chase / merge / cap) on AAPL/AMZN calls, so opt back in here.
+        options_single_name_bullish=True,
+        # Run-6 item 6: the expectancy gate is OFF (report-only) by default;
+        # the legacy gate fixtures here and in test_all_weather opt back in.
+        expectancy_gate_enabled=True,
         max_position_pct=5.0,
         max_symbol_exposure_pct=10.0,
         max_gross_exposure_pct=100.0,
@@ -639,7 +646,11 @@ def test_net_credit_rejected():
 
 
 def test_defined_risk_spread_approved_and_premium_capped():
-    rm = _rm(_limits(options_enabled=True, max_option_premium_pct=1.0))
+    # per_underlying_premium_pct=0 isolates the GLOBAL premium cap under test
+    # (the default 0.5% per-underlying cap would clamp first — its own tests
+    # live in test_run5_gates.py).
+    rm = _rm(_limits(options_enabled=True, max_option_premium_pct=1.0,
+                     per_underlying_premium_pct=0.0))
     legs = [
         OptionLeg(expiry=_opt_exp(30), strike=200, right="call", side=Action.BUY),
         OptionLeg(expiry=_opt_exp(30), strike=210, right="call", side=Action.SELL),
@@ -1419,8 +1430,11 @@ def test_option_premium_cap_scales_with_regime_multiplier():
 
 
 def test_option_premium_cap_unscaled_when_regime_filter_off():
+    # per_underlying_premium_pct=0: this test isolates the regime scaling of
+    # the GLOBAL cap (the default 0.5% per-underlying cap would clamp first).
     rm = _rm(_limits(options_enabled=True, max_option_premium_pct=1.0,
-                     regime_filter_enabled=False))
+                     regime_filter_enabled=False,
+                     per_underlying_premium_pct=0.0))
     d = rm.evaluate_option(_long_call(), _account(), est_premium_per_contract=2.0,
                            regime_multiplier=0.4)
     assert d.verdict is RiskVerdict.APPROVED

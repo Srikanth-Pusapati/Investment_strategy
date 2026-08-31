@@ -127,11 +127,12 @@ def test_render_today_dropped_buy_appears():
     assert "excluded" in block.lower()
 
 
-def test_render_today_overext_reject_tagged_as_call_candidate():
-    """Overextension/earnings rejections are EQUITY-only gates; with options
-    on, the block must explicitly re-offer those names as capped-debit call
-    candidates (the Jul-28 finding: the model read 'Overextended: rejected' as
-    the thesis dying and never pivoted to the exempt option vehicle)."""
+def test_render_today_earnings_reject_tagged_as_call_candidate():
+    """Only EARNINGS-blackout rejections are re-offered as capped-debit call
+    candidates. Overextension is NOT an option escape hatch anymore (Aug-23:
+    evaluate_option runs bullish debits through the same OPTION CHASE GATE —
+    the HL -67.6% re-expression), so an overextended reject must NOT be
+    re-offered, and the block must say chase rejects aren't re-expressible."""
     j = DecisionJournal(base_dir=_tmpdir())
     j.record(_rec("FIRY", "rejected", 0.0,
                   reason="Overextended: RSI 73 and 3.4xATR above the 20d SMA"))
@@ -141,10 +142,24 @@ def test_render_today_overext_reject_tagged_as_call_candidate():
                   reason="Fresh-name conviction 0.55 below the new-position floor"))
     block = j.render_today(equity=100_000.0, options_on=True)
     assert "long_call/bull_call_spread" in block
-    assert "FIRY" in block and "RGEN" in block
-    # Conviction-floor rejections are NOT equity-only gates — no option carve-out.
+    assert "FIRY" in block and "RGEN" in block   # both still listed as rejected
     tag_line = next(l for l in block.splitlines() if "long_call" in l)
+    assert "RGEN" in tag_line
+    # Overextension rejects hit the option chase gate too — never re-offered.
+    assert "FIRY" not in tag_line
+    assert "chase gate" in tag_line
+    # Conviction-floor rejections are NOT equity-only gates — no option carve-out.
     assert "SANM" not in tag_line
+
+
+def test_render_today_overext_only_rejects_get_no_call_tag():
+    # With ONLY overextension rejects on the day, the re-offer line must not
+    # appear at all — there is nothing option-expressible to pivot to.
+    j = DecisionJournal(base_dir=_tmpdir())
+    j.record(_rec("FIRY", "rejected", 0.0,
+                  reason="Overextended: RSI 73 and 3.4xATR above the 20d SMA"))
+    block = j.render_today(equity=100_000.0, options_on=True)
+    assert "long_call" not in block
 
 
 def test_render_today_no_call_tag_when_options_off():

@@ -27,7 +27,7 @@ from investment_strategy.monitor.watchdog import Watchdog
 from investment_strategy.reset import _churn_carryover
 from investment_strategy.state import PortfolioState
 
-from test_risk import _account, _buy, _limits, _pos, _rm
+from test_risk import _account, _buy, _limits, _opt_exp, _pos, _rm
 
 
 def _tmp_state() -> PortfolioState:
@@ -221,7 +221,10 @@ def test_sanctioned_hedge_put_passes_direction_gate_without_held_core():
         symbol="QQQ", action=Action.BUY, conviction=0.7, target_weight_pct=1.0,
         rationale="index hedge", instrument=Instrument.OPTION,
         option_strategy=OptionStrategy.LONG_PUT,
-        option_legs=[OptionLeg(expiry="2026-08-28", strike=650.0,
+        # Dynamic expiry: a fixed date here drifted under the 7d DTE minimum
+        # and failed the test at the DTE gate before it ever reached the
+        # direction gate it exists to exercise.
+        option_legs=[OptionLeg(expiry=_opt_exp(30), strike=650.0,
                                right="put", side=Action.BUY, ratio=1)],
     )
     blocked = rm.evaluate_option(
@@ -247,7 +250,10 @@ def test_reset_carries_churn_memory_and_synthesizes_exits():
             "exit_prices": {"OLD": 14.17},
             "loss_streaks": {"NU": 1},
         }, f)
-    cfg = SimpleNamespace(state_file=state_file, core_etf="QQQ")
+    # Run-6 item 8b: the carry is behind RESET_CARRY_CHURN (default off);
+    # this legacy test exercises the ON path.
+    cfg = SimpleNamespace(state_file=state_file, core_etf="QQQ",
+                          reset_carry_churn=True)
     carry = _churn_carryover(cfg)
     # Open positions at reset get a synthesized exit (the re-entry cooldown
     # applies to what the reset flattened) — but never the passive core.

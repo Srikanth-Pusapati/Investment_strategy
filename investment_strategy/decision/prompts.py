@@ -96,22 +96,18 @@ response; sells execute first, so the freed slot and capital fund the buy. \
 Demand a clear conviction edge over the incumbent (roughly +0.10 or more), \
 not a marginal preference: churn pays the spread twice and a sold name is \
 locked out by a re-entry cooldown.
-- MANAGING OPEN POSITIONS: holding is a DECISION you re-make each cycle, not \
-a default. Each HELD line shows current P&L, the planned stop and how many \
-percentage points of room remain, and your own last verdict today. A LOSING \
-position near its stop (roughly <= 1.5pp of room left) is at a decision \
-point: if the fresh evidence has deteriorated — the composite flipped \
-against the position, the entry thesis's anchor signal is gone, price action \
-confirms the break — propose the SELL and salvage the remaining risk budget \
-rather than riding the last stretch into the bracket. The stop bounds \
-disaster; it is not the exit plan. Give a deterioration SELL your true \
-conviction: at 0.65+ it is treated as a risk-off exit (never vetoed as \
-churn). NEVER anchor a losing hold on congressional/lobbying data or \
-options-chain positioning — those are lagged/weak corroboration and cannot \
-outweigh fresh price action moving against the position. The symmetric \
-mistake is just as bad: do not panic-sell a winner or a thesis-intact \
-ordinary dip. Cut positions whose thesis broke; hold positions whose thesis \
-holds.
+- MANAGING OPEN POSITIONS: each HELD line shows current P&L, the planned \
+stop and how many percentage points of room remain, and your own last verdict \
+today. LOSING positions are managed by the mechanical stops and trails: the \
+planned stop, the R-scaled trail, the time-stop and the name-falling defense \
+own the exit of a loser, and a SELL you propose on a losing position that has \
+not reached its stop is REJECTED unless the system itself has flagged a \
+concrete event for that name (a NAME FALLING read on its HELD line, earnings \
+inside the blackout, a halt, a regime flip into risk-off). Only propose a SELL \
+on a loser when you can name such a concrete NEW event — never on a re-argued \
+thesis, a composite wobble, or "it looks weak". Winners are yours to manage: \
+scale out or close a winner whose thesis is spent, but do not panic-sell a \
+thesis-intact ordinary dip.
 - conviction (0..1) is how strongly the evidence supports the action. \
 target_weight_pct is the fraction of equity you'd want if unconstrained — the \
 risk layer clamps it via vol-targeted, fractional-Kelly sizing and hard caps.
@@ -129,19 +125,19 @@ one long + one short leg. Default to equity unless options clearly fit better.
 name — you cannot short stock, so a long_put or bear_put_spread is the ONLY way \
 to profit from an expected fall; (b) a high-conviction bullish thesis with a \
 defined near-term catalyst where a capped-debit long_call/bull_call_spread \
-expresses it with less capital at risk than shares; (c) a high-conviction \
-bullish name the EQUITY gates would block — the anti-chase overextension gate \
-(hot RSI / stretched over the 20d SMA) and the earnings blackout apply to \
-equity buys ONLY, and option debits are exempt from both: max loss is the \
-capped ~1%-of-equity premium and there is no stop to gap through. An \
-overextended or earnings-imminent name you'd otherwise chase with shares is \
-precisely where a capped-debit long_call/bull_call_spread is the sanctioned \
-vehicle (options still pass their own gates: direction, DTE, liquidity, \
-premium cap). Pick expiries 2-8 weeks out \
+expresses it with less capital at risk than shares. The same gates apply to \
+every instrument: the anti-chase overextension gate and the earnings blackout \
+reject an option debit exactly as they reject the equity buy (plus the \
+option-only gates: direction, DTE, liquidity, premium cap), so an option is \
+never a way around an equity rejection. Pick expiries 2-8 weeks out \
 (the risk layer rejects <7 or >60 days), strikes at/near the money, both \
 vertical legs on ONE expiry. If the options_chain signal shows a HIGH ATM IV, \
 prefer a spread (the short leg offsets the rich premium); modest IV favors a \
-single long leg. Do not propose stop/take levels for options — exits are \
+single long leg. All else equal PREFER long_call over bull_call_spread when \
+both express the thesis: this book's spreads are 0-for-4 (-$33.8k) vs +$11.6k \
+on its lone long_call — at this size the short leg adds leg/quote fragility \
+worth more than the small debit it saves. Do not propose stop/take levels for \
+options — exits are \
 managed deterministically (premium stop/take and a forced close near expiry).
 - OPTION DIRECTION: when a "## Market regime" block is present, option debits \
 follow the LONG-RUN market trend it reports: calls belong in an up market (SPY \

@@ -59,9 +59,14 @@ def _source_weight(name: str) -> float:
 
 
 class ScreenerAggregator:
-    def __init__(self, cfg: Config, quiver: QuiverClient | None = None):
+    def __init__(
+        self, cfg: Config, quiver: QuiverClient | None = None, broker=None,
+    ):
         self.cfg = cfg
         self.quiver = quiver or QuiverClient(cfg.quiver_api_key)
+        # Optional price reader (AlpacaClient) for the pre-cap liquidity floor;
+        # None = floor skipped (the orchestrator's post-slate floor still applies).
+        self.broker = broker
         self.screeners: list[Screener] = []
         for src in cfg.screener.sources:
             cls = _REGISTRY.get(src)
@@ -112,6 +117,7 @@ class ScreenerAggregator:
             c for c in merged.values()
             if (c.score >= min_score) or (options_on and c.score <= -min_score)
         ]
+        cands = self._apply_liquidity_floor(cands)
         cands.sort(key=lambda c: abs(c.score), reverse=True)
         capped = self._cap_with_bearish_reserve(cands, options_on)
 
@@ -125,6 +131,52 @@ class ScreenerAggregator:
             log.info("  candidate %s [%s] score=%+.2f — %s",
                      c.symbol, "+".join(c.sources), c.score, c.reason)
         return capped
+
+    def _apply_liquidity_floor(self, cands: list[Candidate]) -> list[Candidate]:
+        """Run-6 universe hygiene: drop sub-floor names BEFORE the slate cap and
+        the bearish reserve, so they never consume a capped slot, a per-symbol
+        signal fetch or prompt tokens (48% of run-5 slate exclusions were
+        sub-$5 names the orchestrator's later floor rejected anyway).
+
+        Prices come from ONE batched broker read for the whole merged set;
+        the optional ADV floor (screener.min_adv_usd > 0) is ONE batched daily
+        bars read. A name whose price/ADV is unknown is KEPT (fail open — the
+        orchestrator's floor and the risk gate still stand behind it). Any
+        broker error leaves the list untouched."""
+        scr = self.cfg.screener
+        broker = getattr(self, "broker", None)
+        if not cands or broker is None:
+            return cands
+        floor = float(getattr(self.cfg.risk, "min_trade_price_usd", 0.0) or 0.0)
+        use_px = bool(getattr(scr, "price_floor_pre_cap", False)) and floor > 0
+        adv_floor = float(getattr(scr, "min_adv_usd", 0.0) or 0.0)
+        if not use_px and adv_floor <= 0:
+            return cands
+        syms = [c.symbol for c in cands]
+        try:
+            prices = broker.latest_prices(syms) if use_px else {}
+            advs = broker.avg_dollar_volume(syms) if adv_floor > 0 else {}
+        except Exception as e:  # defensive: never let hygiene break discovery
+            log.warning("screener liquidity floor read failed: %s", e)
+            return cands
+        kept: list[Candidate] = []
+        dropped: list[str] = []
+        for c in cands:
+            px = prices.get(c.symbol)
+            adv = advs.get(c.symbol)
+            if use_px and px is not None and px < floor:
+                dropped.append(f"{c.symbol} ${px:.2f}<${floor:g}")
+                continue
+            if adv_floor > 0 and adv is not None and adv < adv_floor:
+                dropped.append(f"{c.symbol} ADV ${adv / 1e6:.1f}M<${adv_floor / 1e6:g}M")
+                continue
+            kept.append(c)
+        if dropped:
+            log.info(
+                "Screener liquidity floor dropped %d/%d pre-cap: %s",
+                len(dropped), len(cands), ", ".join(dropped),
+            )
+        return kept
 
     def _cap_with_bearish_reserve(
         self, cands: list[Candidate], options_on: bool

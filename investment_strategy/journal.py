@@ -250,22 +250,27 @@ class DecisionJournal:
             lines.append("Rejected today: " + ", ".join(rej_parts))
             if options_on:
                 # These reason strings only ever come from the equity buy path
-                # (risk._evaluate_buy); evaluate_option has neither gate.
+                # (risk._evaluate_buy). Overextension is NO LONGER an option
+                # escape hatch: evaluate_option runs bullish debits through
+                # the same _overextension_read (OPTION CHASE GATE, Aug 2026 —
+                # the HL -67.6% re-expression). Only the earnings blackout
+                # stays equity-only (a defined-risk debit through earnings is
+                # a legitimate bounded-loss expression).
                 call_cands = sorted(
                     sym for sym in rejected_count
-                    if rejected_reason.get(sym, "").startswith(
-                        ("Overextended", "Earnings in")
-                    )
+                    if rejected_reason.get(sym, "").startswith("Earnings in")
                 )
                 if call_cands:
                     lines.append(
                         "Of those, " + ", ".join(call_cands[:6]) + " fell to "
-                        "EQUITY-only gates (overextension / earnings blackout) "
-                        "— option debits are exempt. If the bullish thesis "
+                        "the EQUITY-only earnings blackout — option debits "
+                        "are exempt from that gate. If the bullish thesis "
                         "still holds at high conviction, propose a capped-debit "
                         "long_call/bull_call_spread instead (max loss = the "
                         "premium, no stop to gap through; direction/DTE/"
-                        "liquidity gates still apply)."
+                        "liquidity gates still apply). Overextension rejects "
+                        "are NOT re-expressible: bullish option debits hit "
+                        "the same chase gate."
                     )
 
         if guard_vetoed:

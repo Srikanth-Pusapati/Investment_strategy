@@ -559,7 +559,8 @@ def test_new_knob_defaults(monkeypatch):
     monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-ant-x")
     cfg = load_config()
     assert cfg.risk.thesis_decay_enabled is True
-    assert cfg.risk.expectancy_gate_enabled is True
+    # Run-6 item 6: report-only by default (tests/test_run6_feedback_freeze.py).
+    assert cfg.risk.expectancy_gate_enabled is False
     assert cfg.risk.exposure_ladder_enabled is True
     assert cfg.risk.rotation_guard_red_day_release is True
     assert cfg.risk.put_breakdown_ext_pct == 5.0

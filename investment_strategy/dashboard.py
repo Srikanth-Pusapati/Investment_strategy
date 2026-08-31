@@ -27,7 +27,7 @@ from pathlib import Path
 from typing import Optional
 from zoneinfo import ZoneInfo
 
-from .ledger import TradeLedger, TradeRecord
+from .ledger import _OCC_RE, TradeLedger, TradeRecord
 from .status import AccountStatus
 
 log = logging.getLogger("dashboard")
@@ -49,6 +49,14 @@ _AMBER = "#d29922"
 # --------------------------------------------------------------------------- #
 # Optional live enrichment
 # --------------------------------------------------------------------------- #
+def price_symbols(symbols) -> list[str]:
+    """Ledger symbols worth a broker.latest_price() call: equities only.
+    Option rows are keyed by their OCC contract (Aug-23 ledgering) and the
+    stock-trade endpoint 400s on those every dashboard cycle (run-6 item 1d)
+    — skip them; the option rows render from the ledger alone."""
+    return sorted(s for s in symbols if s and not _OCC_RE.fullmatch(s.strip()))
+
+
 def _live_enrichment(
     symbols: set[str],
 ) -> tuple[dict[str, float], Optional[AccountStatus], str]:
@@ -65,7 +73,7 @@ def _live_enrichment(
         cfg = load_config()
         broker = AlpacaClient(cfg)
         prices: dict[str, float] = {}
-        for s in symbols:
+        for s in price_symbols(symbols):
             px = broker.latest_price(s)
             if px > 0:
                 prices[s] = px

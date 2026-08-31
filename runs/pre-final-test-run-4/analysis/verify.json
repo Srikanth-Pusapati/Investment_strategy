@@ -1,0 +1,35 @@
+{
+ "headline": "Independent recompute confirms a profitable but low-win-rate book: full cycle (Jul 27\u2013Aug 21) shows 42 closed trades for +$7,030.97 at 30.95% win rate (expectancy +$167.40/trade), and the away window (Aug 13\u201321) shows 18 closed trades for +$3,402.85 at 33.33% win rate (+$189.05/trade), while the equity curve fell -$11,375.54 in summed day_pl over the same away window (Aug 12 equity $1,017,421.20 \u2192 Aug 21 $1,006,732.28).",
+ "metrics": {
+  "A_closed_trades": 42,
+  "A_sum_realized_pl": 7030.97,
+  "A_win_rate_pct": 30.95,
+  "A_avg_win": 6083.4,
+  "A_avg_loss": -2484.59,
+  "A_expectancy_per_trade": 167.4,
+  "B_closed_trades": 18,
+  "B_sum_realized_pl": 3402.85,
+  "B_win_rate_pct": 33.33,
+  "B_avg_win": 5897.1,
+  "B_avg_loss": -2664.98,
+  "B_expectancy_per_trade": 189.05,
+  "equity_2026_08_12": 1017421.2,
+  "equity_2026_08_21": 1006732.28,
+  "sum_day_pl_aug13_to_aug21": -11375.54,
+  "equity_delta_aug12_to_aug21": -10688.92
+ },
+ "evidence": [
+  "Source: /Users/spusapati/Personal/Investment_stratergy/state/trades.jsonl (111 lines, 42 with non-null realized_pl); closed-trade ts dates span 2026-07-29 to 2026-08-21",
+  "Window A = 2026-07-27..2026-08-21 (full cycle since $1M reset of PA3HBZ8ODAMD): 42 closed, sum realized_pl +7030.97, 13 wins / 29 non-wins (30.95%), avg win +6083.40, avg loss -2484.59, expectancy +167.40",
+  "Window B = 2026-08-13..2026-08-21 (exclusive of Aug 12, inclusive of Aug 21): 18 closed, sum realized_pl +3402.85, win rate 33.33%, avg win +5897.10, avg loss -2664.98, expectancy +189.05",
+  "Source: /Users/spusapati/Personal/Investment_stratergy/state/equity_history.jsonl (19 daily rows, 2026-07-28..2026-08-21): equity 2026-08-12 = 1,017,421.20; equity 2026-08-21 = 1,006,732.28",
+  "Sum of day_pl for dates after Aug 12 through Aug 21 (7 sessions: Aug 13,14,17,18,19,20,21) = -11,375.54",
+  "Method: plain python3 json+dict loops (no bot code imported), realized_pl non-null = closed, date = ts[:10]"
+ ],
+ "surprises": [
+  "Divergence: closed-trade ledger says the away window MADE +$3,402.85 realized, but the equity curve LOST ~$10.7-11.4k over the same window \u2014 the gap is unrealized/open-position decay, not closed-trade losses",
+  "Internal inconsistency in equity file: summed day_pl for Aug 13-21 (-11,375.54) differs from the Aug 12\u2192Aug 21 equity delta (-10,688.92) by $686.62, so day_pl rows do not exactly telescope with equity snapshots",
+  "Alpaca-side realized_pl in equity_history on 2026-08-21 (+5,965.92 cumulative) differs from the trades.jsonl full-cycle sum (+7,030.97) by ~$1,065 \u2014 the two realized ledgers disagree",
+  "Strategy profile is strongly asymmetric: ~31% win rate carried entirely by avg wins ~2.4x the size of avg losses"
+ ]
+}

@@ -1,0 +1,501 @@
+"""Run-6 item 7 — book beta measurement, beta cap gate, beta-sized hedge."""
+from __future__ import annotations
+
+import logging
+import os
+import sys
+import tempfile
+import threading
+import uuid
+from types import SimpleNamespace
+from unittest.mock import patch
+
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from investment_strategy.models import AccountSnapshot, Position, RiskVerdict
+from investment_strategy.orchestrator import Orchestrator
+from investment_strategy.portfolio.beta import (
+    ASSUMED_BETA,
+    BookBeta,
+    aggregate,
+    beta_cap_room,
+    daily_returns,
+    hedge_signal,
+    hedge_target_notional,
+    occ_underlying,
+    post_trade_beta,
+    raw_beta,
+    shrink,
+)
+from investment_strategy.state import PortfolioState
+from tests.test_risk import _account, _buy, _limits, _pos, _rm
+
+_REQ = {"ALPACA_API_KEY": "k", "ALPACA_SECRET_KEY": "s", "ANTHROPIC_API_KEY": "a"}
+
+
+def _env_without(*keys) -> dict:
+    env = {k: v for k, v in os.environ.items() if k not in keys}
+    env.update(_REQ)
+    return env
+
+
+# --------------------------------------------------------------------------- #
+# Synthetic series
+# --------------------------------------------------------------------------- #
+def _series(mult: float, n: int = 80, start: float = 100.0, offset: float = 0.0):
+    """(date, close) pairs whose daily returns are exactly mult x a fixed
+    benchmark return pattern (+offset), so the sample beta is `mult`."""
+    pattern = [0.01, -0.02, 0.015, -0.005, 0.02, -0.01, 0.007, -0.012]
+    pairs, px = [], start
+    for i in range(n):
+        if i:
+            px *= 1.0 + mult * pattern[i % len(pattern)] + offset
+        pairs.append((f"2026-{(i // 28) + 1:02d}-{(i % 28) + 1:02d}", round(px, 6)))
+    return pairs
+
+
+class _Broker:
+    def __init__(self, series: dict, fail: set | None = None):
+        self.series = series
+        self.fail = fail or set()
+        self.calls: list[str] = []
+
+    def daily_close_series(self, symbol, days):
+        self.calls.append(symbol)
+        if symbol in self.fail:
+            raise RuntimeError("feed down")
+        return list(self.series.get(symbol, []))[-days:]
+
+
+def _bench_series():
+    return {"SPY": _series(1.0), "QQQ": _series(1.2), "IWM": _series(0.9)}
+
+
+def _eq(symbol, mv, price=100.0):
+    return Position(
+        symbol=symbol, qty=mv / price, avg_entry_price=price, current_price=price,
+        market_value=mv, unrealized_pl=0.0, unrealized_pl_pct=0.0,
+    )
+
+
+def _acct(positions, equity=100_000.0):
+    invested = sum(p.market_value for p in positions)
+    return AccountSnapshot(
+        equity=equity, last_equity=equity, cash=equity - invested,
+        buying_power=equity - invested, positions=positions,
+    )
+
+
+# --------------------------------------------------------------------------- #
+# (a) beta math
+# --------------------------------------------------------------------------- #
+def test_raw_beta_recovers_multiplier_and_shrinks_toward_one():
+    b = raw_beta(daily_returns(_series(1.5)), daily_returns(_series(1.0)))
+    assert abs(b - 1.5) < 1e-6
+    assert abs(shrink(1.5) - 1.4) < 1e-9          # 0.8*1.5 + 0.2
+    assert abs(shrink(0.0) - 0.2) < 1e-9
+    assert shrink(None) is None
+
+
+def test_raw_beta_none_on_short_overlap_or_flat_bench():
+    assert raw_beta(daily_returns(_series(1.0, n=20)), daily_returns(_series(1.0))) is None
+    assert raw_beta({}, daily_returns(_series(1.0))) is None
+    flat = {d: 0.0 for d, _ in _series(1.0)[1:]}
+    assert raw_beta(daily_returns(_series(1.0)), flat) is None
+
+
+def test_aggregate_counts_unknown_at_assumed_beta():
+    w = {"A": 0.3, "B": 0.2, "PSQ": 0.1}
+    assert abs(aggregate(w, {"A": 1.5, "B": None, "PSQ": -1.0}) - (0.45 + 0.2 * ASSUMED_BETA - 0.1)) < 1e-9
+
+
+def test_post_trade_and_room_arithmetic():
+    assert abs(post_trade_beta(1.0, 10_000, 100_000, 2.0) - 1.2) < 1e-9
+    assert abs(beta_cap_room(1.0, 1.2, 100_000, 2.0) - 10_000) < 1e-6
+    assert beta_cap_room(1.3, 1.2, 100_000, 1.0) == 0.0
+    assert beta_cap_room(1.3, 1.2, 100_000, -1.0) is None
+
+
+def test_occ_underlying():
+    assert occ_underlying("IWM260918P00220000") == "IWM"
+    assert occ_underlying("AAPL") is None
+
+
+# --------------------------------------------------------------------------- #
+# (a) the reading
+# --------------------------------------------------------------------------- #
+def test_book_beta_reading_line_and_weights():
+    series = _bench_series()
+    series["HOT"] = _series(2.0)
+    series["PSQ"] = _series(-1.2)
+    broker = _Broker(series)
+    bb = BookBeta(broker)
+    acct = _acct([_eq("HOT", 30_000), _eq("PSQ", 10_000)])
+    r = bb.read(acct)
+    assert r.available and not r.unknown
+    hot = shrink(2.0)                  # 1.8
+    psq = shrink(-1.2)                 # -1.16 (toward -1: review fix)
+    assert abs(r.spy - (0.3 * hot + 0.1 * psq)) < 1e-6
+    assert abs(r.invested_pct - 40.0) < 1e-9
+    line = r.line()
+    assert line.startswith("BOOK BETA: spy=")
+    assert "qqq=" in line and "iwm=" in line and "invested=40.0%" in line
+    d = r.to_dict()
+    assert set(d) >= {"spy", "qqq", "iwm", "invested_pct", "betas", "weights", "at"}
+
+
+def test_book_beta_unknown_symbol_assumed_one_and_options_fold_into_underlying():
+    series = _bench_series()
+    series["AAPL"] = _series(1.0)
+    broker = _Broker(series, fail={"NEW"})
+    bb = BookBeta(broker)
+    opt = Position(
+        symbol="AAPL260918C00200000", qty=1, avg_entry_price=5.0, current_price=5.0,
+        market_value=500.0, unrealized_pl=0.0, unrealized_pl_pct=0.0,
+        asset_class="us_option",
+    )
+    acct = _acct([_eq("AAPL", 20_000), _eq("NEW", 10_000), opt])
+    r = bb.read(acct)
+    assert r.available
+    assert r.unknown == ["NEW"]
+    assert "unknown=NEW(assumed 1.0)" in r.line()
+    assert "options at debit notional" in r.line()
+    # AAPL weight includes the option's $500 debit at AAPL's beta.
+    assert abs(r.weights["AAPL"] - 0.205) < 1e-9
+    assert abs(r.spy - (0.205 * 1.0 + 0.1 * ASSUMED_BETA)) < 1e-6
+
+
+def test_book_beta_unavailable_when_spy_series_fails():
+    broker = _Broker(_bench_series(), fail={"SPY"})
+    r = BookBeta(broker).read(_acct([_eq("AAPL", 1_000)]))
+    assert not r.available
+    assert r.line().startswith("BOOK BETA: unavailable (")
+
+
+def test_book_beta_reuses_correlation_guard_cache():
+    from investment_strategy.correlation import CorrelationGuard
+    series = _bench_series()
+    series["AAPL"] = _series(1.1, n=100)
+    broker = _Broker(series)
+    guard = CorrelationGuard(broker)
+    guard._daily_returns("AAPL")          # the guard already fetched AAPL
+    bb = BookBeta(broker, guard)
+    bb.beta_of("AAPL", "SPY")
+    assert broker.calls.count("AAPL") == 1  # no double fetch
+    bb.new_cycle()
+    assert bb._betas == {}
+
+
+# --------------------------------------------------------------------------- #
+# (b) beta cap gate
+# --------------------------------------------------------------------------- #
+def _gate_rm(**over):
+    return _rm(_limits(kelly_fraction=0.0, max_position_pct=6.0,
+                       min_cash_buffer_pct=0.0, **over))
+
+
+def test_beta_cap_resizes_and_logs_counterfactual(caplog):
+    rm = _gate_rm(max_book_beta_spy=1.2)
+    caplog.set_level(logging.WARNING, logger="risk")
+    # book 1.08, candidate beta 2.0, request 6% -> post 1.20 exactly fits;
+    # push the book to 1.12 so the 6% request would land at 1.24.
+    d = rm.evaluate(
+        _buy("SMCI", weight=6.0), _account(), price=100.0, volatility=0.3,
+        book_beta_spy=1.12, candidate_beta=2.0,
+    )
+    assert d.verdict == RiskVerdict.RESIZED, d.reason
+    # room = (1.2 - 1.12) * 100k / 2.0 = $4,000
+    assert abs(d.approved_notional - 4_000.0) < 1e-6
+    msgs = [r.getMessage() for r in caplog.records if "BOOK BETA CAP" in r.getMessage()]
+    assert msgs == ["BOOK BETA CAP: SMCI 6.0% -> 4.0% (book 1.24 -> 1.20)"]
+
+
+def test_beta_cap_rejects_when_min_order_breaches(caplog):
+    rm = _gate_rm(max_book_beta_spy=1.2, min_order_usd=500.0)
+    caplog.set_level(logging.WARNING, logger="risk")
+    d = rm.evaluate(
+        _buy("SMCI", weight=6.0), _account(), price=100.0, volatility=0.3,
+        book_beta_spy=1.199, candidate_beta=1.5,
+    )
+    assert d.verdict == RiskVerdict.REJECTED
+    assert "Book beta cap" in d.reason and "min order" in d.reason
+    assert any("-> rejected" in r.getMessage() for r in caplog.records)
+
+
+def test_beta_cap_unknown_beta_assumes_one_and_logs(caplog):
+    rm = _gate_rm(max_book_beta_spy=1.2)
+    caplog.set_level(logging.INFO, logger="risk")
+    d = rm.evaluate(
+        _buy("NEW", weight=6.0), _account(), price=100.0, volatility=0.3,
+        book_beta_spy=1.17, candidate_beta=None,
+    )
+    assert d.verdict == RiskVerdict.RESIZED
+    assert abs(d.approved_notional - 3_000.0) < 1e-6     # (1.2-1.17)*100k/1.0
+    assert any("NEW beta unknown — assuming 1.0" in r.getMessage() for r in caplog.records)
+
+
+def test_beta_cap_inert_without_reading_or_when_off_or_negative_beta():
+    full = 6_000.0
+    for kw in (
+        dict(book_beta_spy=None, candidate_beta=2.0),
+        dict(book_beta_spy=1.9, candidate_beta=-1.0),
+    ):
+        d = _gate_rm(max_book_beta_spy=1.2).evaluate(
+            _buy("X", weight=6.0), _account(), price=100.0, volatility=0.3, **kw,
+        )
+        assert abs(d.approved_notional - full) < 1e-6, kw
+    d = _gate_rm(max_book_beta_spy=0.0).evaluate(
+        _buy("X", weight=6.0), _account(), price=100.0, volatility=0.3,
+        book_beta_spy=1.9, candidate_beta=2.0,
+    )
+    assert abs(d.approved_notional - full) < 1e-6
+    # Under the cap: untouched.
+    d = _gate_rm(max_book_beta_spy=1.2).evaluate(
+        _buy("X", weight=6.0), _account(), price=100.0, volatility=0.3,
+        book_beta_spy=0.5, candidate_beta=1.5,
+    )
+    assert abs(d.approved_notional - full) < 1e-6
+
+
+# --------------------------------------------------------------------------- #
+# (c) hedge arithmetic + hysteresis
+# --------------------------------------------------------------------------- #
+def test_hedge_target_notional_and_ceiling():
+    assert abs(hedge_target_notional(1.3, 1.0, 1_000_000, 40.0) - 300_000) < 1e-6
+    assert hedge_target_notional(0.9, 1.0, 1_000_000, 40.0) == 0.0
+    assert abs(hedge_target_notional(1.6, 1.0, 1_000_000, 40.0) - 400_000) < 1e-6
+
+
+def test_hedge_signal_hysteresis():
+    assert hedge_signal(1.16, 1.0, 0.15, False) == "arm"
+    assert hedge_signal(1.10, 1.0, 0.15, False) == "hold"
+    assert hedge_signal(1.10, 1.0, 0.15, True) == "hold"
+    assert hedge_signal(0.84, 1.0, 0.15, True) == "unwind"
+    assert hedge_signal(0.84, 1.0, 0.15, False) == "hold"
+    assert hedge_signal(None, 1.0, 0.15, True) == "hold"
+
+
+class _HedgeBroker:
+    def __init__(self):
+        self.buys, self.closed, self.canceled = [], [], []
+
+    def cancel_open_orders_for(self, symbol):
+        self.canceled.append(symbol)
+
+    def close_position(self, symbol):
+        self.closed.append(symbol)
+        return f"oid-close-{symbol}"
+
+    def submit_notional_buy(self, symbol, notional):
+        self.buys.append((symbol, round(notional, 2)))
+        return f"oid-buy-{symbol}"
+
+    def latest_price(self, symbol):
+        return 100.0
+
+
+class _FixedBeta:
+    """Stand-in reader returning a scripted SPY-beta per read()."""
+    def __init__(self, betas):
+        self.betas = list(betas)
+
+    def read(self, account):
+        b = self.betas.pop(0) if len(self.betas) > 1 else self.betas[0]
+        return SimpleNamespace(available=b is not None, spy=b)
+
+    def new_cycle(self):
+        pass
+
+
+def _beta_orch(betas, mode="beta", falling=False, max_pct=40.0, target=1.0,
+               band=0.15, falling_target=0.8, halted=False):
+    o = Orchestrator.__new__(Orchestrator)
+    o.cfg = SimpleNamespace(
+        hedge_etf="PSQ", auto_hedge_ratio=0.30, auto_hedge_min_cycles=2,
+        auto_hedge_max_pct=max_pct, auto_hedge_mode=mode,
+        book_beta_enabled=True, hedge_beta_target=target,
+        hedge_beta_band=band, hedge_beta_falling_target=falling_target,
+        risk=SimpleNamespace(
+            min_order_usd=1.0, min_order_pct=0.0, min_cash_buffer_pct=0.0,
+        ),
+    )
+    o._market_falling = lambda: (falling, "test read")
+    o.risk = SimpleNamespace(trading_halted=lambda a: (halted, "halt" if halted else ""))
+    o.broker = _HedgeBroker()
+    records = []
+    o.ledger = SimpleNamespace(records=records, record=records.append)
+    p = os.path.join(tempfile.gettempdir(), f"_r6_beta_{uuid.uuid4().hex}.json")
+    o.state = PortfolioState(path=p)
+    o._trade_lock = threading.Lock()
+    o._pending_oids = []
+    o._falling_cycles = 0
+    o._clear_cycles = 0
+    o.book_beta = _FixedBeta(betas)
+    o._book_beta_reading = None
+    o._hedge_reason = ""
+    return o
+
+
+def _hedge_acct(net_long=600_000.0, cash=400_000.0, psq_value=0.0):
+    positions = [_eq("AAPL", net_long)]
+    if psq_value > 0:
+        positions.append(_eq("PSQ", psq_value))
+    return AccountSnapshot(
+        equity=net_long + cash + psq_value, last_equity=net_long + cash,
+        cash=cash, buying_power=cash, positions=positions,
+    )
+
+
+def test_beta_hedge_arms_after_one_cycle_sized_to_gap(caplog):
+    caplog.set_level(logging.INFO)
+    o = _beta_orch([1.30])
+    o._apply_auto_hedge(_hedge_acct())
+    # (1.30 - 1.00) x $1,000,000 = $300k, under the 40% ceiling.
+    assert o.broker.buys == [("PSQ", 300_000.0)]
+    assert o.ledger.records[0].entry_signals == ["auto_hedge"]
+    assert o.ledger.records[0].rationale.startswith("auto-hedge: beta:")
+    assert o._hedge_reason == "beta:1.30" and o._falling_cycles == 1
+    msgs = [r.getMessage() for r in caplog.records]
+    assert any(m.startswith("AUTO-HEDGE: beta: book spy-beta 1.30 > target 1.00") for m in msgs)
+
+
+def test_beta_hedge_ceiling_and_topup_only_the_gap():
+    o = _beta_orch([1.60])
+    o._apply_auto_hedge(_hedge_acct())
+    assert o.broker.buys == [("PSQ", 400_000.0)]        # 60% gap capped at 40%
+    o = _beta_orch([1.20], max_pct=40.0)
+    o._apply_auto_hedge(_hedge_acct(psq_value=150_000.0))
+    # gap = 0.20 x $1.15M equity = $230k additional; ceiling 40% = $460k,
+    # held $150k -> room $310k -> buy $230k.
+    assert o.broker.buys == [("PSQ", 230_000.0)]
+
+
+def test_beta_hedge_holds_inside_band_and_unwinds_below(caplog):
+    caplog.set_level(logging.INFO)
+    o = _beta_orch([1.05])
+    acct = _hedge_acct(psq_value=100_000.0)
+    o._apply_auto_hedge(acct)
+    assert o.broker.buys == [] and o.broker.closed == []
+    assert o._hedge_reason == "beta:1.05"       # funnel shows armed(beta:..)
+    o = _beta_orch([0.80])
+    acct = _hedge_acct(psq_value=100_000.0)
+    o._apply_auto_hedge(acct)
+    assert o.broker.closed == ["PSQ"]
+    assert o.ledger.records[-1].exit_reason == "hedge_unwind"
+    assert o._hedge_reason == "" and o._falling_cycles == 0
+    assert any(
+        m.startswith("AUTO-HEDGE UNWIND: beta: book spy-beta 0.80 < target 1.00")
+        for m in (r.getMessage() for r in caplog.records)
+    )
+    # Below the band with NO hedge on: nothing to do.
+    o = _beta_orch([0.80])
+    o._apply_auto_hedge(_hedge_acct())
+    assert o.broker.closed == [] and o.broker.buys == []
+
+
+def test_beta_hedge_falling_tape_tightens_target():
+    o = _beta_orch([1.10], falling=True)          # 1.10 > 0.8 + 0.15
+    o._apply_auto_hedge(_hedge_acct())
+    assert o.broker.buys == [("PSQ", 300_000.0)]  # (1.10 - 0.80) x $1M
+    assert "tape falling" in o.ledger.records[0].rationale
+
+
+def test_beta_hedge_unavailable_reading_holds_and_never_raises(caplog):
+    caplog.set_level(logging.INFO)
+    o = _beta_orch([None])
+    o._apply_auto_hedge(_hedge_acct(psq_value=50_000.0))
+    assert o.broker.buys == [] and o.broker.closed == []
+    assert any("book beta unavailable" in r.getMessage() for r in caplog.records)
+    o = _beta_orch([1.5], halted=True)
+    o._apply_auto_hedge(_hedge_acct())
+    assert o.broker.buys == []
+
+
+def test_falling_mode_is_the_legacy_path():
+    o = _beta_orch([1.60], mode="falling", falling=True)
+    o._apply_auto_hedge(_hedge_acct())
+    assert o.broker.buys == []                  # cycle 1/2 — legacy persistence
+    o._apply_auto_hedge(_hedge_acct())
+    # 30% of $600k = $180k, under the (new default) 40% ceiling.
+    assert o.broker.buys == [("PSQ", 180_000.0)]
+
+
+# --------------------------------------------------------------------------- #
+# cycle wiring: reading, persistence, graceful degradation, buy context
+# --------------------------------------------------------------------------- #
+def _read_orch(reader, enabled=True):
+    o = Orchestrator.__new__(Orchestrator)
+    o.cfg = SimpleNamespace(book_beta_enabled=enabled)
+    o.book_beta = reader
+    o._book_beta_reading = None
+    p = os.path.join(tempfile.gettempdir(), f"_r6_bb_{uuid.uuid4().hex}.json")
+    o.state = PortfolioState(path=p)
+    return o
+
+
+def test_read_book_beta_logs_one_line_and_persists(caplog):
+    caplog.set_level(logging.INFO)
+    series = _bench_series()
+    series["AAPL"] = _series(1.5)
+    o = _read_orch(BookBeta(_Broker(series)))
+    acct = _acct([_eq("AAPL", 50_000)])
+    o._read_book_beta(acct)
+    lines = [r.getMessage() for r in caplog.records if r.getMessage().startswith("BOOK BETA:")]
+    assert len(lines) == 1 and "invested=50.0%" in lines[0]
+    assert o._book_beta_reading is not None
+    persisted = PortfolioState(path=o.state.path).get_book_beta()
+    assert abs(persisted["spy"] - 0.5 * shrink(1.5)) < 1e-6
+    assert persisted["at"]
+    # Buy context: book beta + the candidate's own beta.
+    series["SMCI"] = _series(2.0)
+    book, cand = o._beta_context("SMCI", acct)
+    assert abs(book - 0.5 * shrink(1.5)) < 1e-5 and abs(cand - shrink(2.0)) < 1e-5
+
+
+def test_read_book_beta_degrades_gracefully(caplog):
+    caplog.set_level(logging.INFO)
+
+    class _Boom:
+        def read(self, account):
+            raise RuntimeError("data plan exhausted")
+
+    o = _read_orch(_Boom())
+    o._read_book_beta(_acct([_eq("AAPL", 1_000)]))
+    assert o._book_beta_reading is None
+    assert any(
+        r.getMessage().startswith("BOOK BETA: unavailable (RuntimeError")
+        for r in caplog.records
+    )
+    assert o._beta_context("AAPL", _acct([])) == (None, None)
+    # Knob off: no line, no reading.
+    caplog.clear()
+    o = _read_orch(BookBeta(_Broker(_bench_series())), enabled=False)
+    o._read_book_beta(_acct([]))
+    assert not [r for r in caplog.records if "BOOK BETA" in r.getMessage()]
+    assert o._book_beta_reading is None
+
+
+# --------------------------------------------------------------------------- #
+# config defaults
+# --------------------------------------------------------------------------- #
+def test_run6_defaults_in_config():
+    env = _env_without(
+        "MAX_BOOK_BETA_SPY", "AUTO_HEDGE_MODE", "AUTO_HEDGE_MAX_PCT",
+        "HEDGE_BETA_TARGET", "HEDGE_BETA_BAND", "HEDGE_BETA_FALLING_TARGET",
+        "BOOK_BETA_ENABLED",
+    )
+    with patch.dict(os.environ, env, clear=True):
+        from investment_strategy.config import load_config
+        cfg = load_config()
+    assert cfg.risk.max_book_beta_spy == 1.2
+    assert cfg.auto_hedge_mode == "beta"
+    assert cfg.auto_hedge_max_pct == 40.0
+    assert cfg.hedge_beta_target == 1.0
+    assert cfg.hedge_beta_band == 0.15
+    assert cfg.hedge_beta_falling_target == 0.8
+    assert cfg.book_beta_enabled is True
+    with patch.dict(os.environ, {**env, "AUTO_HEDGE_MODE": "Falling",
+                                 "MAX_BOOK_BETA_SPY": "0"}, clear=True):
+        from investment_strategy.config import load_config
+        cfg = load_config()
+    assert cfg.auto_hedge_mode == "falling" and cfg.risk.max_book_beta_spy == 0.0

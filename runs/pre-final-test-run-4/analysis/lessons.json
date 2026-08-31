@@ -1,0 +1,48 @@
+{
+ "headline": "Autotune W33/W34 recommended ZERO knob changes (every sweep below the 5-trade evidence bar; .env verified unchanged), while the nightly postmortems' two biggest 'stop failure' lessons (AMZN -$14,956, HL -$3,650) are misattributed \u2014 both were watchdog OPTION-premium stops ledgered under the underlying ticker, and the real recurring leaks are uncorroborated single-soft-signal entries and unenforced single-name daily-buy concentration.",
+ "metrics": {
+  "autotune_w33_recommendations": 0,
+  "autotune_w34_recommendations": 0,
+  "autotune_w33_round_trips": 20,
+  "autotune_w34_round_trips": 25,
+  "autotune_min_affected_trades_threshold": 5,
+  "autotune_knob_changes_applied": 0,
+  "w34_reentry_1p5_losses_avoided_usd": 2085,
+  "w34_reentry_1p5_trades_affected": 1,
+  "amzn_aug17_option_stop_loss_usd": -14956,
+  "amzn_aug17_option_stop_loss_pct": -50.19,
+  "hl_aug20_option_stop_loss_usd": -3650,
+  "hl_aug20_option_stop_loss_pct": -67.59,
+  "hl_aug19_spread_debit_usd": 5200,
+  "uncorroborated_single_signal_losses_usd": -6675,
+  "aug12_21_realized_net_approx_usd": 11605,
+  "concentration_flag_nights_of_8": 5,
+  "concentration_curated_lessons_of_15": 6,
+  "loser_hold_days_latest": 3.2,
+  "winner_hold_days_latest": 6.3,
+  "max_position_cap": 15,
+  "option_stop_loss_pct_configured": 50
+ },
+ "evidence": [
+  "(1) KNOB RECS: Autotune 2026-W33 (14d window, 20 round trips) and 2026-W34 (25 round trips) each swept 5 knobs \u2014 MIN_NEW_NAME_CONVICTION (cur 0.6), MIN_CONVICTION (cur 0.2), REENTRY_PRICE_OVERRIDE_COMPOSITE (cur 1.25), ROTATION_GUARD_MAX_LOSS_PCT (cur 8), ROTATION_GUARD_REPEAT_RELEASE_PCT (cur 0.75) \u2014 and made ZERO recommendations: every candidate row showed 0 affected trades except one. Applied: nothing; .env values verified identical to autotune 'current' column on 2026-08-23.",
+  "(1 cont) The single non-zero sweep cell: W34 REENTRY_PRICE_OVERRIDE_COMPOSITE candidate 1.5 \u2192 1 trade affected, $2,085 losses avoided, $0 winners missed (this is INTC -$2,085 on Aug 18, re-bought above its $97.88 exit after being correctly rejected Aug 14). Below the 5-trade bar, so autotune withheld the recommendation \u2014 but it is the only evidence-backed tightening on the table.",
+  "(2) THEME concentration: single name eats the day's buy dollars \u2014 SMCI 100% of ~$82k ceiling Aug 12; NVDA+CDE ~35% each Aug 17; SMCI $39k largest Aug 20; PCG 77% ($30k of $39k) Aug 21. 6 of 15 curated lessons (lines 1,3,4,6,15) repeat 'flag >50-70% concentration' \u2014 flagged nightly, never enforced by any gate.",
+  "(2) THEME uncorroborated soft-signal entries fail fast: insider-buy-only QNT -$1,621 + LFTO -$1,634 closed within ~1-2h same day (Aug 13, identical thesis template 'insider +1.00, w=0.91'), INTC -$2,085 insider-anchor (Aug 18), options-flow starters F -$842/ONDS (Aug 18), AVBC -$493 insider scanner (Aug 21) \u2248 -$6.7k total; meanwhile corroborated multi-signal names won: SMCI +$9,437, AXTI +$7,632, CDE +$7,615 and +$8,245, IESC +$1,194. Curated lines 7, 12, 13 all restate this.",
+  "(2) THEME hold asymmetry flagged in all 8 nightlies: losers held ~1.9-3.2d vs winners ~4.9-6.4d. Interpretation drifts night to night, but Aug 17/21 converge on the correct read: exit discipline is healthy; entry timing is the leak. (2) THEME capacity: max-15 position cap turned away 0.60-0.62 conviction ideas on Aug 12 (NOK), Aug 13 (HLIT), Aug 21 (PFE 0.61, BULL 0.60).",
+  "(3) CONTRADICTION lessons-vs-autotune: nightlies keep prescribing 'tighten entry quality / require corroboration', but autotune's conviction-floor sweeps show 0 trades affected at EVERY candidate (0.35-0.6 new-name, 0.1-0.3 global) \u2014 all the losing entries cleared the floors comfortably (QNT/LFTO conviction implied >0.6, HL 0.63). Conviction floors cannot express the fix; it needs a new corroboration/multi-signal gate, not knob tightening.",
+  "(3) CONTRADICTION lessons-vs-lessons: curated line 8 ('don't dump fresh entries within hours on a soft decision exit') directly conflicts with line 9 and the Aug 20/21 diagnostics ('cutting losers fast is working/healthy'). Aug 19's 'cut-winners-short / hold-losers pattern' states the asymmetry backwards (losers 3.2d < winners 6.3d = winners held longer) and contradicts Aug 21's reading of the same numbers.",
+  "(5) WRONG LESSON \u2014 Aug 17 AMZN: postmortem calls -50.2% 'catastrophic for a clean corroborated long... gapping through the stop or sizing/leverage far beyond thesis' on a large-cap. Ledger (state/trades.jsonl 2026-08-17T16:57Z) shows it was a watchdog OPTION stop on the 26-contract 5-leg AMZN Sep-2026 call group (the same group from the PR #52 MLEG-cap fix), exiting at -50.19% of premium \u2014 i.e. OPTION_STOP_LOSS_PCT=50 firing exactly as configured. Not a stop-width or equity-sizing failure; the real issue is ~$29.8k premium in one name's options.",
+  "(5) WRONG LESSON \u2014 Aug 20 HL: postmortem says 'stop was too wide for the position'. Ledger shows a defined-risk 50-contract bull_call_spread ($5,200 debit, bought Aug 19 17:03Z) closed by watchdog option stop at -67.6% of premium \u2014 stop width doesn't apply to a capped-debit spread. The buried real lesson: HL EQUITY was blocked by the overextension gate (RSI 70, 4.2xATR) that same cycle and the bot expressed the identical overextended thesis via options \u2014 options are an unguarded bypass of the overextension gate. Also note -67.6% overshot the 50% watchdog threshold (gap/slippage between ticks).",
+  "(5) WRONG-ISH LESSON \u2014 curated line 14 ('tighten stop width so single lots cannot lose >30-40%') inherits the AMZN/HL options misattribution; applied to equities it would fight DEFAULT_STOP_LOSS_PCT=8.0 which backtests chose deliberately. Curated line 11 ('require fresh non-extended confirmation before late-session buy of an overextension-rejected name') was motivated by CDE Aug 17 \u2014 but CDE became the window's best performer (+$15,860 across Aug 20-21 trail/top-up), so its lone supporting example is a counterexample in hindsight.",
+  "(4) Realized P&L reconstructable from the 8 nightlies (Aug 12-21): ~+$11.6k net (winners ~$43.8k: SMCI 9437, CDE 8245+7615, AXTI 7632, PLTR 4466, PATH 3925, IBIT 1259, IESC 1194; losers ~$32.2k dominated by AMZN -14956 and HL -3650 options stops) \u2014 consistent with the observation-window verdict that expectancy is fine but single-name/single-position reversals drive the red days (down-capture 2.22).",
+  "Files read: /Users/spusapati/Personal/Investment_stratergy/state/autotune/2026-W33.md, 2026-W34.md; state/lessons/2026-08-12.md through 2026-08-21.md (8 files; Aug 15/16 weekend, none exist); state/lessons/curated.md; knob verification in .env; option-trade verification in state/trades.jsonl."
+ ],
+ "surprises": [
+  "Autotune is structurally blind to the two biggest documented losses: AMZN -$14,956 and HL -$3,650 were options trades, and none of the 5 swept knobs touch options (no sweep exists for OPTION_STOP_LOSS_PCT, options sizing, or an options-side overextension gate) \u2014 the self-evaluation loop cannot see its own largest loss channel.",
+  "HL options entry explicitly routed around the equity overextension gate ('Equity blocked as overextended... expressing via capped-debit bull_call_spread' in its own rationale) and lost 67.6% next morning \u2014 the bot documented its own gate bypass and the nightly postmortem still misdiagnosed it as a stop-width problem.",
+  "The HL watchdog option stop executed at -67.6%, well past the configured -50% premium threshold \u2014 watchdog tick granularity or an opening gap produces ~17pp of slippage beyond the supposed floor.",
+  "Conviction floors discriminated nothing: every loser in the window entered with conviction comfortably above 0.6 \u2014 the entire 'entry quality' problem lives in signal composition (single-source vs corroborated), a dimension no current knob encodes.",
+  "Curated.md contains internally contradictory guidance (line 8 vs line 9) and at least two hindsight-wrong entries (lines 11, 14) \u2014 a planner consuming curated.md raw would import the misattributions.",
+  "The only quantified autotune finding in two weeks (REENTRY override 1.25\u21921.5, +$2,085, n=1) aligns perfectly with an independent nightly lesson (INTC re-entry), yet is suppressed by the 5-trade threshold \u2014 cross-referencing the two self-eval streams recovers signal each stream alone discards."
+ ]
+}

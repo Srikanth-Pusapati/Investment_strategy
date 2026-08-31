@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import logging
 from datetime import datetime, timezone
+from zoneinfo import ZoneInfo
 
 from ..config import Config
 from ..execution import AlpacaClient
@@ -29,6 +30,15 @@ from ..risk import trail_geometry
 from ..state import PortfolioState
 
 log = logging.getLogger("watchdog")
+
+_ET = ZoneInfo("America/New_York")
+
+#: Open-mute override threshold: inside the first OPTION_STOP_OPEN_MUTE_MIN
+#: minutes after the 09:30 ET open, a premium stop only fires if the UNDERLYING
+#: itself moved this adversely vs its prior close (down for bullish structures,
+#: up for bearish) — a real gap exits within the window; an auction junk mark
+#: on the option NBBO alone does not.
+_OPEN_MUTE_UNDERLYING_PCT = 2.0
 
 
 def _partial(pos: Position, qty: float) -> Position:
@@ -79,6 +89,17 @@ class Watchdog:
         #: the deferral logs once per closed session instead of every 30s tick
         #: (Jul 23: 1,301 EMERGENCY lines; Jul 24: 228 more until 01:56).
         self._flatten_deferred_noted = False
+        #: premium stop/take two-tick confirmation streaks, keyed like the
+        #: option groups by (underlying, expiry) -> (reason, breach ticks).
+        #: In-memory on purpose (mirrors _last_wait_log, not PortfolioState):
+        #: losing it on a restart merely re-requires the consecutive ticks —
+        #: one ~30s tick more conservative, never less protected. See
+        #: _check_option_positions (HL 2026-08: -67.6% "stop" 14s after the
+        #: open off a junk one-sided auction quote, underlying UP).
+        self._opt_breach: dict[tuple[str, str], tuple[str, int]] = {}
+        #: lazy OptionHistoricalDataClient for exit-mark NBBO sanity reads —
+        #: built on first use only (tests and options-off books never pay it).
+        self._option_data = None
 
     def _alert(self, key: str, subject: str, body: str) -> None:
         """Page a human, if an alerter is wired. The event is already logged at
@@ -696,13 +717,30 @@ class Watchdog:
         premium paid — the max loss on a debit play) breaches the premium
         stop/take, or when expiry is close enough that assignment risk and
         terminal theta outweigh any remaining thesis (the stale-option
-        time-stop), whichever comes first."""
+        time-stop), whichever comes first.
+
+        Hardened Aug 2026 (HL: "stopped" at -67.6% 14 SECONDS after the open
+        while the underlying traded UP — a junk one-sided open-auction quote on
+        the EXIT mark, the Jul-23 failure mode PR #40 hardened on entries
+        only): a premium stop/take now needs OPTION_STOP_CONFIRM_TICKS
+        consecutive breach ticks, a breach tick only counts on a sane two-sided
+        NBBO, and the first OPTION_STOP_OPEN_MUTE_MIN minutes after the open
+        mute premium STOPS unless the underlying itself gapped adversely. A
+        real collapse still exits in ~1 minute (two ticks) — the first breach
+        tick is logged so that latency stays visible. Expiry time-stops are
+        deliberately untouched (DTE doesn't glitch)."""
         if not option_rows:
+            if self._opt_breach:
+                self._opt_breach.clear()
             return
         stop = getattr(self.cfg.risk, "option_stop_loss_pct", 50.0)
         take = getattr(self.cfg.risk, "option_take_profit_pct", 100.0)
         close_dte = getattr(self.cfg.risk, "option_close_dte", 3.0)
-        for (under, expiry), group in self._option_groups(option_rows).items():
+        groups = self._option_groups(option_rows)
+        # Drop confirmation streaks for structures no longer on the book.
+        for stale in set(self._opt_breach) - set(groups):
+            del self._opt_breach[stale]
+        for (under, expiry), group in groups.items():
             # Net premium PAID: long legs debit, short legs (negative qty)
             # credit. The risk gate only approves net-debit structures, so this
             # is positive for anything we opened ourselves.
@@ -710,12 +748,41 @@ class Watchdog:
             pl = sum(p.unrealized_pl for p in group)
             pl_pct = (pl / basis * 100.0) if basis > 1e-9 else 0.0
             dte = self._days_to_expiry(expiry)
+            breach = None
             if stop > 0 and basis > 1e-9 and pl_pct <= -stop:
-                reason = "stop"
-                hit = f"premium stop -{stop:.0f}% (now {pl_pct:+.1f}%)"
+                breach = ("stop", f"premium stop -{stop:.0f}% (now {pl_pct:+.1f}%)")
             elif take > 0 and basis > 1e-9 and pl_pct >= take:
-                reason = "take"
-                hit = f"premium take +{take:.0f}% (now {pl_pct:+.1f}%)"
+                breach = ("take", f"premium take +{take:.0f}% (now {pl_pct:+.1f}%)")
+            elif (under, expiry) in self._opt_breach:
+                # Back inside the thresholds on a fresh mark. Only a mark
+                # backed by a sane two-sided NBBO may reset the streak — the
+                # same veto breach ticks get. Without it, a junk one-sided
+                # quote that INFLATES the mark launders a prior valid breach
+                # tick into 'all clear' (the invariant in
+                # _confirm_premium_breach, read from the other side), and an
+                # oscillating junk NBBO defers the options' only hard exit
+                # indefinitely while a real collapse bleeds.
+                unreliable = self._group_mark_unreliable(group)
+                if unreliable is not None:
+                    _r, _c = self._opt_breach[(under, expiry)]
+                    log.warning(
+                        "Option %s %s premium mark unreliable (%s), skipping "
+                        "tick — breach streak held at %d, not reset.",
+                        under, expiry, unreliable, _c,
+                    )
+                else:
+                    # The prior breach tick was noise (the exact junk-quote
+                    # blip this guard exists for), so the streak resets.
+                    log.info(
+                        "Option %s %s premium back inside stop/take thresholds "
+                        "(now %+.1f%%) — breach streak reset.",
+                        under, expiry, pl_pct,
+                    )
+                    del self._opt_breach[(under, expiry)]
+            if breach is not None and self._confirm_premium_breach(
+                under, expiry, group, breach[0], pl_pct,
+            ):
+                reason, hit = breach
             elif close_dte > 0 and dte is not None and dte <= close_dte:
                 reason = "option_expiry"
                 hit = f"{dte:.0f} DTE <= {close_dte:.0f} — closing before expiry"
@@ -726,6 +793,177 @@ class Watchdog:
                 under, expiry, hit, len(group),
             )
             self._exit_option_group(group, reason, under=under, pl_pct=pl_pct, pl=pl)
+
+    def _confirm_premium_breach(
+        self, under: str, expiry: str, group: list[Position],
+        reason: str, pl_pct: float,
+    ) -> bool:
+        """True when this premium stop/take breach is CONFIRMED enough to
+        close: seen on OPTION_STOP_CONFIRM_TICKS consecutive ticks, each backed
+        by a sane two-sided NBBO, and (for stops) outside the open-auction mute
+        window. An unreliable quote neither counts NOR resets the streak — a
+        venue that stops publishing a real market must not launder a prior
+        valid breach tick into 'all clear'."""
+        confirm = max(1, int(getattr(self.cfg.risk, "option_stop_confirm_ticks", 2)))
+        prior_reason, count = self._opt_breach.get((under, expiry), (reason, 0))
+        if prior_reason != reason:
+            count = 0  # stop->take flip (or vice versa) is a fresh streak
+        why = self._group_mark_unreliable(group)
+        if why is not None:
+            log.warning(
+                "Option %s %s premium mark unreliable (%s), skipping tick — "
+                "breach streak held at %d/%d, not reset.",
+                under, expiry, why, count, confirm,
+            )
+            self._opt_breach[(under, expiry)] = (reason, count)
+            return False
+        count = min(count + 1, confirm)
+        self._opt_breach[(under, expiry)] = (reason, count)
+        if count < confirm:
+            log.info(
+                "Option %s %s premium %s breach tick %d/%d (now %+.1f%%) — "
+                "awaiting confirmation on the next tick before closing.",
+                under, expiry, reason, count, confirm, pl_pct,
+            )
+            return False
+        if reason == "stop" and self._premium_stop_open_muted(
+            under, expiry, group, pl_pct,
+        ):
+            return False
+        return True
+
+    def _group_mark_unreliable(self, group: list[Position]) -> str | None:
+        """Why the structure's exit mark can't be trusted this tick, or None
+        when it can. A leg with a readable NBBO must be two-sided (bid AND ask
+        > 0) and no wider than OPTION_EXIT_MAX_SPREAD_PCT — the HL/T junk
+        quotes were exactly one-sided. A leg whose quote can't be READ at all
+        (feed down, no reader) does NOT veto the tick: this loop is the
+        options' only protection, and a dead quote feed must never disable the
+        premium stop outright."""
+        max_spread = getattr(self.cfg.risk, "option_exit_max_spread_pct", 10.0)
+        for p in group:
+            q = self._leg_quote(p.symbol)
+            if q is None:
+                continue  # unknown != bad; fail toward protection
+            bid, ask = q
+            if bid <= 0 or ask <= 0:
+                return f"one-sided quote on {p.symbol}: bid={bid:.2f} ask={ask:.2f}"
+            spread_pct = (ask - bid) / ((ask + bid) / 2.0) * 100.0
+            if max_spread > 0 and spread_pct > max_spread:
+                return (
+                    f"absurd {spread_pct:.0f}% spread on {p.symbol} "
+                    f"(> {max_spread:.0f}% cap): bid={bid:.2f} ask={ask:.2f}"
+                )
+        return None
+
+    def _leg_quote(self, symbol: str) -> tuple[float, float] | None:
+        """Live NBBO (bid, ask) for one OCC leg, or None when no quote can be
+        read (caller treats unknown as non-vetoing). Prefers a broker-provided
+        `option_quote` reader when one exists; otherwise reads Alpaca's option
+        feed through a lazily-built data client (same client/timeout wrapper
+        the entry-side OptionsHelper uses)."""
+        reader = getattr(self.broker, "option_quote", None)
+        if callable(reader):
+            try:
+                q = reader(symbol)
+                return None if q is None else (float(q[0]), float(q[1]))
+            except Exception as e:  # noqa: BLE001 — never break the safety loop
+                log.debug("broker option_quote(%s) failed: %s", symbol, e)
+                return None
+        try:
+            if self._option_data is None:
+                from alpaca.data.historical.option import OptionHistoricalDataClient
+
+                from ..execution.alpaca_client import bound_client
+                self._option_data = bound_client(OptionHistoricalDataClient(
+                    self.cfg.alpaca_api_key, self.cfg.alpaca_secret_key,
+                ))
+            from alpaca.data.requests import OptionLatestQuoteRequest
+            q = self._option_data.get_option_latest_quote(
+                OptionLatestQuoteRequest(symbol_or_symbols=symbol)
+            ).get(symbol)
+            if q is None:
+                return None
+            return float(q.bid_price or 0), float(q.ask_price or 0)
+        except Exception as e:  # noqa: BLE001 — never break the safety loop
+            log.debug("exit-mark NBBO read failed for %s: %s", symbol, e)
+            return None
+
+    def _premium_stop_open_muted(
+        self, under: str, expiry: str, group: list[Position], pl_pct: float,
+    ) -> bool:
+        """True when a CONFIRMED premium stop should still be suppressed: we're
+        inside the first OPTION_STOP_OPEN_MUTE_MIN minutes after the 09:30 ET
+        open — where auction prints make option marks junk — and the UNDERLYING
+        itself has NOT moved adversely beyond the gap threshold vs its prior
+        close. A real gap (underlying down >2% for a bullish structure, up >2%
+        for bearish) exits immediately; an option-mark-only 'collapse' waits
+        out the mute. Applies to premium STOPS only — takes and expiry stops
+        keep their behavior."""
+        mute_min = getattr(self.cfg.risk, "option_stop_open_mute_min", 5.0)
+        if mute_min <= 0:
+            return False
+        mins = self._minutes_since_open_et()
+        if not 0.0 <= mins < mute_min:
+            return False
+        move = self._underlying_day_move_pct(under)
+        # Same structure-direction read the risk gate uses: all-call = bullish,
+        # anything holding a put leg trades the downside.
+        rights = {occ[2] for p in group if (occ := parse_occ(p.symbol))}
+        bullish = rights == {"C"}
+        adverse = move is not None and (
+            move <= -_OPEN_MUTE_UNDERLYING_PCT if bullish
+            else move >= _OPEN_MUTE_UNDERLYING_PCT
+        )
+        if adverse:
+            log.info(
+                "Option %s %s premium stop firing INSIDE the open-mute window "
+                "(%.1f min after open): underlying moved %+.2f%% vs prior close "
+                "— real gap, not an auction junk mark.",
+                under, expiry, mins, move,
+            )
+            return False
+        log.info(
+            "Option %s %s premium stop MUTED %.1f min after the open "
+            "(< %.0f min, OPTION_STOP_OPEN_MUTE_MIN): mark reads %+.1f%% but "
+            "the underlying is %s vs prior close (adverse bar ±%.1f%%, %s "
+            "structure) — distrusting open-auction option marks.",
+            under, expiry, mins, mute_min, pl_pct,
+            "unreadable" if move is None else f"{move:+.2f}%",
+            _OPEN_MUTE_UNDERLYING_PCT, "bullish" if bullish else "bearish",
+        )
+        return True
+
+    @staticmethod
+    def _minutes_since_open_et() -> float:
+        """Minutes since TODAY'S 09:30 ET (negative before the open). Pure
+        wall-clock — no API call — and only consulted when a confirmed premium
+        stop is about to fire, so a weekend 09:3x ET costs at most a few muted
+        minutes on a market that isn't trading anyway."""
+        now_et = datetime.now(timezone.utc).astimezone(_ET)
+        open_et = now_et.replace(hour=9, minute=30, second=0, microsecond=0)
+        return (now_et - open_et).total_seconds() / 60.0
+
+    def _underlying_day_move_pct(self, under: str) -> float | None:
+        """Underlying's move vs its PRIOR session close, in % — the same
+        latest_price the watchdog prices equity positions with, against the
+        last daily close dated before today (ET). None when either side can't
+        be read (the open-mute then stays conservative and keeps muting)."""
+        try:
+            last = self.broker.latest_price(under)
+            if not last or last <= 0:
+                return None
+            today_et = datetime.now(timezone.utc).astimezone(_ET).date().isoformat()
+            prior = None
+            for day, close in self.broker.daily_close_series(under, 5):
+                if day < today_et and close > 0:
+                    prior = close
+            if prior is None:
+                return None
+            return (last / prior - 1.0) * 100.0
+        except Exception as e:  # noqa: BLE001 — never break the safety loop
+            log.debug("underlying day-move read failed for %s: %s", under, e)
+            return None
 
     @staticmethod
     def _days_to_expiry(expiry: str) -> float | None:

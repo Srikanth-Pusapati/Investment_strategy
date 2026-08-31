@@ -28,6 +28,7 @@ from .journal import DecisionJournal, DecisionRecord
 from .benchmark import BenchmarkTracker
 from .config import Config
 from .correlation import CorrelationGuard
+from .portfolio.beta import BookBeta, hedge_signal, hedge_target_notional
 from .decision import DecisionEngine
 from .earnings import EarningsCalendar
 from .execution import AlpacaClient, OptionsHelper
@@ -91,8 +92,11 @@ class Orchestrator:
         self.signals = SignalAggregator(cfg, self.quiver)
         # Per-(symbol, kind) score series persisted across cycles (E.1+R.4):
         # feeds the freshness/trend annotations rendered on each signal line.
-        self.signal_history = SignalHistory()
-        self.screeners = ScreenerAggregator(cfg, self.quiver)
+        self.signal_history = SignalHistory(
+            retention_days=getattr(cfg, "signal_history_retention_days", None),
+            max_points=getattr(cfg, "signal_history_max_points", None),
+        )
+        self.screeners = ScreenerAggregator(cfg, self.quiver, broker=self.broker)
         self.robinhood = RobinhoodReader(cfg)
         # A restart clears the in-memory dead-auth latch; clear a stale
         # AUTH DEAD health file too, or the panel shows a phantom outage.
@@ -108,6 +112,13 @@ class Orchestrator:
         # NEW buy is effectively a duplicate of something already held; the
         # RiskManager enforces the cap on the number computed here.
         self.corr_guard = CorrelationGuard(self.broker)
+        # Book-beta reader (run-6 item 7): shares the correlation guard's
+        # per-cycle return cache (no double fetch); ONE 'BOOK BETA:' line per
+        # decision cycle, persisted to risk_state.json; feeds the buy-path
+        # beta cap and the beta-sized auto-hedge.
+        self.book_beta = BookBeta(self.broker, self.corr_guard)
+        self._book_beta_reading = None
+        self._hedge_reason = ""   # 'beta:1.31' while the beta hedge is armed
         # Per-cycle market-regime read; scales position size down in risk-off, and
         # DOWN (not full) when its yfinance feed is degraded — since that same
         # outage blinds the sector cap too (1B.7).
@@ -117,6 +128,10 @@ class Orchestrator:
         # multiplier each cycle — they drive the option call/put direction gate.
         self._regime_trend = ""
         self._regime_label = ""
+        # True only on the cycle the regime label flipped INTO risk-off
+        # (computed before the trim persists the new label) — a deterministic
+        # event tag for the LLM sell-authority gate (run-6 item 2).
+        self._regime_flipped_off = False
         # Buys rejected at EQUITY-only gates this cycle, queued for the scoped
         # same-cycle option fallback (reset each _execute_proposals pass).
         self._option_fallbacks: list[tuple[TradeProposal, str]] = []
@@ -158,6 +173,17 @@ class Orchestrator:
         # variant. Feeds the HELD prompt lines and the rotation guard's
         # loss-cut release.
         self._falling_names: dict[str, str] = {}
+        # Breadth double-count guard (Aug 23): the falling-names map computed
+        # in cycle N is re-read by cycle N+1's TOP-of-cycle defense pass (the
+        # fresh map only exists once tech context lands mid-cycle), so the
+        # breadth re-arm counting it in cycle N and the stale re-read counting
+        # it again in cycle N+1 would satisfy auto_hedge_min_cycles=2 with ONE
+        # observation. Track which map (by decision-cycle sequence) was
+        # already counted toward the persistence bar; _market_falling's
+        # breadth-names leg ignores a stale, already-counted map.
+        self._cycle_seq = 0
+        self._breadth_map_cycle = -1
+        self._breadth_counted_cycle = -2
         if (
             cfg.risk.options_enabled
             and getattr(cfg.risk, "option_direction_gate", True)
@@ -817,18 +843,31 @@ class Orchestrator:
         # lands mid-cycle.
         if self._within_close_fence():
             return
+        # Advance the decision-cycle sequence (breadth double-count guard):
+        # anything stamped with an older seq — notably the falling-names map —
+        # is a STALE read from a previous cycle.
+        self._cycle_seq = getattr(self, "_cycle_seq", 0) + 1
         # Fresh Quiver data this cycle, but pulled once and shared by the signal
         # and screener layers (both read the same cached live feeds).
         self.quiver.new_cycle()
         self.earnings.new_cycle()
         self.sectors.new_cycle()
         self.corr_guard.new_cycle()
+        if getattr(self, "book_beta", None) is not None:
+            self.book_beta.new_cycle()
         self.regime.new_cycle()
         if self.cfg.risk.regime_filter_enabled:
             regime = self.regime.assess()
             self._regime_mult = regime.multiplier
             self._regime_trend = regime.trend
             self._regime_label = regime.label
+            try:
+                self._regime_flipped_off = (
+                    regime.label == "risk-off"
+                    and self.state.get_regime_label() != "risk-off"
+                )
+            except Exception:  # noqa: BLE001 — a tag, never a cycle blocker
+                self._regime_flipped_off = False
             # A degraded ("unknown") read means we're flying blind on BOTH regime
             # and the sector cap — surface that at WARNING, not INFO (1B.7).
             if regime.label == "unknown":
@@ -839,8 +878,12 @@ class Orchestrator:
             self._regime_mult = 1.0
             self._regime_trend = ""
             self._regime_label = ""
+            self._regime_flipped_off = False
         self._record_equity_snapshot()
         account = self.broker.get_account()
+        # Ex-ante exposure read (run-6 item 7a) — before any defense acts, so
+        # the line records what the book carried INTO the cycle.
+        self._read_book_beta(account)
 
         # De-risk the EXISTING book on a flip into risk-off (the regime multiplier
         # otherwise only shrinks NEW buys). Runs before new proposals so the trimmed
@@ -918,11 +961,19 @@ class Orchestrator:
         composites: dict[str, float] = {}
         if self.cfg.risk.composite_enabled:
             try:
+                # Run-6: realized perf tilt frozen unless COMPOSITE_PERF_WEIGHTS.
                 pw = perf_weights(
-                    self.ledger, self.cfg.risk.composite_perf_min_trips
+                    self.ledger, self.cfg.risk.composite_perf_min_trips,
+                    enabled=bool(getattr(
+                        self.cfg.risk, "composite_perf_weights", False)),
                 )
+                # Run-6: the scanner's DISCOVERY line stays in the prompt but
+                # no longer scores into the index (COMPOSITE_INCLUDE_DISCOVERY).
+                inc_disc = bool(getattr(
+                    self.cfg.risk, "composite_include_discovery", False))
                 for b in bundles:
-                    b.composite_score = composite_score(b, pw)
+                    b.composite_score = composite_score(
+                        b, pw, include_discovery=inc_disc)
                 composites = {
                     b.symbol: b.composite_score
                     for b in bundles if b.composite_score is not None
@@ -965,29 +1016,27 @@ class Orchestrator:
         # for an index-wide day. Feeds the HELD prompt lines and the rotation
         # guard's loss-cut release below.
         self._falling_names = self._name_falling_reads(account, tech_ctx)
+        # Stamp the map with the cycle it was computed in: a map carried into
+        # the NEXT cycle's top-of-cycle defense pass is stale, and if the
+        # re-arm below already counted it toward the hedge persistence bar it
+        # must not count twice (see _market_falling's breadth-names leg).
+        self._breadth_map_cycle = self._cycle_seq
         for _s, _why in self._falling_names.items():
             log.info("NAME FALLING: %s %s — defense read armed "
                      "(loss-cut release + HELD-line note).", _s, _why)
+        # Aug-22 breadth trigger: the defenses above ran on LAST cycle's
+        # falling-names map (this one only exists once the tech context
+        # lands). If the fresh map alone crosses the breadth bar, re-run
+        # them now so an Aug-18-shaped day acts this hour, not next cycle.
+        self._breadth_rearm(account)
 
         # Expectancy gate input (Jul 30 review): signal families whose CITED
         # trailing realized expectancy is negative. Recomputed once per cycle
         # from the ledger; the risk layer blocks FRESH entries whose thesis
-        # rests entirely on these families. Best-effort — {} disarms the gate.
-        self._neg_families = {}
-        if self.cfg.risk.expectancy_gate_enabled:
-            self._neg_families = negative_expectancy_families(
-                self.ledger,
-                window_days=self.cfg.risk.expectancy_gate_window_days,
-                min_trips=self.cfg.risk.expectancy_gate_min_trips,
-            )
-            if self._neg_families:
-                log.info(
-                    "Expectancy gate armed against: %s",
-                    ", ".join(
-                        f"{k} {v.avg_pl_pct:+.1f}%/trip x{v.trips}"
-                        for k, v in sorted(self._neg_families.items())
-                    ),
-                )
+        # rests entirely on these families. Run-6 (item 6): with the gate
+        # OFF the read still happens and is logged as 'would have armed'
+        # (report-only) but {} is handed to the risk layer, so nothing rejects.
+        self._neg_families = self._expectancy_gate_read()
 
         bench_stats = self.benchmark.compute()
         bench_line = self.benchmark.context_line(bench_stats)
@@ -1058,12 +1107,8 @@ class Orchestrator:
         # and the funnel line. Only ON-SLATE names: the model must never be
         # asked to trade a name whose data was partitioned out of the prompt.
         self._bear_eligibility = {}
-        if self.options is not None and composites:
-            _bear_bar = self.cfg.screener.bearish_reserve_bar or 0.4
-            _slate_syms = {b.symbol for b in bundles}
-            for _sym, _comp in composites.items():
-                if _comp > -_bear_bar or _sym not in _slate_syms:
-                    continue
+        if self.options is not None:
+            for _sym in self._bear_precheck_names(bundles, composites or {}):
                 self._bear_eligibility[_sym] = self.risk.put_precheck(
                     _sym, account,
                     (_reg.trend if _reg else ""),
@@ -1165,6 +1210,12 @@ class Orchestrator:
             bear_detail = " [" + "; ".join(parts) + "]"
         h_etf = getattr(self.cfg, "hedge_etf", "")
         hedge_pos = account.position_for(h_etf) if h_etf else None
+        # Aug 22: the armed/holding state names its trigger source —
+        # (index) vs (breadth:N-names) vs (book:-X.X%) — so the daily log
+        # shows WHICH read armed the hedge sleeve, not just that one did.
+        _trig = getattr(self, "_falling_trigger", "") or getattr(
+            self, "_hedge_reason", ""
+        )
         log.info(
             "BEARISH FUNNEL: slate_bearish=%d%s put_proposals=%d "
             "put_approved=%d auto_hedge=%s proxy_put=%s",
@@ -1174,8 +1225,10 @@ class Orchestrator:
             getattr(self, "_bear_puts_approved", 0),
             (
                 f"${max(0.0, hedge_pos.market_value):,.0f} {h_etf}"
+                + (f"({_trig})" if _trig else "")
                 if hedge_pos is not None else
-                ("armed" if self._falling_cycles > 0 and h_etf
+                (f"armed({_trig or 'clearing'})"
+                 if self._falling_cycles > 0 and h_etf
                  else ("off" if not h_etf else "flat"))
             ),
             getattr(self, "_proxy_put_state", "") or "none",
@@ -1207,7 +1260,18 @@ class Orchestrator:
     def _check_robinhood_health(self) -> list[str]:
         """Page ONCE per RH dead-auth latch event and return the DATA HEALTH
         notes for the decision prompt — so Claude can tell "RH says nothing"
-        apart from "RH is dead" instead of the signals silently vanishing."""
+        apart from "RH is dead" instead of the signals silently vanishing.
+
+        Aug-22 review (rank 8): RH OAuth died Aug 19 mid-window and 2 of 5
+        SCREENER_SOURCES silently vanished — the eval window was confounded
+        and nothing flagged it. Every decision cycle now also logs one FEEDS
+        line asserting the health of ALL configured screener sources."""
+        feeds = self._feed_health_line()
+        if feeds:
+            if "DEAD" in feeds or "UNHEALTHY" in feeds:
+                log.warning("%s", feeds)
+            else:
+                log.info("%s", feeds)
         if not self.cfg.robinhood_enabled:
             return []
         since = RobinhoodReader.auth_dead_since()
@@ -1230,6 +1294,73 @@ class Orchestrator:
             "movers/scans and the RH earnings calendar are missing this cycle "
             "— their absence is an outage, not a neutral signal."
         ]
+
+    def _feed_health_line(self) -> str:
+        """Per-cycle screener-feed liveness summary: 'FEEDS: 5/5 healthy' or
+        'FEEDS: 3/5 — robinhood DEAD (oauth), ... — EVAL WINDOW VALIDITY AT
+        RISK'. Derived READ-ONLY from what the aggregator already exposes:
+        a configured source whose screener `enabled` gate is False is DEAD
+        this cycle (safe_scan skips it and its candidates silently vanish);
+        RH-backed sources report the dead-auth latch as (oauth). No new
+        probes, no network calls. Best-effort — never breaks a cycle.
+
+        Run-6 (FEEDS_DEGRADED_MODES on): a source that is enabled but whose
+        pull FAILED this cycle (screener.degraded, e.g. the EDGAR Form-4 feed
+        timing out with 0 rows) counts as 'UNHEALTHY (<reason>)' in the n/n,
+        and 'news=vader-fallback' is appended once news.py has latched the
+        Finnhub 403 — so 'FEEDS: 5/5 healthy' means what it says."""
+        try:
+            sources = list(getattr(self.cfg.screener, "sources", ()) or ())
+            if not sources:
+                return "FEEDS: 0/0 configured"
+            degraded_modes = bool(getattr(self.cfg, "feeds_degraded_modes", False))
+            by_name = {
+                s.name: s for s in getattr(self.screeners, "screeners", [])
+            }
+            rh_dead = RobinhoodReader.auth_dead()
+            dead: list[str] = []
+            for src in sources:
+                scr = by_name.get(src)
+                if scr is None:
+                    dead.append(f"{src} DEAD (unknown source)")
+                    continue
+                try:
+                    ok = bool(scr.enabled)
+                except Exception:
+                    ok = False
+                if ok:
+                    why = getattr(scr, "degraded", None) if degraded_modes else None
+                    if why:
+                        dead.append(f"{src} UNHEALTHY ({why})")
+                    continue
+                if src in ("robinhood", "robinhood_scans") and rh_dead:
+                    dead.append(f"{src} DEAD (oauth)")
+                else:
+                    dead.append(f"{src} DEAD (disabled/no credentials)")
+            suffix = " news=vader-fallback" if (
+                degraded_modes and self._news_vader_fallback()
+            ) else ""
+            total = len(sources)
+            if not dead:
+                return f"FEEDS: {total}/{total} healthy{suffix}"
+            return (
+                f"FEEDS: {total - len(dead)}/{total} — " + ", ".join(dead)
+                + " — EVAL WINDOW VALIDITY AT RISK" + suffix
+            )
+        except Exception as e:
+            log.debug("feed health line failed: %s", e)
+            return ""
+
+    def _news_vader_fallback(self) -> bool:
+        """True once the news provider has latched the Finnhub 403 (sentiment
+        = VADER for the rest of the process). Read-only; fails False."""
+        try:
+            for p in getattr(self.signals, "per_symbol", []) or []:
+                if getattr(p, "name", "") == "news":
+                    return bool(getattr(p, "_finnhub_gated", False))
+        except Exception:
+            pass
+        return False
 
     def _refresh_dashboard(self) -> None:
         """Regenerate the live dashboard HTML — and the public track-record page
@@ -1300,18 +1431,53 @@ class Orchestrator:
         """Persist a once-per-day account P&L snapshot (true total return from the
         Alpaca account, not the ledger). Best-effort; never blocks a cycle."""
         try:
-            self.equity_history.snapshot(compute_status(self.broker))
+            self.equity_history.snapshot(compute_status(self.broker), basis="intraday")
         except Exception as e:
             log.warning("Could not record equity snapshot: %s", e)
 
-    def _refresh_closing_snapshot(self) -> None:
-        """Market-closed tick: overwrite today's equity row with the TRUE
-        post-close read. The in-session snapshot lands whenever the last open
-        cycle ran (Jul 28: stamped 46 min before the bell, overstating the
-        close by $498 — every day-P&L forensic then reconciles against a wrong
-        baseline). Only refreshes a row that already exists for today's UTC
-        date, so a post-midnight tick can't mint a phantom next-day row."""
+    def _refresh_closing_snapshot(self, now_et: datetime | None = None) -> None:
+        """Market-closed tick: stamp the day's CLOSE equity row.
+
+        Run-6 item 1b (EQUITY_CLOSE_FIXED_STAMP, default on): the row is
+        written ONCE, at the first closed tick at/after 16:00 ET on a weekday,
+        keyed by the ET date with basis='close', and never overwritten — the
+        legacy path re-stamped it on every closed tick with after-hours marks
+        (Aug 24 row moved $346 between the bell and 23:56Z; Aug 25 row moved
+        from $1,006,145 to $1,007,879), which broke day_pl telescoping.
+        Legacy path (knob off): overwrite today's UTC-dated row on every
+        closed tick, only when a row already exists for it."""
         try:
+            if getattr(self.cfg, "equity_close_fixed_stamp", True):
+                et = now_et or datetime.now(ZoneInfo("America/New_York"))
+                if et.weekday() >= 5 or (et.hour * 60 + et.minute) < 16 * 60:
+                    return
+                day = et.date().isoformat()
+                if self.equity_history.has_close_row(day, ("close", "late")):
+                    return
+                # Review fix (Aug 26): a holiday inside the window (Labor Day
+                # Sep 7) is not a session — no row at all (a phantom
+                # day_pl=0 session would enter max_drawdown/worst_day).
+                # Calendar read failure = None = fail open (stamp).
+                is_day = getattr(self.broker, "is_trading_day", None)
+                if callable(is_day) and is_day(et.date()) is False:
+                    log.info("Equity close row skipped for %s (not a session).", day)
+                    return
+                bb = getattr(self, "_book_beta_reading", None)
+                extra = (
+                    {"book_beta_spy": bb.spy}
+                    if bb is not None and getattr(bb, "spy", None) is not None
+                    else None
+                )  # item 8: ex-ante beta on the close row (eval beta-adjust)
+                # Only the 16:xx ET tick may mint the immutable 'close' row;
+                # a bot (re)started later stamps after-hours marks and says
+                # so (basis='late') so the checker can see the row is not a
+                # bell mark. Also written once, never overwritten.
+                basis = "close" if et.hour == 16 else "late"
+                self.equity_history.snapshot(
+                    compute_status(self.broker), basis=basis, day=day,
+                    extra=extra)
+                log.info("Equity close row stamped for %s (basis=%s).", day, basis)
+                return
             rows = self.equity_history.all()
             today = datetime.now(timezone.utc).date().isoformat()
             if rows and rows[-1].get("date") == today:
@@ -1319,12 +1485,47 @@ class Orchestrator:
         except Exception as e:
             log.warning("Closing equity snapshot failed: %s", e)
 
+    def _expectancy_gate_read(self) -> dict:
+        """Negative-expectancy family set for this cycle. Gate ON -> the set
+        (logged 'armed against'); gate OFF -> still computed and logged once
+        per cycle as 'would have armed against' so the next review can see
+        what it would have blocked, but {} is returned (never rejects).
+        Best-effort — any failure disarms."""
+        r = self.cfg.risk
+        try:
+            neg = negative_expectancy_families(
+                self.ledger,
+                window_days=r.expectancy_gate_window_days,
+                min_trips=r.expectancy_gate_min_trips,
+            )
+        except Exception as e:
+            log.warning("Expectancy gate read failed: %s", e)
+            return {}
+        if not neg:
+            return {}
+        desc = ", ".join(
+            f"{k} {v.avg_pl_pct:+.1f}%/trip x{v.trips}"
+            for k, v in sorted(neg.items())
+        )
+        if r.expectancy_gate_enabled:
+            log.info("Expectancy gate armed against: %s", desc)
+            return neg
+        log.info(
+            "Expectancy gate (off, report-only): would have armed against: %s",
+            desc,
+        )
+        return {}
+
     def _attribution_lessons(self) -> str:
         """Per-cycle track-record block (attribution.py) — recomputed every
         cycle and changes whenever a position closes, so it stays in the
         decision prompt's DYNAMIC half (see engine._render_dynamic)."""
         try:
-            return render_lessons(self.ledger)
+            return render_lessons(
+                self.ledger,
+                min_source_trips=int(getattr(
+                    self.cfg, "track_record_min_trips", 20)),
+            )
         except Exception as e:
             log.warning("Could not render track-record lessons: %s", e)
             return ""
@@ -1332,7 +1533,11 @@ class Orchestrator:
     def _curated_lessons(self) -> str:
         """Nightly post-mortem's curated lessons file — changes at most once a
         day, so it belongs in the decision prompt's STABLE/cached half (see
-        engine._render_stable), separate from _attribution_lessons above."""
+        engine._render_stable), separate from _attribution_lessons above.
+        Run-6: injected only when CURATED_LESSONS_INJECT is on (default off);
+        the nightly post-mortem keeps writing the file regardless."""
+        if not bool(getattr(self.cfg, "curated_lessons_inject", False)):
+            return ""
         try:
             from .postmortem import read_curated
             return read_curated(self.cfg.postmortem_max_lessons)
@@ -1344,7 +1549,9 @@ class Orchestrator:
     ) -> None:
         """Attach each scanner candidate's 'why' as a leading DISCOVERY signal so
         Claude sees why a name surfaced. Names that gathered no other signals get
-        a fresh bundle (gather drops empty ones) so they're still evaluated."""
+        a fresh bundle (gather drops empty ones) so they're still evaluated.
+        Run-6: the line is prompt text + bearish-lean input only — it is no
+        longer a scored term of the composite (see composite_score)."""
         if not discovered:
             return
         by_symbol = {b.symbol: b for b in bundles}
@@ -1393,6 +1600,57 @@ class Orchestrator:
         )
         return True
 
+    def _option_fallback_allowed(self, symbol: str) -> bool:
+        """Is a same-cycle CALL fallback on `symbol` even admissible under the
+        single-name bullish gate? True when the knob is on, or the underlying
+        is an index the gate exempts (SPY/QQQ/IWM/DIA + the configured
+        core/hedge/proxy/defensive ETFs)."""
+        r = getattr(getattr(self, "cfg", None), "risk", None)
+        if getattr(r, "options_single_name_bullish", True):
+            return True
+        from .risk import _INDEX_UNDERLYINGS
+        sym = (symbol or "").upper()
+        cfg = getattr(self, "cfg", None)
+        idx = {
+            str(x).upper() for x in (
+                getattr(cfg, "core_etf", ""), getattr(cfg, "hedge_etf", ""),
+                getattr(cfg, "put_proxy_etf", ""),
+                getattr(cfg, "defensive_core_etf", ""),
+                getattr(self, "_hedge_symbol", ""),
+            ) if x
+        }
+        return sym in _INDEX_UNDERLYINGS or sym in idx
+
+    def _stamp_fill(self, oid: str, symbol: str, filled: float,
+                    detail: dict | None = None) -> dict | None:
+        """Run-6 item 1e: pull the broker's filled_avg_price / qty / time for a
+        FILLED order and write them onto the ledger row (TradeLedger.set_fill).
+        `detail` is the fill dict reconcile already got from order_fill_full
+        (one REST read per order — review fix); without it the legacy
+        order_fill_detail read runs. Returns the fill dict (with 'stamped')
+        or None when disabled / not readable. Best-effort — never raises."""
+        if not getattr(self.cfg, "ledger_fill_prices", True):
+            return None
+        reader = getattr(self.broker, "order_fill_detail", None)
+        if detail is None and not callable(reader):
+            return None
+        try:
+            fill = dict(detail) if detail is not None else (reader(oid) or {})
+            price = float(fill.get("price") or 0.0)
+            if price <= 0:
+                return None
+            fill_qty = float(fill.get("qty") or filled or 0.0)
+            fill["qty"] = fill_qty
+            setter = getattr(self.ledger, "set_fill", None)
+            fill["stamped"] = bool(
+                callable(setter)
+                and setter(oid, price, fill_qty, fill.get("filled_at"))
+            )
+            return fill
+        except Exception as e:  # noqa: BLE001 — bookkeeping only
+            log.warning("Fill-price stamp failed for %s (%s): %s", oid, symbol, e)
+            return None
+
     def _reconcile_fills(self) -> None:
         """Confirm last cycle's orders actually filled. A recorded order id is only
         an intent — rejects and partial fills mean the ledger and our risk picture
@@ -1417,7 +1675,12 @@ class Orchestrator:
         self._pending_oids = []
         mismatches: list[str] = []
         for oid, symbol in pending:
-            status, filled, qty = self.broker.order_fill(oid)
+            full = getattr(self.broker, "order_fill_full", None)
+            detail = None
+            if callable(full):
+                status, filled, qty, detail = full(oid)
+            else:
+                status, filled, qty = self.broker.order_fill(oid)
             # EXIT-side intents (watchdog stops/takes/flattens/option closes)
             # self-heal: the watchdog resubmits every tick until the position
             # is gone, and the correction below trues up the ledger. Their
@@ -1427,7 +1690,15 @@ class Orchestrator:
             # intents (the GA-2.1 phantom-BUY class) still halt.
             is_exit = self.state.exit_was_ledgered(symbol, oid)
             if status == "filled":
-                log.info("Order %s (%s) FILLED (%g/%g).", oid, symbol, filled, qty)
+                fill = self._stamp_fill(oid, symbol, filled, detail=detail)
+                if fill:
+                    log.info(
+                        "Order %s (%s) FILLED (%g/%g) @ %.4f x %g%s.",
+                        oid, symbol, filled, qty, fill["price"], fill["qty"],
+                        " [ledger stamped]" if fill.get("stamped") else "",
+                    )
+                else:
+                    log.info("Order %s (%s) FILLED (%g/%g).", oid, symbol, filled, qty)
                 self._oid_retries.pop(oid, None)
                 continue
             if status == "replaced":
@@ -1545,13 +1816,42 @@ class Orchestrator:
             # backfill (oldest fills first) so multiple exits in one batch each
             # see the lots the earlier ones left behind.
             open_lots, _ = build_lot_history(records)
+            # Once-per-oid skip memory (per process): orders we refuse to
+            # backfill stay in the broker's closed list every cycle — log the
+            # ERROR once, not hourly forever (Aug-23 measurement integrity).
+            skipped = getattr(self, "_backfill_skipped_oids", None)
+            if skipped is None:
+                skipped = self._backfill_skipped_oids = set()
             for o in sorted(closed, key=lambda x: x["filled_at"] or ""):
                 if not o["order_id"] or o["order_id"] in known:
                     continue
-                lots = open_lots.get(o["symbol"], [])
+                ts = None
+                if o["filled_at"]:
+                    try:
+                        ts = datetime.fromisoformat(o["filled_at"])
+                    except ValueError:
+                        pass
+                # Aug-23 fix: a multi-leg option (MLEG) parent order carries
+                # symbol=None at the broker; str()-ing it once wrote a SELL row
+                # with symbol="None", exit_price=-1.19 and no P&L (the Aug-17
+                # AMZN unwind). Never write a corrupt row — skip and log loud.
+                sym = (o["symbol"] or "").strip()
+                if not sym or sym == "None":
+                    if o["order_id"] not in skipped:
+                        skipped.add(o["order_id"])
+                        log.error(
+                            "Backfill SKIP (corrupt symbol): order %s has "
+                            "unresolvable symbol %r (MLEG parent?) — refusing "
+                            "to write a corrupt SELL row.",
+                            o["order_id"], o["symbol"],
+                        )
+                    continue
+                occ = parse_occ(sym)
+                instrument = "option" if occ else "equity"
+                lots = open_lots.get(sym, [])
                 basis, covered = fifo_basis(lots, o["qty"])
                 pl_pct = pl = None
-                if basis > 0 and o["price"] > 0:
+                if instrument == "equity" and basis > 0 and o["price"] > 0:
                     pl_pct = (o["price"] / basis - 1.0) * 100.0
                     pl = (o["price"] - basis) * covered
                     # Consume the shares this exit sold so the next backfilled
@@ -1563,6 +1863,31 @@ class Orchestrator:
                         remaining -= take
                         if lots[0].remaining <= 1e-9:
                             lots.pop(0)
+                if pl is None:
+                    # No FIFO basis: an option chunk fill whose group close the
+                    # watchdog already ledgered under another order id (the
+                    # 4-leg MLEG cap splits closes across orders), or an equity
+                    # sale of pre-ledger shares. A P&L-less SELL row is exactly
+                    # the corruption the ledger now rejects — skip, log once,
+                    # but still stamp the exit cooldown (the exit DID happen).
+                    if o["order_id"] not in skipped:
+                        skipped.add(o["order_id"])
+                        log.error(
+                            "Backfill SKIP (no ledger basis): %s %s %g @ %.2f "
+                            "order %s — not writing a P&L-less SELL row (group "
+                            "close already ledgered, or entry predates ledger).",
+                            instrument, sym, o["qty"], o["price"], o["order_id"],
+                        )
+                        # NEVER stamp an option fill's per-share PREMIUM as the
+                        # UNDERLYING's exit price: exit_prices["AMZN"]=1.19
+                        # would trip the price-aware re-entry guard on every
+                        # fresh equity buy for up to 7 days (the watchdog's own
+                        # option exits omit price for exactly this reason).
+                        self.state.register_exit(
+                            occ[0] if occ else sym, when=ts,
+                            price=None if occ else (o["price"] or None),
+                            pl_pct=None)
+                    continue
                 # A bracket's stop leg is a STOP order; its take-profit leg is a
                 # LIMIT. Anything else filled that we didn't place (market/other)
                 # was an outside actor — label it external, don't guess.
@@ -1570,29 +1895,24 @@ class Orchestrator:
                     "stop": "bracket_stop", "stop_limit": "bracket_stop",
                     "trailing_stop": "bracket_stop", "limit": "bracket_take",
                 }.get(o["type"], "external")
-                ts = None
-                if o["filled_at"]:
-                    try:
-                        ts = datetime.fromisoformat(o["filled_at"])
-                    except ValueError:
-                        pass
                 self.ledger.record(TradeRecord.for_sell(
-                    o["symbol"],
+                    sym,
                     f"exchange-side exit backfill ({o['type'] or 'unknown'} sell)",
                     o["order_id"], qty=o["qty"],
                     realized_pl_pct=pl_pct, realized_pl=pl,
                     exit_reason=reason, ts=ts, exit_price=o["price"] or None,
+                    instrument=instrument,
                 ))
                 log.info(
                     "Backfilled exchange exit: %s %g sh @ %.2f (%s -> %s%s).",
-                    o["symbol"], o["qty"], o["price"], o["type"] or "?", reason,
+                    sym, o["qty"], o["price"], o["type"] or "?", reason,
                     f", {pl_pct:+.1f}%" if pl_pct is not None else "",
                 )
                 # An exchange-side exit also starts the re-entry cooldown —
                 # stamped at the FILL time and price when known (price feeds the
                 # price-aware re-entry guard; realized % feeds the loss streak).
                 self.state.register_exit(
-                    o["symbol"], when=ts, price=o["price"] or None,
+                    occ[0] if occ else sym, when=ts, price=o["price"] or None,
                     pl_pct=pl_pct)
         except Exception as e:  # bookkeeping must never break a decision cycle
             log.warning("Exchange-exit backfill failed: %s", e)
@@ -1773,6 +2093,50 @@ class Orchestrator:
             log.debug("Ledger entry-conviction lookup failed for %s: %s", symbol, e)
         return None
 
+    # -- LLM sell authority: deterministic event tags (run-6 item 2) -------- #
+    def _sell_authority(self) -> str:
+        return (
+            getattr(self.cfg.risk, "llm_sell_authority", "full") or "full"
+        ).strip().lower()
+
+    def _sell_event_tags(self, symbol: str, account) -> tuple[str, ...]:
+        """Event tags that license a model SELL on a LOSING equity position
+        under llm_sell_authority='events_only'. Every tag comes from CODE —
+        the model cannot assert one: this cycle's NAME FALLING read for the
+        symbol, earnings inside the blackout window, an account-wide halt,
+        or the regime flipping into risk-off this cycle. Empty tuple = no
+        event; each read fails closed (no tag) on error."""
+        tags: list[str] = []
+        why = (getattr(self, "_falling_names", {}) or {}).get(symbol, "")
+        if why:
+            tags.append(f"name_falling:{why}")
+        try:
+            blackout = int(getattr(self.cfg.risk, "earnings_blackout_days", 0) or 0)
+            d = self.earnings.days_until_earnings(symbol) if blackout > 0 else None
+            if d is not None and 0 <= d <= blackout:
+                tags.append(f"earnings:{d}d")
+        except Exception:  # noqa: BLE001
+            pass
+        try:
+            halted, halt_why = self.risk.trading_halted(account)
+            if halted:
+                tags.append(f"halt:{halt_why[:40]}")
+        except Exception:  # noqa: BLE001
+            pass
+        if getattr(self, "_regime_flipped_off", False):
+            tags.append("regime_flip:risk-off")
+        return tuple(tags)
+
+    def _reached_planned_stop(self, symbol: str, pos) -> bool:
+        """True when `pos` sits at/below the planned stop width recorded at
+        entry (state.get_stop_width) — the same read _evaluate_sell uses to
+        approve a loser under events-only authority. Unknown width = False."""
+        try:
+            w = float(self.state.get_stop_width(symbol) or 0.0)
+        except Exception:  # noqa: BLE001
+            return False
+        return w > 0 and float(getattr(pos, "unrealized_pl_pct", 0.0) or 0.0) <= -w
+
     def _apply_rotation_guard(self, proposals, account, composites):
         """Enforce the rotation edge the prompt only ASKS for: a SELL that locks
         in a real loss to free capital for a new name must be displaced by a
@@ -1832,6 +2196,23 @@ class Orchestrator:
             pos = account.position_for(p.symbol)
             if pos is None or pos.unrealized_pl_pct > -r.rotation_guard_min_loss_pct:
                 kept.append(p)  # not a loss-locking sell
+                continue
+            # Run-6 item 2: under events-only sell authority a loss-locking
+            # rotation sell with NO deterministic event never executes — the
+            # release ladder below (red day, depth, persistence, conviction
+            # edge) is moot for it. Pass it straight to the risk layer, which
+            # rejects it with the one countable 'SELL AUTHORITY' line instead
+            # of a rotation veto that would hide the counterfactual.
+            # Review fix (Aug 26): a loser that has REACHED its planned stop
+            # would be approved downstream as "stop reached", so it must
+            # still earn the release ladder here — only the never-executes
+            # case (no event AND stop not reached) skips it.
+            if (
+                self._sell_authority() == "events_only"
+                and not self._sell_event_tags(p.symbol, account)
+                and not self._reached_planned_stop(p.symbol, pos)
+            ):
+                kept.append(p)
                 continue
             # Red-day release (Jul 29: NOK's -4.8% exit was vetoed at 16:09
             # and only closed at 18:00 — the guard held a sinking loser open
@@ -2245,6 +2626,30 @@ class Orchestrator:
                 log.warning("Bearish verdict: %s ELIGIBLE but IGNORED — %s.",
                             s, why)
 
+    def _bear_precheck_names(self, bundles, composites: dict) -> list[str]:
+        """ON-SLATE names that get a put-gate precheck: composite <= -bar, OR
+        (review fix, Aug 26) a bundle with NO composite whose bearish lean
+        lives in the DISCOVERY score — the run-6 composite excludes discovery,
+        so the insider-sell discovery path (PR #41) would otherwise never
+        reach put_precheck / put_eligibility and the 0/83 sleeve would shrink
+        structurally. `_bearish_lean` still reads discovery."""
+        bar = self.cfg.screener.bearish_reserve_bar or 0.4
+        out: list[str] = []
+        for b in bundles:
+            comp = composites.get(b.symbol)
+            if comp is None:
+                comp = getattr(b, "composite_score", None)
+            if comp is not None:
+                eligible = comp <= -bar
+            else:
+                try:
+                    eligible = self._bearish_lean(b)
+                except Exception:  # noqa: BLE001 — a precheck, never a blocker
+                    eligible = False
+            if eligible:
+                out.append(b.symbol)
+        return out
+
     def _bearish_lean(self, bundle) -> bool:
         """True when the bundle's evidence leans bearish enough to justify
         keeping an equity-blocked, not-held name on the slate as a PUT
@@ -2575,30 +2980,105 @@ class Orchestrator:
         )
 
     # -- falling-tape core defense (Jul 29) --------------------------------- #
-    def _market_falling(self) -> tuple[bool, str]:
-        """Deterministic "the market is falling" read for the core defense and
-        the index-put sanction. True when the regime label is risk-off, the
-        long-run trend is down (SPY below its 200dma), or TODAY'S benchmark
-        move breaches the intraday defense trigger. Fails closed to (False, '')
-        when the regime filter is off or the data is degraded."""
-        if not self.cfg.risk.regime_filter_enabled:
-            return False, ""
-        reg = self.regime.assess()
-        if reg.label == "risk-off":
-            return True, "regime is risk-off"
-        if reg.trend == "down":
-            return True, "SPY below its 200dma (long-run downtrend)"
-        drop = getattr(self.cfg, "market_drop_defense_pct", 0.0)
-        if (
-            drop > 0
-            and reg.day_change_pct is not None
-            and reg.day_change_pct <= -drop
-        ):
-            return True, (
-                f"SPY {reg.day_change_pct:+.1f}% today "
-                f"(<= -{drop:g}% intraday defense trigger)"
+    def _market_falling(self, account=None) -> tuple[bool, str]:
+        """Deterministic "the market is falling" read for the core defense,
+        the auto-hedge and the index-put sanction. True when the INDEX is
+        falling (regime risk-off, SPY under its 200dma, or TODAY'S benchmark
+        move breaching the intraday trigger) OR — Aug-22 breadth trigger
+        (Aug 18: -$26,844 at 3.9x SPY down-capture with ELEVEN per-name
+        falling reads while SPY never breached -1.1% intraday, so every
+        defense slept) — when the BOOK itself is falling: at least
+        breadth_falling_names_min held names carry a NAME FALLING read, or
+        the intraday book P/L (equity vs last_equity — the daily-loss
+        halt's own numbers) breaches breadth_book_drawdown_pct. The index
+        legs still fail closed when the regime filter is off or degraded;
+        the breadth legs need no regime feed. `account` defaults to the
+        snapshot the defense callers stash each cycle (kept optional so
+        zero-arg callers and test stubs still work). The winning trigger
+        source ("index" / "breadth:N-names" / "book:-X.X%") lands in
+        self._falling_trigger for the BEARISH FUNNEL line."""
+        acct = (
+            account if account is not None
+            else getattr(self, "_defense_account", None)
+        )
+        falling, why, source = False, "", ""
+        if self.cfg.risk.regime_filter_enabled:
+            reg = self.regime.assess()
+            if reg.label == "risk-off":
+                falling, why, source = True, "regime is risk-off", "index"
+            elif reg.trend == "down":
+                falling, why, source = (
+                    True, "SPY below its 200dma (long-run downtrend)", "index"
+                )
+            else:
+                drop = getattr(self.cfg, "market_drop_defense_pct", 0.0)
+                if (
+                    drop > 0
+                    and reg.day_change_pct is not None
+                    and reg.day_change_pct <= -drop
+                ):
+                    falling, why, source = True, (
+                        f"SPY {reg.day_change_pct:+.1f}% today "
+                        f"(<= -{drop:g}% intraday defense trigger)"
+                    ), "index"
+        if not falling:
+            names = getattr(self, "_falling_names", {}) or {}
+            names_min = int(
+                getattr(self.cfg, "breadth_falling_names_min", 0) or 0
             )
-        return False, ""
+            # Double-count guard: a map from a PREVIOUS cycle that the breadth
+            # re-arm already counted toward auto_hedge_min_cycles is one
+            # observation, not two — the top-of-cycle defense pass must wait
+            # for this cycle's fresh map instead of re-counting the stale one
+            # (otherwise the 2-cycle persistence bar is satisfied by a single
+            # one-hour blip and the hedge whipsaws).
+            map_cycle = getattr(self, "_breadth_map_cycle", -1)
+            stale_counted = (
+                map_cycle == getattr(self, "_breadth_counted_cycle", -2)
+                and map_cycle < getattr(self, "_cycle_seq", 0)
+            )
+            if names_min > 0 and len(names) >= names_min:
+                if stale_counted:
+                    if getattr(self, "_breadth_guard_logged", -1) != map_cycle:
+                        self._breadth_guard_logged = map_cycle
+                        log.info(
+                            "BREADTH COUNT GUARD: %d-name falling map from a "
+                            "prior cycle already counted toward the hedge "
+                            "persistence bar — awaiting this cycle's fresh "
+                            "breadth read.", len(names),
+                        )
+                else:
+                    falling = True
+                    source = f"breadth:{len(names)}-names"
+                    why = (
+                        f"{len(names)} held names falling at once (>= "
+                        f"{names_min}-name breadth bar: "
+                        + ", ".join(sorted(names)[:5]) + ")"
+                    )
+        if not falling:
+            raw = getattr(self.cfg, "breadth_book_drawdown_pct", 0.0) or 0.0
+            bar = -abs(float(raw))  # sign-agnostic: -1.25 == 1.25 (a loss)
+            if bar < 0 and acct is not None and getattr(acct, "last_equity", 0.0) > 0:
+                day = acct.day_pl_pct
+                if day <= bar:
+                    falling = True
+                    source = f"book:{day:+.1f}%"
+                    why = (
+                        f"book P/L {day:+.2f}% intraday "
+                        f"(<= {bar:g}% breadth drawdown trigger)"
+                    )
+        self._falling_read_last = falling
+        self._falling_trigger = source
+        # One distinctive line per trigger-source TRANSITION (this read runs
+        # several times per cycle — dedupe keeps the daily log greppable
+        # without a 3x echo); the per-cycle state lives in BEARISH FUNNEL.
+        if falling and source != getattr(self, "_falling_trigger_logged", ""):
+            log.info(
+                "FALLING-TAPE TRIGGER (%s): %s — core defense / auto-hedge / "
+                "index-put sanction keying on this read.", source, why,
+            )
+        self._falling_trigger_logged = source
+        return falling, why
 
     def _name_falling_reads(self, account, tech_ctx) -> dict[str, str]:
         """Per-NAME falling read (Jul 30 review, Phase-1 gap): every falling-
@@ -2640,6 +3120,33 @@ class Orchestrator:
                 )
         return out
 
+    def _breadth_rearm(self, account) -> None:
+        """Aug-22 breadth re-arm: the defense pass at the top of the cycle
+        runs BEFORE this cycle's falling-names map exists (the map needs the
+        signal bundles' tech context), so a breadth-armed read would
+        otherwise act a full cycle late. When the FRESH map alone crosses
+        the breadth bar and that earlier pass read clear, re-run the
+        defenses now — Aug 18 fired ELEVEN name-falling reads in one cycle
+        with zero defense trades. Whipsaw bounds hold: the earlier clear
+        pass only advanced _clear_cycles, and this re-run counts at most ONE
+        falling cycle, so the auto_hedge_min_cycles persistence and the
+        auto_hedge_max_pct ceiling apply unchanged."""
+        names_min = int(getattr(self.cfg, "breadth_falling_names_min", 0) or 0)
+        if names_min <= 0:
+            return
+        names = getattr(self, "_falling_names", {}) or {}
+        if len(names) < names_min:
+            return
+        if getattr(self, "_falling_read_last", False):
+            return  # the top-of-cycle pass already counted a falling read
+        log.info(
+            "BREADTH RE-ARM: %d name-falling reads >= %d-name bar — "
+            "re-running core defense + auto-hedge on this cycle's breadth.",
+            len(names), names_min,
+        )
+        self._apply_core_defense(account)
+        self._apply_auto_hedge(account)
+
     def _apply_core_defense(self, account) -> None:
         """When the market itself is falling, stop averaging INTO it and take
         risk OFF the core: pause the core-ETF fill for the cycle (the flag the
@@ -2650,6 +3157,9 @@ class Orchestrator:
         at catastrophe distance. A defensive trim is not a thesis exit: no
         re-entry cooldown / loss-streak stamp, and the fill resumes (DCA back
         in) as soon as the falling read clears."""
+        # Stash the snapshot for _market_falling's book-P/L breadth leg (the
+        # read itself stays zero-arg for its other callers).
+        self._defense_account = account
         etf = self.cfg.core_etf
         self._core_defense_active = False
         if not etf or not getattr(self.cfg, "core_defense_enabled", False):
@@ -2737,13 +3247,27 @@ class Orchestrator:
         OPTIONS_ENABLED off, and — unlike the index-put sanction, which asks
         the model — it never waits on discretion. The persistence requirement
         is the noise filter: a single red tick arms nothing."""
+        # Stash the snapshot for _market_falling's book-P/L breadth leg.
+        self._defense_account = account
         etf = getattr(self.cfg, "hedge_etf", "")
         if not etf:
+            return
+        if str(getattr(self.cfg, "auto_hedge_mode", "falling")).lower() == "beta":
+            self._apply_beta_hedge(account, etf)
             return
         falling, why = self._market_falling()
         if falling:
             self._falling_cycles += 1
             self._clear_cycles = 0
+            # When BREADTH won this read, mark its falling-names map as
+            # counted: next cycle's top-of-cycle pass re-reads the same
+            # (by-then stale) map, and one observation must not satisfy the
+            # persistence bar twice (_market_falling skips a stale counted
+            # map on the breadth-names leg).
+            if str(getattr(self, "_falling_trigger", "")).startswith("breadth:"):
+                self._breadth_counted_cycle = getattr(
+                    self, "_breadth_map_cycle", -1
+                )
         else:
             self._clear_cycles += 1
         need = max(1, getattr(self.cfg, "auto_hedge_min_cycles", 2))
@@ -2753,31 +3277,14 @@ class Orchestrator:
             if self._clear_cycles >= need:
                 self._falling_cycles = 0
                 if pos is not None and pos.qty > 0:
-                    with self._trade_lock:
-                        self.broker.cancel_open_orders_for(etf)
-                        oid = self.broker.close_position(etf)
-                    if oid:
-                        log.warning(
-                            "AUTO-HEDGE UNWIND: falling read clear %d cycles — "
-                            "closing %g %s (%+.1f%%).",
-                            self._clear_cycles, pos.qty, etf,
-                            pos.unrealized_pl_pct,
-                        )
-                        self.ledger.record(TradeRecord.for_sell(
-                            etf, "auto-hedge unwind: falling read cleared",
-                            oid, qty=pos.qty,
-                            realized_pl_pct=pos.unrealized_pl_pct,
-                            realized_pl=pos.unrealized_pl,
-                            exit_reason="hedge_unwind",
-                            exit_price=pos.current_price or None,
-                        ))
-                        self._pending_oids.append((oid, etf))
-                        self.state.add_pending_order(oid, etf)
-                        # Keep the cycle's snapshot honest: hedge is cash now.
-                        account.cash += held_val
-                        account.buying_power += held_val
-                        pos.qty = 0.0
-                        pos.market_value = 0.0
+                    self._hedge_close(
+                        account, etf, pos, held_val,
+                        "auto-hedge unwind: falling read cleared",
+                        "AUTO-HEDGE UNWIND: falling read clear %d cycles — "
+                        "closing %g %s (%+.1f%%).",
+                        self._clear_cycles, pos.qty, etf,
+                        pos.unrealized_pl_pct,
+                    )
             return
         if self._falling_cycles < need:
             log.info(
@@ -2816,11 +3323,11 @@ class Orchestrator:
                 "after the cash buffer.", gap, etf, spendable,
             )
             return
-        price = self.broker.latest_price(etf)
-        with self._trade_lock:
-            oid = self.broker.submit_notional_buy(etf, notional)
-        if not oid:
-            log.warning("Auto-hedge buy of %s failed to submit — next cycle.", etf)
+        if not self._hedge_submit(
+            account, etf, notional, f"auto-hedge: {why}",
+            f"deterministic inverse-ETF hedge, {ratio:.0%} of net-long, "
+            f"ceiling {getattr(self.cfg, 'auto_hedge_max_pct', 0.0):.0f}% equity",
+        ):
             return
         log.warning(
             "AUTO-HEDGE: %s (cycle %d) — bought $%.0f of %s "
@@ -2828,16 +3335,200 @@ class Orchestrator:
             why, self._falling_cycles, notional, etf, held_val + notional,
             target, ratio * 100.0, net_long,
         )
+
+    # -- run-6 item 7: book-beta reading + beta-sized hedge ---------------- #
+    def _read_book_beta(self, account) -> None:
+        """ONE 'BOOK BETA:' line per decision cycle (run-6 item 7a); the
+        reading is kept for the buy-path cap and the beta hedge and
+        persisted to risk_state.json. Never blocks trading."""
+        self._book_beta_reading = None
+        if not getattr(self.cfg, "book_beta_enabled", False):
+            return
+        reader = getattr(self, "book_beta", None)
+        if reader is None:
+            log.info("BOOK BETA: unavailable (no reader)")
+            return
+        try:
+            reading = reader.read(account)
+        except Exception as e:  # noqa: BLE001 — a measurement, never a blocker
+            log.info("BOOK BETA: unavailable (%s: %s)", type(e).__name__, e)
+            return
+        log.info("%s", reading.line())
+        if not reading.available:
+            return
+        self._book_beta_reading = reading
+        try:
+            self.state.set_book_beta(reading.to_dict())
+        except Exception as e:  # noqa: BLE001
+            log.warning("BOOK BETA: state persist failed: %s", e)
+
+    def _beta_context(self, symbol: str, account) -> tuple[float | None, float | None]:
+        """(book SPY-beta right now, candidate's shrunk SPY-beta) for the
+        buy-path beta cap; (None, None) = reader off / blind -> gate skipped.
+        The book is re-read against the (mutated) cycle snapshot so a buy
+        submitted earlier this cycle already counts; the per-symbol series
+        are cycle-cached so this costs at most one fetch (the candidate)."""
+        if getattr(self, "_book_beta_reading", None) is None:
+            return None, None
+        try:
+            cur = self.book_beta.read(account)
+            book = cur.spy if cur.available else self._book_beta_reading.spy
+            return book, self.book_beta.beta_of(symbol, "SPY")
+        except Exception as e:  # noqa: BLE001 — fail open
+            log.warning("BOOK BETA: context for %s failed: %s", symbol, e)
+            return None, None
+
+    def _apply_beta_hedge(self, account, etf: str) -> None:
+        """AUTO_HEDGE_MODE=beta (run-6 item 7c): size the inverse ETF to
+        max(0, beta_book_spy - target) x equity. Arms when the book's SPY-
+        beta exceeds hedge_beta_target by more than hedge_beta_band for ONE
+        cycle; unwinds when it falls below target - band (hysteresis);
+        holds in between. The falling-tape read is kept as a 'tighten the
+        target to hedge_beta_falling_target' condition (its own persistence
+        rules no longer gate the hedge). The measured beta INCLUDES a held
+        hedge, so the gap is the ADDITIONAL notional; auto_hedge_max_pct
+        caps the total. An unavailable reading holds whatever is on."""
+        falling, why = self._market_falling()
+        target = float(getattr(self.cfg, "hedge_beta_target", 1.0))
+        band = max(0.0, float(getattr(self.cfg, "hedge_beta_band", 0.15)))
+        if falling:
+            target = min(
+                target, float(getattr(self.cfg, "hedge_beta_falling_target", target)),
+            )
+        beta = None
+        if getattr(self.cfg, "book_beta_enabled", False):
+            try:
+                cur = self.book_beta.read(account)
+                beta = cur.spy if cur.available else None
+            except Exception as e:  # noqa: BLE001
+                log.warning("Auto-hedge: beta re-read failed: %s", e)
+        if beta is None:
+            base = getattr(self, "_book_beta_reading", None)
+            beta = base.spy if base is not None else None
+        pos = account.position_for(etf)
+        held_val = max(0.0, pos.market_value) if pos is not None else 0.0
+        held = pos is not None and pos.qty > 0
+        if beta is None:
+            log.info(
+                "AUTO-HEDGE: beta: book beta unavailable this cycle — "
+                "holding %s ($%.0f).", etf, held_val,
+            )
+            return
+        sig = hedge_signal(beta, target, band, held)
+        tag = f"beta:{beta:.2f}"
+        if sig == "unwind":
+            self._falling_cycles = 0
+            self._hedge_reason = ""
+            self._hedge_close(
+                account, etf, pos, held_val,
+                f"auto-hedge unwind: beta {beta:.2f} < target {target:.2f} - {band:.2f}",
+                "AUTO-HEDGE UNWIND: beta: book spy-beta %.2f < target %.2f - "
+                "%.2f band — closing %g %s (%+.1f%%).",
+                beta, target, band, pos.qty, etf, pos.unrealized_pl_pct,
+            )
+            return
+        if sig == "hold":
+            self._hedge_reason = tag if held else ""
+            self._falling_cycles = 1 if held else 0
+            if held:
+                log.info(
+                    "Auto-hedge: beta: book spy-beta %.2f within %.2f +/- %.2f "
+                    "— holding $%.0f %s.", beta, target, band, held_val, etf,
+                )
+            return
+        # arm
+        self._falling_cycles = 1
+        self._hedge_reason = tag
+        halted, halt_why = self.risk.trading_halted(account)
+        if halted:
+            log.info("Auto-hedge skipped: %s", halt_why)
+            return
+        max_pct = max(0.0, float(getattr(self.cfg, "auto_hedge_max_pct", 0.0)))
+        gap = hedge_target_notional(beta, target, account.equity, max_pct)
+        ceiling = account.equity * max_pct / 100.0
+        gap = min(gap, max(0.0, ceiling - held_val))
+        r = self.cfg.risk
+        min_fill = max(
+            r.min_order_usd, account.equity * (r.min_order_pct / 100.0), 1.0
+        )
+        if gap < min_fill:
+            if ceiling - held_val < min_fill:
+                log.info(
+                    "Auto-hedge: beta: book spy-beta %.2f > target %.2f but %s "
+                    "already at the %.0f%% ceiling ($%.0f).",
+                    beta, target, etf, max_pct, held_val,
+                )
+            return
+        min_cash = account.equity * (r.min_cash_buffer_pct / 100.0)
+        spendable = max(0.0, min(account.cash - min_cash, account.buying_power))
+        notional = round(min(gap, spendable), 2)
+        if notional < min_fill:
+            log.info(
+                "Auto-hedge: want $%.0f more %s but only $%.0f spendable "
+                "after the cash buffer.", gap, etf, spendable,
+            )
+            return
+        reason = (
+            f"beta: book spy-beta {beta:.2f} > target {target:.2f} + {band:.2f} band"
+            + (f" (tape falling: {why})" if falling else "")
+        )
+        if not self._hedge_submit(
+            account, etf, notional, f"auto-hedge: {reason}",
+            f"beta-sized inverse-ETF hedge to target {target:.2f}, "
+            f"ceiling {max_pct:.0f}% equity",
+        ):
+            return
+        log.warning(
+            "AUTO-HEDGE: %s — bought $%.0f of %s (hedge $%.0f/$%.0f, "
+            "ceiling %.0f%% of equity).",
+            reason, notional, etf, held_val + notional,
+            min(held_val + gap, ceiling), max_pct,
+        )
+
+    def _hedge_close(
+        self, account, etf: str, pos, held_val: float, rationale: str,
+        msg: str, *args,
+    ) -> None:
+        """Close the hedge ETF, ledger the unwind, keep the snapshot honest."""
+        with self._trade_lock:
+            self.broker.cancel_open_orders_for(etf)
+            oid = self.broker.close_position(etf)
+        if not oid:
+            return
+        log.warning(msg, *args)
+        self.ledger.record(TradeRecord.for_sell(
+            etf, rationale, oid, qty=pos.qty,
+            realized_pl_pct=pos.unrealized_pl_pct,
+            realized_pl=pos.unrealized_pl,
+            exit_reason="hedge_unwind",
+            exit_price=pos.current_price or None,
+        ))
+        self._pending_oids.append((oid, etf))
+        self.state.add_pending_order(oid, etf)
+        # Keep the cycle's snapshot honest: hedge is cash now.
+        account.cash += held_val
+        account.buying_power += held_val
+        pos.qty = 0.0
+        pos.market_value = 0.0
+
+    def _hedge_submit(
+        self, account, etf: str, notional: float, rationale: str, risk_note: str,
+    ) -> bool:
+        """Submit a notional hedge buy + ledger/state bookkeeping. False when
+        the broker declined (caller logs nothing; next cycle retries)."""
+        price = self.broker.latest_price(etf)
+        with self._trade_lock:
+            oid = self.broker.submit_notional_buy(etf, notional)
+        if not oid:
+            log.warning("Auto-hedge buy of %s failed to submit — next cycle.", etf)
+            return False
         self.ledger.record(TradeRecord(
             symbol=etf, action="buy", instrument="equity",
             qty=round(notional / price, 6) if price and price > 0 else 0.0,
             entry_price=price or 0.0, cost_usd=round(notional, 2),
-            rationale=f"auto-hedge: {why}",
+            rationale=rationale,
             entry_signals=["auto_hedge"], verdict="approved",
-            risk_note=(
-                f"deterministic inverse-ETF hedge, {ratio:.0%} of net-long, "
-                f"ceiling {getattr(self.cfg, 'auto_hedge_max_pct', 0.0):.0f}% equity"
-            ),
+            risk_note=risk_note,
             order_id=oid,
         ))
         self._pending_oids.append((oid, etf))
@@ -2847,6 +3538,7 @@ class Orchestrator:
             account, etf, notional, price,
             notional / price if price and price > 0 else 0.0,
         )
+        return True
 
     def _apply_defensive_rotation(self, account) -> None:
         """Rotate the defensive T-bill core (SGOV/BIL) back to cash once the
@@ -3194,6 +3886,19 @@ class Orchestrator:
         fams = parse_cited(proposal.key_signals) if is_buy else set()
         d_etf = getattr(self.cfg, "defensive_core_etf", "")
         d_pos = account.position_for(d_etf) if d_etf else None
+        # LLM sell authority (run-6 item 2): deterministic event tags + the
+        # planned stop width travel with every SELL so the risk layer can
+        # hold a loser to the mechanical stack unless code named an event.
+        is_sell = proposal.action.value == "sell"
+        sell_events = self._sell_event_tags(proposal.symbol, account) if is_sell else None
+        stop_width = self.state.get_stop_width(proposal.symbol) if is_sell else None
+        # Book-beta cap context (run-6 item 7b): the book's CURRENT SPY-beta
+        # (re-read against the snapshot so earlier buys this cycle count)
+        # and the candidate's own beta; both None when the reader is off or
+        # blind this cycle (the gate then fails open).
+        book_spy, cand_beta = (
+            self._beta_context(proposal.symbol, account) if is_buy else (None, None)
+        )
         decision = self.risk.evaluate(
             proposal, account, price, vol, pending, days_to_earnings,
             sector, sector_exposure, self._regime_mult,
@@ -3207,6 +3912,8 @@ class Orchestrator:
             defensive_exempt_usd=(
                 max(0.0, d_pos.market_value) if d_pos is not None else 0.0
             ),
+            sell_events=sell_events, stop_width_pct=stop_width,
+            book_beta_spy=book_spy, candidate_beta=cand_beta,
         )
         if proposal.action.value == "hold":
             # A HOLD is the model saying "no action" — the risk layer returns
@@ -3231,18 +3938,27 @@ class Orchestrator:
                 0.0,
                 decision.reason, proposal.rationale[:120] if proposal.rationale else "",
             )
-            # Same-cycle option fallback (Jul 28): a buy that died at an
-            # EQUITY-only gate (overextension / earnings blackout) is the
-            # sanctioned capped-debit call setup — evaluate_option exempts
-            # both gates. Queue it for a scoped follow-up decision AFTER the
-            # main proposal loop; next-cycle journal memory alone never
-            # converted (slate rotates, idea decays, model picks fresh names).
+            # Same-cycle option fallback (Jul 28): a buy that died at the
+            # overextension gate gets a scoped follow-up option decision
+            # AFTER the main proposal loop. Run-6 item 3: the earnings
+            # blackout now applies to option debits too (evaluate_option
+            # rejects them), so "Earnings in" no longer feeds the queue;
+            # "Overextended" stays ONLY because the fallback hands the
+            # underlying's technicals to _handle_option, where the OPTION
+            # CHASE GATE re-reads the same tape (a hot-but-not-extreme name
+            # deploys at the haircut; an extreme/gap chase is re-blocked).
             # Calls trade WITH the tape only, so skip in a down-trend market.
+            # Review fix (Aug 26): with OPTIONS_SINGLE_NAME_BULLISH=off the
+            # fallback is a CALL on a single name that evaluate_option will
+            # reject unconditionally — don't spend the LLM call (or a
+            # journal row against the per-day attempt cap) unless the knob
+            # is on or the underlying is an index the gate exempts.
             if (
                 is_buy
                 and self.options is not None
                 and self._regime_trend != "down"
-                and decision.reason.startswith(("Overextended", "Earnings in"))
+                and decision.reason.startswith("Overextended")
+                and self._option_fallback_allowed(proposal.symbol)
             ):
                 self._option_fallbacks.append((proposal, decision.reason))
             return 0.0
@@ -3426,6 +4142,28 @@ class Orchestrator:
         )
         if is_put_play:
             self._bear_puts_proposed = getattr(self, "_bear_puts_proposed", 0) + 1
+        # Run-6 item 3: the option path gets the SAME earnings read the
+        # equity path gets (fails open on a calendar miss, like equities);
+        # the configured core/hedge/proxy ETFs join the broad-index exemption.
+        days_to_earnings = None
+        if not proxy_for:
+            try:
+                cal = getattr(self, "earnings", None)
+                if cal is not None:
+                    days_to_earnings = cal.days_until_earnings(proposal.symbol)
+            except Exception as e:  # noqa: BLE001 — fail open, never block on a feed error
+                log.warning("Option earnings read for %s failed: %s", proposal.symbol, e)
+                days_to_earnings = None
+        _cfg = getattr(self, "cfg", None)
+        index_symbols = frozenset(
+            str(x).upper() for x in (
+                getattr(_cfg, "core_etf", ""),
+                getattr(_cfg, "hedge_etf", ""),
+                getattr(_cfg, "put_proxy_etf", ""),
+                getattr(_cfg, "defensive_core_etf", ""),
+                getattr(self, "_hedge_symbol", ""),
+            ) if x
+        )
         decision = self.risk.evaluate_option(
             proposal, account, premium, leg_liquidity=liquidity,
             min_leg_premium=min_leg,
@@ -3444,6 +4182,16 @@ class Orchestrator:
             # momentum put carve-out — NU/NOK-shaped names break hard while
             # still reading name_trend="up" on their 200dma.
             name_ext_pct=tech.get("ext_pct_sma20") if tech else None,
+            # Full technicals dict for the bullish-option anti-chase gate
+            # (OPTION CHASE GATE): without it the gate fails open and an
+            # overextended equity reject re-expressed as a call debit walks
+            # straight past the read it was rejected on (the HL -67.6% chase).
+            tech=tech,
+            days_to_earnings=days_to_earnings,
+            index_symbols=index_symbols,
+            proxy_put=bool(proxy_for) and bool(
+                getattr(_cfg, "proxy_put_thesis_gate", True)
+            ),
         )
         if is_put_play and decision.verdict != RiskVerdict.REJECTED:
             self._bear_puts_approved = getattr(self, "_bear_puts_approved", 0) + 1
@@ -3496,6 +4244,46 @@ class Orchestrator:
                 proposal.symbol, decision.approved_notional,
             )
 
+    def _proxy_thesis_transfers(
+        self, etf: str, spot: float, blocked: TradeProposal,
+    ) -> tuple[bool, str]:
+        """Does a single-name bearish read transfer to an index short on
+        `etf`? True on any of: the ETF below its 50-day SMA (daily closes
+        from the broker), the breadth trigger armed this cycle
+        (_market_falling's winning source was "breadth:N-names"), or >= 2
+        bearish slate names (this cycle's put-precheck set) in the blocked
+        name's sector. Every read fails CLOSED (no data = no transfer) —
+        the consequence is the small size, never a skipped hedge."""
+        # 1) proxy ETF under its 50-day SMA
+        try:
+            series = self.broker.daily_close_series(etf, 60)
+            closes = [float(c) for _, c in series if c]
+            if len(closes) >= 50 and spot > 0:
+                sma50 = sum(closes[-50:]) / 50.0
+                if spot < sma50:
+                    return True, f"{etf} {spot:.2f} below its 50d SMA {sma50:.2f}"
+        except Exception as e:  # noqa: BLE001 — a bar-feed miss is not a thesis
+            log.debug("Proxy thesis: 50d SMA read for %s failed: %s", etf, e)
+        # 2) breadth trigger armed this cycle
+        trigger = str(getattr(self, "_falling_trigger", "") or "")
+        if trigger.startswith("breadth"):
+            return True, f"breadth trigger armed ({trigger})"
+        # 3) >= 2 bearish slate names in the same sector
+        try:
+            sectors = getattr(self, "sectors", None)
+            bearish = set(getattr(self, "_bear_eligibility", {}) or {})
+            bearish.add(blocked.symbol.upper())
+            sec = sectors.sector_for(blocked.symbol) if sectors else None
+            if sec:
+                same = sorted(
+                    s for s in bearish if sectors.sector_for(s) == sec
+                )
+                if len(same) >= 2:
+                    return True, f"{len(same)} bearish slate names in {sec} ({', '.join(same[:4])})"
+        except Exception as e:  # noqa: BLE001
+            log.debug("Proxy thesis: sector read failed: %s", e)
+        return False, "no index/breadth/sector confirmation"
+
     def _propose_proxy_put(
         self, blocked: TradeProposal, account,
         signal_kinds: list[str] | None,
@@ -3533,6 +4321,24 @@ class Orchestrator:
             self._proxy_put_state = f"{etf} skipped: no workable chain pair"
             log.info("Proxy put for %s: no workable %s chain pair.", blocked.symbol, etf)
             return
+        # Run-6 item 3e: a single-name bearish read only transfers to an
+        # INDEX short when something index-wide backs it. Otherwise the
+        # proxy is a token-sized hedge, not a thesis.
+        max_premium = blocked.max_premium_usd
+        thesis_note = ""
+        if getattr(self.cfg, "proxy_put_thesis_gate", True):
+            transfers, why = self._proxy_thesis_transfers(etf, spot, blocked)
+            if transfers:
+                thesis_note = f" Transferable thesis: {why}."
+            else:
+                pct = float(getattr(self.cfg, "proxy_put_untransferred_pct", 0.25) or 0.0)
+                small = account.equity * (pct / 100.0)
+                max_premium = small if max_premium is None else min(max_premium, small)
+                thesis_note = (
+                    f" Thesis does not transfer to {etf} ({why}) — sized at "
+                    f"{pct:g}% of equity (${small:,.0f})."
+                )
+            log.info("PROXY PUT THESIS: %s -> %s:%s", blocked.symbol, etf, thesis_note)
         proxy = TradeProposal(
             symbol=etf,
             action=Action.BUY,
@@ -3541,13 +4347,14 @@ class Orchestrator:
             rationale=(
                 f"SYSTEM PROXY PUT for {blocked.symbol}: its own chain failed "
                 f"the liquidity floor, re-expressing the bearish read on "
-                f"liquid {etf}. Original thesis: {blocked.rationale[:150]}"
+                f"liquid {etf}.{thesis_note} Original thesis: "
+                f"{blocked.rationale[:150]}"
             ),
             key_signals=blocked.key_signals,
             instrument=Instrument.OPTION,
             option_strategy=OptionStrategy.BEAR_PUT_SPREAD,
             option_legs=legs,
-            max_premium_usd=blocked.max_premium_usd,
+            max_premium_usd=max_premium,
         )
         log.info(
             "PROXY PUT: %s put blocked on liquidity -> proposing %s %s/%s %s.",

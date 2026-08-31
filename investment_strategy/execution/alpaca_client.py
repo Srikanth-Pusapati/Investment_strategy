@@ -28,6 +28,7 @@ from alpaca.data.timeframe import TimeFrame
 from alpaca.trading.client import TradingClient
 from alpaca.trading.enums import OrderClass, OrderSide, QueryOrderStatus, TimeInForce
 from alpaca.trading.requests import (
+    GetCalendarRequest,
     GetOrdersRequest,
     GetPortfolioHistoryRequest,
     LimitOrderRequest,
@@ -996,9 +997,19 @@ class AlpacaClient:
             log.warning("open_stop_sells(%s) failed: %s", symbol, e)
         return out
 
-    def order_fill(self, order_id: str) -> tuple[str, float, float]:
-        """(status, filled_qty, qty) for an order — for post-hoc fill reconciliation.
-        Returns ('unknown', 0, 0) if the order can't be fetched."""
+    @staticmethod
+    def _fill_detail_of(o) -> dict:
+        return {
+            "price": float(getattr(o, "filled_avg_price", 0) or 0),
+            "qty": float(getattr(o, "filled_qty", 0) or 0),
+            "filled_at": getattr(o, "filled_at", None),
+        }
+
+    def order_fill_full(self, order_id: str) -> tuple[str, float, float, dict]:
+        """(status, filled_qty, qty, fill_detail) from ONE get_order_by_id —
+        reconcile used to read the order twice (order_fill + order_fill_detail)
+        per FILLED order (review fix). ('unknown', 0, 0, {}) when the order
+        can't be fetched."""
         try:
             o = self.trading.get_order_by_id(order_id)
             status = getattr(o, "status", "")
@@ -1009,10 +1020,40 @@ class AlpacaClient:
                 str(status).lower(),
                 float(getattr(o, "filled_qty", 0) or 0),
                 float(getattr(o, "qty", 0) or 0),
+                self._fill_detail_of(o),
             )
         except Exception as e:
             log.warning("order_fill(%s) failed: %s", order_id, e)
-            return ("unknown", 0.0, 0.0)
+            return ("unknown", 0.0, 0.0, {})
+
+    def order_fill(self, order_id: str) -> tuple[str, float, float]:
+        """(status, filled_qty, qty) for an order — for post-hoc fill reconciliation.
+        Returns ('unknown', 0, 0) if the order can't be fetched."""
+        return self.order_fill_full(order_id)[:3]
+
+    def order_fill_detail(self, order_id: str) -> dict:
+        """Broker-reported fill facts for a FILLED order (run-6 item 1e):
+        {'price': filled_avg_price, 'qty': filled_qty, 'filled_at': datetime|None}.
+        Read-only; {} when the order can't be fetched."""
+        return self.order_fill_full(order_id)[3]
+
+    def is_trading_day(self, day) -> Optional[bool]:
+        """True/False when the exchange calendar says `day` (a date) is / is
+        not a session; None when the calendar read fails (callers fail open).
+        Feeds the fixed close stamp so a holiday (Labor Day inside the run-6
+        window) never mints a phantom basis='close' row."""
+        try:
+            cal = _retry_read(
+                lambda: self.trading.get_calendar(
+                    GetCalendarRequest(start=day, end=day)),
+                what="get_calendar",
+            )
+            return any(
+                str(getattr(c, "date", "")) == day.isoformat() for c in cal or []
+            )
+        except Exception as e:
+            log.warning("is_trading_day(%s) failed: %s", day, e)
+            return None
 
     def closed_sell_orders(self, limit: int = 500) -> list[dict]:
         """Recently CLOSED (terminal-state) SELL orders from the broker, newest
@@ -1105,6 +1146,68 @@ class AlpacaClient:
             limit_price=o.limit_price, stop_price=o.stop_price, **common
         )
 
+    def latest_prices(self, symbols: list[str]) -> dict[str, float]:
+        """Last trade price for MANY symbols in ONE data call (run-6 screener
+        hygiene: the aggregator prices the whole merged candidate set before
+        the slate cap). Missing / failed symbols are simply absent from the
+        result so callers fail open. Empty dict on any error."""
+        syms = sorted({s.upper() for s in symbols if s})
+        if not syms:
+            return {}
+        try:
+            req = StockLatestTradeRequest(symbol_or_symbols=syms)
+            trades = _retry_read(
+                lambda: self.data.get_stock_latest_trade(req),
+                what=f"latest_prices({len(syms)})",
+            )
+            out: dict[str, float] = {}
+            for sym, t in (trades or {}).items():
+                try:
+                    px = float(t.price)
+                except (TypeError, ValueError, AttributeError):
+                    continue
+                if px > 0:
+                    out[sym] = px
+            return out
+        except Exception as e:
+            log.warning("latest_prices(%d) failed: %s", len(syms), e)
+            return {}
+
+    def avg_dollar_volume(
+        self, symbols: list[str], days: int = 20
+    ) -> dict[str, float]:
+        """Mean close*volume over the last `days` daily bars, for MANY symbols
+        in ONE batched bars call (screener ADV floor). Symbols with no bars
+        are absent. Empty dict on any error."""
+        syms = sorted({s.upper() for s in symbols if s})
+        if not syms:
+            return {}
+        try:
+            req = StockBarsRequest(
+                symbol_or_symbols=syms,
+                timeframe=TimeFrame.Day,
+                start=datetime.now(timezone.utc) - timedelta(days=days * 2),
+            )
+            resp = _retry_read(
+                lambda: self.data.get_stock_bars(req),
+                what=f"avg_dollar_volume({len(syms)})",
+            )
+            out: dict[str, float] = {}
+            for sym in syms:
+                bars = list(resp.data.get(sym, []) or [])[-days:]
+                vals = []
+                for b in bars:
+                    try:
+                        vals.append(float(b.close) * float(b.volume))
+                    except (TypeError, ValueError, AttributeError):
+                        continue
+                if vals:
+                    out[sym] = sum(vals) / len(vals)
+            return out
+        except Exception as e:
+            log.warning("avg_dollar_volume(%d) failed: %s", len(syms), e)
+            return {}
+
     def daily_close_series(self, symbol: str, days: int) -> list[tuple[str, float]]:
         """(ISO-date, close) pairs for the last `days` trading days — the dated
         variant of _daily_closes. The dates are what lets the backtest glue align
@@ -1125,6 +1228,38 @@ class AlpacaClient:
             ][-days:]
         except Exception as e:
             log.warning("daily_close_series(%s) failed: %s", symbol, e)
+            return []
+
+    _option_data = None  # lazily built OptionHistoricalDataClient
+
+    def option_close_series(self, symbol: str, days: int) -> list[tuple[str, float]]:
+        """(ISO-date, close) pairs of DAILY option bars for one OCC contract —
+        the option twin of daily_close_series, so the nightly post-mortem can
+        mark open option groups close-to-close (run-6 item 1a). Per-share
+        prices (x100 per contract). [] on any failure or when the contract
+        has no daily bars (thin names print no bar on a no-trade day)."""
+        try:
+            if self._option_data is None:
+                from alpaca.data.historical.option import OptionHistoricalDataClient
+                self._option_data = bound_client(OptionHistoricalDataClient(
+                    self.cfg.alpaca_api_key, self.cfg.alpaca_secret_key,
+                ))
+            from alpaca.data.requests import OptionBarsRequest
+            req = OptionBarsRequest(
+                symbol_or_symbols=symbol,
+                timeframe=TimeFrame.Day,
+                start=datetime.now(timezone.utc) - timedelta(days=days * 2),
+            )
+            resp = _retry_read(
+                lambda: self._option_data.get_option_bars(req),
+                what=f"option_close_series({symbol})",
+            )
+            bars = resp.data.get(symbol, [])
+            return [
+                (b.timestamp.date().isoformat(), float(b.close)) for b in bars
+            ][-days:]
+        except Exception as e:
+            log.warning("option_close_series(%s) failed: %s", symbol, e)
             return []
 
     def _daily_closes(self, symbol: str, days: int) -> list[float]:
