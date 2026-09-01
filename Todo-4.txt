@@ -402,3 +402,63 @@ https://claude.ai/code/artifact/9099ad65-64b1-495c-82b9-db7226a1bbbf
             (2) FUTURE WINDOWS RUN ~30 DAYS (~21 sessions) starting run-7 —
             N>=24 becomes reachable, verdicts stop defaulting to PENDING.
             Run-6's own window is unchanged (pre-registered).
+
+2026-09-01  RUN-6 DAY 1 — HEADLESS FALLBACK RAN (resident session went 18.5h
+            without a turn; last turn Mon 23:07 CT = last commit b9283b6).
+            Full report: runs/pre-final-test-run-6/FALLBACK_2026-09-01.md.
+            ARTIFACT NOT REPUBLISHED (no artifact tool headless) — phone view
+            STALE at Aug 31; ops/status_page.html on disk is current.
+            DAY 1 RESULT: close row $1,000,943.64 = +$943.64 (+0.094%),
+            basis='close', book_beta_spy=0.7698, vs SPY -0.69% / QQQ -1.27% /
+            IWM -1.14% => +0.78pp ahead of SPY on a red day. 11 equity
+            positions, 0 options, 13 buys / 0 sells / 0 closed trips. 48.5%
+            invested, cash $515,403. Drawdown 0.00%. API spend $1.55/9 calls.
+            (Live read 17:40 CT $1,000,128.77 — $815 after-hours mark drift,
+            not a discrepancy; stamped row is the contract number.)
+            YOUR 5 DAY-1 VERIFY ITEMS: ALL PASS — FEEDS 3/3 vader-fallback on
+            all 8 cycles; BOOK BETA line live 0.00->0.77 (0 cap hits); first
+            buys on PA3B09IK4MGS with fill prices; single instance (pid 7536);
+            close row stamped 16:28 ET with book_beta_spy.
+            CONTRACT: checker = PENDING (exit 0), designed at N=0. Freeze held
+            (zero commits to investment_strategy/ or .env in window). Fresh
+            state held — exit_times/exit_prices/loss_streaks empty, Amendment 1
+            confirmed in practice. Measurement clean: telescoping delta = $0.00,
+            no null-P&L sells, all FILLED lines priced. Rule 7 = 0.
+            PROTECTION 11/11 (10 brackets w/ HELD stop legs verified leg-by-leg;
+            QQQ standalone GTC stop 601.40 covers 211 of 211.834 sh — 0.83 sh
+            ~$590 bare, known fractional wart).
+            INCIDENTS: 3x QQQ wash-trade reject on the core stop (08:34-08:36,
+            entry buy still open) — anticipated in code, watchdog placed the
+            stop 08:36:31, self-healed in 104s, NOT a bug. 1x yfinance $ACLOX
+            delisted (noise). Zero CRITICAL / halts / IGNORED funnel stages.
+            ROBINHOOD RECOVERED — auth_dead=false, holdings + 443-name earnings
+            calendar every cycle. Your Aug 31 re-login landed.
+            FINDING (logged, NOT fixed — freeze): the put-liquidity fallback can
+            die twice on the same rule. LTH failed OI>=100, proxy correctly
+            re-expressed as IWM 291/276 Oct-9 — and that leg has OI 38 < 100, so
+            the option layer rejected it. The proxy picks strike/expiry WITHOUT
+            consulting the floor it will be judged by (an Oct monthly would
+            pass). Fix = option-selection code inside the freeze => Sep 11
+            change-set candidate. Bearish sleeve 0/1 on the window. Also the
+            first datapoint for the run-7 verdict question "how did the hedge +
+            proxy puts do on red days": on a -0.69% SPY day the hedge never
+            armed (auto_hedge=flat x8) and the one put never reached the book.
+            WATCH: ex-ante book beta closed 0.77, just under rule 4's 0.8-1.2
+            band, because the book is 48.5% invested vs the core's 75% target
+            (regime neutral, size x0.70). Rule 4 is judged on OLS realized beta
+            at >=5 sessions so nothing is breached — but if deployment stalls
+            near half-invested, rule 4 could fail on under-deployment rather
+            than strategy. CHECK THIS THURSDAY (Sep 3), not on verdict day.
+            OPS DEBT: (a) ops/status_page.html is gitignored (.gitignore:32) so
+            the fallback's "rewrite it and commit+push" instruction still cannot
+            be obeyed literally — flagged Aug 27, unchanged; track the file or
+            reword ops/claude_daily.sh. (b) ops/away_mode.md header still says
+            "2026-08-13 -> ~2026-08-27" and names account PA3IRR2BT9FT (two
+            accounts stale; live = PA3B09IK4MGS) — checklist still valid, only
+            the identifiers are wrong. (c) For the NEXT fallback: session .jsonl
+            mtimes are NOT a liveness signal — both idle sessions had mtimes
+            within the hour from artifact-autoreact-ledger metadata rows; only
+            timestamped user/assistant turns count.
+            NOT DONE (deliberate): no trade, flatten, restart, reconcile; no
+            knob/gate/prompt/.env/risk/watchdog change; no merge or force-push;
+            no RH re-auth; no artifact publish.
