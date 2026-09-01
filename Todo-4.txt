@@ -388,3 +388,17 @@ https://claude.ai/code/artifact/9099ad65-64b1-495c-82b9-db7226a1bbbf
             fallback, BOOK BETA line, first buys on the new account, single
             instance; after 16:00: Sep 1 close row basis='close' with
             book_beta_spy.
+
+2026-08-31  POST-SWITCH DECISIONS (user, evening): (1) RUN-7 SHAPE IS
+            DELIBERATELY UNDECIDED until the run-6 verdict (Sep 11, or
+            Sep 18 on extension) — the choice on the table: continue the
+            equity chain per contract vs an options-only run vs a PARALLEL
+            new options-only project (own account/contract/design; current
+            options layer's record: MSFT +$11,645 then MSFT -$5,248,
+            PLTR -$9,940, AMZN group -$13,398, T -100% — an options-only
+            run REQUIRES a fresh design, not the current layer unleashed).
+            Key verdict-day input: how run-6's beta hedge + proxy puts
+            performed on red days (the user's downtrend concern).
+            (2) FUTURE WINDOWS RUN ~30 DAYS (~21 sessions) starting run-7 —
+            N>=24 becomes reachable, verdicts stop defaulting to PENDING.
+            Run-6's own window is unchanged (pre-registered).
