@@ -462,3 +462,72 @@ https://claude.ai/code/artifact/9099ad65-64b1-495c-82b9-db7226a1bbbf
             NOT DONE (deliberate): no trade, flatten, restart, reconcile; no
             knob/gate/prompt/.env/risk/watchdog change; no merge or force-push;
             no RH re-auth; no artifact publish.
+
+2026-09-03  AWAY-MODE FALLBACK (headless) — run-6 day 3 of 9
+            Primary dark ~47h (last commit Sep 1 17:45; last timestamped
+            transcript turn Wed Sep 2 08:57 CT). Verified via timestamped turns,
+            NOT mtimes — the two idle sessions again had fresh mtimes from
+            artifact-autoreact-ledger rows, exactly as the Sep 1 run warned.
+            HEALTH: all green. pid 7536 up 3d, single lock, tick fresh, KILL
+            absent, RH auth_dead=false, FEEDS 3/3 x8 cycles, deadman 241 ok /
+            0 restarts / 0 pages over Sep 1-3. Zero CRITICAL, zero halts.
+            NUMBERS: close $1,016,452.05 +$9,401.01 (+0.94%), beta 1.108;
+            live $1,017,173.58 (+1.005%) vs SPY +1.04 / QQQ +1.18 / IWM +0.40.
+            Window 3 sessions: book +1.72% vs SPY +0.82% (+0.90pp). Cash $20,380
+            (2.0%), 98.0% invested. 16 equity + 1 option. 23 buys / 0 sells /
+            0 closed trips. DD 0.00%. API $1.91 today, $5.18 window.
+            CONTRACT: v2 verdict PENDING, every counted check passes. Freeze
+            verified empty on investment_strategy/ and .env.
+            PROTECTION: 15/16 stop-covered. NOTE FOR FUTURE AUDITS — bracket
+            stop legs are status=held and DO NOT appear under
+            /v2/orders?status=open; that view alone showed 15 false
+            "unprotected". Use status=all + non-terminal filter. PSQ ($265,669,
+            26.1% of equity) has no stop BY DESIGN (_hedge_submit sends a bare
+            notional buy; orchestrator.py:3514).
+            RESOLVED (the Sep 1 "check this Thursday" item): beta 0.77 -> 1.04
+            -> 1.11, deployment 48.5% -> 98.0%. Rule 4's 0.8-1.2 band is met;
+            under-deployment risk is gone.
+            NEW + INVERTED: the beta hedge is now CASH-LOCKED. Today's tranche
+            wanted $407,601, got $265,307 — blocked not by the 40% ceiling but
+            by spendable cash against MIN_CASH_BUFFER_PCT=2.0. Cash $20,380 vs
+            a ~$20,343 floor: the book sits exactly on it, so the hedge CANNOT
+            GROW. If beta pushes past 1.2 the controller has no room and rule 4
+            could fail on funding, not strategy. Knob question => did not touch.
+            DECIDE BEFORE VERDICT DAY.
+            REPEAT FINDING (2nd datapoint): put-liquidity proxy rejected again
+            on its own OI floor — Sep 1 IWM261009P00291000 OI 38, Sep 3
+            IWM261009P00294000 OI 47, both < 100. Proxy picks strike/expiry
+            without consulting the floor that judges it; both chose the Oct-9
+            weekly, a monthly would clear. Inside the freeze => Sep 11 change-set.
+            NEW FINDING: contract telescoping FAIL $1,421.49 on Sep 3 (validity,
+            not verdict). Root cause: we stamp the close row at 20:28Z but
+            day_pl = equity - last_equity (models.py:213) and Alpaca RESTATES
+            last_equity to the official close overnight. Alpaca's Sep 2
+            last_equity $1,007,051.04 vs our stamped $1,005,629.55 = $1,421.49,
+            the gap to the cent. Two clocks, one series. Not fixed — changing
+            measurement mid-window breaks comparability. Sep 11 change-set.
+            GOOD NEWS: bearish sleeve finally armed. FIRST put approval of the
+            program (HD Oct-16 350 put, Sep 2, put_approved=1; run-5 was 0/83),
+            and the beta hedge armed for the first time (2 tranches, $265,307
+            PSQ). Both run-6 item 7-8 paths are live. 0 "-> IGNORED" all 3 days.
+            WATCH: 0 closed trips in 3 sessions => N>=24 floor will NOT be met
+            by Sep 11; expect PENDING on verdict day, decided on pooled data.
+            OPS DEBT: (a) status_page.html still gitignored (3rd flag) — this
+            run committed a tracked HTML copy at runs/pre-final-test-run-6/
+            STATUS_2026-09-03.html rather than force-adding an ignored file, so
+            "read it on GitHub" is finally satisfied; still track it or reword
+            ops/claude_daily.sh. (b) NEW — the liveness heuristic counts FALLBACK
+            commits as primary activity: Sep 2 was skipped as "healthy (commit
+            23h ago)" when that was the Sep 1 fallback's own commit; a day of
+            oversight was lost. Ignore commits matching "Away-mode fallback", or
+            compare against the last timestamped transcript turn. (c) away_mode.md
+            header still says 2026-08-13 -> ~2026-08-27 and names PA3IRR2BT9FT
+            (live = PA3B09IK4MGS). (d) NEW — the runbook's ledger gotcha is
+            half-wrong: per tests/test_ledger.py:185 SINGLE-leg options ARE keyed
+            by OCC symbol by design (underlying kept as a field); only MULTI-leg
+            keys by underlying. The HD row is correct; the note would send you
+            hunting a non-bug.
+            NOT DONE (deliberate): no trade, flatten, restart, reconcile; no
+            knob/gate/prompt/.env/risk/watchdog change; no merge or force-push;
+            no RH re-auth; no artifact publish. investment_strategy/ untouched.
+            PHONE ARTIFACT STALE AT AUG 31 — republish from the resident session.
