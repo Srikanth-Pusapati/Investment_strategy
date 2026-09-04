@@ -1,9 +1,9 @@
-# Away-mode runbook (2026-08-13 → ~2026-08-27)
+# Away-mode runbook (standing; first armed 2026-08-13, in use for run-6 Sep 1–11)
 
-The operator is away; a scheduled Claude session runs each market weekday
-evening and follows this file. The bot trades PAPER account PA3IRR2BT9FT
-(verified live against `/v2/account` 2026-08-13; the older PA3HBZ8ODAMD in
-earlier notes is the pre-Jul-27 account and is wrong).
+While the operator is away, a scheduled Claude session runs each market weekday
+evening and follows this file. The bot trades PAPER account PA3B09IK4MGS
+(run-6 fresh account since Amendment 1, read live by the Sep 1/Sep 3 fallback
+runs; PA3IRR2BT9FT and PA3HBZ8ODAMD in earlier notes are dead prior accounts).
 Everything here is subordinate to one rule: **the risk layer and watchdog are
 never loosened unattended.**
 
@@ -19,8 +19,11 @@ never loosened unattended.**
   artifact URL `https://claude.ai/code/artifact/94bb36b9-af2e-423b-a524-3862e9912da8`
   — rewrite `ops/status_page.html` with fresh values, then republish passing
   that URL as the `url` parameter (a new session mints a new URL otherwise).
-- Ledger gotcha: option trips in `state/trades.jsonl` carry the UNDERLYING
-  ticker + `instrument: "option"` — never grep for OCC-shaped symbols.
+- Ledger gotcha: in `state/trades.jsonl`, MULTI-leg option trips are keyed by
+  the UNDERLYING ticker + `instrument: "option"`, but SINGLE-leg options are
+  keyed by their OCC symbol by design, with the underlying preserved as a
+  field (`tests/test_ledger.py:185`). Check both shapes before declaring an
+  option trip missing.
 
 ## Daily session checklist
 

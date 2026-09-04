@@ -531,3 +531,31 @@ https://claude.ai/code/artifact/9099ad65-64b1-495c-82b9-db7226a1bbbf
             knob/gate/prompt/.env/risk/watchdog change; no merge or force-push;
             no RH re-auth; no artifact publish. investment_strategy/ untouched.
             PHONE ARTIFACT STALE AT AUG 31 — republish from the resident session.
+
+2026-09-03  RESIDENT SESSION BACK (late evening) — status review + ops-debt cleanup
+            Reviewed the day-3 fallback report and verified live state: bot pid
+            7536 alive, tick fresh, 0 CRITICAL, close row stamped, postmortem ran.
+            Day 3 close $1,016,452.05 (+0.94%); window +1.72% vs SPY +0.82%.
+            FIXED (all outside the freeze — ops/ and docs only, zero touches to
+            investment_strategy/ or .env):
+            (a) ops/claude_daily.sh prompt reworded: fallback now commits a
+                tracked HTML copy at runs/<run>/STATUS_<date>.html instead of
+                being told to commit the gitignored ops/status_page.html, and
+                must prefix commits "Away-mode fallback".
+            (b) ops/claude_daily.sh liveness: both git-log signals now exclude
+                commits matching "Away-mode.*fallback" (--invert-grep), so a
+                fallback's own commit can never read as primary liveness again
+                (the Sep 2 skipped-oversight bug). Verified: both signals now
+                resolve to b9283b6 / ba49e2c, skipping the two fallback commits.
+            (c) ops/away_mode.md header: standing runbook, account corrected to
+                PA3B09IK4MGS (PA3IRR2BT9FT/PA3HBZ8ODAMD marked dead).
+            (d) ops/away_mode.md ledger gotcha corrected: single-leg options ARE
+                keyed by OCC symbol (tests/test_ledger.py:185); only multi-leg
+                keys by underlying.
+            PHONE ARTIFACT REPUBLISHED — live again at the standing URL with the
+            fallback's day-3 numbers; banner back to green (resident online).
+            STILL OPEN, deliberately (freeze / user decision):
+            - Cash-locked beta hedge (MIN_CASH_BUFFER_PCT vs trim-funding) —
+              USER DECISION before Sep 11 verdict day.
+            - Proxy-put OI-floor defect — Sep 11 change-set.
+            - Telescoping day_pl restatement artifact — Sep 11 change-set.

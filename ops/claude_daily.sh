@@ -19,8 +19,13 @@ CLAUDE="$HOME/.local/bin/claude"
 cd "$ROOT"
 
 now=$(date +%s)
-last_log_ts=$(git log -1 --format=%ct -- 'logs/*_*_*.log' 2>/dev/null || echo 0)
-last_any_ts=$(git log -1 --format=%ct 2>/dev/null || echo 0)
+# Liveness must come from the PRIMARY session only. Fallback runs prefix their
+# commit messages "Away-mode fallback" (older runs: "Away-mode headless
+# fallback"); on 2026-09-02 the Sep-1 fallback's own 23h-old archive commit
+# read as "primary healthy" and a day of oversight was silently lost. Both
+# signals therefore exclude fallback-authored commits.
+last_log_ts=$(git log -1 --format=%ct --grep='Away-mode.*fallback' --invert-grep -- 'logs/*_*_*.log' 2>/dev/null || echo 0)
+last_any_ts=$(git log -1 --format=%ct --grep='Away-mode.*fallback' --invert-grep 2>/dev/null || echo 0)
 log_age_h=$(( (now - last_log_ts) / 3600 ))
 any_age_h=$(( (now - last_any_ts) / 3600 ))
 
@@ -34,14 +39,14 @@ fi
 # fallback on 2026-08-13 that ran CONCURRENTLY with the live primary (both
 # sessions did the checklist; the primary won the shared-tree race). Any commit
 # at all in the last 12h means the primary is working, just late on the archive.
-# The fallback's own commits can't self-suppress: it runs once a day, so its
-# commits are ~24h old by the next fire.
+# (Fallback-authored commits are already excluded above, so they can never
+# self-suppress the next day's run regardless of timing.)
 if [ "$any_age_h" -lt 12 ]; then
     echo "[$(date '+%F %T')] archive stale (${log_age_h}h) but primary committed ${any_age_h}h ago — alive, skip"
     exit 0
 fi
 
 echo "[$(date '+%F %T')] primary quiet for ${log_age_h}h (no commits for ${any_age_h}h) — running headless fallback"
-"$CLAUDE" -p "FALLBACK away-mode run: the operator's interactive Claude session appears dead (no dated-log commit for ${log_age_h}h, no commits at all for ${any_age_h}h). Read ops/away_mode.md and execute the daily checklist end-to-end. You are HEADLESS: you have no artifact tool and no browser, so do NOT attempt to republish the phone status artifact or re-auth Robinhood — instead rewrite ops/status_page.html with fresh values, note that the fallback ran and that the artifact is therefore stale, and commit+push so the operator can read it on GitHub. Before doing anything, re-verify the primary really is dead (check for a recent ops/status_page.html mtime and recent commits); if it is alive, stop and report rather than racing it in the shared working tree. Honor every guardrail in the runbook." \
+"$CLAUDE" -p "FALLBACK away-mode run: the operator's interactive Claude session appears dead (no dated-log commit for ${log_age_h}h, no commits at all for ${any_age_h}h). Read ops/away_mode.md and execute the daily checklist end-to-end. You are HEADLESS: you have no artifact tool and no browser, so do NOT attempt to republish the phone status artifact or re-auth Robinhood — instead rewrite ops/status_page.html with fresh values (it is gitignored — do NOT force-add it), commit a tracked HTML copy of it at runs/<current run dir>/STATUS_<YYYY-MM-DD>.html alongside your markdown report, note that the fallback ran and that the phone artifact is therefore stale, and push so the operator can read everything on GitHub. Prefix EVERY commit message with 'Away-mode fallback' — the next day's liveness check relies on that prefix to ignore your commits. Before doing anything, re-verify the primary really is dead (check for a recent ops/status_page.html mtime and recent commits); if it is alive, stop and report rather than racing it in the shared working tree. Honor every guardrail in the runbook." \
     --permission-mode bypassPermissions \
     --model opus 2>&1
