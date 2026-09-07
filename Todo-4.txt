@@ -559,3 +559,100 @@ https://claude.ai/code/artifact/9099ad65-64b1-495c-82b9-db7226a1bbbf
               USER DECISION before Sep 11 verdict day.
             - Proxy-put OI-floor defect — Sep 11 change-set.
             - Telescoping day_pl restatement artifact — Sep 11 change-set.
+
+2026-09-07  AWAY-MODE FALLBACK (headless) — Labor Day session; covers the
+            UNREVIEWED Sep 4 trading day. Run-6 day 4 of 9, acct PA3B09IK4MGS.
+            Full report: runs/pre-final-test-run-6/FALLBACK_2026-09-07.md
+            Status page copy: runs/pre-final-test-run-6/STATUS_2026-09-07.html
+            LIVENESS: primary genuinely dead this time — last commit AND last
+            status_page.html write both Sep 3 23:58/23:59 (~90h). NOTE the Sep 4
+            fallback CORRECTLY stood down (primary was 17.6h fresh + 4 live
+            sessions), but the primary then never ran its Sep 4 evening session.
+            So Sep 4 — the window's most eventful day — went unreviewed 3.5 days.
+            NUMBERS: Sep 4 close $1,025,915.86 (+$8,318, +0.93% close-to-close)
+            on a SPY -0.39% day. Window 4/9 sessions: book +2.59% vs SPY +0.41%
+            (+2.18pp), QQQ +0.31%, IWM +0.71%. Cash $31,829 (3.10%), 97.1%
+            invested. 15 equity + 3 option legs. Drawdown 0.00%. API $6.90 window.
+            CONTRACT: PENDING, every counted rule passes. Freeze VERIFIED empty.
+            FEEDS 3/3 healthy 8/8 cycles all four days. 0 "-> IGNORED".
+            *** RULE 4 IS THE PROBLEM — USER DECISION NEEDED BEFORE SEP 9 ***
+            Realized OLS beta = 0.06 (required 0.8-1.2), r2=0.02, alpha
+            +0.802%/day. Becomes a COUNTED rule at the Sep 9 close (checker
+            counts sessions as return-PAIRS: 6 close rows -> 5 pairs). The hedge
+            is NOT broken — ex-ante book_beta_spy held 1.04-1.11 all window,
+            inside its band on 8/8 cycles. Rule 4 grades REALIZED beta, and the
+            pairs are Sep2 (+0.47/+0.44), Sep3 (+1.08/+1.05), Sep4 (+0.93/-0.39).
+            Friday alone flattens the slope. EVERY down-day the book profits on
+            drives rule 4 further toward NO-GO — the strategy working is what
+            breaks the rule. Also: the checker drops Sep 1 (no in-window
+            predecessor), discarding the window's best relative day (+0.09% vs
+            SPY -0.69%); rules 3/4 measure 3 of 4 sessions. CONTRACT question,
+            not a knob — untouched. Options, all needing a pre-registered
+            amendment before Sep 9: (i) grade rule 4 on stamped ex-ante
+            book_beta_spy; (ii) keep OLS but require the >=20-session sample
+            rule 3 already demands of its t-stat; (iii) accept and let it fail.
+            FIRST CLOSED TRIP OF THE WINDOW: MKL +$108.90 (+0.66%), exit_reason
+            'decision'. Exit went through REPLACE-on-the-resting-leg (never
+            cancel-then-resell — the pending_cancel wedge), and SELL AUTHORITY
+            allowed it because it was a WINNER (the gate rejects losing
+            decision-sells with no event, as with BLK twice Sep 3). Rule 7 clean.
+            NEW FINDING — ROTATION IS NOT ATOMIC (highest-value Sep 11 item):
+            09:26:01 SELL MKL approved "rotate out of weakest winner to fund a
+            stronger name"; 09:26:07 REJECT buy MU: At max open positions (15).
+            The paired buy was judged against a position count that STILL
+            INCLUDED the name being sold (MKL's fill landed 10:14). MU (composite
+            +1.50) was never re-proposed; MKL then locked out by its own 24h
+            re-entry cooldown. Net: gave up a winner, never bought the upgrade,
+            ran a slot light for the rest of the window. Frozen code, not fixed.
+            PROXY PUT FINALLY FILLED — BUT BY LUCK, NOT A FIX. IWM Oct-9 295/280
+            bear put spread, 13 contracts, $5,083 debit, filled @3.90. All three
+            attempts picked the SAME Oct-9 weekly; the only change is drifting
+            spot pushed the strike onto 295 — a MULTIPLE OF 5, where IWM weekly
+            OI actually lives (291->OI 38, 294->OI 47, both rejected). Selection
+            logic still never consults the OI floor it is judged by. Makes the
+            Sep 11 fix concrete and cheap: SNAP PROXY STRIKES TO THE LIQUID
+            5-POINT GRID instead of raw spot. (The bot's own Sep 4 postmortem
+            reached the same conclusion.)
+            NETWORK INCIDENT TODAY (holiday, nothing at risk, but read it):
+            two outages — 03:10-03:54 ET (57 skipped watchdog ticks) and
+            15:06-16:57 ET (174 ticks, 111 min). Escalation fired as designed
+            from skip 5: 75 CRITICAL "Watchdog BLIND". *** ALL 75 PAGES FAILED
+            TO SEND *** — "ALERT not delivered (no working sink)", SMTP could not
+            resolve DNS because it rides the same dead network. The alert sink
+            cannot report a network fault. healthchecks.io IS the backstop that
+            survives (heartbeats stopped for the whole window -> it pages
+            independently). Two smaller frozen-code items: the throttle does not
+            throttle (severity= rises each skip, so it re-fires every tick, 75
+            pages where 1-2 were wanted), and _overlaps_paging_hours is pure
+            clock math with NO HOLIDAY CALENDAR, so today's CRITICALs all claim
+            "during market hours" on a closed day. Bot self-recovered 15:58 CT.
+            CASH LOCK EASED: cash $20,380 (2.0%, zero headroom) -> $31,829
+            (3.10%), ~$11.5k restored by the MKL sale + marks; hedge held 8/8
+            cycles and never needed it. The MIN_CASH_BUFFER_PCT decision is now
+            LESS urgent than rule 4 above (no amount of cash fixes rule 4).
+            TELESCOPING: still FAIL $1,421.49 (Sep 3). Root cause CORROBORATED
+            with a second datapoint — Alpaca's current last_equity for Sep 4 is
+            $1,027,333.13 vs our stamped $1,025,915.86 = $1,417.27, same shape.
+            WATCH: ledger vs broker realized $7.63 apart on the MKL trip (ledger
+            $108.90 vs broker-derived $101.27) against the contract's <$5
+            condition — judged AT WINDOW CLOSE so not breached now; check Sep 11.
+            OPS DEBT: Sep 3 resident session's fixes (a)-(d) CONFIRMED in place.
+            Remaining: the liveness guards are STRUCTURALLY UNSATISFIABLE — guard
+            1 wants a primary dated-log commit <30h old but the fallbacks now do
+            all the archiving so that commit can never land again; guard 2 (<12h)
+            always fails because the primary works ~23:58 while the check fires
+            17:37 (~17.6h gap). Both fail every weekday, so it fires daily
+            regardless of primary state — a broken clock (false-fired Sep 4,
+            correctly fired Sep 7, same logic). Durable fix: key liveness off
+            ops/status_page.html mtime, or move the launchd slot after the
+            primary's window. NOT applied — bug-fix authority assumes the primary
+            is absent, and Sep 4 declined the same patch for the same reason.
+            SEP 11 CHANGE-SET LIST NOW: (1) rotation atomicity [highest value],
+            (2) proxy-put strike grid snap, (3) telescoping day_pl restatement,
+            (4) alert sink independent of the network path, (5) alert-storm
+            throttle, (6) holiday-aware paging window, (7) liveness heuristic.
+            NOT DONE (deliberate): no trade, flatten, restart, reconcile; no
+            knob/gate/prompt/.env/risk/watchdog change; no merge or force-push;
+            no RH re-auth (headless); no artifact publish (headless).
+            investment_strategy/ untouched — RUN-6 FREEZE SURVIVES.
+            PHONE ARTIFACT STALE AT SEP 3 — republish from the resident session.
