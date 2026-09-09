@@ -30,7 +30,11 @@ now=$(date +%s)
 # the fallbacks took over all log archiving, and the old guard 2 (any commit
 # < 12h) always missed because the primary works ~23:58 CT while this check
 # fires 17:37 — a built-in ~17.6h gap. Both failed every weekday, so the
-# fallback launched daily regardless of primary state. Now:
+# fallback launched daily regardless of primary state. Also fixed: the old
+# `--grep --invert-grep` exclusion matched the commit BODY, so a primary
+# commit that merely *discussed* the fallback excluded itself (that is what
+# false-fired Sep 4 against commit 9a9b05e); the subject-only awk match below
+# cannot. Now:
 #   * one freshness threshold T: 30h normally, 78h on Mondays (the primary's
 #     last session is Friday night; the weekend is not evidence of death)
 #   * signal 1: any non-fallback commit younger than T
@@ -41,7 +45,9 @@ now=$(date +%s)
 #     fallback can never count its own rewrite as primary liveness)
 [ "$(date +%u)" = 1 ] && T=78 || T=30
 
-last_any_ts=$(git log -1 --format=%ct --grep='Away-mode.*fallback' --invert-grep 2>/dev/null || echo 0)
+last_any_ts=$(git log -300 --format='%ct%x09%s' 2>/dev/null \
+    | awk -F'\t' '$2 !~ /^Away-mode.*fallback/ {print $1; exit}')
+[ -n "$last_any_ts" ] || last_any_ts=0
 any_age_h=$(( (now - last_any_ts) / 3600 ))
 if [ "$any_age_h" -lt "$T" ]; then
     echo "[$(date '+%F %T')] primary committed ${any_age_h}h ago (< ${T}h) — alive, skip"
