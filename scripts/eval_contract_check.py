@@ -48,7 +48,13 @@ byte-for-byte the run-5 rule set). v2 rules:
     alpha/day, its t, beta; the t is flagged as not interpretable under 20
     sessions (reported either way)
   * realized beta within +/-0.2 of --beta-target (default 1.0), judged when
-    the OLS has >= 5 sessions
+    the OLS has >= 5 sessions. AMENDMENT 2 (run-6, pre-registered 2026-09-09
+    before the rule first counted): below 20 sessions the OLS slope is
+    unidentifiable (single days dominate; r2 ~ 0), so the rule is graded on
+    the MEAN of the stamped ex-ante `book_beta_spy` across the window's
+    basis='close' rows instead; the OLS beta is still printed and recorded.
+    At >= 20 sessions grading reverts to realized OLS as originally written.
+    See runs/pre-final-test-run-6/EVAL_CONTRACT.md Amendment 2.
   * max drawdown > -5% (unchanged)
   * capture judged when >= 4 SPY up-days AND >= 4 down-days (was 6/6)
   * zero decision-sell losses below 0.5x the planned stop (validity check —
@@ -698,7 +704,7 @@ def render_report(start: str, end: str, trade_rows, equity_rows,
     # (5) verdict
     if contract == "v2":
         return _verdict_v2(st, pooled, pooled_decided, pt, pcrit, pdf, p_pass,
-                           dd, cap, ols, beta_target, dsl)
+                           dd, cap, ols, beta_target, dsl, betas)
     print("--- (5) verdict: pre-final-test-run-5 contract ---")
     checks = [
         (f"closed trades N >= {MIN_TRADES}", st["n"] >= MIN_TRADES,
@@ -727,11 +733,15 @@ def render_report(start: str, end: str, trade_rows, equity_rows,
 
 
 def _verdict_v2(st, pooled, pooled_decided, pt, pcrit, pdf, p_pass,
-                dd, cap, ols, beta_target, dsl) -> int:
+                dd, cap, ols, beta_target, dsl,
+                exante: dict[str, float] | None = None) -> int:
     """Contract v2 verdict (run-6). Counted checks: pooled expectancy (only
     once pooled N >= 60 — else PENDING), max DD, realized beta vs target
-    (when >= V2_MIN_BETA_SESSIONS sessions), capture (when qualified), zero
-    decision-sell losses below 0.5x stop. N >= 24 is a floor, reported."""
+    (when >= V2_MIN_BETA_SESSIONS sessions; below V2_MIN_ALPHA_SESSIONS it is
+    graded on the mean stamped ex-ante book_beta_spy per Amendment 2, with the
+    OLS beta recorded), capture (when qualified), zero decision-sell losses
+    below 0.5x stop. N >= 24 is a floor, reported. `exante` = {date:
+    book_beta_spy} from the window's close rows (Amendment 2 input)."""
     print("--- (5) verdict: pre-final-test-run-6 contract v2 ---")
     n = st["n"]
     print(f"[INFO] sample floor N >= {V2_MIN_TRADES_FLOOR}: N={n} "
@@ -749,10 +759,36 @@ def _verdict_v2(st, pooled, pooled_decided, pt, pcrit, pdf, p_pass,
     print(f"[{'PASS' if dd_ok else 'FAIL'}] max drawdown > {MAX_DD_FLOOR_PCT:.0f}%  "
           f"({'no equity data' if dd is None else f'{dd[0]:.2f}%'})")
     if ols is not None and ols["beta"] is not None and ols["n"] >= V2_MIN_BETA_SESSIONS:
-        b_ok = abs(ols["beta"] - beta_target) <= V2_BETA_TOLERANCE
-        checks.append(("realized beta", b_ok))
-        print(f"[{'PASS' if b_ok else 'FAIL'}] realized beta within +/-{V2_BETA_TOLERANCE:.1f} "
-              f"of {beta_target:.2f}  (beta={ols['beta']:.2f} over {ols['n']} sessions)")
+        if ols["n"] >= V2_MIN_ALPHA_SESSIONS:
+            b_ok = abs(ols["beta"] - beta_target) <= V2_BETA_TOLERANCE
+            checks.append(("realized beta", b_ok))
+            print(f"[{'PASS' if b_ok else 'FAIL'}] realized beta within +/-{V2_BETA_TOLERANCE:.1f} "
+                  f"of {beta_target:.2f}  (beta={ols['beta']:.2f} over {ols['n']} sessions)")
+        elif exante:
+            # Amendment 2 (pre-registered 2026-09-09, before the rule first
+            # counted): under V2_MIN_ALPHA_SESSIONS the OLS slope is dominated
+            # by single days, so grade the hedge on the mean stamped ex-ante
+            # book_beta_spy; the OLS beta stays printed and recorded.
+            vals = sorted(exante.values())
+            mean_b = sum(vals) / len(vals)
+            b_ok = abs(mean_b - beta_target) <= V2_BETA_TOLERANCE
+            checks.append(("realized beta (Amend-2 ex-ante)", b_ok))
+            print(f"[{'PASS' if b_ok else 'FAIL'}] beta rule (Amendment 2, "
+                  f"{ols['n']} sessions < {V2_MIN_ALPHA_SESSIONS}): mean ex-ante "
+                  f"book_beta_spy={mean_b:.2f} over {len(vals)} stamped close row(s) "
+                  f"(range {vals[0]:.2f}..{vals[-1]:.2f}) within +/-"
+                  f"{V2_BETA_TOLERANCE:.1f} of {beta_target:.2f}")
+            print(f"[INFO] realized OLS beta={ols['beta']:.2f} "
+                  f"(r2={ols['r2']:.2f}) recorded, NOT counted below "
+                  f"{V2_MIN_ALPHA_SESSIONS} sessions (Amendment 2)"
+                  if ols["r2"] is not None else
+                  f"[INFO] realized OLS beta={ols['beta']:.2f} recorded, NOT "
+                  f"counted below {V2_MIN_ALPHA_SESSIONS} sessions (Amendment 2)")
+        else:
+            print(f"[N/A ] beta rule (Amendment 2): {ols['n']} sessions < "
+                  f"{V2_MIN_ALPHA_SESSIONS} and NO stamped book_beta_spy close "
+                  f"rows to grade on — not counted "
+                  f"(OLS beta={ols['beta']:.2f} recorded)")
         note = ("" if ols["n"] >= V2_MIN_ALPHA_SESSIONS
                 else f" — < {V2_MIN_ALPHA_SESSIONS} sessions, not interpretable")
         print(f"[INFO] daily alpha {ols['alpha'] * 100:+.3f}%/day, t={ols['t_alpha']:.2f} "
@@ -966,6 +1002,46 @@ def selftest() -> int:
     assert render_report(start, end, dirty, parse_jsonl(_FIXTURE_EQUITY),
                          spy_closes=spy, contract="v2",
                          pool=[("run-x", prior)]) == EXIT_NO_GO
+
+    # Amendment 2: 5-19 OLS sessions -> beta graded on the mean stamped
+    # ex-ante book_beta_spy; the OLS slope (here ~0: book drifts +0.1%/day
+    # against SPY alternating +/-1%) is recorded but not counted.
+    def _am_equity(stamp: float):
+        return parse_jsonl([
+            json.dumps({"date": dates[i], "equity": 100000.0 * (1.001 ** i),
+                        "day_pl": None, "basis": "close",
+                        "book_beta_spy": stamp})
+            for i in range(7)
+        ])
+    assert render_report("2026-09-01", "2026-09-07", trades, _am_equity(1.05),
+                         spy_closes=spy2, contract="v2") == EXIT_PENDING
+    assert render_report("2026-09-01", "2026-09-07", trades, _am_equity(0.5),
+                         spy_closes=spy2, contract="v2") == EXIT_NO_GO
+    # 5-19 sessions but NO stamps at all -> beta rule N/A, verdict PENDING
+    nostamp = parse_jsonl([
+        json.dumps({"date": dates[i], "equity": 100000.0 * (1.001 ** i),
+                    "day_pl": None, "basis": "close"})
+        for i in range(7)
+    ])
+    assert render_report("2026-09-01", "2026-09-07", trades, nostamp,
+                         spy_closes=spy2, contract="v2") == EXIT_PENDING
+    # >= 20 sessions: grading reverts to realized OLS as originally written —
+    # book = 0.5 x SPY + drift gives OLS beta 0.5 (FAIL) even though every
+    # stamp says 1.0, so the amendment no longer shields it.
+    dates3 = [f"2026-10-{i:02d}" for i in range(1, 23)]
+    spy_px, bot_eq = 100.0, 100000.0
+    spy3, rows3 = {dates3[0]: spy_px}, [
+        json.dumps({"date": dates3[0], "equity": bot_eq, "day_pl": None,
+                    "basis": "close", "book_beta_spy": 1.0})]
+    for i, d in enumerate(dates3[1:]):
+        r = 0.01 if i % 2 == 0 else -0.01
+        spy_px *= 1.0 + r
+        bot_eq *= 1.0 + r / 2.0 + 0.0004
+        spy3[d] = spy_px
+        rows3.append(json.dumps({"date": d, "equity": bot_eq, "day_pl": None,
+                                 "basis": "close", "book_beta_spy": 1.0}))
+    assert render_report("2026-10-01", "2026-10-22", trades, parse_jsonl(rows3),
+                         spy_closes=spy3, contract="v2") == EXIT_NO_GO
 
     print("SELFTEST PASS")
     return 0

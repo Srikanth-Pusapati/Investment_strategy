@@ -656,3 +656,40 @@ https://claude.ai/code/artifact/9099ad65-64b1-495c-82b9-db7226a1bbbf
             no RH re-auth (headless); no artifact publish (headless).
             investment_strategy/ untouched — RUN-6 FREEZE SURVIVES.
             PHONE ARTIFACT STALE AT SEP 3 — republish from the resident session.
+
+2026-09-09  ~11:00 CT RESIDENT SESSION (user back, "fix all the related items
+            as required") — acted on the Sep 7 day-4 report within the freeze.
+            AMENDMENT 2 REGISTERED (EVAL_CONTRACT.md) before the Sep 9 close:
+            rule 4 graded on the MEAN stamped ex-ante book_beta_spy (+/-0.2 of
+            1.0) while sessions < 20 — the same interpretability floor rule 3
+            uses — reverting to realized OLS at >= 20 sessions. OLS beta stays
+            printed/recorded every run. Disclosure + counterfactual are in the
+            amendment text (OLS read +0.06 / -0.31 / +0.13 on Sep 7/8/9; the
+            unamended rule was already counting at the Sep 8 close row and
+            read OUTSIDE -> NO-GO track). Implemented in
+            scripts/eval_contract_check.py (ops/measurement surface, NOT
+            investment_strategy/ or .env — freeze intact) with 4 new selftest
+            cases (pass/fail on stamps, no-stamps N/A, OLS reversion at >=20).
+            Amended checker on the live window: mean ex-ante 0.98 over 5
+            stamped closes (range 0.77..1.11) -> PASS; verdict PENDING with
+            every counted rule passing; N=9 closed trips; max DD -0.57%.
+            LIVENESS GUARDS FIXED (ops/claude_daily.sh, Sep-11 list item 7
+            pulled forward — ops tooling, not frozen code): one threshold T
+            (30h weekdays, 78h Mondays to span the weekend); signal 1 = any
+            non-fallback commit < T; signal 2 = ops/status_page.html mtime < T
+            (runbook-mandated nightly rewrite), with
+            state/claude_daily_run.stamp recording each fallback launch so the
+            fallback's own page rewrite can never read as primary liveness.
+            Replaces the unsatisfiable dated-log-commit and 12h guards; sh -n
+            clean; guard logic dry-run verified. Plist/schedule unchanged.
+            ROBINHOOD: no action needed — tokens re-issued Aug 31 17:21 CT
+            (post-death re-login), access token expires ~Sep 9 16:20 CT and
+            the SDK auto-refreshes headlessly; refresh token good to ~Sep 28.
+            RH imports succeeding in this morning's log. Watch for an
+            auth_dead latch after tonight's first refresh.
+            PHONE ARTIFACT republished with Sep-7 data on Sep 7 ~21:45 CT
+            (resident session; noted here since no commit recorded it).
+            NOT touched (frozen until Sep 11): rotation atomicity, proxy-put
+            strike grid, telescoping day_pl restatement, alert sink/throttle/
+            holiday window. Freeze re-verified: git log --since=2026-08-31
+            --until=2026-09-12 -- investment_strategy/ .env is empty.
