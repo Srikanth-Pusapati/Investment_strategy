@@ -693,3 +693,80 @@ https://claude.ai/code/artifact/9099ad65-64b1-495c-82b9-db7226a1bbbf
             strike grid, telescoping day_pl restatement, alert sink/throttle/
             holiday window. Freeze re-verified: git log --since=2026-08-31
             --until=2026-09-12 -- investment_strategy/ .env is empty.
+
+2026-09-11  LAST SCHEDULED SESSION OF RUN-6 (resident session; verdict-day review
+            ran Fri afternoon through Sat 2026-09-12 ~01:00 CT — a usage cap
+            killed the first workflow pass at ~13:40 CT and the work resumed
+            after the reset; nothing below was lost, only delayed).
+            CLOSE: Sep 11 basis=close row $1,038,988.75 = +3.90% window vs SPY
+            -0.36% / QQQ -0.26% / IWM -1.71%. Session +1.04% vs SPY +0.85%.
+            CHECKER v2 on the close row (runs/.../CHECKER_2026-09-11_close.txt):
+            N=14, +$26,962.66, t=1.733 vs 1.771 (miss by 0.04), bootstrap
+            [$118,$4,204]; DD -1.41%; ex-ante beta 0.96 PASS; OLS alpha
+            +0.513%/day t=1.46 beta 0.50 (7 pairs, not counted); capture 3u/4d
+            not counted; rule 7 = 0. VERDICT: PENDING, every counted rule passes.
+            N<24 -> RULE 1 EXTENSION APPLIES. AMENDMENT 3 REGISTERED (Option B):
+            window runs to Fri Sep 18, freeze re-registered to Sep 19, verdict on
+            the Sep 18 close row; telescoping (6/7 rows, max $1,421.49), ledger
+            realized-at-quote (-$72.24) + 7 null fill_price rows, the two verdict
+            commands, and Amendment 2's intraday Sep 9 reading are all disclosed
+            and accepted BEFORE the last close row (so run-6 is not CONFOUNDED).
+            Option A (close at N=14 = PENDING-TERMINATED + CONFOUNDED-by-letter)
+            is recorded in the contract as the alternative if the user overrides.
+            Run-7 under B: fresh account, day 0 = Fri Sep 18 after the bell
+            (restart after 16:00 ET so a 'late' day-0 row exists), day 1 = Mon
+            Sep 21, 21 sessions, contract v3 DRAFT at runs/pre-final-test-run-7/
+            EVAL_CONTRACT.md (pre-register before day 1).
+            REVIEW (8 analysts, 43 adversarial votes; full text in the run-6
+            RUN_SUMMARY.md + report artifact): GRADE B+ PROVISIONAL (from B-):
+            strategy B (98.8% of realized in 3 trips; ex-top-3 +$325), downside
+            A- (green on 3 of 5 SPY red days, DD -1.41%), bearish C+ (2 fills,
+            both green; 5/5 single-name puts died on far-from-money strikes; 3
+            'ELIGIBLE but IGNORED' on Sep 10 hidden by the funnel line's top-6
+            truncation), options B, ops B, measurement B-, process B.
+            LOAD-BEARING FINDINGS (verified): (1) 'rotation not atomic' was
+            WRONG — the fold is atomic; MU/HOOD/PCG were rejected because
+            MAX_OPEN_POSITIONS counts the QQQ core + PSQ hedge rows (16/15 on
+            Sep 3-4; 15/15 with QQQ alone on Sep 2). (2) The hedge sizer assumes
+            PSQ beta -1.0; the bot's own estimate is -1.51 -> every arm ~50%
+            over-sized, lands 0.04-0.05 above the unwind line, and the Sep 3
+            'cash lock' was this (MIN_CASH_BUFFER explains 14%). (3) The Sep 9
+            unwind was rule-correct (ex-hedge beta 0.82-0.99); N-cycle
+            persistence would NOT have kept it; whipsaw cost $2,754 through the
+            Sep 11 close. (4) Core defense fired on Sep 11's UP open from Sep
+            10's stale falling map, failed only on a cancel->sell race, and left
+            the QQQ core stopless 4m53s. (5) Regime label flipped 5x in 8 reads
+            on Sep 10 (QQQ +/-0.35% of its 50dma on a partial bar); SMCI top-up
+            slipped in on a risk-on read. (6) Top-ups: 37 of 77 risk-judged buys
+            died on the +0.05 bar the prompt never states; the gate compares raw
+            floats so a proposal exactly at the bar is rejected. (7) Proxy put
+            builder ignores OI (2 of 3 attempts self-rejected; Oct-16 monthly had
+            100-265x the OI). (8) 'Fresh buys on SPY-red days lose' is NOT
+            supported by the pooled ledger (red +$88 vs green +$187 avg, CIs
+            overlap) -> shadow logging only, no haircut. (9) events_only sell
+            authority removed the pre-run-6 loss engine (-$32k in 58 LLM exits;
+            run-6: 0 decision losses). (10) Sep 7 alert storm = retry without
+            backoff + no holiday calendar; OAuth wait has no deadline; liveness
+            check needs a ps gate.
+            CHANGE-SET being built on feature/run7-changeset (isolated worktree,
+            live tree untouched): 14 ops/measurement items (built: telescoping
+            day_pl, OAuth deadline, flatten leg order, alert backoff+spool,
+            session-calendar paging, 5xx transient, beta-read liveness, funnel
+            '-> IGNORED', backfill fill_price, earnings-fallback FEEDS token,
+            ledger restate-at-fill knob, checker v3, signal_ic calibrated p,
+            claude_daily ps gate) + strategy items S-1..S-8 (slot exemption,
+            hedge sizing by measured beta, OI-aware proxy strikes, put strike
+            snap, regime persistence, HELD-line top-up bar + 4dp gate, core-
+            defense stale-map/race/stop filter, unwind-persistence knob default
+            1). PR opens from that branch when tests + review pass; MERGE ONLY
+            AFTER THE SEP 18 CLOSE (freeze).
+            OPERATOR DECISIONS (defaults in parentheses, applied unless changed):
+            1 Amendment 3 B vs A (B registered); 2 MAX_OPEN_POSITIONS after S-1
+            = 15 model names (keep 15); 3 regime stabiliser persistence vs band
+            (persistence); 4 core-defense trim via replace-qty-down vs cancel-
+            poll (replace); 5 HEDGE_UNWIND_MIN_CYCLES 1 vs 2 (1); 6
+            MAX_BOOK_BETA_SPY keep 1.2 vs 1.10 (keep); 7 ship the strike snap
+            in run-7 vs defer (ship).
+            USER ACTIONS Sep 14-18: none required for the window (bot runs
+            frozen); verify the Sep 18 close row + run the checker; create the
+            fresh run-7 paper account keys before Fri Sep 18 16:00 ET.
