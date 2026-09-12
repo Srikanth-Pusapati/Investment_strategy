@@ -770,3 +770,36 @@ https://claude.ai/code/artifact/9099ad65-64b1-495c-82b9-db7226a1bbbf
             USER ACTIONS Sep 14-18: none required for the window (bot runs
             frozen); verify the Sep 18 close row + run the checker; create the
             fresh run-7 paper account keys before Fri Sep 18 16:00 ET.
+2026-09-12  ~11:30 CT — RUN-7 CHANGE-SET BUILT, REVIEWED, PR OPEN (resident session,
+            continuation of the Sep 11 entry). Branch feature/run7-changeset, PR #57
+            -> feature/preview: https://github.com/Srikanth-Pusapati/Investment_stratergy/pull/57
+            MERGE ONLY AFTER THE SEP 18 CLOSE (Amendment 3 freeze to Sep 19), then
+            docs/RUN7_SWITCH.md (day 0 = Sep 18 after the bell on a FRESH account so a
+            'late' day-0 row exists; day 1 = Mon Sep 21; 21 sessions; contract v3 at
+            runs/pre-final-test-run-7/EVAL_CONTRACT.md — flip its header to
+            pre-registered + record the merge SHA before day 1).
+            CONTENT: part 1 (6e33426) = 14 ops/measurement items (pooling-safe);
+            part 2 (74c73fa) = strategy S-1..S-8 + ENTRY TAPE shadow fields +
+            floor6 shadow + sell-row lot stamps + phantom dedup + contract-handles
+            test + RUN7_SWITCH.md. Tests 1517 passed / 1 skipped (the skip needs the
+            v3 contract file, which lives on feature/preview -> passes after merge).
+            Four adversarial reviews (31 findings) applied; notable late catches:
+            S-7 replace-then-sell availability poll + restore-on-refusal, floor6
+            shadow moved off the watchdog thread, same-cycle hedge whipsaw guard
+            while a cross-day map is ignored, post-exec beta read stamped.
+            NEW STRATEGY KEYS (fingerprint): HEDGE_BETA_ASSUMED=-1.0,
+            PROXY_PUT_PREFER_MONTHLY=on, OPTION_STRIKE_SNAP=on,
+            OPTION_STRIKE_MAX_MONEYNESS_PCT=10, REGIME_LOOSEN_MIN_CYCLES=2,
+            HEDGE_UNWIND_MIN_CYCLES=1. NEW OPS KEYS: ALERT_RETRY_BASE_S,
+            ALERT_RETRY_CAP_S, ALERT_SPOOL_FILE, SESSION_CALENDAR_FILE,
+            ROBINHOOD_LOGIN_TIMEOUT_S, LEDGER_RESTATE_AT_FILL (defaults apply;
+            nothing written to .env yet — the switch checklist writes them).
+            DISCLOSED for the fingerprint note: LEDGER_RESTATE_AT_FILL feeds the
+            attribution prompt block once a source has >= TRACK_RECORD_MIN_TRIPS
+            trips (measurement-only for pooling, but a prompt input).
+            REPORT PAGE: https://claude.ai/code/artifact/52b9bfd0-cc0b-41b8-9d66-9a4bdfab5eca
+            USER ACTIONS: (1) read PR #57 + RUN_SUMMARY; override any of the 7 default
+            decisions before merge; (2) create the run-7 paper account keys before
+            Fri Sep 18 16:00 ET; (3) Sep 14-18: nothing — bot runs frozen; (4) Sep
+            18 after the close: run the run-6 checker (both --start commands),
+            archive state, merge PR #57, switch per RUN7_SWITCH.md.
