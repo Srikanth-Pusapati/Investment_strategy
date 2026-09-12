@@ -13,7 +13,7 @@ from datetime import datetime, timedelta, timezone
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from investment_strategy.ledger import TradeRecord
-from investment_strategy.lots import build_lot_history, fifo_basis
+from investment_strategy.lots import build_lot_history, fifo_basis, fifo_lots
 
 _T0 = datetime(2026, 7, 1, 15, 0, tzinfo=timezone.utc)
 
@@ -125,6 +125,45 @@ def test_fifo_basis_is_non_consuming_and_reports_coverage():
     assert covered2 == 10.0 and abs(basis2 - 150.0) < 1e-9
     # And nothing was consumed by either call.
     assert sum(l.remaining for l in lots["AAPL"]) == 10.0
+
+
+# ---- run-7 4a-18: lots carry the entry attributes the sell-row stamp needs -- #
+
+def test_lot_carries_entry_attributes_from_the_buy_row():
+    rec = TradeRecord(
+        ts=_T0, symbol="NU", action="buy", qty=10.0, entry_price=100.0,
+        cost_usd=1000.0, order_id="b1", conviction=0.66, composite_score=1.42,
+        stop_loss_pct=5.71, key_signals=["technical +0.8", "insider +0.4"],
+        fill_price=100.37,
+    )
+    lots, _ = build_lot_history([rec])
+    lot = lots["NU"][0]
+    assert lot.conviction == 0.66 and lot.composite_score == 1.42
+    assert lot.stop_loss_pct == 5.71 and lot.fill_price == 100.37
+    assert lot.key_signals == ["technical +0.8", "insider +0.4"]
+    # 0.0 in the ledger means "not recorded" (core fills, pre-tracking rows),
+    # never zero conviction / a zero stop; an unstamped fill is None.
+    core = _buy(symbol="QQQ", qty=5.0, entry=400.0, oid="core")
+    lots, _ = build_lot_history([core])
+    lot = lots["QQQ"][0]
+    assert lot.conviction is None and lot.stop_loss_pct is None
+    assert lot.fill_price is None and lot.composite_score is None
+    assert lot.key_signals == []
+
+
+def test_fifo_lots_is_non_consuming_oldest_first_and_full_close_on_qty_zero():
+    lots, _ = build_lot_history([
+        _buy(qty=5.0, entry=100.0, oid="b1"),
+        _buy(qty=5.0, entry=200.0, oid="b2"),
+        _buy(qty=5.0, entry=300.0, oid="b3"),
+    ])
+    held = lots["AAPL"]
+    assert [l.order_id for l in fifo_lots(held, 3.0)] == ["b1"]
+    assert [l.order_id for l in fifo_lots(held, 5.0)] == ["b1"]
+    assert [l.order_id for l in fifo_lots(held, 7.0)] == ["b1", "b2"]
+    assert [l.order_id for l in fifo_lots(held, 99.0)] == ["b1", "b2", "b3"]
+    assert [l.order_id for l in fifo_lots(held, 0.0)] == ["b1", "b2", "b3"]  # legacy full close
+    assert sum(l.remaining for l in held) == 15.0                          # nothing consumed
 
 
 def _run_all():

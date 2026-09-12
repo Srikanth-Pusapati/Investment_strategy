@@ -365,10 +365,16 @@ class DecisionEngine:
         # rejected at the slot cap while CVX sat held at 0.46 — the model never
         # tried pairing a sell with the buy). Counted the same way the risk
         # gate counts (equity rows only; options have their own concurrency
-        # cap), so this appears exactly when the cap would actually reject.
+        # cap; S-1 run-7: system-managed CORE/HEDGE/DEFENSIVE ETF rows are
+        # exempt — Sep 4 2026 the prompt told the model "Book FULL (16/15)"
+        # and it sold MKL to fund MU when 14/15 model rows had room), so this
+        # appears exactly when the cap would actually reject.
         max_slots = int(getattr(r, "max_open_positions", 0) or 0) if r else 0
+        slot_exempt = set(getattr(r, "slot_exempt_symbols", ()) or ()) if r else set()
         equity_rows = sum(
-            1 for p in account.positions if not getattr(p, "is_option", False)
+            1 for p in account.positions
+            if not getattr(p, "is_option", False)
+            and getattr(p, "symbol", "") not in slot_exempt
         )
         if max_slots and equity_rows >= max_slots:
             lines += [
@@ -604,7 +610,27 @@ class DecisionEngine:
                 tag = " (NEW — surfaced by scanner)"
             else:
                 tag = ""
-            lines.append(f"### {b.symbol}{tag}")
+            # Run-7 S-4: the spot price the technical provider already
+            # fetched (signal.data['price']) rendered on the candidate line
+            # when options are on — until now the prompt carried NO price
+            # for a name, so "strikes at/near the money" was unactionable
+            # (Sep 4 2026 journal: the model called HD's 400 strike "the
+            # ATM put" with HD at $321; the leg died at OI 2). Factual
+            # data, not persuasion.
+            spot_tag = ""
+            if r is not None and getattr(r, "options_enabled", False):
+                px = 0.0
+                for s in b.signals:
+                    if s.kind is SignalKind.TECHNICAL and s.data:
+                        try:
+                            px = float(s.data.get("price") or 0.0)
+                        except (TypeError, ValueError):
+                            px = 0.0
+                        if px > 0:
+                            break
+                if px > 0:
+                    spot_tag = f" — spot ${px:,.2f}"
+            lines.append(f"### {b.symbol}{tag}{spot_tag}")
             comp = (composites or {}).get(b.symbol)
             if comp is not None:
                 # Our deterministic weighted index (trusted): per-kind mean
@@ -661,6 +687,22 @@ class DecisionEngine:
                 f"- A NEW name (not currently held) needs conviction ≥ "
                 f"{r.min_new_name_conviction:g} — starter positions on lagged/"
                 "crowd theses below that bar are rejected; top-ups are exempt."
+            )
+        if getattr(r, "topup_min_conviction_delta", 0):
+            # S-6 (run-7): the top-up evidence gate was enforced but never
+            # stated — run-6 saw 37 of 77 risk-judged BUYs re-propose a held
+            # name at (or a hair above) its entry number and die at it.
+            delta = float(r.topup_min_conviction_delta)
+            near_miss = (
+                f"+0.01-{delta - 0.01:.2f} over it" if delta > 0.01
+                else "anything short of the bar"
+            )
+            out.append(
+                "- A top-up BUY of a held name is rejected unless its conviction "
+                "clears the bar printed on that name's HELD line (last buy + "
+                f"{delta:g}). Re-proposing the entry number or {near_miss} is "
+                "rejected every cycle and wastes your BUY attention: unless NEW "
+                "evidence since the last buy lifts conviction past the bar, HOLD."
             )
         if getattr(r, "min_composite_score", 0) and getattr(r, "composite_gate_enabled", False):
             out.append(

@@ -662,6 +662,124 @@ def all_satellite_pls(trade_rows: list[dict], system_symbols=None) -> list[float
     return [float(r["realized_pl"]) for r in sat]
 
 
+# Run-7 4a-18: phantom / duplicate SELL rows. A dict-level MIRROR of
+# investment_strategy.ledger.dedup_sells (this script stays import-free so it
+# runs on archived ledgers from any checkout); tests/test_ledger.py pins the
+# two rules to the same dropped set on the AVAV / BIIB / T fixtures.
+#   negative_qty   qty < 0 (AVAV 2026-07-07 flatten qty=-37 +$365.04, a
+#                  snapshot that read the position short after the Jul-7
+#                  bracket double-fill).
+#   replaced_dupe  a LATER sell on the same (symbol, instrument, exit_reason)
+#                  with the same qty within PHANTOM_DUPE_WINDOW_H whose
+#                  realized_pl matches to the cent (T 2026-07-23 option
+#                  flatten -$2,700 x2, an expired DAY close resubmitted) or
+#                  differs by exactly qty x the exit_price delta (AVAV
+#                  2026-07-08 trail 37 sh re-replaced 36 s later, +$212.01 ->
+#                  +$213.98 = 37 x $0.0532): the EARLIER row is the phantom.
+#                  A row with a broker fill stamped (fill_price) is never one.
+# qty == 0 / missing is KEPT (legacy "full close, size unknown"). Rows whose
+# ts cannot be parsed are kept. Applied by the v3 report to the window ledger
+# and to every --pool file; --show-dropped lists each dropped row.
+PHANTOM_DUPE_WINDOW_H = 4.0
+
+
+def _row_ts(row: dict):
+    """UTC-aware datetime of a row's ts, or None when unparseable."""
+    from datetime import datetime, timezone
+    raw = str(row.get("ts") or "").strip()
+    if not raw:
+        return None
+    try:
+        ts = datetime.fromisoformat(raw.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    return ts if ts.tzinfo is not None else ts.replace(tzinfo=timezone.utc)
+
+
+def drop_phantom_sells(rows: list[dict]) -> tuple[list[dict], list[dict]]:
+    """(kept rows in file order, dropped rows) — each dropped row is a copy
+    carrying `_phantom_rule` and, for a dupe, `_kept_order_id`."""
+    from datetime import timedelta
+    if not rows:
+        return [], []
+    stamped = [(i, r, _row_ts(r)) for i, r in enumerate(rows)]
+    order = sorted(stamped, key=lambda t: (t[2] is None, t[2] or 0, t[0]))
+    window = timedelta(hours=PHANTOM_DUPE_WINDOW_H)
+    dropped: dict[int, dict] = {}
+    last_kept: dict[tuple, tuple[int, dict, object]] = {}
+    for i, r, ts in order:
+        if str(r.get("action") or "sell").lower() != "sell":
+            continue
+        qty = r.get("qty")
+        try:
+            qty = float(qty) if qty is not None else None
+        except (TypeError, ValueError):
+            qty = None
+        if qty is not None and qty < 0:
+            dropped[i] = dict(r, _phantom_rule="negative_qty")
+            continue
+        key = (str(r.get("symbol") or "").upper(),
+               str(r.get("instrument") or "equity").lower(),
+               str(r.get("exit_reason") or ""))
+        prev = last_kept.get(key)
+        if prev is not None and ts is not None:
+            j, p, pts = prev
+            pq = p.get("qty")
+            try:
+                pq = float(pq) if pq is not None else None
+            except (TypeError, ValueError):
+                pq = None
+            if (
+                pts is not None and qty is not None and pq is not None
+                and pq > 0 and abs(pq - qty) < 1e-6
+                and float(p.get("fill_price") or 0) <= 0
+                and timedelta(0) <= (ts - pts) <= window
+                and _remark_dupe(p, r, qty)
+            ):
+                dropped[j] = dict(p, _phantom_rule="replaced_dupe",
+                                  _kept_order_id=r.get("order_id"))
+        last_kept[key] = (i, r, ts)
+    kept = [r for i, r in enumerate(rows) if i not in dropped]
+    return kept, [dropped[i] for i in sorted(dropped)]
+
+
+def _remark_dupe(earlier: dict, later: dict, qty: float) -> bool:
+    e_pl, l_pl = earlier.get("realized_pl"), later.get("realized_pl")
+    if e_pl is None or l_pl is None:
+        return False
+    d_pl = float(l_pl) - float(e_pl)
+    if abs(d_pl) < 0.005:
+        return True
+    e_px, l_px = earlier.get("exit_price"), later.get("exit_price")
+    if e_px and l_px and float(e_px) > 0 and float(l_px) > 0:
+        return abs(d_pl - qty * (float(l_px) - float(e_px))) < 0.01
+    return False
+
+
+def _phantom_desc(r: dict) -> str:
+    pl = r.get("realized_pl")
+    kept = f" (exit carried by order {r['_kept_order_id']})" if r.get("_kept_order_id") else ""
+    return (f"{str(r.get('ts') or '')[:16]} {r.get('symbol')} "
+            f"{r.get('instrument') or 'equity'} {r.get('exit_reason') or '-'} "
+            f"qty={r.get('qty')} {_money(pl) if pl is not None else '$n/a'} "
+            f"[{r.get('_phantom_rule')}]{kept}")
+
+
+def print_phantoms(label: str, dropped: list[dict], show: bool) -> None:
+    """One summary line per ledger (always) + one line per row (--show-dropped)."""
+    total = sum(float(r.get("realized_pl") or 0.0) for r in dropped)
+    rules = {}
+    for r in dropped:
+        rules[r["_phantom_rule"]] = rules.get(r["_phantom_rule"], 0) + 1
+    detail = " ".join(f"{k}={v}" for k, v in sorted(rules.items())) or "-"
+    print(f"phantom/dupe sell rows dropped ({label}): n={len(dropped)} "
+          f"sum={_money(total)} [{detail}]"
+          + ("" if show or not dropped else "  (--show-dropped lists them)"))
+    if show:
+        for r in dropped:
+            print(f"  dropped: {_phantom_desc(r)}")
+
+
 def profit_factor(pls: list[float]) -> float | None:
     """sum(wins) / |sum(losses)|; inf when there are wins and no losses;
     None when the sample is empty or has neither."""
@@ -843,7 +961,7 @@ def render_report(start: str, end: str, trade_rows, equity_rows,
                   pool: list[tuple[str, list[dict]]] | None = None,
                   beta_target: float = 1.0,
                   beta_fallback: float | None = None,
-                  system_symbols=None) -> int:
+                  system_symbols=None, show_dropped: bool = False) -> int:
     """Print the full report and return the exit code (EXIT_GO / EXIT_NO_GO /
     EXIT_PENDING; v3 also EXIT_VOID). `bench_closes` ({SYM: {date: close}})
     adds capture lines per benchmark. `contract` picks the rule set ('v1' =
@@ -858,7 +976,8 @@ def render_report(start: str, end: str, trade_rows, equity_rows,
                                 spy_closes=spy_closes, bench_closes=bench_closes,
                                 pool=pool, beta_target=beta_target,
                                 beta_fallback=beta_fallback,
-                                system_symbols=system_symbols)
+                                system_symbols=system_symbols,
+                                show_dropped=show_dropped)
     label = "pre-final-test-run-6 (v2)" if contract == "v2" else "pre-final-test-run-5"
     print(f"=== EVAL-CONTRACT {label} | window {start}..{end} | contract {contract} ===")
 
@@ -1163,7 +1282,7 @@ def render_report_v3(start: str, end: str, trade_rows, equity_rows,
                      pool: list[tuple[str, list[dict]]] | None = None,
                      beta_target: float = 1.0,
                      beta_fallback: float | None = None,
-                     system_symbols=None) -> int:
+                     system_symbols=None, show_dropped: bool = False) -> int:
     """Contract v3 report + verdict (run-7). Same inputs as render_report;
     see the module docstring for the rule set. Prints 'pairs', never
     'sessions'. Returns EXIT_GO (PASS) / EXIT_NO_GO (FAIL) / EXIT_PENDING
@@ -1195,7 +1314,10 @@ def render_report_v3(start: str, end: str, trade_rows, equity_rows,
               "the series starts at the first in-window close row; the first "
               "in-window day forms no pair")
 
-    # (1) satellite closed trips
+    # (1) satellite closed trips — on the phantom-free ledger (4a-18): the
+    # same rows TradeLedger.effective() drops are dropped here, and listed.
+    trade_rows, dropped = drop_phantom_sells(trade_rows)
+    pool = [(plabel, drop_phantom_sells(prows)) for plabel, prows in (pool or [])]
     sat_rows, excl_rows = satellite_closed_in_window(trade_rows, start, end, syms)
     pls = [float(r["realized_pl"]) for r in sat_rows]
     st = trade_stats(pls)
@@ -1216,6 +1338,9 @@ def render_report_v3(start: str, end: str, trade_rows, equity_rows,
     print(f"win rate: {wr} ({st['wins']}W / {st['losses']}L / {st['flat']} flat)")
     print(f"avg win: {_money(st['avg_win'])}   avg loss: {_money(st['avg_loss'])}")
     print(f"expectancy/trade: {_money(st['expectancy'])}")
+    print_phantoms("this ledger", dropped, show_dropped)
+    for plabel, (_prows, pdropped) in pool:
+        print_phantoms(plabel, pdropped, show_dropped)
 
     # (2) window expectancy
     t, df, crit, t_pass = t_test_mean_gt_zero(pls)
@@ -1248,7 +1373,7 @@ def render_report_v3(start: str, end: str, trade_rows, equity_rows,
     print(f"--- (3) pooled expectancy (rule 3: live-pilot bar, pooled satellite "
           f"N >= {V3_POOLED_MIN_TRADES}; never a window rule) ---")
     windows: list[tuple[str, list[float]]] = [(f"this window {start}..{end}", pls)]
-    for plabel, prows in (pool or []):
+    for plabel, (prows, _pdropped) in pool:
         windows.append((plabel, all_satellite_pls(prows, syms)))
     pooled: list[float] = []
     for wlabel, wpls in windows:
@@ -2069,6 +2194,41 @@ def selftest() -> int:
     assert "broker last_equity restatement (informational): max |delta-equity - broker_day_pl| $4,500.00 on 2026-09-02 (3 row(s))" in out
     assert rc == EXIT_PENDING                                     # validity never sets the exit code
 
+    # (10) run-7 4a-18: phantom / duplicate sell rows (AVAV / T shapes)
+    ph = parse_jsonl([
+        '{"ts":"2026-07-07T14:54:45Z","symbol":"AVAV","action":"sell","qty":-37.0,"exit_price":163.72,"realized_pl":365.04,"exit_reason":"flatten","order_id":"c9e7"}',
+        '{"ts":"2026-07-08T13:23:02Z","symbol":"AVAV","action":"sell","qty":37.0,"exit_price":169.67,"realized_pl":212.01,"exit_reason":"trail","order_id":"6f23"}',
+        '{"ts":"2026-07-08T13:23:38Z","symbol":"AVAV","action":"sell","qty":37.0,"exit_price":169.7232,"realized_pl":213.9784,"exit_reason":"trail","order_id":"bf06"}',
+        '{"ts":"2026-07-23T16:50:50Z","symbol":"T","action":"sell","instrument":"option","qty":900.0,"realized_pl":-2700.0,"exit_reason":"flatten","order_id":"cf8b"}',
+        '{"ts":"2026-07-23T20:00:13Z","symbol":"T","action":"sell","instrument":"option","qty":900.0,"realized_pl":-2700.0,"exit_reason":"flatten","order_id":"b4dc"}',
+        '{"ts":"2026-07-24T14:00:00Z","symbol":"T","action":"sell","instrument":"option","qty":900.0,"realized_pl":-2700.0,"exit_reason":"flatten","order_id":"late"}',
+        '{"ts":"2026-07-25T14:00:00Z","symbol":"ZZ","action":"sell","qty":5.0,"realized_pl":10.0,"exit_reason":"trail","order_id":"f1","fill_price":10.0}',
+        '{"ts":"2026-07-25T14:05:00Z","symbol":"ZZ","action":"sell","qty":5.0,"realized_pl":10.0,"exit_reason":"trail","order_id":"f2"}',
+        '{"ts":"2026-07-26T14:00:00Z","symbol":"LEG","action":"sell","qty":0.0,"realized_pl":1.0,"exit_reason":"decision"}',
+    ])
+    kept_ph, dropped_ph = drop_phantom_sells(ph)
+    assert [(r["order_id"], r["_phantom_rule"]) for r in dropped_ph] == [
+        ("c9e7", "negative_qty"), ("6f23", "replaced_dupe"), ("cf8b", "replaced_dupe")]
+    assert dropped_ph[1]["_kept_order_id"] == "bf06"
+    assert [r.get("order_id") for r in kept_ph] == ["bf06", "b4dc", "late", "f1", "f2", None]
+    assert drop_phantom_sells(kept_ph) == (kept_ph, [])            # idempotent
+    rc, out = _quiet(render_report, "2026-07-01", "2026-07-31",
+                     ph + parse_jsonl(['{"ts":"2026-07-08T15:00:00Z","symbol":"AAA","action":"sell","qty":1.0,"realized_pl":5.0,"exit_reason":"trail"}']),
+                     [{"date": "2026-06-30", "equity": 100.0, "basis": "close"},
+                      {"date": "2026-07-31", "equity": 100.0, "basis": "close"}],
+                     contract="v3", pool=[("prior", ph)], show_dropped=True)
+    assert "phantom/dupe sell rows dropped (this ledger): n=3 sum=$-2,122.95 [negative_qty=1 replaced_dupe=2]" in out
+    assert "phantom/dupe sell rows dropped (prior): n=3" in out
+    assert "  dropped: 2026-07-07T14:54 AVAV equity flatten qty=-37.0 $365.04 [negative_qty]" in out
+    assert "  dropped: 2026-07-08T13:23 AVAV equity trail qty=37.0 $212.01 [replaced_dupe] (exit carried by order bf06)" in out
+    assert "ts in window): N=7" in out                            # 10 sells - 3 phantoms
+    rc, out = _quiet(render_report, "2026-07-01", "2026-07-31", ph,
+                     [{"date": "2026-06-30", "equity": 100.0, "basis": "close"},
+                      {"date": "2026-07-31", "equity": 100.0, "basis": "close"}],
+                     contract="v3")
+    assert "n=3 sum=$-2,122.95 [negative_qty=1 replaced_dupe=2]  (--show-dropped lists them)" in out
+    assert "  dropped:" not in out
+
     print("SELFTEST PASS")
     return 0
 
@@ -2120,6 +2280,12 @@ def main(argv=None) -> int:
                          "filter); excluded from satellite N and printed on the "
                          "'excluded system-managed rows' line; '' disables "
                          "(default: %(default)s)")
+    ap.add_argument("--show-dropped", action="store_true",
+                    help="v3 only: list every phantom/duplicate SELL row the "
+                         "checker dropped (negative qty; a replaced or "
+                         "expired-and-resubmitted exit ledgered twice within "
+                         f"{PHANTOM_DUPE_WINDOW_H:g} h) — the summary line "
+                         "prints regardless")
     ap.add_argument("--selftest", action="store_true",
                     help="run the embedded-fixture selftest and exit")
     args = ap.parse_args(argv)
@@ -2168,7 +2334,8 @@ def main(argv=None) -> int:
                          contract=args.contract, pool=pool or None,
                          beta_target=args.beta_target,
                          beta_fallback=beta_fallback,
-                         system_symbols=system_symbols)
+                         system_symbols=system_symbols,
+                         show_dropped=bool(args.show_dropped))
 
 
 if __name__ == "__main__":

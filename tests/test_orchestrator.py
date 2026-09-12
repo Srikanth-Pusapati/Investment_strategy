@@ -1117,6 +1117,89 @@ def test_held_notes_skip_options_and_unclocked_names():
     assert o._held_notes(acct) == {}
 
 
+def test_held_notes_state_the_topup_bar():
+    """S-6 (run-7): the HELD line prints the bar the top-up gate enforces.
+    Run-6 lost 37 of 77 risk-judged BUYs at that gate — the prompt showed
+    'entry conviction 0.66' (the anchor) but never the +0.05 rule."""
+    o = _orch(core_etf="QQQ")
+    o.cfg.risk.topup_min_conviction_delta = 0.05
+    o.state.register_buy("CVX", conviction=0.46)
+    o.state.register_entry("CVX")
+    acct = _acct(positions=[_pos("CVX", 100.0), _pos("QQQ", 500.0)])
+    notes = o._held_notes(acct)
+    assert "entry conviction 0.46" in notes["CVX"]
+    assert (
+        "top-up needs conviction >= 0.51 (+0.05 over the last buy) — else HOLD"
+        in notes["CVX"]
+    )
+    assert "QQQ" not in notes
+    # Gate off -> no bar (nothing is enforced, so nothing is printed).
+    o.cfg.risk.topup_min_conviction_delta = 0.0
+    assert "top-up needs" not in o._held_notes(acct)["CVX"]
+
+
+def test_held_notes_topup_bar_absent_when_state_pruned():
+    """The gate reads the STATE stamp and fails open once the 7-day buy clock
+    prunes it; the ledger fallback still supplies the rotation baseline
+    ('entry conviction') but must NOT print a bar the gate will not hold."""
+    from datetime import datetime, timedelta, timezone
+    o = _orch()
+    o.cfg.risk.topup_min_conviction_delta = 0.05
+    o.state.register_buy(
+        "CVX", when=datetime.now(timezone.utc) - timedelta(days=8), conviction=0.46,
+    )
+    assert o.state.last_buy_conviction("CVX") is None  # pruned with the clock
+    o.ledger = SimpleNamespace(effective=lambda: [
+        SimpleNamespace(action="buy", symbol="CVX", conviction=0.46, rationale=""),
+    ])
+    notes = o._held_notes(_acct(positions=[_pos("CVX", 100.0)]))
+    assert "entry conviction 0.46" in notes["CVX"]
+    assert "top-up needs" not in notes["CVX"]
+
+
+def test_held_notes_marks_rejected_topup_verdict():
+    """A BUY that died at the top-up gate is echoed AS rejected — the bare
+    'your last verdict today: BUY conv 0.66' anchored the model to re-assert
+    the number the gate had just refused (Sep 10 2026 NOK/SEI/GRNT)."""
+    from investment_strategy.journal import DecisionRecord
+
+    def _rec(verdict, reason, action="buy"):
+        return DecisionRecord(
+            ts="2026-09-10T14:26:14+00:00", symbol="CVX", action=action,
+            instrument="equity", conviction=0.66, target_weight_pct=10.0,
+            verdict=verdict, reason=reason,
+            rationale_head="Top-up on strongest intact winner",
+        )
+
+    o = _orch()
+    o.cfg.risk.topup_min_conviction_delta = 0.05
+    o.state.register_buy("CVX", conviction=0.66)
+    acct = _acct(positions=[_pos("CVX", 100.0)])
+    o.journal = SimpleNamespace(today=lambda: [_rec(
+        "rejected",
+        "Top-up conviction 0.66 shows no new edge over prior entry 0.66 "
+        "(bar 0.71 = last buy +0.05) — 'adding to a winner' is not a signal.",
+    )])
+    note = o._held_notes(acct)["CVX"]
+    assert "top-up needs conviction >= 0.71" in note
+    assert (
+        "your last verdict today: BUY conv 0.66 — rejected at the top-up bar "
+        "('Top-up on strongest intact winner')" in note
+    )
+    # Rejected elsewhere (slot cap) -> plain echo, no top-up mark.
+    o.journal = SimpleNamespace(today=lambda: [_rec(
+        "rejected", "At max open positions (15/15 model rows).",
+    )])
+    note = o._held_notes(acct)["CVX"]
+    assert "your last verdict today: BUY conv 0.66 (" in note
+    assert "rejected at the top-up bar" not in note
+    # Approved BUY / HOLD -> never marked.
+    o.journal = SimpleNamespace(today=lambda: [_rec("approved", "")])
+    assert "rejected at the top-up bar" not in o._held_notes(acct)["CVX"]
+    o.journal = SimpleNamespace(today=lambda: [_rec("approved", "", action="hold")])
+    assert "rejected at the top-up bar" not in o._held_notes(acct)["CVX"]
+
+
 # --------------------------------------------------------------------------- #
 # Daily dated log names (backward-analysis archive)
 # --------------------------------------------------------------------------- #
@@ -1654,3 +1737,37 @@ def test_cycle_stamps_liveness_through_the_beta_read():
         "stamp",                                    # after the beta read
         "screener",
     ]
+
+
+# --------------------------------------------------------------------------- #
+# S-1 (run-7): a PARTIAL decision-sell fold says so in the log. Sep 4 2026 the
+# watchdog's "Partial close MKL ... 9 reserved" WARNING was followed 6s later
+# by "REJECT buy MU: At max open positions (15)" with nothing recording that
+# MKL's slot HAD been folded into the cycle — the reject came from QQQ+PSQ in
+# the count, not from the fold failing.
+# --------------------------------------------------------------------------- #
+def test_decision_sell_partial_logs_rotation_fold(caplog):
+    o = _orch()
+    held = _held_position("MKL", qty=9.0, price=1836.44)   # $16,528 as on Sep 4
+    o.broker.annualized_vol = lambda s: 0.3
+    o.broker.open_position = lambda s: held
+    o._regime_mult = 1.0
+    prop = _sell_prop("MKL", rationale="rotate out of weakest winner")
+    decision = _RiskDecision(
+        proposal=prop, verdict=_RiskVerdict.APPROVED, approved_qty=held.qty,
+        approved_notional=held.market_value, reason="approved sell",
+    )
+    o.risk.evaluate = lambda *a, **k: decision
+    o.watchdog.outcomes = [("partial", None)]
+    acct = _acct(cash=0.0, positions=[held])
+    caplog.set_level(logging.INFO, logger="orchestrator")
+
+    o._handle_equity(prop, acct, [], composite=0.42)
+
+    assert "ROTATION: MKL slot + $16528 folded into this cycle pending fill" in caplog.text
+    # And the fold really happened: the slot and the capital are free for the
+    # buys that follow in this same cycle.
+    assert acct.position_for("MKL") is None
+    assert acct.cash == held.market_value
+    assert o.ledger.records == []                   # close_now already ledgered
+    assert "MKL" not in o.watchdog.forgotten        # still tracked until fills land

@@ -1034,12 +1034,31 @@ class AlpacaClient:
             log.warning("cancel order %s failed: %s", order_id, e)
             return False
 
-    def open_stop_sells(self, symbol: str) -> list[dict]:
-        """OPEN stop-type SELL orders for `symbol` as (id, qty, stop_price)
-        dicts — how the core-stop maintainer (GA-2.3) sees the protection that
-        is ALREADY resting at the exchange before deciding to replace it.
-        Best-effort: [] on failure (caller then leaves the resting stop alone
-        rather than risking a cancel with no replacement)."""
+    #: Order states in which a stop is NOT protection: a cancel is in flight
+    #: (the venue will drop it, but until it settles the shares stay reserved)
+    #: or the order is already terminal. Run-7 S-7 (Sep 11 2026 08:30 ET): the
+    #: core-defense trim canceled the 163-sh QQQ GTC stop and the same-instant
+    #: reduce_position got 40310000 "available 0.4975 / held_for_orders 163"
+    #: — then _ensure_core_stop read the pending_cancel stop back as "already
+    #: right", cleared the retry flag, and the core sat stopless 4m53s.
+    _STOP_NOT_RESTING = frozenset({
+        "pending_cancel", "canceled", "cancelled", "expired", "replaced",
+        "filled", "rejected", "done_for_day", "stopped", "suspended",
+    })
+
+    def open_stop_sells(self, symbol: str, resting_only: bool = True) -> list[dict]:
+        """OPEN stop-type SELL orders for `symbol` as (id, qty, stop_price,
+        status) dicts — how the core-stop maintainer (GA-2.3) sees the
+        protection that is ALREADY resting at the exchange before deciding to
+        replace it. With `resting_only` (the default) an order whose status is
+        in _STOP_NOT_RESTING — pending_cancel above all — is NOT returned: it
+        cannot fire, so treating it as the resting stop leaves the position
+        unprotected while the retry flag reads "healthy" (Sep 11 2026). Pass
+        `resting_only=False` to see those too — the core-defense cancel
+        fallback polls that view to learn when the venue-side cancel has
+        actually settled and the reserved shares are free. Best-effort: [] on
+        failure (caller then leaves the resting stop alone rather than risking
+        a cancel with no replacement)."""
         out: list[dict] = []
         try:
             for o in self.trading.get_orders():
@@ -1050,14 +1069,42 @@ class AlpacaClient:
                 otype = getattr(o, "order_type", None) or getattr(o, "type", "")
                 if "stop" not in str(getattr(otype, "value", otype)).lower():
                     continue
+                status = self._order_status(o)
+                if resting_only and status in self._STOP_NOT_RESTING:
+                    continue  # a cancel in flight / terminal: not protection
                 out.append({
                     "id": str(o.id),
                     "qty": float(getattr(o, "qty", 0) or 0),
                     "stop_price": float(getattr(o, "stop_price", 0) or 0),
+                    "status": status,
                 })
         except Exception as e:
             log.warning("open_stop_sells(%s) failed: %s", symbol, e)
         return out
+
+    def replace_order_qty(self, order_id: str, qty: float) -> Optional[str]:
+        """PATCH a resting order's qty DOWN to `qty` whole shares and return
+        the NEW order id (Alpaca issues a fresh id per replace; the old one
+        goes to status `replaced`), or None when the venue refuses. This is
+        how the core-defense trim frees exactly the shares it sells from the
+        GTC core stop (run-7 S-7): a replace is atomic at the venue, so the
+        remainder never rides stopless and there is no cancel to settle before
+        the sell can go in — the "replace on live legs, never cancel-then-
+        resell" rule (Alpaca pending_cancel wedge, Jul 2026). Whole shares
+        only (GTC stops cannot be fractional); None for qty < 1 so a caller
+        can never shrink a stop to nothing through this path."""
+        if qty is None or qty < 1:
+            return None
+        try:
+            new = self.trading.replace_order_by_id(
+                order_id, ReplaceOrderRequest(qty=int(qty)),
+            )
+        except Exception as e:
+            log.warning(
+                "replace order %s qty -> %d failed: %s", order_id, int(qty), e,
+            )
+            return None
+        return str(new.id)
 
     @staticmethod
     def _fill_detail_of(o) -> dict:

@@ -17,6 +17,7 @@ so a restart doesn't silently reset all protection to "all clear".
 from __future__ import annotations
 
 import logging
+import threading
 from datetime import datetime, timezone
 from zoneinfo import ZoneInfo
 
@@ -89,6 +90,15 @@ class Watchdog:
         #: the deferral logs once per closed session instead of every 30s tick
         #: (Jul 23: 1,301 EMERGENCY lines; Jul 24: 228 more until 01:56).
         self._flatten_deferred_noted = False
+        #: run-7 4a-16 (fix-pass, review 2 #2): clamp-floor shadow jobs for
+        #: hard-STOP exits, computed here from the ledger's lots (local) but
+        #: FETCHED and stamped by the decision thread
+        #: (orchestrator._drain_floor_shadow_jobs) — the bars read is a
+        #: network call with a retry budget and this loop runs under the
+        #: trade lock. Guarded by its own lock: appended on this thread,
+        #: drained on the decision thread.
+        self.floor_shadow_jobs: list[dict] = []
+        self._floor_jobs_lock = threading.Lock()
         #: premium stop/take two-tick confirmation streaks, keyed like the
         #: option groups by (underlying, expiry) -> (reason, breach ticks).
         #: In-memory on purpose (mirrors _last_wait_log, not PortfolioState):
@@ -1080,6 +1090,57 @@ class Watchdog:
         """Drop trailing state when a position is gone (filled stop/tp)."""
         self.state.forget_symbol(symbol)
 
+    # -- run-7 4a-16: clamp-floor shadow on a hard-stop exit ---------------- #
+    def _floor_shadow_job(self, pos: Position, oid: str) -> dict | None:
+        """The inputs the decision thread needs to compute the trip's
+        (floor6_would_survive, worst close %) for the stop closing `pos`:
+        the ledger's open FIFO lots give the opening date and the basis of
+        the shares being sold (a LOCAL read, taken BEFORE the sell row
+        consumes the lot); the broker's daily closes give the path — and
+        that fetch is what does NOT happen here (fix-pass, review 2 #2: a
+        `daily_close_series` read is `_retry_read`-budgeted network I/O and
+        this runs on the safety loop under the trade lock; two stop breaches
+        on a Sep-11-shaped 5xx feed would stall the tick ~60 s each with the
+        decision thread's submits waiting on the lock). Measurement only.
+        None whenever the ledger has no lot for the name; never raises."""
+        try:
+            from ..lots import build_lot_history, fifo_basis
+            records = self.ledger.effective()
+            open_lots, _ = build_lot_history(records)
+            lots = open_lots.get(pos.symbol) or []
+            if not lots:
+                return None
+            qty = pos.qty if pos.qty and pos.qty > 0 else sum(l.remaining for l in lots)
+            basis, _covered = fifo_basis(lots, qty)
+            live_stop = next(
+                (r.stop_loss_pct for r in reversed(records)
+                 if r.symbol == pos.symbol and r.action == "buy"), None,
+            )
+            return {
+                "symbol": pos.symbol, "order_id": oid, "entry_ts": lots[0].entry_ts,
+                "basis": basis, "live_stop": live_stop,
+                "exit_ts": datetime.now(timezone.utc),
+            }
+        except Exception as e:  # noqa: BLE001 — a shadow never blocks an exit
+            log.debug("floor shadow for %s unavailable: %s", pos.symbol, e)
+            return None
+
+    def _queue_floor_shadow(self, job: dict | None) -> None:
+        if not job:
+            return
+        with self._floor_jobs_lock:
+            self.floor_shadow_jobs.append(job)
+        log.info(
+            "FLOOR6 SHADOW: %s stop deferred to the decision thread (basis "
+            "%.2f; no bars fetch on the safety loop).", job["symbol"], job["basis"],
+        )
+
+    def drain_floor_shadow_jobs(self) -> list[dict]:
+        """Hand the queued shadow jobs to the decision thread (and clear)."""
+        with self._floor_jobs_lock:
+            jobs, self.floor_shadow_jobs = self.floor_shadow_jobs, []
+        return jobs
+
     # -- ledger ------------------------------------------------------------- #
     def _record_exit(
         self, pos: Position, oid: str | None, reason: str, *,
@@ -1107,6 +1168,13 @@ class Watchdog:
             log.warning("Exit-clock stamp failed for %s: %s", pos.symbol, e)
         if self.ledger is None:
             return
+        # Run-7 4a-16: a hard STOP exit (the fractional path — whole-share
+        # brackets stop at the exchange and reach the ledger via the
+        # orchestrator's backfill) gets the clamp-floor shadow — recorded
+        # None here and stamped by the decision thread once it has fetched
+        # the closes (job queued below, off the safety loop). Every other
+        # reason leaves the field None for good.
+        job = self._floor_shadow_job(pos, oid) if reason == "stop" and oid else None
         try:
             self.ledger.record(TradeRecord.for_sell(
                 pos.symbol, rationale or f"watchdog {reason}", oid,
@@ -1114,7 +1182,9 @@ class Watchdog:
                 realized_pl_pct=pos.unrealized_pl_pct, realized_pl=pos.unrealized_pl,
                 exit_reason=reason, exit_price=pos.current_price or None,
                 composite_score=composite_score,
+                floor6_would_survive=None, floor6_worst_close_pct=None,
             ))
+            self._queue_floor_shadow(job)
         except Exception as e:  # never let logging break the watchdog
             log.warning("Ledger exit-record failed for %s: %s", pos.symbol, e)
         if not oid:
