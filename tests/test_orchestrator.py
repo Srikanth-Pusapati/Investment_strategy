@@ -857,6 +857,54 @@ def test_backfill_stamps_reentry_cooldown_clock():
     assert o.state.hours_since_exit("AAPL") is not None
 
 
+def test_backfill_rows_carry_the_broker_fill_fields():
+    """Run-7 A6: run-6 closed 14 trips and the 7 exchange bracket exits all
+    had fill_price=null — the backfill priced realized_pl from the broker's
+    filled_avg_price but never stamped fill_price/fill_qty/fill_ts, so the
+    contract's ledger-vs-fill reconciliation could not cover half the sample.
+    The row must carry the fill it was recorded from."""
+    from datetime import datetime as _dt, timezone as _tz
+    o = _backfill_orch(
+        closed_sells=[
+            _closed("leg-stop", qty=10.0, price=92.0, otype="stop",
+                    filled_at="2026-07-02T15:30:00+00:00"),
+            _closed("leg-take", symbol="NVDA", qty=5.0, price=240.0,
+                    otype="limit", filled_at="not-a-timestamp"),
+        ],
+        records=[_buy_rec("AAPL", entry=100.0),
+                 _buy_rec("NVDA", entry=200.0, oid="buy-2")],
+    )
+    cap = _LogCapture()
+    lg = logging.getLogger("orchestrator")
+    old_level = lg.level
+    lg.addHandler(cap)
+    lg.setLevel(logging.INFO)
+    try:
+        o._backfill_exchange_exits()
+    finally:
+        lg.removeHandler(cap)
+        lg.setLevel(old_level)
+    msgs = [r.getMessage() for r in cap.records
+            if r.getMessage().startswith("Backfilled exchange exit")]
+    stop, take = o.ledger.records[2:]
+    assert stop.exit_reason == "bracket_stop"
+    assert stop.fill_price == 92.0 == stop.exit_price     # == filled_avg_price
+    assert stop.fill_qty == 10.0
+    assert stop.fill_ts == _dt(2026, 7, 2, 15, 30, tzinfo=_tz.utc) == stop.ts
+    assert abs(stop.realized_pl - (92.0 - 100.0) * 10.0) < 1e-9  # AT the fill
+    # An unparseable filled_at leaves fill_ts None (the field means the FILL
+    # time or nothing — never "now"); the price/qty stamps still land.
+    assert take.fill_price == 240.0 and take.fill_qty == 5.0
+    assert take.fill_ts is None
+    assert abs(take.realized_pl - (240.0 - 200.0) * 5.0) < 1e-9
+    # Greppable audit: a backfill line without "[fill stamped" is a regression.
+    assert len(msgs) == 2 and all("[fill stamped" in m for m in msgs), msgs
+    assert any("AAPL" in m and "[fill stamped 2026-07-02T15:30:00+00:00]." in m
+               for m in msgs), msgs
+    assert any("NVDA" in m and "[fill stamped, no filled_at]." in m
+               for m in msgs), msgs
+
+
 # --------------------------------------------------------------------------- #
 # Per-cycle budget fair-share (the 2026-07-06 all-LLY fix)
 # --------------------------------------------------------------------------- #
@@ -1320,3 +1368,289 @@ def test_core_fill_rejected_buy_reverts_the_snapshot_fold():
         o._apply_core_fill(acct)
     assert acct.position_for("SPY") is None
     assert acct.cash == 1_000.0
+
+
+# -- main-loop tick failure policy: broker 5xx (run-7 A3) --------------------- #
+# Sep 11 2026 11:59:30-12:03:24 CT: Alpaca /v2/clock answered 500 on eight
+# consecutive 30 s ticks; each one escaped is_market_open at the top of
+# run_decision_cycle and hit the run loop's catch-all, which wrote a 37-line
+# traceback at ERROR per tick as if the bot had a bug. A 5xx is a broker blip:
+# one WARNING per tick, count the run, page in-hours at the doubling rungs
+# (like watchdog-blind), and leave 4xx / real bugs on the traceback path.
+import contextlib
+
+
+@contextlib.contextmanager
+def _pin_paging_hours(fn):
+    """Pin Orchestrator._overlaps_paging_hours (it reads the cached session
+    calendar / wall clock otherwise); no pytest fixture so the file stays
+    runnable standalone."""
+    orig = Orchestrator.__dict__["_overlaps_paging_hours"]
+    Orchestrator._overlaps_paging_hours = staticmethod(fn)
+    try:
+        yield
+    finally:
+        Orchestrator._overlaps_paging_hours = orig
+
+
+def _api_error(status, body='{"message":"Internal Server Error"}',
+               url="https://paper-api.alpaca.markets/v2/clock"):
+    from requests.exceptions import HTTPError
+    from alpaca.common.exceptions import APIError
+    resp = SimpleNamespace(status_code=status, url=url)
+    req = SimpleNamespace(method="GET", url=url)
+    return APIError(body, HTTPError(f"{status}", response=resp, request=req))
+
+
+def _loop_orch(exc_factory):
+    """A bare orchestrator whose _tick raises exc_factory() (None = clean),
+    with the alerter's pages recorded as (key, severity)."""
+    o = Orchestrator.__new__(Orchestrator)
+    o.cfg = SimpleNamespace(monitor_interval_s=30)
+    pages = []
+    o.alerter = SimpleNamespace(
+        critical=lambda k, s, b, severity=None: pages.append((k, severity)) or True)
+    box = {"exc": exc_factory}
+
+    def _tick():
+        e = box["exc"]() if box["exc"] else None
+        if e is not None:
+            raise e
+    o._tick = _tick
+    o._set_tick_error = lambda f: box.__setitem__("exc", f)
+    return o, pages
+
+
+def _guarded_ticks(o, n):
+    """Run n guarded ticks capturing the orchestrator log; return records."""
+    h = _LogCapture()
+    lg = logging.getLogger("orchestrator")
+    lg.addHandler(h)
+    try:
+        for _ in range(n):
+            o._guarded_tick()
+    finally:
+        lg.removeHandler(h)
+    return h.records
+
+
+def _watchdog_ticks(o, n, exc_factory):
+    """Drive _watchdog_loop for n iterations with watchdog.check_once raising
+    exc_factory() (None = clean); the rest of the tick body is stubbed."""
+    import threading as _th
+    o._trade_lock = _th.Lock()
+    o._watchdog_skips = 0
+    for name in ("_note_loop_tick", "_maybe_warn_on_battery", "_retry_core_stop",
+                 "_maybe_heartbeat"):
+        setattr(o, name, lambda: None)
+
+    def check_once():
+        e = exc_factory() if exc_factory else None
+        if e is not None:
+            raise e
+    o.watchdog = SimpleNamespace(check_once=check_once)
+    left = {"n": n}
+
+    class _Stop:
+        def is_set(self):
+            return left["n"] <= 0
+
+        def wait(self, _s):
+            left["n"] -= 1
+    o._stop = _Stop()
+    h = _LogCapture()
+    lg = logging.getLogger("orchestrator")
+    lg.addHandler(h)
+    try:
+        o._watchdog_loop()
+    finally:
+        lg.removeHandler(h)
+    return h.records
+
+
+def test_watchdog_loop_5xx_counts_toward_blind_and_logs_no_traceback():
+    # Review finding (run-7 A3): a broker 5xx inside check_once went to
+    # log.exception and never counted toward _watchdog_skips, so a pure-5xx
+    # outage (the Sep 11 shape) logged a traceback per tick and never produced
+    # the watchdog_blind page. It is a blind tick like a network fault.
+    with _pin_paging_hours(lambda s, e: True):
+        o, pages = _loop_orch(None)
+        records = _watchdog_ticks(o, 6, lambda: _api_error(503, body="Service Unavailable"))
+    assert o._watchdog_skips == 6
+    warns = [r for r in records if r.levelno == logging.WARNING
+             and "Watchdog tick skipped on broker HTTP 503" in r.getMessage()]
+    assert len(warns) == 6 and "6 in a row" in warns[-1].getMessage()
+    assert not any(r.levelno >= logging.ERROR and r.exc_info for r in records)
+    assert [k for k, _ in pages] == ["watchdog_blind"]          # first rung at 5
+    # A clean tick ends the run; a 4xx is still a real error with its traceback.
+    with _pin_paging_hours(lambda s, e: True):
+        _watchdog_ticks(o, 1, None)
+        assert o._watchdog_skips == 0
+        records = _watchdog_ticks(o, 1, lambda: _api_error(403, body="forbidden"))
+    assert o._watchdog_skips == 0
+    assert any(r.levelno == logging.ERROR and r.exc_info for r in records)
+
+
+def test_guarded_tick_5xx_logs_one_warning_per_tick_without_traceback():
+    with _pin_paging_hours(lambda s, e: True):
+        o, pages = _loop_orch(lambda: _api_error(500))
+        records = _guarded_ticks(o, 8)              # the Sep 11 run, replayed
+    assert [r.levelno for r in records] == [logging.WARNING] * 8
+    assert all(r.exc_info is None for r in records), "no traceback for a 5xx"
+    msgs = [r.getMessage() for r in records]
+    assert msgs[0] == (
+        'Decision tick skipped on broker HTTP 500 (GET '
+        'https://paper-api.alpaca.markets/v2/clock: {"message":"Internal Server '
+        'Error"}); 1 in a row — retrying next tick.')
+    assert msgs[-1].endswith("; 8 in a row — retrying next tick.")
+    assert o._broker_5xx_ticks == 8
+    assert pages == [], "8 ticks is below the first rung (10)"
+
+
+def test_guarded_tick_clean_tick_ends_the_5xx_run():
+    with _pin_paging_hours(lambda s, e: True):
+        o, pages = _loop_orch(lambda: _api_error(500))
+        _guarded_ticks(o, 3)
+        assert o._broker_5xx_ticks == 3
+        o._set_tick_error(None)
+        _guarded_ticks(o, 1)
+        assert o._broker_5xx_ticks == 0
+        # a NEW run counts from 1 again
+        o._set_tick_error(lambda: _api_error(502, body="Bad Gateway"))
+        records = _guarded_ticks(o, 1)
+    assert o._broker_5xx_ticks == 1
+    assert "broker HTTP 502" in records[0].getMessage()
+
+
+def test_guarded_tick_5xx_pages_in_hours_at_doubling_rungs_only():
+    with _pin_paging_hours(lambda s, e: True):
+        o, pages = _loop_orch(lambda: _api_error(500))
+        records = _guarded_ticks(o, 45)
+    assert pages == [("broker_5xx", 10.0), ("broker_5xx", 20.0), ("broker_5xx", 40.0)]
+    crit = [r.getMessage() for r in records if r.levelno == logging.CRITICAL]
+    assert len(crit) == 3 and crit[0].startswith(
+        "Broker DOWN: 10 consecutive decision ticks failed on HTTP 500 (~300s)")
+    assert "next page at 20 ticks" in crit[0]
+    assert sum(1 for r in records if r.levelno == logging.WARNING) == 45
+    assert not any(r.levelno == logging.ERROR for r in records)
+
+
+def test_guarded_tick_5xx_never_pages_out_of_hours():
+    with _pin_paging_hours(lambda s, e: False):
+        o, pages = _loop_orch(lambda: _api_error(500))
+        records = _guarded_ticks(o, 45)
+    assert pages == []
+    assert not any(r.levelno == logging.CRITICAL for r in records)
+    assert o._broker_5xx_ticks == 45         # still counted, just not paged
+
+
+def test_guarded_tick_5xx_page_held_by_alerter_is_logged():
+    with _pin_paging_hours(lambda s, e: True):
+        o, pages = _loop_orch(lambda: _api_error(500))
+        o.alerter = SimpleNamespace(critical=lambda k, s, b, severity=None: False)
+        records = _guarded_ticks(o, 10)
+    held = [r for r in records if r.levelno == logging.WARNING
+            and "Broker DOWN page at 10 ticks held by the alerter" in r.getMessage()]
+    assert len(held) == 1
+
+
+def test_guarded_tick_4xx_still_logs_the_traceback():
+    # A 422 (wash trade) or 403 is a WRONG REQUEST: the pre-existing
+    # log.exception path is untouched and the 5xx counter never moves.
+    with _pin_paging_hours(lambda s, e: True):
+        o, pages = _loop_orch(lambda: _api_error(
+            422, body='{"code":40310000,"message":"potential wash trade detected"}'))
+        records = _guarded_ticks(o, 2)
+    assert [r.levelno for r in records] == [logging.ERROR, logging.ERROR]
+    assert all(r.getMessage() == "Decision tick failed; continuing." for r in records)
+    assert all(r.exc_info is not None for r in records), "4xx keeps its traceback"
+    assert o._broker_5xx_ticks == 0 and pages == []
+
+
+def test_guarded_tick_generic_exception_and_transient_net_unchanged():
+    from requests.exceptions import ConnectionError as RCE
+    with _pin_paging_hours(lambda s, e: True):
+        o, pages = _loop_orch(lambda: RuntimeError("bug"))
+        records = _guarded_ticks(o, 1)
+        assert records[0].levelno == logging.ERROR and records[0].exc_info is not None
+        o._set_tick_error(lambda: RCE("reset by peer"))
+        records = _guarded_ticks(o, 1)
+    assert records[0].levelno == logging.WARNING and records[0].exc_info is None
+    assert records[0].getMessage() == (
+        "Decision tick skipped on a transient network error (ConnectionError); "
+        "retrying next tick.")
+    assert o._broker_5xx_ticks == 0 and pages == []
+
+
+# --------------------------------------------------------------------------- #
+# Liveness stamps through the regime -> book-beta stage (run-7 item A4)
+# --------------------------------------------------------------------------- #
+class _StopAtScreener(RuntimeError):
+    pass
+
+
+def test_cycle_stamps_liveness_through_the_beta_read():
+    """Sep 11 2026: between the post-reconcile stamp and the post-screener
+    stamp the cycle ran the regime read, the equity snapshot, get_account and
+    a ~21-fetch serial book-beta read with NO liveness stamp; one Alpaca
+    ReadTimeout stretched that span to 163 s (>150 s gate) and the heartbeat
+    was withheld twice. The cycle must now stamp after the regime read, hand
+    the reader the stamp (ticked per fetched symbol) and stamp again after
+    the read — all BEFORE the screener runs."""
+    ns = SimpleNamespace
+    o = Orchestrator.__new__(Orchestrator)
+    events: list[str] = []
+    o.cfg = ns(
+        risk=ns(regime_filter_enabled=False),
+        screener=ns(enabled=True),
+        book_beta_enabled=True,
+        core_etf="", hedge_etf="", defensive_core_etf="",
+    )
+    o.broker = ns(is_market_open=lambda: True, get_account=lambda: _acct())
+    for feed in ("quiver", "earnings", "sectors", "corr_guard", "regime"):
+        setattr(o, feed, ns(new_cycle=lambda: None))
+    o.watchlist = []
+
+    class _Reader:
+        def new_cycle(self):
+            pass
+
+        def read(self, account, on_progress=None):
+            events.append("read-start")
+            for _ in range(3):                      # three "fetches"
+                on_progress()
+            events.append("read-end")
+            return ns(available=False, spy=None,
+                      line=lambda: "BOOK BETA: unavailable (stub)")
+
+    o.book_beta = _Reader()
+
+    def _scan(exclude):
+        events.append("screener")
+        raise _StopAtScreener()
+
+    o.screeners = ns(scan=_scan)
+    # Instance-level stubs shadow the bound methods not under test.
+    o._refresh_session_calendar = lambda: None
+    o._reconcile_fills = lambda: None
+    o._backfill_exchange_exits_locked = lambda: None
+    o._stamp_liveness = lambda: events.append("stamp")
+    o._within_close_fence = lambda: False
+    o._record_equity_snapshot = lambda: events.append("snapshot")
+    o._apply_core_defense = lambda a: None
+    o._apply_auto_hedge = lambda a: None
+    o._apply_defensive_rotation = lambda a: None
+    try:
+        o.run_decision_cycle()
+        raise AssertionError("screener never reached — cycle rewired?")
+    except _StopAtScreener:
+        pass
+    assert events == [
+        "stamp",                                    # after the session-calendar refresh
+        "stamp",                                    # after reconcile/backfill
+        "stamp",                                    # after the regime block
+        "snapshot",
+        "read-start", "stamp", "stamp", "stamp", "read-end",   # per fetch
+        "stamp",                                    # after the beta read
+        "screener",
+    ]

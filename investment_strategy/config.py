@@ -705,6 +705,11 @@ class Config:
     # back before the first decision cycle, so the read-retry budget isn't burnt
     # while Wi-Fi is still reconnecting. 0 = off.
     wake_settle_seconds: float = 20.0
+    # Cached exchange calendar (run-7 A2): JSON the decision loop refreshes
+    # once per ET date; the watchdog's paging window and ops/deadman.py read
+    # it so holidays/early closes stop counting as market hours. Default:
+    # <dir of STATE_FILE>/session_calendar.json.
+    session_calendar_file: str = "state/session_calendar.json"
     # Nightly self post-mortem (B2): on the first market-closed decision tick
     # after a day that has journal entries, feed the day's decisions to Claude
     # and fold its one-line lessons back into the next day's decision prompt.
@@ -743,7 +748,10 @@ class Config:
     #     timeout/HTTP error counts as UNHEALTHY for that cycle, and the line
     #     carries 'news=vader-fallback' once news.py has latched the Finnhub
     #     403 (Aug 25: FEEDS said 5/5 while news was VADER all run and EDGAR
-    #     returned 0 filings twice). off = legacy enabled-only line.
+    #     returned 0 filings twice), and (run-7 A7) 'earnings=<rh|yfinance-
+    #     fallback|none>' — the earnings-blackout gate's source this cycle
+    #     (Sep 10: RH dead 12 cycles behind '3/3 healthy'). off = legacy
+    #     enabled-only line.
     feeds_degraded_modes: bool = True
     #   RESET_CARRY_CHURN (run-6 default off): whether a reset / fresh cycle
     #     carries the OLD account's churn memory (exit clocks + exit prices,
@@ -862,6 +870,10 @@ def load_config() -> Config:
         monitor_interval_s=_i("MONITOR_INTERVAL_SECONDS", 30),
         close_fence_minutes=_f("CLOSE_FENCE_MINUTES", 5.0),
         wake_settle_seconds=_f("WAKE_SETTLE_SECONDS", 20.0),
+        session_calendar_file=os.getenv("SESSION_CALENDAR_FILE", "").strip()
+        or os.path.join(
+            os.path.dirname(os.getenv("STATE_FILE", "state/risk_state.json"))
+            or "state", "session_calendar.json"),
         kill_switch_file=os.getenv("KILL_SWITCH_FILE", "state/KILL"),
         heartbeat_url=os.getenv("HEARTBEAT_URL", "").strip(),
         reconcile_halt_enabled=_flag("RECONCILE_HALT", "on"),

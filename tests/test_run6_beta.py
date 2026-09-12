@@ -187,6 +187,79 @@ def test_book_beta_reuses_correlation_guard_cache():
 
 
 # --------------------------------------------------------------------------- #
+# (a) liveness: one progress tick per fetched symbol (Sep 11 2026: a 163 s
+# serial fan-out under an Alpaca degradation withheld the heartbeat twice)
+# --------------------------------------------------------------------------- #
+def test_book_beta_read_reports_progress_once_per_fetched_symbol():
+    series = _bench_series()
+    series["AAPL"] = _series(1.0)
+    series["HOT"] = _series(2.0)
+    series["PSQ"] = _series(-1.2)
+    broker = _Broker(series, fail={"NEW"})
+    bb = BookBeta(broker)
+    acct = _acct([_eq("AAPL", 10_000), _eq("HOT", 10_000), _eq("PSQ", 5_000),
+                  _eq("NEW", 5_000)])
+    ticks: list[int] = []
+    r = bb.read(acct, on_progress=lambda: ticks.append(1))
+    # 3 benchmarks + 4 held = 7 fetches -> 7 ticks. NEW's FAILED fetch ticks
+    # too (the loop returned and moved on: that is forward progress, only a
+    # read that never returns must go silent). Never more than one tick per
+    # symbol even though each holding is measured against three benchmarks.
+    assert len(broker.calls) == 7 and len(ticks) == 7
+    assert r.available and r.unknown == ["NEW"]
+    # Same cycle again: everything is cycle-cached -> no fetch, no tick.
+    ticks.clear()
+    r2 = bb.read(acct, on_progress=lambda: ticks.append(1))
+    assert len(broker.calls) == 7 and ticks == []
+    assert r2.spy == r.spy
+    # The hook has no effect on the numbers.
+    plain = BookBeta(_Broker(series, fail={"NEW"})).read(acct)
+    assert plain.to_dict()["betas"] == r.to_dict()["betas"] and plain.spy == r.spy
+    # New cycle: refetched, re-ticked.
+    bb.new_cycle()
+    bb.read(acct, on_progress=lambda: ticks.append(1))
+    assert len(broker.calls) == 14 and len(ticks) == 7
+    # No hook: still fine.
+    bb.new_cycle()
+    assert bb.read(acct).available
+
+
+def test_book_beta_read_reuses_guard_cache_and_still_ticks_once():
+    # The per-cycle price cache is CorrelationGuard's series cache, shared
+    # with the reader: a symbol the guard already fetched this cycle is not
+    # refetched by read(); the hook still ticks once for it (harmless — the
+    # stamp is throttled — and simpler than reaching into the guard's cache).
+    from investment_strategy.correlation import CorrelationGuard
+    series = _bench_series()
+    series["AAPL"] = _series(1.1, n=100)
+    broker = _Broker(series)
+    guard = CorrelationGuard(broker)
+    guard._daily_returns("AAPL")
+    bb = BookBeta(broker, guard)
+    ticks: list[int] = []
+    r = bb.read(_acct([_eq("AAPL", 20_000)]), on_progress=lambda: ticks.append(1))
+    assert r.available
+    assert broker.calls.count("AAPL") == 1        # warmed by the guard, not refetched
+    assert sorted(broker.calls) == ["AAPL", "IWM", "QQQ", "SPY"]
+    assert len(ticks) == 4                        # SPY, QQQ, IWM, AAPL — once each
+
+
+def test_book_beta_progress_hook_failure_never_breaks_reading():
+    series = _bench_series()
+    series["AAPL"] = _series(1.5)
+    bb = BookBeta(_Broker(series))
+    acct = _acct([_eq("AAPL", 50_000)])
+
+    def boom():
+        raise RuntimeError("stamp write failed")
+
+    r = bb.read(acct, on_progress=boom)
+    assert r.available and not r.reason
+    assert abs(r.spy - 0.5 * shrink(1.5)) < 1e-6
+    assert bb._on_progress is None                # released after the read
+
+
+# --------------------------------------------------------------------------- #
 # (b) beta cap gate
 # --------------------------------------------------------------------------- #
 def _gate_rm(**over):
@@ -299,7 +372,7 @@ class _FixedBeta:
     def __init__(self, betas):
         self.betas = list(betas)
 
-    def read(self, account):
+    def read(self, account, on_progress=None):
         b = self.betas.pop(0) if len(self.betas) > 1 else self.betas[0]
         return SimpleNamespace(available=b is not None, spy=b)
 
@@ -452,11 +525,33 @@ def test_read_book_beta_logs_one_line_and_persists(caplog):
     assert abs(book - 0.5 * shrink(1.5)) < 1e-5 and abs(cand - shrink(2.0)) < 1e-5
 
 
+def test_read_book_beta_stamps_liveness_once_per_fetch(caplog):
+    # The orchestrator hands the reader its heartbeat liveness stamp, the way
+    # it does for SignalAggregator.gather: one stamp per symbol fetched, so a
+    # slow serial fan-out (Sep 11: 163 s, heartbeat withheld twice) can't
+    # exceed the 150 s freshness bar while the loop is merely busy.
+    caplog.set_level(logging.INFO)
+    series = _bench_series()
+    series["AAPL"] = _series(1.5)
+    series["HOT"] = _series(2.0)
+    broker = _Broker(series)
+    o = _read_orch(BookBeta(broker))
+    stamps: list[int] = []
+    o._stamp_liveness = lambda: stamps.append(1)
+    acct = _acct([_eq("AAPL", 30_000), _eq("HOT", 20_000)])
+    o._read_book_beta(acct)
+    assert o._book_beta_reading is not None
+    assert len(stamps) == len(broker.calls) == 5          # SPY QQQ IWM AAPL HOT
+    lines = [r.getMessage() for r in caplog.records if r.getMessage().startswith("BOOK BETA:")]
+    assert len(lines) == 1 and "invested=50.0%" in lines[0]
+    assert abs(o._book_beta_reading.spy - (0.3 * shrink(1.5) + 0.2 * shrink(2.0))) < 1e-6
+
+
 def test_read_book_beta_degrades_gracefully(caplog):
     caplog.set_level(logging.INFO)
 
     class _Boom:
-        def read(self, account):
+        def read(self, account, on_progress=None):
             raise RuntimeError("data plan exhausted")
 
     o = _read_orch(_Boom())

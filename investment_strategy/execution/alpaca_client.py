@@ -22,6 +22,7 @@ from requests.exceptions import ConnectionError as RequestsConnectionError
 from requests.exceptions import Timeout as RequestsTimeout
 from urllib3.exceptions import ProtocolError
 
+from alpaca.common.exceptions import APIError
 from alpaca.data.historical import StockHistoricalDataClient
 from alpaca.data.requests import StockBarsRequest, StockLatestTradeRequest
 from alpaca.data.timeframe import TimeFrame
@@ -104,25 +105,81 @@ def bound_client(client: _T, timeout: tuple[int, int] = HTTP_TIMEOUT) -> _T:
 # single blip fail a whole watchdog/decision tick.
 _TRANSIENT_NET = (RequestsConnectionError, RequestsTimeout, ProtocolError)
 
+# A SERVER-side failure (HTTP 5xx) is the same kind of blip, but alpaca-py
+# reports it as APIError — the type it also uses for 4xx "your request is wrong"
+# replies (422 wash-trade, 403 insufficient qty …) which must NOT be retried.
+# The SDK only retries 429 itself. Sep 11 2026: /v2/clock answered 500 for ~4.5
+# min; `_retry_read` re-raised on the first try, the decision loop treated it
+# as a bug (8 consecutive 37-line tracebacks at ERROR, one per 30 s tick) and
+# the 11:58 cycle ran 4.5 min late. The status usually rides on the wrapped
+# HTTPError; an APIError built without one (older SDK paths, tests) is still
+# recognised by Alpaca's canonical 5xx body text.
+_SERVER_ERROR_TEXT = "internal server error"
+
+
+def broker_5xx_status(e: BaseException) -> Optional[int]:
+    """HTTP status when `e` is an alpaca APIError for a SERVER-side (5xx)
+    failure — 500 when only the body says 'Internal Server Error' — else None
+    (4xx, non-APIError, unknown). The one place the bot decides "the broker
+    is down, retry" vs "the request is wrong, surface it"."""
+    if not isinstance(e, APIError):
+        return None
+    try:
+        status = e.status_code
+    except Exception:  # noqa: BLE001 — defensive: SDK shape may drift
+        status = None
+    if isinstance(status, int) and 500 <= status <= 599:
+        return status
+    if status is None and _SERVER_ERROR_TEXT in str(e).lower():
+        return 500
+    return None
+
+
+def broker_error_summary(e: BaseException) -> str:
+    """One-line 'METHOD url: body' for a broker APIError (greppable, no
+    traceback) — falls back to str(e) when the SDK attached no request."""
+    req = None
+    try:
+        req = getattr(e, "request", None)
+    except Exception:  # noqa: BLE001
+        req = None
+    method = getattr(req, "method", None)
+    url = getattr(req, "url", None) or getattr(getattr(e, "response", None), "url", None)
+    prefix = " ".join(str(x) for x in (method, url) if x)
+    body = str(e).strip() or e.__class__.__name__
+    return f"{prefix}: {body}" if prefix else body
+
 
 def _retry_read(fn: Callable[[], _T], *, what: str, tries: int = 3,
                 backoff_s: float = 0.5) -> _T:
-    """Call `fn` (an IDEMPOTENT read) and retry on a transient network fault with a
-    short linear backoff. Only reads go through here — never order submits, which
-    aren't safe to blind-retry (a reset can drop the response AFTER the order was
-    accepted, so a retry could double-submit). Re-raises the last error if every
-    attempt fails, so real outages still surface."""
+    """Call `fn` (an IDEMPOTENT read) and retry on a transient network fault OR
+    a broker 5xx with a short linear backoff. Only reads go through here — never
+    order submits, which aren't safe to blind-retry (a reset can drop the
+    response AFTER the order was accepted, so a retry could double-submit).
+    Re-raises the last error if every attempt fails, so real outages still
+    surface (the decision loop then classifies it via broker_5xx_status rather
+    than treating it as a bug). A 4xx APIError is raised on the first try —
+    the request itself is wrong and no retry can fix it."""
     last: Exception | None = None
     for attempt in range(1, tries + 1):
         try:
             return fn()
-        except _TRANSIENT_NET as e:
+        except (*_TRANSIENT_NET, APIError) as e:
+            status = broker_5xx_status(e)
+            if isinstance(e, APIError) and status is None:
+                raise
             last = e
             if attempt < tries:
-                log.warning(
-                    "%s: transient network error (%s); retry %d/%d.",
-                    what, e.__class__.__name__, attempt, tries - 1,
-                )
+                if status is not None:
+                    log.warning(
+                        "%s: broker HTTP %d (%s); retry %d/%d.",
+                        what, status, broker_error_summary(e), attempt, tries - 1,
+                    )
+                else:
+                    log.warning(
+                        "%s: transient network error (%s); retry %d/%d.",
+                        what, e.__class__.__name__, attempt, tries - 1,
+                    )
                 time.sleep(backoff_s * attempt)
     assert last is not None  # loop only exits early via return
     raise last
@@ -298,6 +355,11 @@ class AlpacaClient:
         return (closes[-1] / closes[0] - 1.0) * 100.0
 
     def is_market_open(self) -> bool:
+        """Broker clock read at the top of every decision cycle. A 5xx from
+        /v2/clock is retried by _retry_read and, if it persists, propagates
+        as the APIError so the decision loop can classify it as a transient
+        broker outage (broker_5xx_status) and skip the tick with one WARNING
+        instead of a traceback — the caller must NOT guess open/closed."""
         clock = _retry_read(self.trading.get_clock, what="get_clock")
         return bool(clock.is_open)
 
@@ -1053,6 +1115,33 @@ class AlpacaClient:
             )
         except Exception as e:
             log.warning("is_trading_day(%s) failed: %s", day, e)
+            return None
+
+    def get_session_calendar(self, start, end) -> Optional[dict[str, tuple[str, str]]]:
+        """Exchange sessions in [start, end] (dates, inclusive) as
+        {iso_date: ("HH:MM", "HH:MM")} ET open/close — early closes carry
+        their real close (13:00); holidays are simply absent. None when the
+        calendar read fails (callers keep their previous cache). Feeds the
+        decision loop's once-a-day session_calendar refresh (run-7 A2) that
+        the watchdog's paging window and ops/deadman.py read network-free."""
+        try:
+            cal = _retry_read(
+                lambda: self.trading.get_calendar(
+                    GetCalendarRequest(start=start, end=end)),
+                what="get_calendar",
+            )
+            out: dict[str, tuple[str, str]] = {}
+            for c in cal or []:
+                day = getattr(c, "date", None)
+                opn = getattr(c, "open", None)
+                cls = getattr(c, "close", None)
+                if day is None or opn is None or cls is None:
+                    continue
+                fmt = lambda t: t.strftime("%H:%M") if hasattr(t, "strftime") else str(t)[:5]  # noqa: E731
+                out[str(day)[:10]] = (fmt(opn), fmt(cls))
+            return out
+        except Exception as e:
+            log.warning("get_session_calendar(%s..%s) failed: %s", start, end, e)
             return None
 
     def closed_sell_orders(self, limit: int = 500) -> list[dict]:

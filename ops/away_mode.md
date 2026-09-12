@@ -15,6 +15,25 @@ never loosened unattended.**
 - Self-healing: `ops/deadman.py` (launchd, 5-min cadence, market hours)
   auto-restarts a dead/wedged bot through the panel and pages by email.
   healthchecks.io pages externally if the whole machine goes dark.
+- Fallback liveness — **check `ps` first**: `ops/claude_daily.sh` (launchd,
+  weekday 17:37) decides whether this resident session is dead before it
+  launches a headless `claude -p` run, and its first gate is a process gate
+  (run-7 item C3, after three false fires Sep 4/8/10 vs one true fire Sep 7):
+  any `claude` binary (`ps -ax -o pid=,etime=,comm=`, never `pgrep` — BSD
+  pgrep hides its own ancestors) whose cwd (`lsof -a -p PID -d cwd -Fn`) is
+  this repo means the primary is alive, quiet or wedged, and the fallback
+  logs `primary process alive (pid N[etime]) with cwd=… — skip` and exits.
+  Only when no such process exists do the commit-age and
+  `ops/status_page.html`-mtime signals decide. The same rule binds anyone
+  diagnosing liveness by hand (resident session, headless fallback, or the
+  operator): staleness math cannot see a hung primary — the Sep 10 wedge was
+  a session blocked 2h44m on the Robinhood OAuth wait, alive the whole time.
+  Residual: a session left open but idle (its in-session cron dead)
+  suppresses the fallback indefinitely; the skip line keeps the commit/page
+  ages so `logs/claude_daily.log` shows the drift, and a stale phone status
+  page is then the operator's only signal. Verify the decision any time with
+  `DRY_RUN=1 sh ops/claude_daily.sh` (prints the branch taken, writes no
+  stamp, launches nothing).
 - Status page the operator checks from their phone (update EVERY session):
   artifact URL `https://claude.ai/code/artifact/94bb36b9-af2e-423b-a524-3862e9912da8`
   — rewrite `ops/status_page.html` with fresh values, then republish passing
@@ -41,8 +60,12 @@ never loosened unattended.**
      operator's phone — if pushed, ping the operator and retry by reloading
      the auth URL + Allow (same state/PKCE stays valid while `login` waits).
      A failed handshake never touches the existing token file; on success the
-     reader latch self-heals in ~60s, no restart. If consent stalls twice,
-     stop, leave DEGRADED, warn pill on the status page.
+     reader latch self-heals in ~60s, no restart. `login` gives up on its own
+     after ROBINHOOD_LOGIN_TIMEOUT_S (default 600s; `--timeout N` per run) with
+     exit code 3 and the line "consent stalled — leaving Robinhood DEGRADED" —
+     it no longer blocks forever holding port 8765 (Sep 10 2026: 2h44m wedge
+     that false-fired the fallback). If consent stalls twice, stop, leave
+     DEGRADED, warn pill on the status page.
 2. **Incidents**: grep the day's log for `CRITICAL|ERROR|halt|FAILED`;
    grep `BEARISH FUNNEL` terminal stages (`-> IGNORED` = schema violation,
    escalate on the status page); grep `Option exit|OPTION close`.

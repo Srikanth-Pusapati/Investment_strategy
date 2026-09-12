@@ -15,6 +15,7 @@ import os
 import sys
 import tempfile
 import uuid
+from unittest.mock import patch
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -312,6 +313,185 @@ def test_new_fields_are_backward_compatible():
     assert old.underlying is None
     assert old.occ_symbols == []
     assert old.repair_note is None
+
+
+# ---- run-7 B2: set_fill restates equity SELL rows at the broker's fill ----- #
+# Run-6 item 1e stamped fill_price/fill_qty/fill_ts as a pure annotation and
+# left realized_pl at the submission-time quote, so 7/14 closed run-6 rows
+# were net -$72.24 off the fills (PSQ hedge_unwind read +$41.76 at the quote,
+# -$61.07 filled). The row's exit figures AS RECORDED survive as quote_*.
+
+_PSQ = dict(qty=10283.17942229, realized_pl=41.759991, realized_pl_pct=0.016,
+            exit_price=25.85)   # the real Sep 9 hedge_unwind row
+
+
+def _sell(symbol="PSQ", oid="s1", instrument="equity", **kw):
+    fields = dict(_PSQ) if instrument == "equity" and not kw else kw
+    return TradeRecord.for_sell(
+        symbol, "exit", oid, instrument=instrument, exit_reason="hedge_unwind",
+        **fields,
+    )
+
+
+def test_set_fill_restates_equity_sell_at_the_broker_fill():
+    led = TradeLedger(path=_ledger().path, restate_at_fill=True)
+    led.record(_sell())
+    assert led.set_fill("s1", 25.84, _PSQ["qty"]) is True
+    row = led.effective()[0]
+    assert row.fill_price == 25.84 and row.fill_qty == _PSQ["qty"]
+    assert row.exit_price == 25.84
+    assert round(row.realized_pl, 2) == -61.07              # was +41.76 at the quote
+    assert round(row.realized_pl_pct, 3) == -0.023
+    assert row.quote_exit_price == 25.85
+    assert row.quote_realized_pl == 41.759991
+    assert row.quote_realized_pl_pct == 0.016
+    assert round(row.realized_pl - row.quote_realized_pl, 2) == -102.83  # slippage
+    assert row.qty == _PSQ["qty"]                           # qty never touched
+    assert len(led.all()) == 1                              # in place, no new row
+
+
+def test_set_fill_restatement_is_a_pure_function_of_the_quote_figures():
+    """A refined fill re-restates from the AS-RECORDED figures — the second
+    stamp must equal a fresh single stamp at that price, never compound."""
+    led = TradeLedger(path=_ledger().path, restate_at_fill=True)
+    led.record(_sell())
+    led.set_fill("s1", 25.84, _PSQ["qty"])
+    led.set_fill("s1", 25.83, _PSQ["qty"])
+    twice = led.effective()[0]
+    once = TradeLedger(path=_ledger().path, restate_at_fill=True)
+    once.record(_sell())
+    once.set_fill("s1", 25.83, _PSQ["qty"])
+    fresh = once.effective()[0]
+    for f in ("exit_price", "realized_pl", "realized_pl_pct", "quote_exit_price",
+              "quote_realized_pl", "quote_realized_pl_pct"):
+        assert getattr(twice, f) == getattr(fresh, f), f
+    assert twice.quote_exit_price == 25.85 and round(twice.realized_pl, 2) == -163.90
+    # same price again: idempotent
+    led.set_fill("s1", 25.83, _PSQ["qty"])
+    assert led.effective()[0] == twice
+
+
+def test_set_fill_leaves_option_sell_rows_at_the_recorded_figures():
+    """Option rows keep the run-6 annotation-only convention: a multi-leg
+    filled_avg_price is a per-spread net debit/credit that does not map onto
+    the group's realized_pl, so we don't guess."""
+    led = TradeLedger(path=_ledger().path, restate_at_fill=True)
+    led.record(TradeRecord.for_sell(
+        "AAPL", "watchdog option stop (AAPL260918C00150000,AAPL260918C00160000)",
+        "o1", qty=2.0, realized_pl_pct=-50.0, realized_pl=-200.0, exit_price=1.0,
+        instrument="option",
+    ))
+    assert led.set_fill("o1", 1.1, 2.0) is True
+    row = led.effective()[0]
+    assert row.fill_price == 1.1 and row.fill_qty == 2.0    # annotated ...
+    assert row.exit_price == 1.0 and row.realized_pl == -200.0   # ... not restated
+    assert row.realized_pl_pct == -50.0
+    assert row.quote_exit_price is None and row.quote_realized_pl is None
+
+
+def test_set_fill_knob_off_keeps_the_run6_annotation_only_behaviour():
+    # constructor arg
+    led = TradeLedger(path=_ledger().path, restate_at_fill=False)
+    led.record(_sell())
+    assert led.set_fill("s1", 25.84, _PSQ["qty"]) is True
+    row = led.effective()[0]
+    assert row.fill_price == 25.84                          # stamped ...
+    assert row.exit_price == 25.85 and row.realized_pl == 41.759991   # ... untouched
+    assert row.quote_exit_price is None
+    # env key (what the bare TradeLedger() the orchestrator builds resolves)
+    with patch.dict(os.environ, {"LEDGER_RESTATE_AT_FILL": "off"}):
+        assert TradeLedger(path=_ledger().path).restate_at_fill is False
+    with patch.dict(os.environ, {"LEDGER_RESTATE_AT_FILL": "on"}):
+        assert TradeLedger(path=_ledger().path).restate_at_fill is True
+    with patch.dict(os.environ, {}, clear=False):
+        os.environ.pop("LEDGER_RESTATE_AT_FILL", None)
+        assert TradeLedger(path=_ledger().path).restate_at_fill is True   # default on
+    # per-call override in both directions
+    led2 = TradeLedger(path=_ledger().path, restate_at_fill=False)
+    led2.record(_sell())
+    led2.set_fill("s1", 25.84, _PSQ["qty"], restate=True)
+    assert round(led2.effective()[0].realized_pl, 2) == -61.07
+    led3 = TradeLedger(path=_ledger().path, restate_at_fill=True)
+    led3.record(_sell())
+    led3.set_fill("s1", 25.84, _PSQ["qty"], restate=False)
+    assert led3.effective()[0].realized_pl == 41.759991
+
+
+def test_set_fill_never_touches_buy_rows_qty_or_cost():
+    led = TradeLedger(path=_ledger().path, restate_at_fill=True)
+    led.record(_buy(qty=10.0, entry=100.0, oid="b1"))
+    led.record(TradeRecord.for_sell("AAPL", "exit", "s1", qty=10.0,
+                                    realized_pl_pct=5.0, realized_pl=50.0,
+                                    exit_price=105.0))
+    led.set_fill("b1", 100.37, 10.0)
+    led.set_fill("s1", 105.5, 10.0)
+    rows = {r.order_id: r for r in led.effective()}
+    b, s = rows["b1"], rows["s1"]
+    assert b.fill_price == 100.37 and b.entry_price == 100.0 and b.cost_usd == 1000.0
+    assert b.realized_pl is None and b.quote_exit_price is None
+    assert s.qty == 10.0 and s.cost_usd == 0.0
+    assert s.exit_price == 105.5 and s.realized_pl == 55.0 and s.realized_pl_pct == 5.5
+    assert s.quote_exit_price == 105.0 and s.quote_realized_pl == 50.0
+
+
+def test_set_fill_skips_restatement_when_the_row_has_no_usable_basis():
+    """Rows the restatement cannot honestly recompute keep their numbers:
+    no realized $ (junk-pct row), qty 0 (legacy full-close sells), or a
+    basis <= 0 (realized $ that was not computed over the row's qty)."""
+    led = TradeLedger(path=_ledger().path, restate_at_fill=True)
+    led.record(TradeRecord.for_sell("AAPL", "junk quote", "s1", qty=5.0,
+                                    realized_pl_pct=-150.0, exit_price=1.0))
+    led.record(TradeRecord.for_sell("MSFT", "legacy full close", "s2", qty=0.0,
+                                    realized_pl_pct=2.0, realized_pl=20.0,
+                                    exit_price=50.0))
+    led.record(TradeRecord.for_sell("NVDA", "group $ on a per-share row", "s3",
+                                    qty=10.0, realized_pl_pct=1.0,
+                                    realized_pl=50.0, exit_price=1.0))
+    for oid, px in (("s1", 1.1), ("s2", 50.5), ("s3", 1.1)):
+        assert led.set_fill(oid, px, 5.0) is True
+    rows = {r.order_id: r for r in led.effective()}
+    assert rows["s1"].fill_price == 1.1 and rows["s1"].realized_pl is None
+    assert rows["s1"].exit_price == 1.0 and rows["s1"].quote_exit_price is None
+    assert rows["s2"].exit_price == 50.0 and rows["s2"].realized_pl == 20.0
+    assert rows["s3"].exit_price == 1.0 and rows["s3"].realized_pl == 50.0
+    assert all(rows[o].quote_realized_pl is None for o in ("s1", "s2", "s3"))
+
+
+def test_effective_scales_restated_and_quote_dollars_together_on_a_partial():
+    led = TradeLedger(path=_ledger().path, restate_at_fill=True)
+    led.record(TradeRecord.for_sell("AAPL", "exit", "s1", qty=10.0,
+                                    realized_pl_pct=5.0, realized_pl=50.0,
+                                    exit_price=105.0))
+    led.set_fill("s1", 106.0, 10.0)                # +$1/sh on the ROW qty
+    led.record(TradeRecord.correction("s1", "AAPL", "canceled", 5.0, 10.0))
+    eff = led.effective()[0]
+    assert eff.qty == 5.0
+    assert eff.realized_pl == 30.0                 # 60 x 5/10
+    assert eff.quote_realized_pl == 25.0           # 50 x 5/10
+    assert eff.realized_pl_pct == 6.0 and eff.quote_realized_pl_pct == 5.0
+    assert round(eff.realized_pl - eff.quote_realized_pl, 2) == 5.0   # 1 x 5 sh
+
+
+def test_restated_exit_price_feeds_fifo_lot_pl():
+    from investment_strategy.lots import build_lot_history
+    led = TradeLedger(path=_ledger().path, restate_at_fill=True)
+    led.record(_buy(qty=10.0, entry=100.0, oid="b1"))
+    led.record(TradeRecord.for_sell("AAPL", "exit", "s1", qty=10.0,
+                                    realized_pl_pct=5.0, realized_pl=50.0,
+                                    exit_price=105.0))
+    led.set_fill("s1", 104.0, 10.0)
+    _open, realized = build_lot_history(led.effective())
+    assert len(realized) == 1 and realized[0].exit_price == 104.0
+    assert not realized[0].basis_estimated
+
+
+def test_quote_fields_default_none_on_rows_predating_them():
+    old = TradeRecord.model_validate_json(
+        '{"symbol": "AAPL", "action": "sell", "realized_pl": 1.0, '
+        '"exit_price": 10.0, "fill_price": 10.1}')
+    assert old.quote_exit_price is None
+    assert old.quote_realized_pl is None
+    assert old.quote_realized_pl_pct is None
 
 
 def _run_all():

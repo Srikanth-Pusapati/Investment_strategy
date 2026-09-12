@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import json
 import logging
+import math
 import re
 import threading
 from datetime import datetime, timezone
@@ -106,10 +107,23 @@ class TradeRecord(BaseModel):
     # Broker-confirmed fill (run-6 item 1e): entry_price is the DECISION quote;
     # these are what the broker actually reported when the order was seen
     # FILLED at reconcile (filled_avg_price, filled qty, filled_at). None until
-    # confirmed / on rows predating the field. realized_pl semantics unchanged.
+    # confirmed / on rows predating the field. Buy rows: realized/cost
+    # semantics unchanged. Equity SELL rows (run-7 B2): set_fill also restates
+    # exit_price / realized_pl / realized_pl_pct at fill_price — see set_fill.
     fill_price: Optional[float] = None
     fill_qty: Optional[float] = None
     fill_ts: Optional[datetime] = None
+    # Run-7 B2 (measurement-only): an equity SELL row's exit figures AS FIRST
+    # RECORDED, preserved when set_fill restates the row at the broker's fill.
+    # For decision/watchdog exits that is the submission-time quote (run-6:
+    # 7/14 closed rows, net -$72.24 vs the fills); for exchange-backfill rows,
+    # which are recorded from the fill itself, quote == fill. None on rows
+    # never restated (buys, option rows, LEDGER_RESTATE_AT_FILL=off, rows
+    # predating the field). The restatement is a pure function of these, so
+    # a refined fill re-restates from the original instead of compounding.
+    quote_exit_price: Optional[float] = None
+    quote_realized_pl: Optional[float] = None
+    quote_realized_pl_pct: Optional[float] = None
     # Set only by repair scripts on rows they rewrote (e.g.
     # scripts/repair_mleg_ledger_rows.py) — documents why a row's numbers were
     # changed and marks informational duplicates. Never set by live code.
@@ -222,6 +236,9 @@ class TradeRecord(BaseModel):
         composite_score: Optional[float] = None,
         underlying: Optional[str] = None,
         occ_symbols: Optional[list[str]] = None,
+        fill_price: Optional[float] = None,
+        fill_qty: Optional[float] = None,
+        fill_ts: Optional[datetime] = None,
     ) -> "TradeRecord":
         """`ts` overrides the record time — the exchange-exit backfill (F.1)
         stamps the order's actual FILL time so attribution's chronological
@@ -230,6 +247,17 @@ class TradeRecord(BaseModel):
         record it whenever known so FIFO lot P&L (GA-2.5) has a real basis.
         `composite_score` is the name's weighted composite at exit — recorded so
         sell rows aren't blind to it (buys already carry it).
+
+        `fill_price` / `fill_qty` / `fill_ts` (run-7 A6): the broker-confirmed
+        fill, stamped AT CONSTRUCTION when the row is being recorded FROM a
+        broker fill — the exchange-exit backfill, whose exit_price IS the
+        order's filled_avg_price. Every other sell path leaves them None for
+        set_fill to stamp at FILLED reconcile. Run-6 closed 14 trips and the 7
+        exchange bracket exits all carried fill_price=null (the backfill priced
+        realized_pl from the fill but never stamped it), so the contract's
+        ledger-vs-fill reconciliation could not cover half the sample. Passed
+        through verbatim (no rounding) so fill_price == exit_price on such
+        rows and a later set_fill at the same fill is a numeric no-op.
 
         Option sells (Aug-23 OCC ledgering): callers that don't pass
         `occ_symbols` explicitly (the watchdog predates the field) get them
@@ -256,6 +284,10 @@ class TradeRecord(BaseModel):
         )
         if ts is not None:
             kwargs["ts"] = ts
+        if fill_price is not None and fill_price > 0:
+            kwargs["fill_price"] = float(fill_price)
+            kwargs["fill_qty"] = float(fill_qty if fill_qty is not None else qty)
+            kwargs["fill_ts"] = fill_ts
         return cls(**kwargs)
 
     @classmethod
@@ -288,8 +320,22 @@ class TradeLedger:
     # interleave (a torn append inside a rewrite would lose a row).
     _io_lock = threading.Lock()
 
-    def __init__(self, path: Path | str = DEFAULT_LEDGER_PATH):
+    def __init__(
+        self, path: Path | str = DEFAULT_LEDGER_PATH,
+        restate_at_fill: Optional[bool] = None,
+    ):
         self.path = Path(path)
+        # Run-7 B2 knob: LEDGER_RESTATE_AT_FILL (default on; off = the run-6
+        # annotation-only set_fill, see there). Resolved HERE, not as a
+        # Config field: every consumer builds the ledger bare — TradeLedger()
+        # in the orchestrator, post-mortem, dashboard, track record, autotune —
+        # with no Config in hand, so a Config field would be dead code. None
+        # reads the env key (config._flag semantics: on/true/1/yes) after
+        # .env has been loaded; tests pass the bool explicitly.
+        if restate_at_fill is None:
+            from .config import _flag  # lazy: config imports dotenv/notify
+            restate_at_fill = _flag("LEDGER_RESTATE_AT_FILL", "on")
+        self.restate_at_fill = bool(restate_at_fill)
 
     def record(self, rec: TradeRecord) -> None:
         try:
@@ -312,18 +358,41 @@ class TradeLedger:
 
     def set_fill(
         self, order_id: str, fill_price: float, fill_qty: float,
-        fill_ts: Optional[datetime] = None,
+        fill_ts: Optional[datetime] = None, restate: Optional[bool] = None,
     ) -> bool:
         """Stamp the broker-confirmed fill (run-6 item 1e) onto the buy/sell
-        row(s) carrying `order_id`. The ONLY in-place edit the ledger makes:
-        it touches nothing but fill_price / fill_qty / fill_ts, so every
-        realized/qty/cost number (and effective()'s corrections) stands.
+        row(s) carrying `order_id` and — run-7 B2 — restate an equity SELL
+        row's exit_price / realized_pl / realized_pl_pct at that fill.
+
+        Why the run-6 version stamped fill_* and touched NOTHING else: the
+        ledger is append-only by design, `qty` is what effective()'s
+        partial-fill corrections scale against, and realized_pl was the
+        contract's counted number mid-window. Run-6 then showed the cost of
+        that purity: 7/14 closed rows carried the submission-time quote (net
+        -$72.24 vs the fills; the PSQ hedge_unwind read +$41.76 at the quote
+        and -$61.07 filled), so "ledger vs broker realized" was unmeasurable.
+        The restatement keeps every one of the original reasons intact:
+          - `qty`, cost_usd and BUY rows are never touched (entry_price stays
+            the decision quote; corrections still scale on the row qty);
+          - the as-recorded figures survive as quote_exit_price /
+            quote_realized_pl / quote_realized_pl_pct, and the restatement is
+            a pure function of them (a refined fill re-restates from the
+            original, never compounds);
+          - option rows keep the annotation-only convention — a multi-leg
+            filled_avg_price is a net debit/credit per spread that does not
+            map onto the group's realized_pl, so we don't guess;
+          - LEDGER_RESTATE_AT_FILL=off (or restate=False here) restores the
+            run-6 behaviour exactly. `restate=None` uses the ledger's knob.
         Rewrites atomically (tmp + replace) under the append lock. Returns
         True when at least one row was stamped; False (never raises) when
         the order id is unknown or the file can't be rewritten."""
         if not order_id or not (fill_price and fill_price > 0):
             return False
+        do_restate = self.restate_at_fill if restate is None else bool(restate)
         try:
+            fill_px = round(float(fill_price), 4)
+            restated: list[tuple] = []
+            skipped: list[tuple] = []
             with self._io_lock:
                 if not self.path.exists():
                     return False
@@ -341,13 +410,26 @@ class TradeLedger:
                         continue
                     if (obj.get("order_id") == order_id
                             and obj.get("action") in ("buy", "sell")):
-                        obj["fill_price"] = round(float(fill_price), 4)
+                        obj["fill_price"] = fill_px
                         obj["fill_qty"] = float(fill_qty)
                         # No broker filled_at -> None, never "now": the
                         # field means the FILL time or nothing (review fix).
                         obj["fill_ts"] = (
                             fill_ts.isoformat() if fill_ts is not None else None
                         )
+                        if obj.get("action") == "sell":
+                            if do_restate:
+                                upd, why = self._restate_sell_at_fill(obj, fill_px)
+                            else:
+                                upd, why = None, "LEDGER_RESTATE_AT_FILL=off"
+                            if upd is not None:
+                                restated.append((
+                                    obj.get("symbol"), obj.get("realized_pl"),
+                                    upd["realized_pl"], upd["quote_exit_price"],
+                                ))
+                                obj.update(upd)
+                            else:
+                                skipped.append((obj.get("symbol"), why))
                         out.append(json.dumps(obj))
                         hit = True
                     else:
@@ -357,10 +439,88 @@ class TradeLedger:
                 tmp = self.path.with_suffix(".tmp")
                 tmp.write_text("".join(l + "\n" for l in out), encoding="utf-8")
                 tmp.replace(self.path)
-                return True
+            for sym, old_pl, new_pl, quote_px in restated:
+                if abs(new_pl - old_pl) < 0.005:
+                    # Exchange-backfill rows are recorded FROM the fill, so
+                    # their quote == fill: provenance stamped, numbers as-is.
+                    log.info(
+                        "Ledger: fill %.4f matches recorded exit_price on SELL "
+                        "%s: realized $%.2f unchanged [order %s]",
+                        fill_px, sym, new_pl, order_id,
+                    )
+                    continue
+                log.info(
+                    "Ledger: RESTATED SELL %s at fill %.4f (quote %.4f): "
+                    "realized $%.2f -> $%.2f (%+.2f) [order %s]",
+                    sym, fill_px, quote_px, old_pl, new_pl, new_pl - old_pl,
+                    order_id,
+                )
+            for sym, why in skipped:
+                log.info(
+                    "Ledger: fill %.4f stamped on SELL %s WITHOUT restatement "
+                    "(%s) [order %s]", fill_px, sym, why, order_id,
+                )
+            return True
         except Exception as e:  # never let bookkeeping break the trade loop
             log.warning("Ledger set_fill failed for order %s: %s", order_id, e)
             return False
+
+    @staticmethod
+    def _restate_sell_at_fill(
+        obj: dict, fill_price: float,
+    ) -> tuple[Optional[dict], str]:
+        """Field updates that move an equity SELL row's exit_price /
+        realized_pl / realized_pl_pct from the as-recorded quote to
+        `fill_price`, or (None, reason) when the row must stay as recorded:
+        option rows (annotation-only convention), no exit_price, no qty, no
+        realized $, or a basis that isn't positive (the row's realized_pl was
+        not computed over the row's qty — restating would fabricate a %).
+
+        Math, on the ROW qty — never fill_qty: effective()'s partial-fill
+        correction scales realized_pl by filled/row qty, so restating on the
+        fill qty would double-scale a partial.
+            basis         = quote_exit_price - quote_realized_pl / qty
+            realized_pl   = quote_realized_pl + (fill - quote_exit_price) * qty
+            realized_pct  = (fill - basis) / basis * 100
+        The $ figure is the basis source (Alpaca's unrealized_pl is exact to
+        the cent) rather than the pct (Alpaca rounds unrealized_plpc to ~5
+        significant digits — $0.45 off on the $12.5k BE trip)."""
+        if (obj.get("instrument") or "equity") != "equity":
+            return None, "option row: annotation-only convention"
+        # Origin = the figures as first recorded (a second set_fill for a
+        # refined fill must not compound the first restatement).
+        if obj.get("quote_exit_price") is not None:
+            px, pl, pct = (obj.get("quote_exit_price"),
+                           obj.get("quote_realized_pl"),
+                           obj.get("quote_realized_pl_pct"))
+        else:
+            px, pl, pct = (obj.get("exit_price"), obj.get("realized_pl"),
+                           obj.get("realized_pl_pct"))
+        try:
+            qty = float(obj.get("qty") or 0.0)
+            px = float(px) if px is not None else 0.0
+            pl = float(pl) if pl is not None else None
+        except (TypeError, ValueError):
+            return None, "non-numeric row fields"
+        if not (px > 0 and math.isfinite(px)):
+            return None, "no exit_price on row"
+        if not (qty > 0 and math.isfinite(qty)):
+            return None, "row qty is 0"
+        if pl is None or not math.isfinite(pl):
+            return None, "no realized_pl on row"
+        basis = px - pl / qty
+        if not (basis > 0 and math.isfinite(basis)):
+            return None, "inconsistent basis (realized_pl not over row qty)"
+        new_pl = pl + (fill_price - px) * qty
+        new_pct = (fill_price - basis) / basis * 100.0
+        return {
+            "exit_price": fill_price,
+            "realized_pl": round(new_pl, 4),
+            "realized_pl_pct": round(new_pct, 6),
+            "quote_exit_price": px,
+            "quote_realized_pl": pl,
+            "quote_realized_pl_pct": pct,
+        }, "restated"
 
     def _validate_sell(self, rec: TradeRecord) -> Optional[TradeRecord]:
         """Append-path integrity gate (Aug-23). The Aug-17 MLEG unwind wrote
@@ -481,6 +641,12 @@ class TradeLedger:
                     "cost_usd": round(r.cost_usd * frac, 2),
                     "realized_pl": (
                         r.realized_pl * frac if r.realized_pl is not None else None
+                    ),
+                    # The as-recorded $ (run-7 B2) is over the row qty too, so
+                    # realized_pl - quote_realized_pl stays the fill slippage.
+                    "quote_realized_pl": (
+                        r.quote_realized_pl * frac
+                        if r.quote_realized_pl is not None else None
                     ),
                     "risk_note": (r.risk_note + " " if r.risk_note else "")
                     + f"[corrected: {c.qty:g}/{r.qty:g} filled]",

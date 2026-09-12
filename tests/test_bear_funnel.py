@@ -29,6 +29,7 @@ Runnable two ways:
 from __future__ import annotations
 
 import json
+import logging
 import os
 import sys
 import tempfile
@@ -269,6 +270,136 @@ def test_reconcile_noop_without_eligible_names():
     o = _reco_orch({"CCC": (False, "uptrend name")}, {})
     o._reconcile_bear_verdicts([])
     assert o._bear_verdict_stage == {} and o._journal_rows == []
+
+
+# --------------------------------------------------------------------------- #
+# BEARISH FUNNEL line (run-7 change-set, item A5): every ELIGIBLE name renders
+# its terminal stage, '-> IGNORED' is a literal handle, ignored=N is a field.
+#
+# Sep 10 2026: the line rendered only the 6 most-bearish names, so all three
+# 'ELIGIBLE but IGNORED' verdicts that day (ABT 7th of 7; KORU/STE 7th/8th of
+# 8) fell off it — `grep '-> IGNORED'` returned 0 across the whole run-6
+# window while the WARNING fired three times, and the window was scored
+# "0 IGNORED" on a truncated line.
+# --------------------------------------------------------------------------- #
+def _funnel_orch(eligibility, verdicts, stages=None, hedge_etf=""):
+    o = _reco_orch(eligibility, verdicts)
+    o.cfg = SimpleNamespace(hedge_etf=hedge_etf)
+    o._falling_cycles = 0
+    o._bear_puts_proposed = 0
+    o._bear_puts_approved = 0
+    o._proxy_put_state = ""
+    if stages is not None:
+        o._bear_verdict_stage = stages
+    return o
+
+
+def _funnel_line(o, bear_map, caplog) -> str:
+    with caplog.at_level(logging.INFO, logger="orchestrator"):
+        o._log_bear_funnel(bear_map, _account())
+    lines = [r.getMessage() for r in caplog.records
+             if r.getMessage().startswith("BEARISH FUNNEL:")]
+    assert len(lines) == 1
+    return lines[0]
+
+
+def test_funnel_line_renders_ignored_names_past_the_top_six(caplog):
+    # The Sep 10 09:26 shape: 8 bearish names, the two IGNORED ones ranked
+    # 7th and 8th by score. The old [:6] cut rendered neither.
+    bear_map = {"LYV": -1.65, "CLH": -1.57, "VIPS": -1.27, "HD": -1.22,
+                "VIK": -1.11, "IWM": -1.09, "KORU": -0.80, "STE": -0.77}
+    eligibility = {
+        "LYV": (True, "-5.3% vs 20d SMA breakdown"),
+        "CLH": (False, "uptrend name"),
+        "VIPS": (True, "below its 200dma"),
+        "HD": (True, "below its 200dma"),
+        "VIK": (True, "-6.6% vs 20d SMA breakdown"),
+        "IWM": (False, "uptrend name"),
+        "KORU": (True, "below its 200dma"),
+        "STE": (True, "below its 200dma"),
+    }
+    verdicts = {
+        "LYV": ("declined", "thesis real but options flow neutral"),
+        "VIPS": ("declined", "RSI 27 deeply oversold"),
+        "HD": ("declined", "RSI 31 oversold"),
+        "VIK": ("declined", "bearish flow on tiny volume"),
+    }
+    o = _funnel_orch(eligibility, verdicts)
+    o._reconcile_bear_verdicts([])  # real path: KORU/STE owe a verdict, get none
+    assert o._bear_verdict_stage["KORU"] == "IGNORED"
+    assert o._bear_verdict_stage["STE"] == "IGNORED"
+    line = _funnel_line(o, bear_map, caplog)
+    # Both 7th/8th-ranked names render with the literal handle.
+    assert "KORU -0.80 ELIGIBLE (below its 200dma) -> IGNORED" in line
+    assert "STE -0.77 ELIGIBLE (below its 200dma) -> IGNORED" in line
+    assert line.count("-> IGNORED") == 2
+    # Every other eligible name still shows its terminal stage, blocked names
+    # keep their existing rendering, and the counter sits in the tail beside
+    # put_proposals/put_approved.
+    assert "LYV -1.65 ELIGIBLE (-5.3% vs 20d SMA breakdown) -> declined: thesis real" in line
+    assert "VIPS -1.27 ELIGIBLE (below its 200dma) -> declined: RSI 27" in line
+    assert "HD -1.22 ELIGIBLE (below its 200dma) -> declined: RSI 31" in line
+    assert "VIK -1.11 ELIGIBLE (-6.6% vs 20d SMA breakdown) -> declined: bearish flow" in line
+    assert "CLH -1.57 gate-blocked" in line and "IWM -1.09 gate-blocked" in line
+    assert "slate_bearish=8 [" in line
+    assert "put_proposals=0 put_approved=0 ignored=2 auto_hedge=off proxy_put=none" in line
+    assert "more gate-blocked" not in line  # nothing was cut
+
+
+def test_funnel_line_eligible_without_reconciled_stage_renders_ignored(caplog):
+    # Defensive: an eligible name that never got a reconciled stage must still
+    # carry the handle — the schema owes a verdict per eligible name, so "no
+    # stage" IS ignored. Before, it rendered "ELIGIBLE (why)" with no arrow.
+    o = _funnel_orch({"GLUE": (True, "below its 200dma")}, {}, stages={})
+    line = _funnel_line(o, {"GLUE": -0.9}, caplog)
+    assert "GLUE -0.90 ELIGIBLE (below its 200dma) -> IGNORED" in line
+    assert "ignored=1" in line
+
+
+def test_funnel_line_zero_ignored_when_every_eligible_name_is_addressed(caplog):
+    o = _funnel_orch(
+        {"AAA": (True, "below its 200dma"), "BBB": (True, "risk-off regime"),
+         "CCC": (False, "uptrend name")},
+        {"AAA": ("declined", "no bearish flow confirm")},
+    )
+    o._reconcile_bear_verdicts([_put_proposal("BBB")])
+    line = _funnel_line(o, {"AAA": -1.0, "BBB": -0.8, "CCC": -0.6}, caplog)
+    assert "AAA -1.00 ELIGIBLE (below its 200dma) -> declined: no bearish flow confirm" in line
+    assert "BBB -0.80 ELIGIBLE (risk-off regime) -> put proposed" in line
+    assert "CCC -0.60 gate-blocked" in line
+    assert "-> IGNORED" not in line and "ignored=0" in line
+
+
+def test_funnel_line_caps_blocked_names_but_never_eligible_ones(caplog):
+    # 10 blocked names all outrank the single eligible one: the eligible name
+    # still renders (it is the only stage that matters), blocked names cap at
+    # the top 6 by score with a visible '+N more' tail, off-slate keeps its
+    # label, and reason text is clipped to 60 chars so the line stays bounded.
+    long_why = "y" * 100
+    bear_map = {f"B{i:02d}": -2.0 + i * 0.05 for i in range(10)}
+    bear_map["ELIG"] = -0.5
+    eligibility = {s: (False, "uptrend name") for s in bear_map if s != "ELIG"}
+    del eligibility["B03"]  # off-slate: no precheck verdict at all
+    eligibility["ELIG"] = (True, long_why)
+    o = _funnel_orch(eligibility, {}, stages={"ELIG": "IGNORED"})
+    line = _funnel_line(o, bear_map, caplog)
+    for i in range(6):
+        assert f"B{i:02d} " in line
+    for i in range(6, 10):
+        assert f"B{i:02d} " not in line
+    assert "B03 -1.85 off-slate" in line
+    assert "…+4 more gate-blocked/off-slate" in line
+    assert f"ELIG -0.50 ELIGIBLE ({'y' * 60}) -> IGNORED" in line
+    assert "y" * 61 not in line
+    assert "slate_bearish=11 [" in line and "ignored=1" in line
+
+
+def test_funnel_line_empty_map_keeps_bare_counts(caplog):
+    o = _funnel_orch({}, {}, stages={})
+    line = _funnel_line(o, {}, caplog)
+    assert line.startswith("BEARISH FUNNEL: slate_bearish=0 put_proposals=0 "
+                           "put_approved=0 ignored=0 auto_hedge=off proxy_put=none")
+    assert "[" not in line
 
 
 # --------------------------------------------------------------------------- #

@@ -11,7 +11,12 @@ This script waits for the next regular session (09:31 ET), then:
   1. stops the RUNNING bot (pid from state/bot.lock; SIGINT -> TERM -> KILL) —
      it must not trade against the flatten or hold the single-instance flock
   2. cancels every open order and waits for the cancels to finalize
-  3. closes every position (equities + options) and waits until flat
+  3. closes every position (equities + options) ONE SYMBOL AT A TIME in leg
+     order — short legs first, then their covers — waiting for each batch to
+     leave the position list, and retries leftovers for up to CLOSE_ROUNDS
+     (a leftover whose earlier close order is still working is waited on,
+     not re-sent),
+     printing every broker response (order id, or the rejection body)
   4. runs `investment_strategy.reset --yes`  (archives local state)
   5. runs `investment_strategy.preflight`    (sanity gate)
   6. starts the bot detached (fresh code from this working tree), appending
@@ -30,6 +35,7 @@ from __future__ import annotations
 
 import datetime as dt
 import os
+import re
 import signal
 import subprocess
 import sys
@@ -49,6 +55,28 @@ ET = ZoneInfo("America/New_York")
 # older than 2h, so even a flatten that dies before its finally cannot mute the
 # dead-man forever.
 HOLD_MARKER = ROOT / "state" / "flatten.hold"
+# Close choreography (Aug 31 2026 abort): the old flatten called
+# close_all_positions, which fires every close at once. The long IWM 295P was
+# the cover of the short IWM 280P (a debit put spread), and Alpaca refuses to
+# sell a covering long while the short it covers is still open (it would leave
+# a naked short) — so the 295P sale was rejected, the per-position response
+# was thrown away, nothing was retried, and after 15 minutes the script quit
+# with "NOT FLAT — 1 positions remain: IWM260930P00295000" (the operator sold
+# it by hand; logs/flatten_restart.log 11:41-11:56 ET). Now: one
+# close_position per symbol, SHORT legs first and confirmed gone before the
+# longs go out, leftovers retried up to CLOSE_ROUNDS with every response
+# printed so a persistent rejection is diagnosable from the log alone.
+# Round >= 2 (review fix, 2026-09-12): a leftover whose close order from an
+# earlier round is STILL WORKING (accepted, unfilled past CLOSE_WAIT_S — an
+# illiquid option cover) is NOT re-sent: Alpaca would reject the duplicate on
+# qty available (the open order holds the contracts), the cover would keep
+# failing the naked guard, and after 3 rounds the script would report NOT
+# FLAT although the first order fills minutes later. It is waited on instead.
+CLOSE_ROUNDS = 3          # per-symbol close attempts before giving up
+CLOSE_WAIT_S = 180        # max wait for one batch's closes to leave the book
+CLOSE_POLL_S = 5          # position-list poll interval during that wait
+CLOSE_ROUND_PAUSE_S = 10  # pause between rounds (lets rejected fills settle)
+_OCC_RE = re.compile(r"^[A-Z]{1,6}\d{6}[CP]\d{8}$")   # e.g. IWM260930P00295000
 
 
 def say(msg: str) -> None:
@@ -128,8 +156,112 @@ def stop_running_bot() -> None:
     say(f"WARNING: pid {pid} survived SIGKILL?! — continuing anyway")
 
 
+def _qty(p) -> float:
+    return float(getattr(p, "qty", 0) or 0)
+
+
+def _is_option(p) -> bool:
+    """Alpaca Position.asset_class is the AssetClass enum ("us_option"); fall
+    back to the OCC symbol shape when the row carries no asset_class."""
+    ac = getattr(p, "asset_class", None)
+    ac = getattr(ac, "value", ac)
+    if ac:
+        return str(ac).lower() == "us_option"
+    return bool(_OCC_RE.match(str(getattr(p, "symbol", "") or "")))
+
+
+def order_close_legs(positions) -> list:
+    """The order positions must be closed in: SHORT legs first (qty < 0,
+    short options before short stock), then longs (options before equities),
+    symbol-sorted within a group so the sequence is deterministic. A short
+    option's cover is a long on the same underlying; buying back the short is
+    always allowed, selling the cover while the short is open is not — so
+    every short must be gone before its cover is sold. Pure: returns a new
+    list, never mutates the input."""
+    return sorted(
+        positions,
+        key=lambda p: (0 if _qty(p) < 0 else 1,
+                       0 if _is_option(p) else 1,
+                       str(getattr(p, "symbol", ""))),
+    )
+
+
+def describe_close_response(resp) -> str:
+    """One greppable clause for whatever a close call returned: an Order
+    (close_position) or a ClosePositionResponse (close_all_positions)."""
+    http = getattr(resp, "status", None)
+    if isinstance(http, int):                     # ClosePositionResponse
+        body = getattr(resp, "body", None)
+        detail = (f"order={getattr(resp, 'order_id', None)}" if http < 300
+                  else f"body={body!r}")
+        return f"HTTP {http} {detail}"
+    return f"order={getattr(resp, 'id', None)} status={http}"
+
+
+def _describe_error(e: Exception) -> str:
+    """alpaca APIError carries status_code + a JSON body with code/message;
+    anything else (connection blips) prints as type: text."""
+    code = getattr(e, "status_code", None)
+    try:
+        msg = e.message                            # APIError: parsed JSON body
+    except Exception:  # noqa: BLE001 — non-JSON body or not an APIError
+        msg = str(e)
+    return f"{type(e).__name__} HTTP {code if code is not None else '?'}: {msg}"
+
+
+def _working_close_orders(tc) -> set:
+    """Symbols with an OPEN order at the broker — consulted from round 2 on,
+    when the only open orders are the earlier rounds' accepted-but-unfilled
+    closes (step 2 cancelled everything else). Never raises: an unreadable
+    order list means every leftover is re-sent, exactly as before."""
+    try:
+        return {getattr(o, "symbol", None) for o in tc.get_orders()} - {None}
+    except Exception as e:  # noqa: BLE001 — advisory read
+        say(f"  open-order check failed ({_describe_error(e)}); re-sending every leftover")
+        return set()
+
+
+def _close_batch(tc, phase: str, batch: list, working: set = frozenset()) -> set:
+    """One close_position per symbol, in the given order. Per-symbol failures
+    are printed (greppable 'close ... REJECTED') and skipped so one bad leg
+    never stops the rest. A symbol in `working` (its close from an earlier
+    round is still open) is NOT re-sent — printed as 'SKIPPED' and waited on.
+    Returns the symbols worth waiting on: the ones the broker ACCEPTED a close
+    for now, plus the skipped ones."""
+    sent: set = set()
+    for p in batch:
+        if p.symbol in working:
+            say(f"  {phase} close {p.symbol} qty={p.qty} SKIPPED: a close order is "
+                f"still working from an earlier round — waiting on it")
+            sent.add(p.symbol)
+            continue
+        try:
+            resp = tc.close_position(p.symbol)
+        except Exception as e:  # noqa: BLE001 — isolate per-symbol failures
+            say(f"  {phase} close {p.symbol} qty={p.qty} REJECTED: {_describe_error(e)}")
+            continue
+        sent.add(p.symbol)
+        say(f"  {phase} close {p.symbol} qty={p.qty} -> {describe_close_response(resp)}")
+    return sent
+
+
+def _wait_gone(tc, symbols: set) -> set:
+    """Poll the position list until none of `symbols` remains, or CLOSE_WAIT_S
+    elapses. Returns the symbols still held."""
+    still = symbols & {p.symbol for p in tc.get_all_positions()}
+    waited = 0
+    while still and waited < CLOSE_WAIT_S:
+        time.sleep(CLOSE_POLL_S)
+        waited += CLOSE_POLL_S
+        still = symbols & {p.symbol for p in tc.get_all_positions()}
+    return still
+
+
 def flatten(tc) -> bool:
-    """Cancel all orders, close all positions. True when the account is flat."""
+    """Cancel all orders, then close every position — one close_position per
+    symbol in order_close_legs() order, shorts confirmed gone before their
+    covers go out, leftovers retried up to CLOSE_ROUNDS (a leftover whose
+    earlier close is still working is waited on, not re-sent). True when flat."""
     orders = tc.get_orders()
     say(f"open orders: {len(orders)}")
     if orders:
@@ -145,19 +277,41 @@ def flatten(tc) -> bool:
 
     positions = tc.get_all_positions()
     say(f"open positions: {len(positions)}")
+    for rnd in range(1, CLOSE_ROUNDS + 1):
+        if not positions:
+            break
+        legs = order_close_legs(positions)
+        say(f"close round {rnd}/{CLOSE_ROUNDS}: {len(legs)} positions in leg order: "
+            + ", ".join(f"{p.symbol} qty={p.qty}" for p in legs))
+        shorts = [p for p in legs if _qty(p) < 0]
+        longs = [p for p in legs if _qty(p) >= 0]
+        # Round >= 2: an earlier round's close may still be working (see the
+        # constants block) — such a leftover is waited on, never re-sent.
+        working = _working_close_orders(tc) if rnd > 1 else set()
+        # Shorts go out first and must be OFF the book before a single long is
+        # sold: the long may be the short's cover, and Alpaca rejects selling
+        # a cover while the short it covers is open (the Aug 31 abort).
+        for phase, batch in (("short", shorts), ("long", longs)):
+            if not batch:
+                continue
+            sent = _close_batch(tc, phase, batch, working)
+            if not sent:
+                continue
+            still = _wait_gone(tc, sent)
+            if still:
+                say(f"  {phase} closes still open after {CLOSE_WAIT_S}s: "
+                    + ", ".join(sorted(still)))
+        positions = tc.get_all_positions()
+        if positions and rnd < CLOSE_ROUNDS:
+            say(f"  round {rnd}/{CLOSE_ROUNDS}: {len(positions)} remain: "
+                + ", ".join(p.symbol for p in positions)
+                + f" — retrying in {CLOSE_ROUND_PAUSE_S}s")
+            time.sleep(CLOSE_ROUND_PAUSE_S)
     if positions:
-        for p in positions:
-            say(f"  closing {p.symbol} qty={p.qty}")
-        tc.close_all_positions(cancel_orders=True)
-        for _ in range(180):
-            if not tc.get_all_positions():
-                break
-            time.sleep(5)
-        left = tc.get_all_positions()
-        if left:
-            say(f"NOT FLAT — {len(left)} positions remain: "
-                + ", ".join(p.symbol for p in left))
-            return False
+        say(f"NOT FLAT — {len(positions)} positions remain after {CLOSE_ROUNDS} rounds: "
+            + ", ".join(p.symbol for p in positions)
+            + " (see the 'close ... REJECTED' lines above for the broker's reason)")
+        return False
     say("account is flat: no orders, no positions")
     return True
 

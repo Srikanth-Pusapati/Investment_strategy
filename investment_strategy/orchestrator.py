@@ -32,6 +32,7 @@ from .portfolio.beta import BookBeta, hedge_signal, hedge_target_notional
 from .decision import DecisionEngine
 from .earnings import EarningsCalendar
 from .execution import AlpacaClient, OptionsHelper
+from .execution.alpaca_client import broker_5xx_status, broker_error_summary
 from .execution.options import parse_occ
 from .ledger import TradeLedger, TradeRecord
 from .models import (
@@ -55,6 +56,13 @@ from .risk import RiskManager
 from .regime import RegimeReader
 from .reset import maybe_reset_on_account_change
 from .screener import ScreenerAggregator
+from .session_calendar import (
+    MIN_SESSIONS,
+    REFRESH_SPAN_DAYS,
+    SessionCalendar,
+    paging_overlap,
+    set_active as set_active_session_calendar,
+)
 from .sectors import SectorMap
 from .signals import SignalAggregator, SignalHistory
 from .signals.composite import composite_score, perf_weights
@@ -66,7 +74,10 @@ log = logging.getLogger("orchestrator")
 
 # Transient network faults that already survived the broker's own retries. They're
 # self-healing (the next tick reconnects), so they're logged as a one-line warning
-# rather than a full traceback — a reset-by-peer isn't a bug to debug.
+# rather than a full traceback — a reset-by-peer isn't a bug to debug. A broker
+# HTTP 5xx (alpaca APIError, classified by broker_5xx_status) is the same kind
+# of blip and gets the same one-line treatment in _guarded_tick; it can't join
+# this tuple because the SDK uses APIError for 4xx "your request is wrong" too.
 _TRANSIENT_NET = (RequestsConnectionError, RequestsTimeout, ProtocolError)
 
 # The model is DISCOVERY-DRIVEN: there is no standing watchlist. The scanner
@@ -318,6 +329,16 @@ class Orchestrator:
         # safety loop is effectively blind and must page (Jul 17: 9 in a row,
         # zero alerts). Reset on any clean tick.
         self._watchdog_skips = 0
+        # Cached exchange calendar (run-7 A2): the paging window and the
+        # dead-man used to be weekday clock math, so Labor Day 2026-09-07
+        # produced 75 CRITICAL 'positions unwatched during market hours'
+        # pages for a closed market. Loaded from state/session_calendar.json
+        # (survives restart), refreshed once per ET date by the DECISION loop
+        # (_refresh_session_calendar) and only ever READ on the watchdog
+        # thread via the module-level active calendar (no network there).
+        self._session_calendar = SessionCalendar(
+            getattr(cfg, "session_calendar_file", "") or None)
+        set_active_session_calendar(self._session_calendar)
 
     # -- main loop ---------------------------------------------------------- #
     def run(self) -> None:
@@ -346,15 +367,7 @@ class Orchestrator:
         # shutdown (signal the watchdog thread, then join it) on any exit path.
         try:
             while not self._stop.is_set():
-                try:
-                    self._tick()
-                except _TRANSIENT_NET as e:
-                    log.warning(
-                        "Decision tick skipped on a transient network error (%s); "
-                        "retrying next tick.", e.__class__.__name__,
-                    )
-                except Exception:
-                    log.exception("Decision tick failed; continuing.")
+                self._guarded_tick()
                 # Wake promptly on shutdown; otherwise tick on the monitor cadence.
                 self._stop.wait(self.cfg.monitor_interval_s)
         except KeyboardInterrupt:
@@ -367,6 +380,87 @@ class Orchestrator:
                 self.alerter.flush()
             except Exception:  # noqa: BLE001 — shutdown best-effort
                 pass
+
+    def _guarded_tick(self) -> None:
+        """One main-loop tick with the failure policy applied (extracted from
+        run() so the handler is unit-testable). Three classes of failure:
+          - transient network fault (_TRANSIENT_NET): one WARNING, next tick
+            retries;
+          - broker HTTP 5xx (alpaca APIError classified by broker_5xx_status):
+            one WARNING per tick, NO traceback, consecutive ticks counted and
+            paged at doubling rungs by _note_broker_5xx_tick — Sep 11 2026:
+            /v2/clock 500'd for eight 30 s ticks and each one logged a 37-line
+            traceback at ERROR as if the bot had a bug;
+          - anything else (4xx APIError included — the request is wrong):
+            log.exception with the full traceback, unchanged.
+        A tick that returns cleanly ends any 5xx run."""
+        try:
+            self._tick()
+            self._broker_5xx_ticks = 0     # broker answered: the run is over
+        except _TRANSIENT_NET as e:
+            log.warning(
+                "Decision tick skipped on a transient network error (%s); "
+                "retrying next tick.", e.__class__.__name__,
+            )
+        except Exception as e:  # noqa: BLE001 — the loop must survive any tick
+            if broker_5xx_status(e) is not None:
+                self._note_broker_5xx_tick(e)
+            else:
+                log.exception("Decision tick failed; continuing.")
+
+    #: consecutive decision ticks aborted by a broker 5xx before we page (the
+    #: watchdog-blind style: first rung here, then every doubling — 10, 20,
+    #: 40 … ticks; ~5 min of a dead broker API at the 30 s tick).
+    BROKER_5XX_ESCALATE = 10
+    #: class-level defaults so bare Orchestrator.__new__ fixtures need no init.
+    _broker_5xx_ticks = 0
+    _broker_5xx_paged_at = 0
+
+    def _note_broker_5xx_tick(self, e: Exception) -> None:
+        """Record one decision tick lost to a broker HTTP 5xx: a single
+        greppable WARNING (no traceback — the SDK/requests frames say nothing
+        the status line doesn't) and a consecutive-tick counter that pages
+        'Broker DOWN' in-hours at the doubling rungs of the run
+        (BROKER_5XX_ESCALATE, x2, x4 …), mirroring _maybe_page_on_skip_run so
+        a long outage can't storm the log or the alerter queue. The cadence
+        is untouched: the failed cycle stays due and the next tick retries.
+        Overnight runs stay silent (nothing to trade). Best-effort."""
+        self._broker_5xx_ticks += 1
+        n = self._broker_5xx_ticks
+        status = broker_5xx_status(e)
+        log.warning(
+            "Decision tick skipped on broker HTTP %s (%s); %d in a row — "
+            "retrying next tick.", status, broker_error_summary(e), n,
+        )
+        if n < self.BROKER_5XX_ESCALATE:
+            self._broker_5xx_paged_at = 0     # a fresh run: page at its first rung
+            return
+        if self._broker_5xx_paged_at and n < self._broker_5xx_paged_at * 2:
+            return                            # between rungs
+        now = time.time()
+        if not self._overlaps_paging_hours(now, now):
+            return
+        self._broker_5xx_paged_at = n
+        secs = n * self.cfg.monitor_interval_s
+        log.critical(
+            "Broker DOWN: %d consecutive decision ticks failed on HTTP %s (~%.0fs) "
+            "— no decision cycle can run during market hours (next page at %d "
+            "ticks).", n, status, secs, n * 2,
+        )
+        paged = self.alerter.critical(
+            "broker_5xx",
+            f"Broker API down: HTTP {status} for {n} ticks (~{secs:.0f}s)",
+            "Alpaca has answered the decision loop's reads with a server error "
+            f"({broker_error_summary(e)}) for {n} consecutive ticks. No decision "
+            "cycle can run until it recovers; the watchdog keeps its own reads. "
+            "Check https://status.alpaca.markets before touching the bot.",
+            severity=float(n),
+        )
+        if not paged:
+            log.warning(
+                "Broker DOWN page at %d ticks held by the alerter "
+                "(cooldown/backoff) — logged only.", n,
+            )
 
     def _watchdog_loop(self) -> None:
         """Independent safety loop: closing positions is never gated, so this runs
@@ -392,36 +486,76 @@ class Orchestrator:
                     e.__class__.__name__, self._watchdog_skips,
                 )
                 self._maybe_page_on_skip_run()
-            except Exception:
-                log.exception("Watchdog tick failed; continuing.")
+            except Exception as e:  # noqa: BLE001 — the safety loop must survive any tick
+                if broker_5xx_status(e) is not None:
+                    # A broker 5xx blinds the safety loop exactly like a
+                    # network fault (the reads inside check_once went through
+                    # _retry_read and still failed): count it toward the
+                    # watchdog-blind rungs — a pure-5xx outage (Sep 11 shape)
+                    # used to log a traceback per tick and never page.
+                    self._watchdog_skips += 1
+                    log.warning(
+                        "Watchdog tick skipped on broker HTTP %s (%s); retrying "
+                        "next tick (%d in a row).", broker_5xx_status(e),
+                        broker_error_summary(e), self._watchdog_skips,
+                    )
+                    self._maybe_page_on_skip_run()
+                else:
+                    log.exception("Watchdog tick failed; continuing.")
             self._stop.wait(self.cfg.monitor_interval_s)
 
     #: consecutive watchdog skips (network) before we page the safety loop is blind.
     WATCHDOG_SKIP_ESCALATE = 5
+    #: skip count at which the current run last paged (0 = not yet). Class-level
+    #: default so bare Orchestrator.__new__ fixtures need no init; the instance
+    #: attribute shadows it once a run pages.
+    _blind_paged_at = 0
 
     def _maybe_page_on_skip_run(self) -> None:
         """Page when the watchdog has skipped WATCHDOG_SKIP_ESCALATE ticks in a
         row on network errors during market hours — the safety loop can't see the
-        book. Throttled by the alerter's dark_gap-style key; only fires in-hours
-        (an overnight outage strands nothing). Best-effort."""
-        if self._watchdog_skips < self.WATCHDOG_SKIP_ESCALATE:
+        book. Only fires in-hours (an overnight outage strands nothing) and only
+        at the DOUBLING rungs of the run — 5, 10, 20, 40, 80 … in-hours ticks
+        (or the first in-hours tick past 5 of a run that began overnight, then
+        2x, 4x …). Sep 7 2026: paging every tick past 5 put 75 CRITICALs in
+        the log in 56 min while DNS was dead (0 delivered; the alerter's
+        failed sends un-stamped its throttle, so each tick retried). The rungs
+        are exactly what the alerter's SEVERITY_ESCALATION=2.0 admits with a
+        working sink anyway (one page per doubling of the outage — 5 in the
+        first hour at a ~47s tick), so gating here costs no page a human would
+        have received and stops the log/queue churn. The per-tick WARNING in
+        _watchdog_loop keeps the count visible between rungs. Best-effort."""
+        skips = self._watchdog_skips
+        if skips < self.WATCHDOG_SKIP_ESCALATE:
+            self._blind_paged_at = 0      # a fresh run: page at its first rung
             return
+        if self._blind_paged_at and skips < self._blind_paged_at * 2:
+            return                        # between rungs
         now = time.time()
         if not self._overlaps_paging_hours(now, now):
             return
-        secs = self._watchdog_skips * self.cfg.monitor_interval_s
+        self._blind_paged_at = skips
+        secs = skips * self.cfg.monitor_interval_s
         log.critical(
             "Watchdog BLIND: %d consecutive ticks failed (~%.0fs) — positions "
-            "unwatched during market hours.", self._watchdog_skips, secs,
+            "unwatched during market hours (next page at %d ticks).",
+            skips, secs, skips * 2,
         )
-        self.alerter.critical(
+        paged = self.alerter.critical(
             "watchdog_blind",
-            f"Watchdog blind for {self._watchdog_skips} ticks (~{secs:.0f}s)",
+            f"Watchdog blind for {skips} ticks (~{secs:.0f}s)",
             "The safety loop has failed to read the account for several ticks in "
             "a row (network). Stops/floor/flatten can't fire while it's blind. "
             "Check the host's connectivity.",
-            severity=float(self._watchdog_skips),
+            severity=float(skips),
         )
+        if not paged:
+            # Alerter held it (cooldown, or every sink is down and the key is in
+            # its retry backoff — the page is spooled for the catch-up summary).
+            log.warning(
+                "Watchdog BLIND page at %d ticks held by the alerter "
+                "(cooldown/backoff) — logged only.", skips,
+            )
 
     #: page at most once per this window about running on battery in-hours.
     BATTERY_WARN_COOLDOWN_S = 1800.0
@@ -513,32 +647,66 @@ class Orchestrator:
                     gap / 60.0,
                 )
 
+    #: class-level default so bare Orchestrator.__new__ fixtures need no init;
+    #: __init__ replaces it with the loaded SessionCalendar.
+    _session_calendar: SessionCalendar | None = None
+
     @staticmethod
-    def _overlaps_paging_hours(start_ts: float, end_ts: float) -> bool:
+    def _overlaps_paging_hours(start_ts: float, end_ts: float,
+                               calendar: SessionCalendar | None = None) -> bool:
         """True when any part of wall-clock [start_ts, end_ts] falls inside the
-        weekday 09:25-16:05 ET paging window (the same window ops/deadman.py
-        uses). Checked at both endpoints plus each session open inside the
-        span, so a multi-day gap can't thread between samples. Pure clock math
-        — no network — because this runs on the watchdog thread."""
-        et = ZoneInfo("America/New_York")
+        paging window: (session open - 5min, close + 5min) ET per the cached
+        exchange calendar (holidays and early closes honoured; the same file
+        ops/deadman.py reads), or weekday 09:25-16:05 ET for any date the
+        cache doesn't cover. Checked at both endpoints plus each session open
+        inside the span, so a multi-day gap can't thread between samples.
+        Pure clock math over the cache — no network — because this runs on
+        the watchdog thread. `calendar` defaults to the module-level active
+        calendar registered by __init__ (tests pass one explicitly); before
+        run-7 this was weekday math only, which is how Labor Day 2026-09-07
+        paged 75 times for a closed market."""
+        return paging_overlap(start_ts, end_ts, calendar)
 
-        def in_window(dt_: datetime) -> bool:
-            if dt_.weekday() >= 5:
-                return False
-            minute = dt_.hour * 60 + dt_.minute
-            return (9 * 60 + 25) <= minute <= (16 * 60 + 5)
-
-        start = datetime.fromtimestamp(start_ts, et)
-        end = datetime.fromtimestamp(end_ts, et)
-        if in_window(start) or in_window(end):
-            return True
-        day = start.date()
-        while day <= end.date():
-            session_open = datetime(day.year, day.month, day.day, 9, 30, tzinfo=et)
-            if start <= session_open <= end and in_window(session_open):
-                return True
-            day += timedelta(days=1)
-        return False
+    def _refresh_session_calendar(self) -> None:
+        """DECISION-thread only: once per ET date, pull the exchange calendar
+        for today +/- REFRESH_SPAN_DAYS and persist it (state/session_calendar
+        .json) for the watchdog's paging window and ops/deadman.py. A failed or
+        rejected fetch keeps the previous cache (weekday math for dates it
+        doesn't cover) and retries on the next decision cycle; the watchdog
+        never fetches. Best-effort — never raises into the cycle."""
+        cal = getattr(self, "_session_calendar", None)
+        if cal is None:
+            return
+        try:
+            today = datetime.now(ZoneInfo("America/New_York")).date()
+            if not cal.needs_refresh(today):
+                return
+            fetch = getattr(self.broker, "get_session_calendar", None)
+            if not callable(fetch):
+                return
+            start = today - timedelta(days=REFRESH_SPAN_DAYS)
+            end = today + timedelta(days=REFRESH_SPAN_DAYS)
+            sessions = fetch(start, end)
+            if not sessions:
+                log.warning(
+                    "Session calendar refresh failed for %s..%s; keeping cached "
+                    "%s..%s (weekday paging math outside it); retry next cycle.",
+                    start, end, cal.start, cal.end,
+                )
+                return
+            if cal.update(sessions, start, end, today):
+                log.info(
+                    "Session calendar refreshed: %d session(s) %s..%s -> %s.",
+                    len(sessions), start, end, cal.path,
+                )
+            else:
+                log.warning(
+                    "Session calendar response rejected (%d session(s) for %s..%s, "
+                    "floor %d); keeping cached %s..%s.",
+                    len(sessions), start, end, MIN_SESSIONS, cal.start, cal.end,
+                )
+        except Exception as e:  # noqa: BLE001 — advisory cache, never blocks a cycle
+            log.warning("Session calendar refresh error: %s", e)
 
     def _maybe_heartbeat(self) -> None:
         """Ping the external dead-man monitor — only while the MAIN loop is also
@@ -820,6 +988,14 @@ class Orchestrator:
             log.warning("Weekly auto-tune failed: %s", e)
 
     def run_decision_cycle(self) -> None:
+        # Before the closed-market early return so holiday/overnight ticks
+        # refresh the paging calendar too (once per ET date, decision thread).
+        # While the fetch keeps failing it re-runs every cycle (3 tries x the
+        # HTTP timeout + 5xx sleeps, ~60 s worst case), so stamp liveness
+        # right after it: the span is otherwise unstamped between _tick's
+        # stamp and the first in-cycle one.
+        self._refresh_session_calendar()
+        self._stamp_liveness()
         self._cycle_market_open = self.broker.is_market_open()
         if not self._cycle_market_open:
             log.info("Market closed; skipping decision cycle.")
@@ -879,11 +1055,16 @@ class Orchestrator:
             self._regime_trend = ""
             self._regime_label = ""
             self._regime_flipped_off = False
+        self._stamp_liveness()  # regime read done (a few benchmark fetches)
         self._record_equity_snapshot()
         account = self.broker.get_account()
         # Ex-ante exposure read (run-6 item 7a) — before any defense acts, so
-        # the line records what the book carried INTO the cycle.
+        # the line records what the book carried INTO the cycle. The reader
+        # stamps liveness per symbol (Sep 11: a 163 s beta fan-out under an
+        # Alpaca degradation withheld the heartbeat twice) and the stage is
+        # stamped once more here so a disabled reader leaves no gap.
         self._read_book_beta(account)
+        self._stamp_liveness()
 
         # De-risk the EXISTING book on a flip into risk-off (the regime multiplier
         # otherwise only shrinks NEW buys). Runs before new proposals so the trimmed
@@ -1180,59 +1361,12 @@ class Orchestrator:
         )
         # Bearish funnel (Jul 30 review): the put path was dormant for 388
         # straight trades and nothing surfaced it. One line per cycle makes
-        # downside-conviction leakage visible: how many slate names carried a
-        # real bearish read, how many puts the model proposed, how many the
-        # gates passed, and whether the deterministic hedge sleeve is on.
-        # Jul 31: decomposed per name — the bare count hid WHERE the 4->0
-        # drop-off happened (off-slate? gate-blocked by the uptrend? model
-        # declined an eligible name?). Each bearish name now shows its stage.
+        # downside-conviction leakage visible — see _log_bear_funnel for the
+        # per-name stage rendering and its truncation rules (Sep 12: every
+        # ELIGIBLE name is rendered; only gate-blocked/off-slate names cap).
         bear_bar = self.cfg.screener.bearish_reserve_bar or 0.4
         bear_map = {s: v for s, v in composites.items() if v <= -bear_bar}
-        bear_detail = ""
-        if bear_map:
-            parts = []
-            for s, v in sorted(bear_map.items(), key=lambda kv: kv[1])[:6]:
-                verdict = self._bear_eligibility.get(s)
-                if verdict is None:
-                    parts.append(f"{s} {v:+.2f} off-slate")
-                elif verdict[0]:
-                    # Aug 1: append the model's reconciled verdict so the
-                    # funnel line shows where an ELIGIBLE name ended — put
-                    # proposed / declined(reason) / IGNORED — not just that
-                    # it was offered.
-                    stage = self._bear_verdict_stage.get(s, "")
-                    parts.append(
-                        f"{s} {v:+.2f} ELIGIBLE ({verdict[1]})"
-                        + (f" -> {stage}" if stage else "")
-                    )
-                else:
-                    parts.append(f"{s} {v:+.2f} gate-blocked")
-            bear_detail = " [" + "; ".join(parts) + "]"
-        h_etf = getattr(self.cfg, "hedge_etf", "")
-        hedge_pos = account.position_for(h_etf) if h_etf else None
-        # Aug 22: the armed/holding state names its trigger source —
-        # (index) vs (breadth:N-names) vs (book:-X.X%) — so the daily log
-        # shows WHICH read armed the hedge sleeve, not just that one did.
-        _trig = getattr(self, "_falling_trigger", "") or getattr(
-            self, "_hedge_reason", ""
-        )
-        log.info(
-            "BEARISH FUNNEL: slate_bearish=%d%s put_proposals=%d "
-            "put_approved=%d auto_hedge=%s proxy_put=%s",
-            len(bear_map),
-            bear_detail,
-            getattr(self, "_bear_puts_proposed", 0),
-            getattr(self, "_bear_puts_approved", 0),
-            (
-                f"${max(0.0, hedge_pos.market_value):,.0f} {h_etf}"
-                + (f"({_trig})" if _trig else "")
-                if hedge_pos is not None else
-                (f"armed({_trig or 'clearing'})"
-                 if self._falling_cycles > 0 and h_etf
-                 else ("off" if not h_etf else "flat"))
-            ),
-            getattr(self, "_proxy_put_state", "") or "none",
-        )
+        self._log_bear_funnel(bear_map, account)
         if undeployed >= 1.0:
             # Whole-share bracket flooring drops each buy's sub-share remainder
             # (deliberate — the exchange-resident bracket wins over precision);
@@ -1265,10 +1399,17 @@ class Orchestrator:
         Aug-22 review (rank 8): RH OAuth died Aug 19 mid-window and 2 of 5
         SCREENER_SOURCES silently vanished — the eval window was confounded
         and nothing flagged it. Every decision cycle now also logs one FEEDS
-        line asserting the health of ALL configured screener sources."""
+        line asserting the health of ALL configured screener sources.
+
+        Run-7 (A7): the line also carries 'earnings=<rh|yfinance-fallback|
+        none>' — Sep 10 RH died and the earnings-blackout gate ran on
+        yfinance for 12 cycles behind a '3/3 healthy' line. 'earnings=none'
+        (no source at all; the gate is blind) logs at WARNING; the
+        yfinance fallback itself is announced by earnings.py's own once-per-
+        cycle line (WARNING when RH was expected), so FEEDS stays INFO."""
         feeds = self._feed_health_line()
         if feeds:
-            if "DEAD" in feeds or "UNHEALTHY" in feeds:
+            if "DEAD" in feeds or "UNHEALTHY" in feeds or "earnings=none" in feeds:
                 log.warning("%s", feeds)
             else:
                 log.info("%s", feeds)
@@ -1308,7 +1449,14 @@ class Orchestrator:
         pull FAILED this cycle (screener.degraded, e.g. the EDGAR Form-4 feed
         timing out with 0 rows) counts as 'UNHEALTHY (<reason>)' in the n/n,
         and 'news=vader-fallback' is appended once news.py has latched the
-        Finnhub 403 — so 'FEEDS: 5/5 healthy' means what it says."""
+        Finnhub 403 — so 'FEEDS: 5/5 healthy' means what it says.
+
+        Run-7 (A7): under the same knob the line ends with
+        'earnings=<rh|yfinance-fallback|none>' — the source the earnings-
+        blackout gate consults this cycle (EarningsCalendar.source(): the RH
+        reader's enabled flag/dead-auth latch + the last calendar read's
+        outcome; no probe). RH is not a SCREENER_SOURCE in run-6/7, so the
+        n/n alone could not see the Sep 10 RH outage."""
         try:
             sources = list(getattr(self.cfg.screener, "sources", ()) or ())
             if not sources:
@@ -1340,6 +1488,8 @@ class Orchestrator:
             suffix = " news=vader-fallback" if (
                 degraded_modes and self._news_vader_fallback()
             ) else ""
+            if degraded_modes:
+                suffix += self._earnings_source_token()
             total = len(sources)
             if not dead:
                 return f"FEEDS: {total}/{total} healthy{suffix}"
@@ -1349,6 +1499,19 @@ class Orchestrator:
             )
         except Exception as e:
             log.debug("feed health line failed: %s", e)
+            return ""
+
+    def _earnings_source_token(self) -> str:
+        """' earnings=<rh|yfinance-fallback|none>' for the FEEDS line, or ''
+        when no calendar is wired (test doubles). Read-only and best-effort:
+        a failure here drops the token, never the FEEDS line."""
+        cal = getattr(self, "earnings", None)
+        if cal is None:
+            return ""
+        try:
+            return f" earnings={cal.source()}"
+        except Exception as e:  # noqa: BLE001
+            log.debug("earnings source token failed: %s", e)
             return ""
 
     def _news_vader_fallback(self) -> bool:
@@ -1803,7 +1966,15 @@ class Orchestrator:
         most-recent-buy-price basis was wrong for multi-lot names); the record
         is stamped with the actual fill time so chronological pairing holds.
         Idempotent (order-id keyed) and best-effort — a failure just retries
-        next cycle."""
+        next cycle.
+
+        Run-7 A6: the row is written WITH fill_price / fill_qty / fill_ts from
+        the broker's closed order (filled_avg_price / filled_qty / filled_at).
+        Run-6's 7 bracket exits — half the closed sample — had fill_price=null
+        because this path priced realized_pl from the fill but never stamped
+        it, leaving the contract's ledger-vs-fill reconciliation undefined.
+        Stamped regardless of LEDGER_FILL_PRICES: that knob gates the extra
+        per-order REST read at reconcile; here the fill is already in hand."""
         try:
             from .lots import build_lot_history, fifo_basis
 
@@ -1895,6 +2066,10 @@ class Orchestrator:
                     "stop": "bracket_stop", "stop_limit": "bracket_stop",
                     "trailing_stop": "bracket_stop", "limit": "bracket_take",
                 }.get(o["type"], "external")
+                # o["price"] is the broker's filled_avg_price and o["qty"] its
+                # filled_qty (AlpacaClient.closed_sell_orders): realized_pl
+                # above is already computed AT the fill, so exit_price and
+                # fill_price are the same number here by construction (A6).
                 self.ledger.record(TradeRecord.for_sell(
                     sym,
                     f"exchange-side exit backfill ({o['type'] or 'unknown'} sell)",
@@ -1902,11 +2077,15 @@ class Orchestrator:
                     realized_pl_pct=pl_pct, realized_pl=pl,
                     exit_reason=reason, ts=ts, exit_price=o["price"] or None,
                     instrument=instrument,
+                    fill_price=o["price"] or None, fill_qty=o["qty"] or None,
+                    fill_ts=ts,
                 ))
                 log.info(
-                    "Backfilled exchange exit: %s %g sh @ %.2f (%s -> %s%s).",
+                    "Backfilled exchange exit: %s %g sh @ %.2f (%s -> %s%s) "
+                    "[fill stamped%s].",
                     sym, o["qty"], o["price"], o["type"] or "?", reason,
                     f", {pl_pct:+.1f}%" if pl_pct is not None else "",
+                    f" {ts.isoformat()}" if ts is not None else ", no filled_at",
                 )
                 # An exchange-side exit also starts the re-entry cooldown —
                 # stamped at the FILL time and price when known (price feeds the
@@ -2625,6 +2804,97 @@ class Orchestrator:
                 )
                 log.warning("Bearish verdict: %s ELIGIBLE but IGNORED — %s.",
                             s, why)
+
+    # BEARISH FUNNEL line bounds: gate-blocked / off-slate names are capped at
+    # the top N by score; ELIGIBLE names are NEVER capped (see _log_bear_funnel).
+    # Per-name reason text (eligibility carve-out / decline reason) is clipped
+    # so one verbose model reply cannot balloon the line.
+    FUNNEL_BLOCKED_MAX = 6
+    FUNNEL_REASON_CHARS = 60
+
+    def _log_bear_funnel(self, bear_map: dict, account) -> int:
+        """Emit the per-cycle BEARISH FUNNEL line and return the IGNORED count.
+
+        One line per cycle: how many slate names carried a real bearish read
+        (composite <= -bearish_reserve_bar), where each one ended — off-slate
+        / gate-blocked / `ELIGIBLE (why) -> put proposed | declined: … |
+        IGNORED` — how many puts the model proposed, how many the gates
+        passed, and whether the deterministic hedge sleeve is on.
+
+        History: Jul 30 the bare count shipped (the put path had been dormant
+        for 388 straight trades). Jul 31 decomposed it per name — the count
+        hid WHERE the 4->0 drop-off happened. Aug 1 appended the model's
+        reconciled verdict to each ELIGIBLE name. Sep 12 (run-7 change-set,
+        item A5): the line rendered only the 6 most-bearish names, so on
+        Sep 10 2026 all three "ELIGIBLE but IGNORED" verdicts (ABT ranked 7th
+        of 7 at 08:34; KORU/STE 7th/8th of 8 at 09:26) fell off the line and
+        never appeared as `-> IGNORED` — the literal handle the away-mode
+        runbook, Todo-4 and the Aug-1 escalation trigger grep for — so the
+        window was scored "0 IGNORED" on a truncated line. Rules now:
+
+          * every ELIGIBLE name renders its terminal stage, no cap; an
+            eligible name with no reconciled stage renders `-> IGNORED`
+            (the schema owes a verdict per eligible name, so "no stage" IS
+            ignored) — the handle always exists when the miss happens;
+          * gate-blocked / off-slate names keep the top-FUNNEL_BLOCKED_MAX
+            cap by score, with a `…+N more` tail so the cap is visible;
+          * reason text is clipped to FUNNEL_REASON_CHARS;
+          * `ignored=N` sits in the summary tail beside put_proposals /
+            put_approved so the count is a field, not a grep.
+        """
+        eligibility = getattr(self, "_bear_eligibility", {}) or {}
+        stages = getattr(self, "_bear_verdict_stage", {}) or {}
+        parts: list[str] = []
+        ignored = 0
+        blocked_shown = 0
+        blocked_hidden = 0
+        for s, v in sorted(bear_map.items(), key=lambda kv: kv[1]):
+            verdict = eligibility.get(s)
+            if verdict is not None and verdict[0]:
+                stage = (stages.get(s) or "").strip() or "IGNORED"
+                if stage == "IGNORED":
+                    ignored += 1
+                why = (verdict[1] or "")[:self.FUNNEL_REASON_CHARS]
+                parts.append(f"{s} {v:+.2f} ELIGIBLE ({why}) -> {stage}")
+                continue
+            if blocked_shown >= self.FUNNEL_BLOCKED_MAX:
+                blocked_hidden += 1
+                continue
+            blocked_shown += 1
+            parts.append(
+                f"{s} {v:+.2f} "
+                + ("off-slate" if verdict is None else "gate-blocked")
+            )
+        if blocked_hidden:
+            parts.append(f"…+{blocked_hidden} more gate-blocked/off-slate")
+        bear_detail = (" [" + "; ".join(parts) + "]") if parts else ""
+        h_etf = getattr(self.cfg, "hedge_etf", "")
+        hedge_pos = account.position_for(h_etf) if h_etf else None
+        # Aug 22: the armed/holding state names its trigger source —
+        # (index) vs (breadth:N-names) vs (book:-X.X%) — so the daily log
+        # shows WHICH read armed the hedge sleeve, not just that one did.
+        _trig = getattr(self, "_falling_trigger", "") or getattr(
+            self, "_hedge_reason", ""
+        )
+        log.info(
+            "BEARISH FUNNEL: slate_bearish=%d%s put_proposals=%d "
+            "put_approved=%d ignored=%d auto_hedge=%s proxy_put=%s",
+            len(bear_map),
+            bear_detail,
+            getattr(self, "_bear_puts_proposed", 0),
+            getattr(self, "_bear_puts_approved", 0),
+            ignored,
+            (
+                f"${max(0.0, hedge_pos.market_value):,.0f} {h_etf}"
+                + (f"({_trig})" if _trig else "")
+                if hedge_pos is not None else
+                (f"armed({_trig or 'clearing'})"
+                 if getattr(self, "_falling_cycles", 0) > 0 and h_etf
+                 else ("off" if not h_etf else "flat"))
+            ),
+            getattr(self, "_proxy_put_state", "") or "none",
+        )
+        return ignored
 
     def _bear_precheck_names(self, bundles, composites: dict) -> list[str]:
         """ON-SLATE names that get a put-gate precheck: composite <= -bar, OR
@@ -3349,7 +3619,9 @@ class Orchestrator:
             log.info("BOOK BETA: unavailable (no reader)")
             return
         try:
-            reading = reader.read(account)
+            # Per-symbol liveness stamps: the read is a serial ~20-fetch
+            # fan-out (see portfolio/beta.py) that must not read as a hang.
+            reading = reader.read(account, on_progress=self._stamp_liveness)
         except Exception as e:  # noqa: BLE001 — a measurement, never a blocker
             log.info("BOOK BETA: unavailable (%s: %s)", type(e).__name__, e)
             return

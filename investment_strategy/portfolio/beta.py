@@ -28,12 +28,26 @@ from a private cache on this object. Everything fails open: an unavailable
 series makes the holding an `unknown` (assumed beta 1.0, listed on the log
 line); a failed benchmark makes that column None; the caller never blocks
 trading on this reading.
+
+Liveness: read() is a SERIAL fan-out of one daily_close_series fetch per
+benchmark plus per held underlying (~20 on a full book), each bound only by
+the broker's retry budget (3 tries x (5, 15)s). On 2026-09-11 an Alpaca
+degradation stretched that stage to 163 s (median 2 s) and the orchestrator
+withheld the external heartbeat twice ("Heartbeat withheld: main loop last
+ticked 168s/199s ago") although the loop was merely busy. read() therefore
+takes an optional `on_progress` hook, fired once per symbol as its series is
+resolved — the orchestrator passes its liveness stamp, exactly as it does
+for SignalAggregator.gather — so a slow fan-out keeps the heartbeat gate
+open while a read that genuinely wedges (never returns) still stops the
+stamps and the external monitor still pages. The hook is never called from
+inside the fetch and can never break the reading.
 """
 from __future__ import annotations
 
 import logging
 import re
 import statistics
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 
@@ -238,10 +252,34 @@ class BookBeta:
         self.min_overlap = int(min_overlap)
         self._returns: dict[str, dict[str, float] | None] = {}
         self._betas: dict[tuple[str, str], float | None] = {}
+        # Liveness hook for the duration of one read() (see module docstring)
+        # and the symbols it has already reported this cycle — one tick per
+        # symbol per cycle, so the three beta_of() calls a holding needs (one
+        # per benchmark) and a cycle-cached re-read don't re-tick.
+        self._on_progress: Callable[[], None] | None = None
+        self._progressed: set[str] = set()
 
     def new_cycle(self) -> None:
         self._returns.clear()
         self._betas.clear()
+        self._progressed.clear()
+
+    def _note_progress(self, symbol: str) -> None:
+        """Fire the liveness hook the FIRST time `symbol`'s series is resolved
+        this cycle. Called after the fetch returned (data, an empty series or
+        a caught failure — the loop is moving on to the next symbol either
+        way), never while one is in flight. A hook that raises is logged and
+        dropped: a heartbeat stamp must never cost the beta reading."""
+        if symbol in self._progressed:
+            return
+        self._progressed.add(symbol)
+        cb = self._on_progress
+        if cb is None:
+            return
+        try:
+            cb()
+        except Exception as e:  # noqa: BLE001 — a liveness stamp, never a blocker
+            log.debug("beta progress hook failed after %s: %s", symbol, e)
 
     # -- series ---------------------------------------------------------- #
     def _daily_returns(self, symbol: str) -> dict[str, float] | None:
@@ -251,6 +289,7 @@ class BookBeta:
             try:
                 rets = guard._daily_returns(symbol)
                 if rets:
+                    self._note_progress(symbol)
                     return rets
             except Exception as e:  # noqa: BLE001 — fall through to own fetch
                 log.debug("corr-guard series for %s failed: %s", symbol, e)
@@ -264,6 +303,7 @@ class BookBeta:
             log.warning("beta history for %s failed: %s", symbol, e)
             rets = None
         self._returns[symbol] = rets
+        self._note_progress(symbol)
         return rets
 
     # -- betas ----------------------------------------------------------- #
@@ -310,9 +350,16 @@ class BookBeta:
                 weights[sym] = weights.get(sym, 0.0) + mv / equity
         return weights, folded
 
-    def read(self, account) -> BookBetaReading:
-        """Measure the book. Never raises."""
+    def read(
+        self, account, on_progress: Callable[[], None] | None = None,
+    ) -> BookBetaReading:
+        """Measure the book. Never raises. `on_progress` (optional) is called
+        once per symbol as its return series is resolved — the orchestrator
+        passes its heartbeat liveness stamp so the serial fan-out can't read
+        as a hung main loop (2026-09-11). Only forward progress may call it;
+        it has no effect on the numbers."""
         reading = BookBetaReading()
+        self._on_progress = on_progress
         try:
             equity = float(getattr(account, "equity", 0.0) or 0.0)
             if equity <= 0:
@@ -352,4 +399,6 @@ class BookBeta:
                 reading.reason = "SPY series unavailable"
         except Exception as e:  # noqa: BLE001 — a measurement, never a blocker
             reading.reason = f"{type(e).__name__}: {e}"[:120]
+        finally:
+            self._on_progress = None
         return reading
