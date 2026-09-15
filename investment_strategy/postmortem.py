@@ -468,6 +468,168 @@ def _no_option_marks(_occ: str, _days: int) -> list:
     return []
 
 
+# --------------------------------------------------------------------------- #
+# Run-7 S-8 / 4a-17: deterministic hedge counters (log + ledger; no LLM)
+# --------------------------------------------------------------------------- #
+HEDGE_WHIPSAW_SESSIONS = 2
+
+
+def _weekday_sessions_between(d0, d1) -> int:
+    """Mon-Fri days strictly after date d0 up to and including d1 (0 for the
+    same day; a weekend gap adds nothing). Exchange holidays are NOT
+    subtracted: a re-arm two weekdays after an unwind is a whipsaw whether
+    or not one of them was a holiday — the counter errs conservative."""
+    from datetime import timedelta
+    if d1 <= d0:
+        return 0
+    n, d = 0, d0
+    while d < d1:
+        d += timedelta(days=1)
+        if d.weekday() < 5:
+            n += 1
+    return n
+
+
+def _day_log_lines(day: str, log_dir=None) -> list[str]:
+    """Every bot-log line stamped with ET date `day` ('YYYY-MM-DD ...').
+    The live file is logs/bot.log until local midnight, then the
+    Sep_10_2026.log-style rotated name (__main__.dated_log_name); the
+    post-mortem normally runs after the close (live file) but may be
+    re-run next day (rotated file), so both are read and lines are kept
+    by their own date stamp. Unreadable = []."""
+    import os
+    from datetime import datetime
+    from pathlib import Path
+    base = Path(log_dir or os.getenv("LOG_DIR", "logs") or "logs")
+    try:
+        d = datetime.strptime(day, "%Y-%m-%d")
+    except ValueError:
+        return []
+    out: list[str] = []
+    for name in ("bot.log", d.strftime("%b_%d_%Y") + ".log"):
+        p = base / name
+        try:
+            if not p.exists():
+                continue
+            for line in p.read_text(encoding="utf-8", errors="replace").splitlines():
+                if line.startswith(day + " "):
+                    out.append(line)
+        except OSError:
+            continue
+    return out
+
+
+def hedge_diagnostics(day: str, ledger, log_dir=None) -> list[str]:
+    """Deterministic hedge counters for the nightly post-mortem (4a-17):
+
+    - `HEDGE WHIPSAW`: auto-hedge ARMS on `day` (ledger buy rows carrying
+      entry_signals ['auto_hedge']) whose latest preceding hedge_unwind
+      sell lies within HEDGE_WHIPSAW_SESSIONS weekday sessions. Run-6:
+      Sep 9 09:22 unwind -> Sep 10 11:06 re-arm (1 session) at 26.09 vs
+      the 25.84 exit — the fixture this counter is pinned to.
+    - `BOOK BETA CAP -> next-cycle arm`: decision cycles (delimited by the
+      ONE 'BOOK BETA:' reading line each) that logged a 'BOOK BETA CAP:'
+      resize/reject and whose NEXT cycle armed the beta hedge
+      ('AUTO-HEDGE: beta:'). Cap 1.20 vs arm line 1.15 means every
+      cap-bound buy lands inside the arm zone (run-6: Sep 3 09:25 cap ->
+      10:14 arm; Sep 10 10:19 cap -> 11:06 arm); operator decision 6 keeps
+      MAX_BOOK_BETA_SPY at 1.2 until this count says otherwise.
+    - the day's last `HEDGE COUNTERFACTUAL:` line, verbatim, when present.
+
+    Reads the ledger (cross-day: an unwind may be sessions old) and the
+    day's log; never raises; a missing log yields an 'n/a' line, never a
+    silent zero (a handle that matches nothing is a measurement breach)."""
+    from datetime import datetime
+    from zoneinfo import ZoneInfo
+    et = ZoneInfo("America/New_York")
+    lines: list[str] = []
+    try:
+        day_date = datetime.strptime(day, "%Y-%m-%d").date()
+    except ValueError:
+        return lines
+
+    # -- whipsaw (ledger) ------------------------------------------------- #
+    try:
+        rows = ledger.effective() if hasattr(ledger, "effective") else ledger.all()
+    except Exception as e:  # noqa: BLE001
+        rows = []
+        lines.append(f"HEDGE WHIPSAW: n/a (ledger unreadable: {e})")
+    if rows or not lines:
+        def _et(ts):
+            try:
+                return ts.astimezone(et)
+            except Exception:  # noqa: BLE001 — naive/odd stamps: treat as ET
+                return ts
+        arms = [r for r in rows if getattr(r, "action", "") == "buy"
+                and "auto_hedge" in (getattr(r, "entry_signals", None) or [])]
+        unwinds = [r for r in rows if getattr(r, "action", "") == "sell"
+                   and getattr(r, "exit_reason", "") == "hedge_unwind"]
+        today_arms = [a for a in arms if _et(a.ts).date() == day_date]
+        whip = 0
+        details: list[str] = []
+        try:
+            for a in today_arms:
+                prior = [u for u in unwinds if u.ts < a.ts]
+                if not prior:
+                    continue
+                u = max(prior, key=lambda r: r.ts)
+                gap = _weekday_sessions_between(_et(u.ts).date(), _et(a.ts).date())
+                if gap <= HEDGE_WHIPSAW_SESSIONS:
+                    whip += 1
+                    details.append(
+                        f"{a.symbol} unwound {_et(u.ts).strftime('%Y-%m-%d %H:%M')} ET "
+                        f"-> re-armed {_et(a.ts).strftime('%Y-%m-%d %H:%M')} ET, "
+                        f"{gap} session(s), ${float(getattr(a, 'cost_usd', 0.0) or 0.0):,.0f}"
+                    )
+        except TypeError as e:      # naive vs aware stamps on pre-field rows
+            lines.append(f"HEDGE WHIPSAW: n/a (ledger stamps not comparable: {e})")
+            today_arms = []
+            whip = -1
+        if whip < 0:
+            pass
+        elif not today_arms:
+            lines.append("HEDGE WHIPSAW: 0 (no auto-hedge arm today).")
+        else:
+            tail = "; ".join(details) if details else "no unwind within the window"
+            lines.append(
+                f"HEDGE WHIPSAW: {whip} of {len(today_arms)} arm(s) today re-armed "
+                f"within {HEDGE_WHIPSAW_SESSIONS} sessions of an unwind ({tail})."
+            )
+
+    # -- cap -> next-cycle arm pairs (day's log) --------------------------- #
+    log_lines = _day_log_lines(day, log_dir)
+    if not log_lines:
+        lines.append(
+            f"BOOK BETA CAP -> next-cycle arm: n/a (no log lines for {day})."
+        )
+    else:
+        cycles: list[dict] = []
+        for line in log_lines:
+            if "| BOOK BETA: " in line:
+                cycles.append({"cap": False, "arm": False})
+                continue
+            if not cycles:
+                continue
+            if "BOOK BETA CAP:" in line:
+                cycles[-1]["cap"] = True
+            if "AUTO-HEDGE: beta:" in line:
+                cycles[-1]["arm"] = True
+        pairs = sum(
+            1 for i in range(len(cycles) - 1)
+            if cycles[i]["cap"] and cycles[i + 1]["arm"]
+        )
+        lines.append(
+            f"BOOK BETA CAP -> next-cycle arm: {pairs} pair(s) today "
+            f"(cycles {len(cycles)}; cap-bound cycles "
+            f"{sum(1 for c in cycles if c['cap'])}; arms "
+            f"{sum(1 for c in cycles if c['arm'])})."
+        )
+        cf = [l for l in log_lines if "HEDGE COUNTERFACTUAL:" in l]
+        if cf:
+            lines.append(cf[-1].split(" | ", 1)[-1])
+    return lines
+
+
 def run_postmortem(
     cfg,
     ledger,
@@ -620,6 +782,18 @@ def run_postmortem(
         if not diag:
             diag = ["## Behavior diagnostics (deterministic — trusted)"]
         diag.append(gate_line)
+    # Run-7 S-8 / 4a-17: hedge counters — whipsaw, cap->arm pairs, and the
+    # day's counterfactual line. Deterministic; a failure never costs the
+    # post-mortem.
+    try:
+        hedge_lines = hedge_diagnostics(day, ledger)
+    except Exception as e:  # noqa: BLE001
+        log.warning("Post-mortem hedge diagnostics failed: %s", e)
+        hedge_lines = []
+    if hedge_lines:
+        if not diag:
+            diag = ["## Behavior diagnostics (deterministic — trusted)"]
+        diag.extend(hedge_lines)
     if diag:
         user_text += "\n\n" + "\n".join(diag)
 

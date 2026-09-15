@@ -96,6 +96,28 @@ def trail_geometry(limits, stop_pct: float) -> tuple[float, float]:
     return arm, giveback
 
 
+def topup_bar(prev_conviction: float, delta: float) -> float:
+    """The conviction an ADD to a held name must reach: last buy + delta,
+    at 4 dp. S-6 (run-7): the gate used to compare raw floats, and for most
+    2-dp priors `prev + 0.05` is a hair ABOVE the printed number
+    (0.66 + 0.05 = 0.7100000000000001), so a proposal exactly at the bar was
+    rejected — Jul 10 2026 08:57 LASR 0.60 vs prior 0.55 died that way. The
+    prompt's HELD line now prints this bar, so the gate and the prompt must
+    share one function: printed == enforced, by construction."""
+    return round(float(prev_conviction) + float(delta), 4)
+
+
+def format_topup_bar(bar: float) -> str:
+    """Render a 4-dp bar with at least two decimals and no float noise
+    (0.71 -> '0.71', 0.7 -> '0.70', 0.685 -> '0.685'). Used by both the
+    reject reason and the HELD line so the model reads exactly the number
+    the gate compares against."""
+    text = f"{bar:.4f}".rstrip("0")
+    if len(text.split(".")[1]) < 2:
+        text = f"{bar:.2f}"
+    return text
+
+
 class RiskManager:
     def __init__(
         self, limits: RiskLimits, kill_switch: bool = False,
@@ -365,14 +387,39 @@ class RiskManager:
         # Option rows don't count either: they have their own concurrency cap
         # (max_option_positions) and premium cap, and letting a ~1%-of-equity
         # debit eat an equity slot starves the equity book.
-        equity_rows = [p for p in account.positions if not p.is_option]
-        if (
-            len(equity_rows) >= self.limits.max_open_positions
-            and account.position_for(proposal.symbol) is None
-        ):
+        # System-managed rows don't count either (S-1, run-7): the core ETF,
+        # the auto-hedge inverse ETF and the defensive T-bill core are opened
+        # by the orchestrator outside this gate, so they can push the raw
+        # count PAST the cap and the model then cannot open anything. Sep 3-4
+        # 2026: 14 satellites + QQQ + PSQ read 16/15 -> HOOD (x2) and MU were
+        # rejected here; MU six seconds after a partial MKL fold that had
+        # already freed a slot. With the exemption MU was 14/15 and approved
+        # WITHOUT the MKL sale (that exit and its 24h cooldown were artifacts
+        # of the miscount). Exemption set = RiskLimits.slot_exempt_symbols,
+        # derived in load_config from the same three env keys as
+        # Orchestrator._system_managed_symbols. Default () = legacy count.
+        exempt_cfg = tuple(getattr(self.limits, "slot_exempt_symbols", ()) or ())
+        exempt = set(exempt_cfg)
+        raw_rows = [p for p in account.positions if not p.is_option]
+        equity_rows = [p for p in raw_rows if p.symbol not in exempt]
+        is_new_name = account.position_for(proposal.symbol) is None
+        if is_new_name and len(equity_rows) != len(raw_rows):
+            # Greppable whenever the exemption changed the count: the
+            # counterfactual ("raw N") is what the pre-S-1 gate would have
+            # judged this buy against. Exempt names print in config order
+            # (CORE_ETF, HEDGE_ETF, DEFENSIVE_CORE_ETF), held ones only.
+            on_book = {p.symbol for p in raw_rows}
+            log.info(
+                "SLOT COUNT: %d/%d model rows (exempt: %s; raw %d)",
+                len(equity_rows), self.limits.max_open_positions,
+                ", ".join(s for s in exempt_cfg if s in on_book),
+                len(raw_rows),
+            )
+        if is_new_name and len(equity_rows) >= self.limits.max_open_positions:
             return self._reject(
                 proposal,
-                f"At max open positions ({self.limits.max_open_positions}).",
+                f"At max open positions ({len(equity_rows)}/"
+                f"{self.limits.max_open_positions} model rows).",
             )
 
         # Conviction floor: a barely-there idea that only clears the friction floor
@@ -591,21 +638,28 @@ class RiskManager:
         # the prior entry's by topup_min_conviction_delta. Re-proposing the same
         # number every cycle is a reflex ("adding to a winner"), not new
         # evidence. Fails open on a missing prior; inert at 0.
+        #
+        # S-6 (run-7): bar and proposal are compared at 4 dp via topup_bar()
+        # — the same function the prompt's HELD line prints — so a proposal
+        # EXACTLY at the printed bar passes (raw floats rejected it: run-6
+        # lost 37 of 77 risk-judged BUYs here, 12 of them re-proposing the
+        # entry number the prompt showed without ever stating the +0.05 rule).
         if (
             self.limits.topup_min_conviction_delta > 0
             and account.position_for(proposal.symbol) is not None
         ):
             prev = self.state.last_buy_conviction(proposal.symbol)
-            if prev is not None and (
-                proposal.conviction < prev + self.limits.topup_min_conviction_delta
-            ):
-                return self._reject(
-                    proposal,
-                    f"Top-up conviction {proposal.conviction:.2f} shows no new "
-                    f"edge over prior entry {prev:.2f} (needs "
-                    f"+{self.limits.topup_min_conviction_delta:g}) — 'adding to "
-                    "a winner' is not a signal.",
-                )
+            if prev is not None:
+                bar = topup_bar(prev, self.limits.topup_min_conviction_delta)
+                if round(proposal.conviction, 4) < bar:
+                    return self._reject(
+                        proposal,
+                        f"Top-up conviction {proposal.conviction:.2f} shows no "
+                        f"new edge over prior entry {prev:.2f} (bar "
+                        f"{format_topup_bar(bar)} = last buy "
+                        f"+{self.limits.topup_min_conviction_delta:g}) — 'adding "
+                        "to a winner' is not a signal.",
+                    )
 
         # Earnings-blackout guard: refuse NEW buys within N days of a scheduled
         # report. Gap risk through the print dwarfs the stop, so a tight stop gives

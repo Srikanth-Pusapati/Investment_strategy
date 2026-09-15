@@ -22,6 +22,28 @@ at once — during exactly the vol spike they exist for. So a failed read no lon
 "fails open" to full size: it returns a DEGRADED multiplier (< 1.0) and logs
 LOUDLY. We still trade (never block on missing data), just SMALLER while flying
 blind, on the assumption the sector cap is blind too.
+
+LABEL PERSISTENCE (S-5, run-7) — tighten fast, loosen slow. The breadth
+confirm below is a single-bar threshold (QQQ/IWM close vs 50dma) on a yfinance
+pull whose last bar is the LIVE partial bar during the session, and new_cycle()
+drops the only cache — so on a knife-edge day the label flaps every read:
+logs/Sep_10_2026.log 08:30 risk-on, 09:22 neutral, 10:14 risk-on, 11:06
+neutral, 11:58 risk-on, 12:50/13:43/14:35 neutral = 5 transitions in 8 reads,
+QQQ oscillating a few tenths of a percent around its 50dma (Sep 9 close +0.72%
+above, Sep 10 close -0.27% below; IWM -2..-3% below all day, so QQQ was the
+single swing vote). The 60% exposure ladder and the x0.70 multiplier were
+applied to different buys under different labels within the same hour. assess()
+therefore adopts a TIGHTER fresh read at once but a LOOSER one only after
+REGIME_LOOSEN_MIN_CYCLES consecutive looser reads, holding the tighter label
+(and its multiplier ceiling) in between. It only ever holds TIGHTER — the same
+convention as every other enhancement in this file. State is in-memory: a
+restart FORGETS the held label — the first post-restart read is applied as
+read, which can be an immediate loosening (a neutral held on Friday, risk-on
+x1.00 on Monday's first read); tightening is unaffected either way. Persisting
+the hold was deliberately not done (never under state.regime_label, per the
+run-7 vote). Sep 10 replay: neutral
+held from 09:22 through the close (the 10:19 SMCI top-up is *likely* rejected
+by the 60% ladder); the 08:35 INTC buy in the first cycle is unchanged.
 """
 from __future__ import annotations
 
@@ -41,6 +63,17 @@ _DEFAULT_DEGRADED_MULT = 0.5
 # ^VIX above 3-month ^VIX3M = backwardation). Applied via min(), so it only ever
 # tightens the level-based vol_factor, never loosens it.
 _BACKWARDATION_VOL_FACTOR = 0.7
+# --- S-5 (run-7): label persistence knobs (see module docstring). ---
+# Consecutive LOOSER reads before the applied label may loosen; tightening is
+# immediate. 1 = legacy no-memory (every fresh read applied as-is).
+_DEFAULT_LOOSEN_MIN_CYCLES = 2
+# Rank for "tighter/looser"; "unknown" (degraded feed) is deliberately unranked.
+_LABEL_RANK = {"risk-off": 0, "neutral": 1, "risk-on": 2}
+# Multiplier CEILING while holding a tighter label than the fresh read: the
+# neutral tier's x0.70 (elevated vol / narrow breadth) or the risk-off tier's
+# x0.40 (the VIX>30 vol factor). Applied via min() with the fresh multiplier,
+# so a fresh read that is already smaller is never loosened by the hold.
+_HOLD_MULT = {"neutral": 0.70, "risk-off": 0.40}
 
 
 @dataclass
@@ -64,26 +97,111 @@ class Regime:
 
 
 class RegimeReader:
-    def __init__(self, degraded_mult: float = _DEFAULT_DEGRADED_MULT) -> None:
+    def __init__(
+        self,
+        degraded_mult: float = _DEFAULT_DEGRADED_MULT,
+        loosen_min_cycles: int = _DEFAULT_LOOSEN_MIN_CYCLES,
+    ) -> None:
         # Clamp: a degraded read must SIZE DOWN (0..1), never inflate or zero out.
         self.degraded_mult = max(_FLOOR, min(1.0, degraded_mult))
+        # S-5: floor at 1 (= legacy no-memory); 0/negative would never loosen.
+        self.loosen_min_cycles = max(1, int(loosen_min_cycles))
         self._cached: Regime | None = None
+        # S-5 persistence — IN-MEMORY: a restart DROPS the held tighter label
+        # (_eff_label=None), so the first read after it is applied as read —
+        # a loosening is accelerated, not delayed; a tightening is unaffected.
+        # Deliberately NOT stored in state.regime_label: that slot is the
+        # once-per-downturn latch for the risk-off book trim
+        # (orchestrator._apply_regime_trim) and keeps its own semantics.
+        self._eff_label: str | None = None   # label currently APPLIED
+        self._loosen_streak = 0              # consecutive looser-than-held reads
         self._lock = threading.Lock()
 
     def new_cycle(self) -> None:
         """Drop the cached read so the next assess() recomputes. Call once per
-        decision cycle."""
+        decision cycle. The S-5 held label / loosen streak survive on purpose —
+        they ARE the cross-cycle memory."""
         with self._lock:
             self._cached = None
+
+    def current(self) -> Regime | None:
+        """This cycle's APPLIED read if assess() already ran, else None — a
+        peek that never fetches. For consumers that only annotate (the run-7
+        4a-15 buy-row tape stamp): a shadow field must not be the thing that
+        triggers a yfinance round-trip inside the buy path, and it must see
+        exactly the read the 'Market regime:' line printed."""
+        with self._lock:
+            return self._cached
 
     def assess(self) -> Regime:
         with self._lock:
             if self._cached is not None:
                 return self._cached
-        regime = self._compute()
+        fresh = self._compute()
         with self._lock:
-            self._cached = regime
-        return regime
+            # First writer this cycle applies persistence EXACTLY once: two
+            # callers racing on an empty cache must not advance the loosen
+            # streak twice for one read.
+            if self._cached is None:
+                self._cached = self._persist(fresh)
+            return self._cached
+
+    # -- S-5 label persistence ---------------------------------------------- #
+    def _persist(self, fresh: Regime) -> Regime:
+        """Tighten fast, loosen slow. Returns the regime to APPLY this cycle —
+        the fresh read itself, or the held tighter label with the multiplier
+        capped at that label's tier. Mutates _eff_label/_loosen_streak, so it
+        must run once per cycle (assess() guarantees that under its lock).
+
+        Why a held label and not a +/-0.5% band on the breadth threshold: on
+        Sep 10 2026 a band would have read RISK-ON all day (QQQ closed only
+        -0.27%/-0.35% under its 50dma) — the opposite outcome; persistence only
+        ever holds the tighter side, so it can't loosen a genuine tightening."""
+        held = self._eff_label
+        if fresh.label not in _LABEL_RANK:
+            # "unknown" (degraded feed) is outside the ranking: pass it through
+            # (the degraded multiplier already sizes down) and leave the streak
+            # and the held label alone, so a yfinance blip neither resets the
+            # count nor gets ranked as a loosening/tightening.
+            return fresh
+        if held not in _LABEL_RANK or _LABEL_RANK[fresh.label] <= _LABEL_RANK[held]:
+            # First ranked read since start, or the same/tighter label: adopt now.
+            if held in _LABEL_RANK and fresh.label != held:
+                log.info(
+                    "REGIME TIGHTEN: %s -> %s adopted now (loosening back needs "
+                    "%d clean reads)", held, fresh.label, self.loosen_min_cycles,
+                )
+            self._eff_label = fresh.label
+            self._loosen_streak = 0
+            return fresh
+        # Looser than the held label: count it; adopt only after N in a row.
+        self._loosen_streak += 1
+        n, need = self._loosen_streak, self.loosen_min_cycles
+        if n >= need:
+            log.info(
+                "REGIME LOOSEN: %s -> %s after %d/%d clean reads; fresh read "
+                "%s x%.2f applied", held, fresh.label, n, need, fresh.label,
+                fresh.multiplier,
+            )
+            self._eff_label = fresh.label
+            self._loosen_streak = 0
+            return fresh
+        mult = round(min(fresh.multiplier, _HOLD_MULT[held]), 2)
+        log.info(
+            "REGIME HOLD: %s held (%d/%d clean reads); fresh read %s x%.2f -> "
+            "applied %s x%.2f", held, n, need, fresh.label, fresh.multiplier,
+            held, mult,
+        )
+        # The reason is what the LLM prompt and the "Market regime:" log line
+        # show, so it must say what was APPLIED, not just what was read.
+        reason = (
+            f"{fresh.reason.rstrip('.')}, held {held} ({n}/{need} clean reads) "
+            f"-> applied {held} x{mult:.2f}."
+        )
+        return Regime(
+            mult, held, reason, trend=fresh.trend,
+            day_change_pct=fresh.day_change_pct,
+        )
 
     # -- computation -------------------------------------------------------- #
     def _compute(self) -> Regime:

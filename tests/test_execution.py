@@ -10,6 +10,7 @@ Runnable two ways:
 """
 from __future__ import annotations
 
+import logging
 import os
 import sys
 from datetime import datetime, timedelta, timezone
@@ -1046,3 +1047,185 @@ def test_has_working_exit_counts_limit_between_buffer_and_last_trade():
     c = AlpacaClient.__new__(AlpacaClient)
     c.trading = _FakeExitTrading([_open_order("mid", limit_price="49.5", qty="9")])
     assert c.has_working_exit("FRHC", ref_price=50.0) is True
+
+
+# -- broker HTTP 5xx is transient (run-7 A3) ---------------------------------- #
+# Sep 11 2026: /v2/clock answered 500 for ~4.5 min. _retry_read only retried
+# connection-level faults, so the APIError escaped on the first try and every
+# 30 s decision tick logged a 37-line traceback at ERROR (8 in a row). A 5xx
+# is a broker blip, not a bad request: retry it like a reset-by-peer, and let
+# the loop classify what escapes. 4xx (wash-trade 422, insufficient-qty 403 …)
+# must keep failing on the FIRST try — a retry can't fix a wrong request.
+def _api_error(status, body='{"message":"Internal Server Error"}',
+               url="https://paper-api.alpaca.markets/v2/clock", method="GET"):
+    """An alpaca APIError shaped exactly as the SDK raises it: wrapping the
+    requests HTTPError whose .response carries the status (and .request the
+    method/url), so .status_code resolves the way production sees it."""
+    from requests.exceptions import HTTPError
+    from alpaca.common.exceptions import APIError
+    resp = SimpleNamespace(status_code=status, url=url)
+    req = SimpleNamespace(method=method, url=url)
+    return APIError(body, HTTPError(f"{status} Server Error", response=resp, request=req))
+
+
+def _flaky(errors, value="ok"):
+    """A read that raises each error in `errors` in turn, then returns value;
+    records how many times it was called."""
+    calls = {"n": 0}
+
+    def fn():
+        calls["n"] += 1
+        i = calls["n"] - 1
+        if i < len(errors):
+            raise errors[i]
+        return value
+    fn.calls = calls
+    return fn
+
+
+def _retry_read_records(fn, **kw):
+    """Run _retry_read with sleeps captured and the alpaca log recorded."""
+    import logging
+    from investment_strategy.execution.alpaca_client import _retry_read
+
+    class _H(logging.Handler):
+        def __init__(self):
+            super().__init__()
+            self.records = []
+
+        def emit(self, record):
+            self.records.append(record)
+    h = _H()
+    sleeps = []
+    lg = logging.getLogger("alpaca")
+    lg.addHandler(h)
+    try:
+        with patch("investment_strategy.execution.alpaca_client.time.sleep", sleeps.append):
+            try:
+                out = _retry_read(fn, what="get_clock", **kw)
+                exc = None
+            except Exception as e:  # noqa: BLE001 — the test inspects it
+                out, exc = None, e
+    finally:
+        lg.removeHandler(h)
+    return out, exc, sleeps, h.records
+
+
+def test_broker_5xx_status_classifies_server_errors_only():
+    from investment_strategy.execution.alpaca_client import broker_5xx_status
+    from alpaca.common.exceptions import APIError
+    assert broker_5xx_status(_api_error(500)) == 500
+    assert broker_5xx_status(_api_error(502, body="Bad Gateway")) == 502
+    assert broker_5xx_status(_api_error(503, body="<html>maintenance</html>")) == 503
+    # body-only recognition: an APIError with no wrapped HTTPError but Alpaca's
+    # canonical 5xx text still reads as a server fault
+    assert broker_5xx_status(APIError('{"message":"Internal Server Error"}')) == 500
+    # 4xx / unknown / non-APIError: NOT transient
+    assert broker_5xx_status(_api_error(422, body='{"code":40310000,"message":"potential wash trade detected"}')) is None
+    assert broker_5xx_status(_api_error(403, body='{"message":"insufficient qty available"}')) is None
+    assert broker_5xx_status(APIError('{"message":"forbidden"}')) is None
+    assert broker_5xx_status(RuntimeError("Internal Server Error")) is None
+    assert broker_5xx_status(ValueError("x")) is None
+
+
+def test_broker_error_summary_is_one_greppable_line():
+    from investment_strategy.execution.alpaca_client import broker_error_summary
+    from alpaca.common.exceptions import APIError
+    s = broker_error_summary(_api_error(500))
+    assert s == 'GET https://paper-api.alpaca.markets/v2/clock: {"message":"Internal Server Error"}'
+    assert "\n" not in s
+    assert broker_error_summary(APIError('{"message":"Internal Server Error"}')) == \
+        '{"message":"Internal Server Error"}'
+
+
+def test_retry_read_retries_5xx_twice_with_backoff_then_raises():
+    from alpaca.common.exceptions import APIError
+    fn = _flaky([_api_error(500), _api_error(500), _api_error(500)])
+    out, exc, sleeps, records = _retry_read_records(fn)
+    assert isinstance(exc, APIError) and exc.status_code == 500
+    assert fn.calls["n"] == 3, "three tries: the read, then two retries"
+    assert sleeps == [0.5, 1.0], "linear backoff between tries, none after the last"
+    warns = [r.getMessage() for r in records if r.levelno == logging.WARNING]
+    assert warns == [
+        'get_clock: broker HTTP 500 (GET https://paper-api.alpaca.markets/v2/clock: '
+        '{"message":"Internal Server Error"}); retry 1/2.',
+        'get_clock: broker HTTP 500 (GET https://paper-api.alpaca.markets/v2/clock: '
+        '{"message":"Internal Server Error"}); retry 2/2.',
+    ]
+    assert all(r.exc_info is None for r in records), "no traceback for a blip"
+
+
+def test_retry_read_5xx_recovers_within_the_retry_budget():
+    fn = _flaky([_api_error(500), _api_error(503, body="Service Unavailable")], value="clock")
+    out, exc, sleeps, records = _retry_read_records(fn)
+    assert exc is None and out == "clock"
+    assert fn.calls["n"] == 3
+    assert sleeps == [0.5, 1.0]
+    warns = [r.getMessage() for r in records if r.levelno == logging.WARNING]
+    assert len(warns) == 2 and "HTTP 500" in warns[0] and "HTTP 503" in warns[1]
+
+
+def test_retry_read_body_only_internal_server_error_is_retried():
+    from alpaca.common.exceptions import APIError
+    fn = _flaky([APIError('{"message":"Internal Server Error"}')], value=1)
+    out, exc, sleeps, records = _retry_read_records(fn)
+    assert exc is None and out == 1 and fn.calls["n"] == 2
+    assert sleeps == [0.5]
+    assert any("broker HTTP 500" in r.getMessage() for r in records)
+
+
+def test_retry_read_4xx_raises_on_first_try_unchanged():
+    from alpaca.common.exceptions import APIError
+    for status, body in ((422, '{"code":40310000,"message":"potential wash trade detected"}'),
+                         (403, '{"message":"insufficient qty available"}'),
+                         (404, '{"message":"position does not exist"}')):
+        fn = _flaky([_api_error(status, body=body)], value="never")
+        out, exc, sleeps, records = _retry_read_records(fn)
+        assert isinstance(exc, APIError) and exc.status_code == status
+        assert fn.calls["n"] == 1, f"{status}: a wrong request is never retried"
+        assert sleeps == [] and records == []
+
+
+def test_retry_read_transient_net_path_unchanged():
+    # The pre-existing connection-fault path keeps its message and budget.
+    from requests.exceptions import ConnectionError as RCE
+    fn = _flaky([RCE("reset by peer")], value=7)
+    out, exc, sleeps, records = _retry_read_records(fn)
+    assert exc is None and out == 7 and sleeps == [0.5]
+    assert [r.getMessage() for r in records] == [
+        "get_clock: transient network error (ConnectionError); retry 1/2."]
+
+
+def test_retry_read_never_retries_a_non_transient_exception():
+    fn = _flaky([RuntimeError("bug")], value="never")
+    out, exc, sleeps, records = _retry_read_records(fn)
+    assert isinstance(exc, RuntimeError) and fn.calls["n"] == 1 and sleeps == []
+
+
+def test_is_market_open_surfaces_persistent_5xx_as_transient_broker_error():
+    # After the retry budget the APIError propagates UNCHANGED out of
+    # is_market_open (no guessed open/closed), and the loop's classifier
+    # reads it as a transient broker fault — not a bug to traceback.
+    from alpaca.common.exceptions import APIError
+    from investment_strategy.execution.alpaca_client import broker_5xx_status
+    c = AlpacaClient.__new__(AlpacaClient)
+    get_clock = _flaky([_api_error(500)] * 3)
+    c.trading = SimpleNamespace(get_clock=get_clock)
+    with patch("investment_strategy.execution.alpaca_client.time.sleep", lambda s: None):
+        try:
+            c.is_market_open()
+        except APIError as e:
+            assert broker_5xx_status(e) == 500
+        else:
+            raise AssertionError("persistent 500 must propagate")
+    assert get_clock.calls["n"] == 3
+
+
+def test_is_market_open_recovers_from_a_500_blip():
+    c = AlpacaClient.__new__(AlpacaClient)
+    get_clock = _flaky([_api_error(500), _api_error(500)],
+                       value=SimpleNamespace(is_open=True))
+    c.trading = SimpleNamespace(get_clock=get_clock)
+    with patch("investment_strategy.execution.alpaca_client.time.sleep", lambda s: None):
+        assert c.is_market_open() is True
+    assert get_clock.calls["n"] == 3

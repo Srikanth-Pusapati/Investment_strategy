@@ -248,6 +248,27 @@ def test_stable_block_has_curated_and_risk_contract_not_dynamic_content():
     assert "Today so far" not in stable_text
 
 
+def test_risk_contract_states_topup_bar():
+    """S-6 (run-7): the top-up evidence gate is stated in the cached stable
+    block (config-invariant), naming the same +delta the HELD line prints;
+    the line is absent when the gate is off."""
+    eng = _decide_engine()
+    eng.cfg.risk.topup_min_conviction_delta = 0.05
+    kwargs = _call_decide(eng, lessons="L", curated="C")
+    stable_text = kwargs["messages"][0]["content"][0]["text"]
+    assert "## Risk contract" in stable_text
+    assert (
+        "clears the bar printed on that name's HELD line (last buy + 0.05)"
+        in stable_text
+    )
+    assert "+0.01-0.04 over it is rejected every cycle" in stable_text
+    assert "lifts conviction past the bar, HOLD." in stable_text
+    # Gate off (0 / unset) -> no contract line.
+    eng = _decide_engine()
+    kwargs = _call_decide(eng, lessons="L", curated="C")
+    assert "last buy + " not in kwargs["messages"][0]["content"][0]["text"]
+
+
 def test_dynamic_block_carries_everything_else():
     eng = _decide_engine(options_enabled=True)
     kwargs = _call_decide(
@@ -512,3 +533,66 @@ def test_bearish_block_absent_when_options_off():
         put_eligibility={"IREN": (True, "below its 200dma")},
     )
     assert "BEARISH CANDIDATES" not in text
+
+
+def test_rotation_block_ignores_system_managed_rows():
+    # S-1 (run-7): the core ETF / auto-hedge / defensive-core rows are opened
+    # by the orchestrator outside the buy gate and never consume a slot, so
+    # the prompt must not count them either — Sep 4 2026 it told the model
+    # "Book FULL (16/15)" and the model sold MKL to fund MU when 14/15 model
+    # rows had room. Same exemption source as risk.py (slot_exempt_symbols).
+    eng = _engine(max_open_positions=2)
+    eng.cfg.risk.slot_exempt_symbols = ("QQQ", "PSQ")
+    acct = _acct([_pos("CVX"), _pos("AAPL"), _pos("QQQ")])
+    text = eng._render_dynamic([_bundle("MU")], acct, "", [])
+    assert "Book FULL (2/2 equity slots)" in text     # model rows fill the cap
+    acct = _acct([_pos("CVX"), _pos("QQQ")])
+    text = eng._render_dynamic([_bundle("MU")], acct, "", [])
+    assert "Book FULL" not in text                    # 1/2 model rows: room
+    assert "ROTATION" not in text
+
+
+def test_rotation_block_legacy_count_without_exemption_field():
+    # A risk config predating S-1 (no slot_exempt_symbols attribute) counts
+    # every equity row, exactly as before.
+    eng = _engine(max_open_positions=2)
+    assert not hasattr(eng.cfg.risk, "slot_exempt_symbols")
+    acct = _acct([_pos("CVX"), _pos("QQQ")])
+    text = eng._render_dynamic([_bundle("MU")], acct, "", [])
+    assert "Book FULL (2/2 equity slots)" in text
+
+
+# --------------------------------------------------------------------------- #
+# Run-7 S-4: the candidate header carries the name's spot when options are on
+# --------------------------------------------------------------------------- #
+def test_candidate_line_carries_spot_when_options_on():
+    """The technical provider's price (signal.data['price']) is rendered on the
+    candidate header when options are enabled — before this the prompt had
+    NO price for a name, so "strikes at/near the money" was unactionable
+    (Sep 4 2026: the model called HD's 400 strike "the ATM put" at $321).
+    Options off: header unchanged. No technical price: header unchanged."""
+    tech = Signal(
+        kind=SignalKind.TECHNICAL, symbol="HD", score=-0.4,
+        summary="RSI 35 (neutral), MACD bear, downtrend (px<50<200)",
+        data={"price": 321.05, "rsi14": 35.0, "sma200": 380.0},
+    )
+    bundle = SignalBundle(symbol="HD", signals=[tech])
+    acct = _acct([])
+    on = _engine(max_open_positions=5, options_enabled=True)._render_dynamic(
+        [bundle], acct, "", [],
+    ).splitlines()
+    assert "### HD — spot $321.05" in on
+    assert on[on.index("### HD — spot $321.05") + 1].startswith("- [technical] score=-0.40")
+    off = _engine(max_open_positions=5, options_enabled=False)._render_dynamic(
+        [bundle], acct, "", [],
+    )
+    assert "### HD" in off.splitlines() and "spot $" not in off
+    plain = _engine(max_open_positions=5, options_enabled=True)._render_dynamic(
+        [_bundle("HD")], acct, "", [],
+    )
+    assert "### HD" in plain.splitlines() and "spot $" not in plain
+    # A HELD tag keeps its place; the spot follows it.
+    held = _engine(max_open_positions=5, options_enabled=True)._render_dynamic(
+        [bundle], _acct([_pos("HD")]), "", [],
+    )
+    assert "### HD (HELD: 1 sh, +0.0%) — spot $321.05" in held.splitlines()

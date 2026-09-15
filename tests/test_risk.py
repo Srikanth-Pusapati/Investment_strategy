@@ -1050,6 +1050,40 @@ def test_topup_evidence_off_at_zero():
     assert d.verdict is not RiskVerdict.REJECTED, d.reason
 
 
+def test_topup_evidence_exact_bar_passes():
+    """S-6 (run-7): the bar is compared at 4 dp. Raw floats put prev+0.05 a
+    hair ABOVE the number the prompt prints (0.66+0.05 = 0.7100000000000001),
+    so a proposal EXACTLY at the bar was rejected — production instance
+    logs/Jul_10_2026.log 08:57:44 'REJECT buy LASR: Top-up conviction 0.60
+    ... prior entry 0.55'. The reason now prints the bar the HELD line shows."""
+    for prev, at_bar, below in ((0.66, 0.71, 0.70), (0.55, 0.60, 0.59)):
+        acct = _account(positions=[_pos("LLY", qty=1.0, price=100.0)])
+        state = _fresh_state()
+        state.register_buy("LLY", conviction=prev)
+        rm = _rm(_limits(topup_min_conviction_delta=0.05, min_add_interval_hours=0), state=state)
+        d = rm.evaluate(_buy("LLY", conviction=at_bar), acct, price=100.0, volatility=0.3)
+        assert d.verdict is not RiskVerdict.REJECTED, (prev, at_bar, d.reason)
+
+        state = _fresh_state()
+        state.register_buy("LLY", conviction=prev)
+        rm = _rm(_limits(topup_min_conviction_delta=0.05, min_add_interval_hours=0), state=state)
+        d = rm.evaluate(_buy("LLY", conviction=below), acct, price=100.0, volatility=0.3)
+        assert d.verdict is RiskVerdict.REJECTED, (prev, below, d.reason)
+        assert f"bar {prev + 0.05:.2f}" in d.reason, d.reason
+        assert d.reason.startswith("Top-up conviction")  # journal/held-notes handle
+
+
+def test_topup_bar_helpers_are_shared_and_noise_free():
+    """The gate and the HELD line render the bar through ONE function, so
+    printed == enforced by construction (S-6)."""
+    from investment_strategy.risk import format_topup_bar, topup_bar
+    assert topup_bar(0.66, 0.05) == 0.71
+    assert topup_bar(0.55, 0.05) == 0.6
+    assert format_topup_bar(topup_bar(0.66, 0.05)) == "0.71"
+    assert format_topup_bar(topup_bar(0.65, 0.05)) == "0.70"
+    assert format_topup_bar(0.685) == "0.685"
+
+
 # --------------------------------------------------------------------------- #
 # Missing-data multipliers (A4)
 # --------------------------------------------------------------------------- #
@@ -1468,3 +1502,140 @@ def test_call_in_downtrend_rejected_even_if_name_trending_up():
                            market_trend="down", regime_label="neutral",
                            name_trend="up")
     assert d.verdict is RiskVerdict.REJECTED
+
+
+# --------------------------------------------------------------------------- #
+# S-1 (run-7): MAX_OPEN_POSITIONS counts only MODEL-opened equity rows.
+# Sep 3-4 2026: the core ETF (QQQ) and the auto-hedge (PSQ) are opened by the
+# orchestrator OUTSIDE the buy gate, yet sat in the slot count — a
+# 14-satellite book read 16/15 and HOOD (x2) / MU were rejected "At max open
+# positions (15)", MU six seconds after a partial MKL fold had already freed
+# a slot. The exemption set is derived from the same three env keys as
+# Orchestrator._system_managed_symbols so the two cannot drift.
+# --------------------------------------------------------------------------- #
+import logging as _logging  # noqa: E402
+from types import SimpleNamespace as _SNS  # noqa: E402
+from unittest.mock import patch as _patch  # noqa: E402
+
+
+def test_slot_exempt_symbols_default_is_empty_tuple():
+    # Default () = legacy count (every equity row) — every existing
+    # max_open_positions test above runs unchanged on the default.
+    assert RiskLimits.__dataclass_fields__["slot_exempt_symbols"].default == ()
+
+
+def test_max_open_positions_ignores_system_managed_rows(caplog):
+    rm = _rm(_limits(max_open_positions=2, slot_exempt_symbols=("QQQ", "PSQ")))
+    caplog.set_level(_logging.INFO, logger="risk")
+    # Two model rows + core + hedge: the cap is genuinely full (2/2).
+    acct = _account(positions=[_pos("AAPL"), _pos("MSFT"), _pos("QQQ"), _pos("PSQ")])
+    d = rm.evaluate(_buy("NVDA"), acct, price=100.0, volatility=0.25)
+    assert d.verdict is RiskVerdict.REJECTED
+    assert "max open positions" in d.reason.lower()
+    # The reject reason prints the COUNT the gate judged, not just the cap
+    # (pre-S-1 it printed "(15)" and nobody could see the 16 behind it).
+    assert "(2/2 model rows)" in d.reason
+    assert "SLOT COUNT: 2/2 model rows (exempt: QQQ, PSQ; raw 4)" in caplog.text
+    # One model row + core + hedge: raw 3 >= 2 would have rejected; the model
+    # count is 1/2, so the buy clears the cap.
+    caplog.clear()
+    acct = _account(positions=[_pos("AAPL"), _pos("QQQ"), _pos("PSQ")])
+    d = rm.evaluate(_buy("NVDA"), acct, price=100.0, volatility=0.25)
+    assert "max open positions" not in d.reason.lower()
+    assert "SLOT COUNT: 1/2 model rows (exempt: QQQ, PSQ; raw 3)" in caplog.text
+
+
+def test_slot_count_line_silent_when_exemption_changes_nothing(caplog):
+    # Exempt names configured but NOT on the book: the counts agree, so no
+    # SLOT COUNT line (it is a counterfactual marker, not a heartbeat).
+    rm = _rm(_limits(max_open_positions=2, slot_exempt_symbols=("QQQ", "PSQ")))
+    caplog.set_level(_logging.INFO, logger="risk")
+    acct = _account(positions=[_pos("AAPL")])
+    d = rm.evaluate(_buy("NVDA"), acct, price=100.0, volatility=0.25)
+    assert "max open positions" not in d.reason.lower()
+    assert "SLOT COUNT" not in caplog.text
+    # A top-up of a held name never evaluates the cap, so no line either.
+    acct = _account(positions=[_pos("AAPL"), _pos("MSFT"), _pos("QQQ")])
+    rm.evaluate(_buy("AAPL"), acct, price=100.0, volatility=0.25)
+    assert "SLOT COUNT" not in caplog.text
+
+
+def test_sep4_rotation_replay_hedge_and_core_held(caplog):
+    # Ledger replay of the Sep 4 2026 09:26 CT book (16 equity rows): 14
+    # satellites + QQQ core + PSQ hedge. MU was rejected at "(15)" six seconds
+    # after the MKL partial fold. With the exemption MU is 14/15 and approved
+    # WITHOUT selling MKL; without it the legacy count (16 >= 15) rejects.
+    satellites = ["AAPL", "ABT", "BE", "BLK", "F", "INTC", "MKL", "NOK",
+                  "NU", "NVDA", "PFE", "RIG", "SMCI", "SPCX"]
+    book = [_pos(s) for s in satellites] + [_pos("PSQ"), _pos("QQQ")]
+    caplog.set_level(_logging.INFO, logger="risk")
+
+    legacy = _rm(_limits(max_open_positions=15))
+    d = legacy.evaluate(
+        _buy("MU", weight=1.0), _account(positions=list(book)),
+        price=100.0, volatility=0.25,
+    )
+    assert d.verdict is RiskVerdict.REJECTED
+    assert "max open positions" in d.reason.lower()
+    assert "SLOT COUNT" not in caplog.text        # nothing exempt -> silent
+
+    fixed = _rm(_limits(max_open_positions=15, slot_exempt_symbols=("QQQ", "PSQ")))
+    d = fixed.evaluate(
+        _buy("MU", weight=1.0), _account(positions=list(book)),
+        price=100.0, volatility=0.25,
+    )
+    assert "max open positions" not in d.reason.lower()
+    assert "SLOT COUNT: 14/15 model rows (exempt: QQQ, PSQ; raw 16)" in caplog.text
+
+
+def _slot_env(**over) -> dict:
+    """os.environ minus the system-ETF keys, plus the keys load_config needs
+    to construct at all, plus `over`."""
+    env = {
+        k: v for k, v in os.environ.items()
+        if k not in {"CORE_ETF", "HEDGE_ETF", "DEFENSIVE_CORE_ETF", "PUT_PROXY_ETF"}
+    }
+    env.update({"ALPACA_API_KEY": "k", "ALPACA_SECRET_KEY": "s",
+                "ANTHROPIC_API_KEY": "a", "TRADING_MODE": "paper",
+                "ALPACA_BASE_URL": "https://paper-api.alpaca.markets/v2"})
+    env.update(over)
+    return env
+
+
+def test_load_config_slot_exempt_from_system_etfs():
+    from investment_strategy.config import load_config
+
+    # CORE_ETF == DEFENSIVE_CORE_ETF is a legal .env: de-duplicated, key order.
+    with _patch.dict(os.environ, _slot_env(
+        CORE_ETF="QQQ", HEDGE_ETF="PSQ", DEFENSIVE_CORE_ETF="QQQ",
+        PUT_PROXY_ETF="IWM",
+    ), clear=True):
+        cfg = load_config()
+    assert cfg.risk.slot_exempt_symbols == ("QQQ", "PSQ")
+    # PUT_PROXY_ETF is an option underlying, never an equity row: NOT exempt.
+    assert "IWM" not in cfg.risk.slot_exempt_symbols
+    # Lower-case / padded .env values normalize the way the ETF fields do.
+    with _patch.dict(os.environ, _slot_env(
+        CORE_ETF=" qqq ", HEDGE_ETF="", DEFENSIVE_CORE_ETF="sgov",
+    ), clear=True):
+        assert load_config().risk.slot_exempt_symbols == ("QQQ", "SGOV")
+    # No system ETFs configured -> legacy count.
+    with _patch.dict(os.environ, _slot_env(), clear=True):
+        assert load_config().risk.slot_exempt_symbols == ()
+
+
+def test_slot_exempt_matches_system_managed_symbols():
+    # Drift guard: the risk gate's exemption and the orchestrator's
+    # system-managed set are derived from the same three env keys. If a
+    # fourth system-managed source is ever added on one side only, this
+    # fails — the Sep 3-4 2026 16/15 book was exactly that gap.
+    from investment_strategy.config import load_config
+    from investment_strategy.orchestrator import Orchestrator
+
+    with _patch.dict(os.environ, _slot_env(
+        CORE_ETF="QQQ", HEDGE_ETF="PSQ", DEFENSIVE_CORE_ETF="SGOV",
+        PUT_PROXY_ETF="IWM",
+    ), clear=True):
+        cfg = load_config()
+    managed = Orchestrator._system_managed_symbols(_SNS(cfg=cfg))
+    assert set(cfg.risk.slot_exempt_symbols) == managed == {"QQQ", "PSQ", "SGOV"}

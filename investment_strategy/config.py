@@ -469,6 +469,33 @@ class RiskLimits:
     # open — data outages must not freeze buying). Run-6 DEFAULT 1.2.
     # MAX_BOOK_BETA_SPY
     max_book_beta_spy: float = 1.2
+    # --- S-1 (run-7): MAX_OPEN_POSITIONS counts only MODEL-opened equity
+    # rows. The core ETF, the auto-hedge inverse ETF and the defensive
+    # T-bill core are opened by the orchestrator OUTSIDE the buy gate
+    # (_apply_pending_buy, never _evaluate_buy), yet their rows sat in the
+    # slot count: Sep 3-4 2026 a 14-satellite book + QQQ + PSQ read 16/15,
+    # so HOOD (x2) and MU were rejected "At max open positions (15)" — MU
+    # six seconds after a partial MKL fold that had already freed a slot.
+    # No env key of its own: load_config derives this from the SAME three
+    # keys (CORE_ETF / HEDGE_ETF / DEFENSIVE_CORE_ETF) that feed
+    # Orchestrator._system_managed_symbols, so the two sets cannot drift.
+    # PUT_PROXY_ETF is deliberately NOT here — it is an option underlying,
+    # never an equity row. Default () = legacy count (every equity row).
+    slot_exempt_symbols: tuple[str, ...] = ()
+    # --- S-5 (run-7): regime label PERSISTENCE — tighten fast, loosen slow.
+    # regime.py's breadth confirm is a single-bar threshold on a yfinance
+    # pull whose last bar is the LIVE partial bar, and the reader had no
+    # memory across cycles: Sep 10 2026 the label flapped risk-on/neutral
+    # 5x in 8 reads (08:30 risk-on, 09:22 neutral, 10:14 risk-on, 11:06
+    # neutral, 11:58 risk-on, 12:50-14:35 neutral) on QQQ oscillating a few
+    # tenths of a percent around its 50dma, so the 60% exposure ladder and
+    # the x0.70 multiplier hit different buys under different labels inside
+    # one hour. A TIGHTER fresh read is applied at once; a LOOSER one only
+    # after this many consecutive looser reads, the held label's tier
+    # (neutral x0.70 / risk-off x0.40) capping the multiplier meanwhile.
+    # Only ever holds tighter; no new gross rule — it stabilises the input
+    # to the EXISTING ladder. 1 = legacy no-memory. REGIME_LOOSEN_MIN_CYCLES
+    regime_loosen_min_cycles: int = 2
 
 
 @dataclass(frozen=True)
@@ -635,8 +662,11 @@ class Config:
     # cycle and unwinding below target - band (hysteresis); the falling-
     # tape read is kept as a 'tighten the target to hedge_beta_falling_
     # target' condition. Instrument stays HEDGE_ETF (PSQ vs the QQQ-heavy
-    # book; its SPY-beta ~ -1.1 slightly over-hedges the gap, inside the
-    # band). auto_hedge_max_pct caps both modes. AUTO_HEDGE_MODE
+    # book). PSQ is ~ -1.0 x QQQ and QQQ's SPY-beta is what drifts (1.51
+    # shrunk on 60 d as of Sep 11 2026, so PSQ read -1.51 vs SPY): run-7 S-2
+    # divides the gap by the ETF's MEASURED SPY-beta (hedge_beta_assumed is
+    # the fallback only) — an undivided gap over-hedged run-6's arms ~50%.
+    # auto_hedge_max_pct caps both modes. AUTO_HEDGE_MODE
     auto_hedge_mode: str = "beta"
     hedge_beta_target: float = 1.0         # HEDGE_BETA_TARGET (book SPY-beta the hedge sizes to)
     hedge_beta_band: float = 0.15          # HEDGE_BETA_BAND (arm above target+band, unwind below target-band)
@@ -705,6 +735,11 @@ class Config:
     # back before the first decision cycle, so the read-retry budget isn't burnt
     # while Wi-Fi is still reconnecting. 0 = off.
     wake_settle_seconds: float = 20.0
+    # Cached exchange calendar (run-7 A2): JSON the decision loop refreshes
+    # once per ET date; the watchdog's paging window and ops/deadman.py read
+    # it so holidays/early closes stop counting as market hours. Default:
+    # <dir of STATE_FILE>/session_calendar.json.
+    session_calendar_file: str = "state/session_calendar.json"
     # Nightly self post-mortem (B2): on the first market-closed decision tick
     # after a day that has journal entries, feed the day's decisions to Claude
     # and fold its one-line lessons back into the next day's decision prompt.
@@ -743,7 +778,10 @@ class Config:
     #     timeout/HTTP error counts as UNHEALTHY for that cycle, and the line
     #     carries 'news=vader-fallback' once news.py has latched the Finnhub
     #     403 (Aug 25: FEEDS said 5/5 while news was VADER all run and EDGAR
-    #     returned 0 filings twice). off = legacy enabled-only line.
+    #     returned 0 filings twice), and (run-7 A7) 'earnings=<rh|yfinance-
+    #     fallback|none>' — the earnings-blackout gate's source this cycle
+    #     (Sep 10: RH dead 12 cycles behind '3/3 healthy'). off = legacy
+    #     enabled-only line.
     feeds_degraded_modes: bool = True
     #   RESET_CARRY_CHURN (run-6 default off): whether a reset / fresh cycle
     #     carries the OLD account's churn memory (exit clocks + exit prices,
@@ -788,6 +826,60 @@ class Config:
     # together with OPTIONS_ENABLED.
     options_chain_signal: bool = False
     options_chain_max_symbols: int = 25   # per-cycle chain-fetch cap (2 calls/name)
+
+    # --- Run-7 S-3: proxy-put builder — OI-aware, monthly-first pick.
+    # PROXY_PUT_PREFER_MONTHLY (default on): build_proxy_put_spread ranks
+    # third-Friday (monthly) expiries first inside the DTE window and only
+    # takes strikes whose open interest clears MIN_OPTION_OPEN_INTEREST on
+    # BOTH legs; off = expiries ranked by nearest-mid-DTE only (strikes are
+    # still OI-qualified). Run-6: the legacy nearest-mid/highest-strike pick
+    # handed the gate the thin Oct-9 weekly three times (Sep 1 IWM 291P OI
+    # 38, Sep 3 294P OI 47 -> rejected) while the Oct-16 monthly carried
+    # >= 5,000 OI on every candidate strike. ---
+    proxy_put_prefer_monthly: bool = True  # PROXY_PUT_PREFER_MONTHLY
+    # --- Run-7 S-2 (Sep 12 2026): hedge notional divided by the hedge ETF's
+    # MEASURED SPY-beta. HEDGE_BETA_ASSUMED is the SPY-beta assumed for
+    # HEDGE_ETF ONLY when its own series cannot be read (reader off/blind,
+    # history too short) or reads outside [-3.0, -0.5]; the measured,
+    # shrunk, cycle-cached beta (BookBeta.beta_of) is used otherwise and the
+    # AUTO-HEDGE line names which one sized the arm. Must itself lie in
+    # [-3.0, -0.5] (load_config WARNs and uses -1.0 otherwise). -1.0 = the
+    # legacy sizer's implicit assumption, kept as the default so a blind
+    # reader reproduces run-6 sizing exactly. NEVER pin this to today's
+    # -1.51: PSQ is -1.0 x QQQ and QQQ's SPY-beta drifts. ---
+    hedge_beta_assumed: float = -1.0       # HEDGE_BETA_ASSUMED
+
+    # --- Run-7 S-4 (Sep 12 2026): single-name put strike snap. A model-
+    # proposed SINGLE-NAME put structure (long_put / bear_put_spread; never
+    # the proxy, an index underlying, or a call) is re-struck BEFORE premium
+    # sizing and the liquidity gate: a long-put strike farther than
+    # OPTION_STRIKE_MAX_MONEYNESS_PCT from spot re-targets the at-the-money
+    # strike, then each leg moves to the nearest strike on the same expiry
+    # (else the nearest third Friday within +/-7 d) whose open interest
+    # clears MIN_OPTION_OPEN_INTEREST and whose NBBO is two-sided within
+    # MAX_OPTION_SPREAD_PCT. Run-6: all five single-name put failures were
+    # strikes far from the money on chains liquid near ATM — HD 400P ~25%
+    # ITM (OI 2) while 320P carried 1,744; LTH 30P 28% OTM (OI 26) vs 40P
+    # 843; LYV 150/140P 12-18% OTM vs 170P 368; SCI 75P vs 77.5P 161; AAL
+    # 11P/10P with pennies of premium vs 12P 9,581 — because the prompt
+    # rendered no spot price. off = legs judged exactly as proposed. ---
+    option_strike_snap: bool = True            # OPTION_STRIKE_SNAP
+    option_strike_max_moneyness_pct: float = 10.0  # OPTION_STRIKE_MAX_MONEYNESS_PCT
+
+    # --- Run-7 S-8 (Sep 12 2026): beta-mode UNWIND noise guard. The beta
+    # hedge unwinds on ONE below-band reading (Sep 9 09:22: 0.44 after the
+    # same-cycle exits closed 10,283 PSQ; re-armed Sep 10 11:06 at 26.09 vs
+    # the 25.84 exit). HEDGE_UNWIND_MIN_CYCLES is the number of CONSECUTIVE
+    # below-band readings — counted at most once per decision cycle, since
+    # the breadth re-arm re-runs the hedge inside one cycle (Sep 10 14:35:37
+    # and 14:38:52) — before the hedge is closed; the streak resets on an
+    # arm, on a hold, and on an unavailable reading. 1 = today's behaviour
+    # (default, fingerprint-neutral). Run-6 counterfactual: 13 consecutive
+    # below-band reads followed the Sep 9 unwind (9 at a -1.1 PSQ beta), so
+    # no N <= 9 would have kept that hedge — the knob guards a noise-driven
+    # unwind (n=0 in run-6), NOT the Sep 9 whipsaw. Log:
+    # 'Auto-hedge: beta: unwind read 1/2 — holding $X PSQ'. ---
+    hedge_unwind_min_cycles: int = 1       # HEDGE_UNWIND_MIN_CYCLES
 
     @property
     def is_live(self) -> bool:
@@ -862,6 +954,10 @@ def load_config() -> Config:
         monitor_interval_s=_i("MONITOR_INTERVAL_SECONDS", 30),
         close_fence_minutes=_f("CLOSE_FENCE_MINUTES", 5.0),
         wake_settle_seconds=_f("WAKE_SETTLE_SECONDS", 20.0),
+        session_calendar_file=os.getenv("SESSION_CALENDAR_FILE", "").strip()
+        or os.path.join(
+            os.path.dirname(os.getenv("STATE_FILE", "state/risk_state.json"))
+            or "state", "session_calendar.json"),
         kill_switch_file=os.getenv("KILL_SWITCH_FILE", "state/KILL"),
         heartbeat_url=os.getenv("HEARTBEAT_URL", "").strip(),
         reconcile_halt_enabled=_flag("RECONCILE_HALT", "on"),
@@ -1075,6 +1171,20 @@ def load_config() -> Config:
             exposure_neutral_pct=_f("EXPOSURE_NEUTRAL_PCT", 60.0),
             max_book_beta_spy=_f("MAX_BOOK_BETA_SPY", 1.2),
             exposure_risk_off_pct=_f("EXPOSURE_RISK_OFF_PCT", 30.0),
+            # S-1 (run-7): slot-cap exemption derived from the system-managed
+            # ETF keys (same three as Orchestrator._system_managed_symbols),
+            # de-duplicated in key order (CORE_ETF == DEFENSIVE_CORE_ETF is a
+            # legal .env; the tuple must not carry the symbol twice).
+            slot_exempt_symbols=tuple(dict.fromkeys(
+                s for s in (
+                    os.getenv(k, "").strip().upper()
+                    for k in ("CORE_ETF", "HEDGE_ETF", "DEFENSIVE_CORE_ETF")
+                ) if s
+            )),
+            # S-5 (run-7): consecutive looser regime reads before the label
+            # may loosen (tightening is immediate); 1 = legacy no-memory.
+            # Sep 10 2026 flapped 5x in 8 reads on a partial QQQ bar.
+            regime_loosen_min_cycles=_i("REGIME_LOOSEN_MIN_CYCLES", 2),
         ),
         screener=ScreenerConfig(
             enabled=_flag("SCREENER_ENABLED", "on"),
@@ -1131,6 +1241,14 @@ def load_config() -> Config:
         proxy_put_untransferred_pct=_f("PROXY_PUT_UNTRANSFERRED_PCT", 0.25),
         defensive_core_etf=os.getenv("DEFENSIVE_CORE_ETF", "").strip().upper(),
         track_record_file=os.getenv("TRACK_RECORD_FILE", "").strip(),
+        proxy_put_prefer_monthly=_flag("PROXY_PUT_PREFER_MONTHLY", "on"),
+        # Run-7 S-2
+        hedge_beta_assumed=_hedge_beta_assumed(),
+        # Run-7 S-4
+        option_strike_snap=_flag("OPTION_STRIKE_SNAP", "on"),
+        option_strike_max_moneyness_pct=_f("OPTION_STRIKE_MAX_MONEYNESS_PCT", 10.0),
+        # Run-7 S-8
+        hedge_unwind_min_cycles=_hedge_unwind_min_cycles(),
     )
 
     missing = [
@@ -1143,4 +1261,71 @@ def load_config() -> Config:
     if missing:
         raise ValueError(f"Missing required env vars: {', '.join(missing)}")
 
+    _log_beta_cap_vs_arm_line(cfg)
     return cfg
+
+
+def _hedge_beta_assumed() -> float:
+    """HEDGE_BETA_ASSUMED (run-7 S-2) -> a sane inverse-ETF SPY-beta in
+    [-3.0, -0.5]. A positive/zero/tiny value would size a 'hedge' that adds
+    exposure or divide the gap by ~0, so it WARNs and uses -1.0 (the legacy
+    sizer's implicit assumption) exactly as _choice does for a bad enum."""
+    raw = os.getenv("HEDGE_BETA_ASSUMED")
+    try:
+        val = float((raw or "").strip() or -1.0)
+    except ValueError:
+        val = float("nan")
+    if not (-3.0 <= val <= -0.5):
+        log.warning(
+            "HEDGE_BETA_ASSUMED=%r is not a SPY-beta in [-3.0, -0.5]; using "
+            "the default -1.0.", raw,
+        )
+        return -1.0
+    return val
+
+
+def _hedge_unwind_min_cycles() -> int:
+    """HEDGE_UNWIND_MIN_CYCLES (run-7 S-8) -> consecutive below-band beta
+    readings (one per decision cycle) before the beta hedge is closed. A
+    value under 1 or garbage would make the streak bar unreachable or
+    crash config load, so it WARNs and uses 1 (today's one-read unwind),
+    the way _hedge_beta_assumed falls back rather than raising."""
+    raw = os.getenv("HEDGE_UNWIND_MIN_CYCLES")
+    try:
+        val = int((raw or "").strip() or 1)
+    except ValueError:
+        val = 0
+    if val < 1:
+        log.warning(
+            "HEDGE_UNWIND_MIN_CYCLES=%r is not a whole number >= 1; using the "
+            "default 1 (one-read unwind).", raw,
+        )
+        return 1
+    return val
+
+
+def _log_beta_cap_vs_arm_line(cfg: "Config") -> None:
+    """ONE INFO line at config load (run-7 decision 6: MAX_BOOK_BETA_SPY
+    stays 1.2). The buy-path beta cap lets a buy land the book at the cap;
+    the beta hedge arms above hedge_beta_target + hedge_beta_band. With
+    cap 1.20 and arm line 1.15 the margin is +0.05: every cap-bound buy
+    lands INSIDE the arm zone and the hedge arms next cycle (run-6: 3 arms,
+    each following a cap-resized buy). The line makes the geometry
+    greppable per run so the 'BOOK BETA CAP -> next-cycle arm' counter can
+    be read against the configuration that produced it; it is not a gate."""
+    try:
+        cap = float(cfg.risk.max_book_beta_spy)
+        if cap <= 0:
+            return                              # cap off: nothing to align
+        target = float(cfg.hedge_beta_target)
+        band = max(0.0, float(cfg.hedge_beta_band))
+        margin = cap - (target + band)
+        log.info(
+            "BOOK BETA CAP vs hedge arm line: cap %.2f - (target %.2f + band "
+            "%.2f) = %+.2f (%s)",
+            cap, target, band, margin,
+            "cap-bound buys land inside the arm zone" if margin > 0
+            else "cap-bound buys stay at/below the arm line",
+        )
+    except Exception as e:  # noqa: BLE001 — a log line must never fail startup
+        log.debug("BOOK BETA CAP vs hedge arm line: not computed (%s)", e)

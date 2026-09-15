@@ -28,12 +28,26 @@ from a private cache on this object. Everything fails open: an unavailable
 series makes the holding an `unknown` (assumed beta 1.0, listed on the log
 line); a failed benchmark makes that column None; the caller never blocks
 trading on this reading.
+
+Liveness: read() is a SERIAL fan-out of one daily_close_series fetch per
+benchmark plus per held underlying (~20 on a full book), each bound only by
+the broker's retry budget (3 tries x (5, 15)s). On 2026-09-11 an Alpaca
+degradation stretched that stage to 163 s (median 2 s) and the orchestrator
+withheld the external heartbeat twice ("Heartbeat withheld: main loop last
+ticked 168s/199s ago") although the loop was merely busy. read() therefore
+takes an optional `on_progress` hook, fired once per symbol as its series is
+resolved — the orchestrator passes its liveness stamp, exactly as it does
+for SignalAggregator.gather — so a slow fan-out keeps the heartbeat gate
+open while a read that genuinely wedges (never returns) still stops the
+stamps and the external monitor still pages. The hook is never called from
+inside the fetch and can never break the reading.
 """
 from __future__ import annotations
 
 import logging
 import re
 import statistics
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 
@@ -99,10 +113,14 @@ def shrink(beta: float | None, factor: float = SHRINK) -> float | None:
     """beta_shrunk = factor * beta + (1 - factor) * sign(beta) (None passes
     through). The prior is the market beta of the instrument's OWN SIGN: a
     long name shrinks toward +1, an inverse ETF toward -1. Shrinking PSQ
-    (raw ~ -1.2) toward +1 read it at -0.76, so a hedge sized on a -1 beta
-    only moved the MEASURED book beta by 76% of the gap, re-armed the hedge
-    next cycle and overstated the buy-path BOOK BETA CAP reading (review
-    fix, Aug 26)."""
+    toward +1 read it at -0.76 (raw ~ -1.2 in late Aug), so a hedge sized on
+    a -1 beta only moved the MEASURED book beta by 76% of the gap, re-armed
+    the hedge next cycle and overstated the buy-path BOOK BETA CAP reading
+    (review fix, Aug 26). Note the level itself is NOT stable: PSQ is
+    ~ -1.0 x QQQ, and QQQ's SPY-beta is what drifts (1.51 shrunk / 1.64 raw
+    on 60 d as of Sep 11 2026, so PSQ read -1.51 vs SPY) — the hedge sizer
+    therefore divides by this measured value (run-7 S-2), never by a
+    constant."""
     if beta is None:
         return None
     prior = -1.0 if beta < 0 else 1.0
@@ -141,13 +159,33 @@ def beta_cap_room(
 
 def hedge_target_notional(
     beta_spy: float, target: float, equity: float, ceiling_pct: float,
+    hedge_beta: float = -1.0,
 ) -> float:
     """Inverse-ETF notional that would bring the book's SPY-beta from
-    `beta_spy` down to `target`, i.e. max(0, beta - target) * equity, capped
-    at ceiling_pct% of equity. Assumes the hedge instrument carries a SPY-
-    beta of about -1 (PSQ, the 1x inverse QQQ, measures ~-1.1: a ~10%
-    over-hedge on the gap, well inside the hysteresis band)."""
-    gap = max(0.0, beta_spy - target) * equity
+    `beta_spy` down to `target`: max(0, beta - target) * equity / |hedge_beta|,
+    capped at ceiling_pct% of equity (the ceiling is on NOTIONAL and is not
+    divided). `hedge_beta` is the hedge instrument's OWN SPY-beta — pass the
+    same shrunk, measured value BookBeta.beta_of(etf, 'SPY') prices it at in
+    the reading, so the post-fill reading lands ON target rather than
+    target - gap x (|hedge_beta| - 1).
+
+    Run-7 S-2 (Sep 12 2026): until run-7 the gap was NOT divided — the
+    docstring assumed PSQ "measures ~-1.1, inside the band". PSQ is a clean
+    -1.0 x QQQ (60-d raw -0.996); what drifts is QQQ's OWN SPY-beta (1.51
+    shrunk / 1.64 raw on 60 d as of Sep 11 2026), so PSQ read -1.51 vs SPY
+    and every arm was ~50% too big: Sep 3 10:14 and Sep 10 11:06 a 1.20 read
+    bought $203,605 / $204,391 of PSQ and the next reading landed at 0.89 /
+    0.90 — 0.04-0.05 above the 0.85 unwind line instead of ~1.00, ~$68k of
+    excess cash per arm and extra room under the buy-path beta cap. Any
+    fixed constant goes stale again, which is why the caller passes the
+    measured value and only falls back to Config.hedge_beta_assumed. The
+    default -1.0 keeps the legacy 4-arg call (and its tests) byte-identical.
+    A zero/NaN divisor is treated as 1.0 so a bad knob can never raise on
+    the decision path (the orchestrator validates the band itself)."""
+    div = abs(float(hedge_beta or 0.0))
+    if not div > 0.0 or div != div:          # 0 or NaN -> legacy 1.0
+        div = 1.0
+    gap = max(0.0, beta_spy - target) * equity / div
     ceiling = max(0.0, ceiling_pct) / 100.0 * max(0.0, equity)
     return min(gap, ceiling)
 
@@ -183,10 +221,35 @@ class BookBetaReading:
     unknown: list[str] = field(default_factory=list)
     notes: list[str] = field(default_factory=list)
     reason: str = ""          # non-empty = unavailable
+    # Hedge ETF this book is read against (run-7 S-8 / 4a-17 observability):
+    # stamped by the reader (BookBeta(hedge_etf=...)) or the orchestrator;
+    # "" = no hedge configured, line and dict unchanged from run-6.
+    hedge_etf: str = ""
 
     @property
     def available(self) -> bool:
         return not self.reason and self.spy is not None
+
+    def hedge_view(self) -> tuple[float, float | None, float] | None:
+        """(hedge weight, hedge SPY-beta AS PRICED in this reading, book
+        SPY-beta with the hedge ETF's weight removed) — None when no hedge
+        ETF is named or the reading is unavailable. `unhedged` re-aggregates
+        the same weights/betas minus the hedge row, so it is exactly what
+        the reading would say with the hedge off (an unknown hedge beta was
+        priced at ASSUMED_BETA by aggregate and is removed the same way).
+        Run-6 never printed this: the Sep 9 0.44 read was an ex-hedge 0.82
+        (PSQ at -1.51 pulling 0.385), and the eval could not tell a
+        book-driven unwind from a hedge-driven one (4a-17)."""
+        if not self.hedge_etf or not self.available:
+            return None
+        etf = self.hedge_etf
+        w = float(self.weights.get(etf, 0.0) or 0.0)
+        b = (self.betas.get(etf) or {}).get("SPY")
+        unhedged = aggregate(
+            {s: x for s, x in self.weights.items() if s != etf},
+            {s: d.get("SPY") for s, d in self.betas.items()},
+        )
+        return w, b, unhedged
 
     def line(self) -> str:
         """The ONE greppable log line per decision cycle."""
@@ -198,6 +261,16 @@ class BookBetaReading:
             f"BOOK BETA: spy={_f(self.spy)} qqq={_f(self.qqq)} "
             f"iwm={_f(self.iwm)} invested={self.invested_pct:.1f}%"
         )
+        hv = self.hedge_view()
+        if hv is not None:
+            # 4a-17: 'hedge=PSQ w=0.258 beta=-1.51 unhedged=1.20' — the
+            # hedge's pull is on the line, so an unwind read can be judged
+            # ex-hedge; 'w=0' when the ETF is configured but not held.
+            w, b, unh = hv
+            if w:
+                s += f" hedge={self.hedge_etf} w={w:.3f} beta={_f(b)} unhedged={unh:.2f}"
+            else:
+                s += f" hedge={self.hedge_etf} w=0 unhedged={unh:.2f}"
         if self.unknown:
             s += (
                 f" unknown={','.join(self.unknown)}"
@@ -208,6 +281,7 @@ class BookBetaReading:
         return s
 
     def to_dict(self) -> dict:
+        hv = self.hedge_view()
         return {
             "spy": self.spy, "qqq": self.qqq, "iwm": self.iwm,
             "invested_pct": round(self.invested_pct, 3),
@@ -219,6 +293,12 @@ class BookBetaReading:
             "unknown": list(self.unknown),
             "reason": self.reason,
             "at": datetime.now(timezone.utc).isoformat(),
+            # 4a-17: the hedge view beside the headline so risk_state /
+            # the eval checker read the ex-hedge beta without re-deriving it.
+            "hedge_etf": self.hedge_etf,
+            "hedge_w": None if hv is None else round(hv[0], 5),
+            "hedge_beta": None if hv is None or hv[1] is None else round(hv[1], 4),
+            "unhedged_spy": None if hv is None else round(hv[2], 4),
         }
 
 
@@ -230,18 +310,45 @@ class BookBeta:
     def __init__(
         self, broker, corr_guard=None, lookback: int = BETA_LOOKBACK_DAYS,
         shrink_factor: float = SHRINK, min_overlap: int = MIN_OVERLAP,
+        hedge_etf: str = "",
     ):
         self.broker = broker
+        # Hedge ETF every reading is stamped with (4a-17); "" = none.
+        self.hedge_etf = str(hedge_etf or "").strip().upper()
         self.corr_guard = corr_guard
         self.lookback = int(lookback)
         self.shrink_factor = float(shrink_factor)
         self.min_overlap = int(min_overlap)
         self._returns: dict[str, dict[str, float] | None] = {}
         self._betas: dict[tuple[str, str], float | None] = {}
+        # Liveness hook for the duration of one read() (see module docstring)
+        # and the symbols it has already reported this cycle — one tick per
+        # symbol per cycle, so the three beta_of() calls a holding needs (one
+        # per benchmark) and a cycle-cached re-read don't re-tick.
+        self._on_progress: Callable[[], None] | None = None
+        self._progressed: set[str] = set()
 
     def new_cycle(self) -> None:
         self._returns.clear()
         self._betas.clear()
+        self._progressed.clear()
+
+    def _note_progress(self, symbol: str) -> None:
+        """Fire the liveness hook the FIRST time `symbol`'s series is resolved
+        this cycle. Called after the fetch returned (data, an empty series or
+        a caught failure — the loop is moving on to the next symbol either
+        way), never while one is in flight. A hook that raises is logged and
+        dropped: a heartbeat stamp must never cost the beta reading."""
+        if symbol in self._progressed:
+            return
+        self._progressed.add(symbol)
+        cb = self._on_progress
+        if cb is None:
+            return
+        try:
+            cb()
+        except Exception as e:  # noqa: BLE001 — a liveness stamp, never a blocker
+            log.debug("beta progress hook failed after %s: %s", symbol, e)
 
     # -- series ---------------------------------------------------------- #
     def _daily_returns(self, symbol: str) -> dict[str, float] | None:
@@ -251,6 +358,7 @@ class BookBeta:
             try:
                 rets = guard._daily_returns(symbol)
                 if rets:
+                    self._note_progress(symbol)
                     return rets
             except Exception as e:  # noqa: BLE001 — fall through to own fetch
                 log.debug("corr-guard series for %s failed: %s", symbol, e)
@@ -264,6 +372,7 @@ class BookBeta:
             log.warning("beta history for %s failed: %s", symbol, e)
             rets = None
         self._returns[symbol] = rets
+        self._note_progress(symbol)
         return rets
 
     # -- betas ----------------------------------------------------------- #
@@ -310,9 +419,16 @@ class BookBeta:
                 weights[sym] = weights.get(sym, 0.0) + mv / equity
         return weights, folded
 
-    def read(self, account) -> BookBetaReading:
-        """Measure the book. Never raises."""
-        reading = BookBetaReading()
+    def read(
+        self, account, on_progress: Callable[[], None] | None = None,
+    ) -> BookBetaReading:
+        """Measure the book. Never raises. `on_progress` (optional) is called
+        once per symbol as its return series is resolved — the orchestrator
+        passes its heartbeat liveness stamp so the serial fan-out can't read
+        as a hung main loop (2026-09-11). Only forward progress may call it;
+        it has no effect on the numbers."""
+        reading = BookBetaReading(hedge_etf=getattr(self, "hedge_etf", ""))
+        self._on_progress = on_progress
         try:
             equity = float(getattr(account, "equity", 0.0) or 0.0)
             if equity <= 0:
@@ -352,4 +468,6 @@ class BookBeta:
                 reading.reason = "SPY series unavailable"
         except Exception as e:  # noqa: BLE001 — a measurement, never a blocker
             reading.reason = f"{type(e).__name__}: {e}"[:120]
+        finally:
+            self._on_progress = None
         return reading

@@ -12,10 +12,15 @@ This module reads the account and derives, from Alpaca's own numbers:
                    the true cumulative P&L since inception)
   unrealized_pl = sum of open positions' unrealized P&L
   realized_pl   = total_return - unrealized_pl   (identity, no fill-by-fill replay)
-  day_pl        = equity - last_equity            (today vs prior close)
+  day_pl        = equity - last_equity            (today vs prior close — the
+                                                   BROKER's figure; see below)
 
 It also appends a once-per-day equity snapshot to state/equity_history.jsonl so the
-curve survives restarts and a real backtest/report has history to read.
+curve survives restarts and a real backtest/report has history to read. On the
+fixed close row that file measures day_pl against OUR OWN previous close row,
+not the broker's last_equity (run-7 B1, EquityHistory.snapshot) — Alpaca
+restates last_equity overnight, so the broker figure cannot telescope against
+a series stamped by a different clock.
 
     python -m investment_strategy.status          # print the report
     python -m investment_strategy.status --no-snapshot   # don't append a snapshot
@@ -35,6 +40,20 @@ log = logging.getLogger("status")
 
 # state/ is gitignored — local account history never gets committed.
 DEFAULT_EQUITY_HISTORY_PATH = Path("state") / "equity_history.jsonl"
+
+# Row bases that are a post-bell mark of the day (one immutable row per
+# session) and therefore a valid predecessor for the next close row's
+# day_pl. 'intraday' rows and legacy rows (no basis) are not.
+_CLOSE_BASES = ("close", "late")
+
+
+def _as_float(v) -> Optional[float]:
+    """float(v) or None — a legacy row may carry a non-numeric equity."""
+    try:
+        f = float(v)
+    except (TypeError, ValueError):
+        return None
+    return f if f == f else None   # NaN is not an equity
 
 
 class AccountStatus(BaseModel):
@@ -98,7 +117,13 @@ def compute_status(broker) -> AccountStatus:
 class EquityHistory:
     """Append-only daily equity snapshots (JSON-Lines). At most one row per
     calendar day — repeated calls the same day overwrite that day's row so a
-    fast loop doesn't bloat the file."""
+    fast loop doesn't bloat the file.
+
+    Row fields: date, ts, equity, cash, unrealized_pl, realized_pl,
+    total_return, day_pl, then the additive ones — basis (run-6 1b),
+    book_beta_spy (run-6 8), broker_day_pl + day_pl_basis (run-7 B1, close/
+    late rows only). Readers must tolerate a missing field: older rows in the
+    same file never get rewritten."""
 
     def __init__(self, path: Path | str = DEFAULT_EQUITY_HISTORY_PATH):
         self.path = Path(path)
@@ -117,7 +142,24 @@ class EquityHistory:
         (the ET trading day — after 20:00 ET the UTC date has rolled).
         `extra` adds report-only fields to the row (run-6 item 8: the close
         row carries `book_beta_spy`, the cycle's ex-ante SPY beta, so the
-        eval checker can beta-adjust capture per day)."""
+        eval checker can beta-adjust capture per day).
+
+        Run-7 B1 (self-consistent close-row day_pl): on a 'close'/'late' row
+        `day_pl` = equity - the PREVIOUS close/late row's equity (our own
+        series, one clock) and the broker's figure is kept verbatim as
+        `broker_day_pl`; `day_pl_basis` names the rule that produced day_pl
+        ('self' = a prior close/late row existed, 'broker' = none yet, so the
+        broker figure stands unchanged). WHY: the broker's day_pl is
+        equity - last_equity and Alpaca RESTATES last_equity overnight
+        (dividends / corporate actions / after-hours option marks), so on
+        run-6 it missed our own close-to-close delta by -$777 (Sep 2),
+        +$1,421 (Sep 3), +$1,146 (Sep 4), +$1,417 (Sep 8), +$195 (Sep 9),
+        +$563 (Sep 10) and the contract's telescoping validity check
+        (|dEquity - day_pl| < $1) FAILED by construction on 6 of 7 close
+        days. Intraday rows are untouched (never a bell mark) and legacy
+        rows (no basis) are never a predecessor (they were re-stamped with
+        after-hours marks). No runtime gate reads a history row's day_pl —
+        this is measurement only."""
         try:
             today = day or status.as_of.date().isoformat()
             existing = self._read()
@@ -142,6 +184,8 @@ class EquityHistory:
             }
             if basis:
                 row["basis"] = basis
+            if basis in _CLOSE_BASES:
+                self._stamp_close_day_pl(row, status, existing, today)
             for k, v in (extra or {}).items():
                 if k not in row:
                     row[k] = v
@@ -154,6 +198,61 @@ class EquityHistory:
             tmp.replace(self.path)  # atomic-ish swap
         except Exception as e:  # persistence must never break the loop
             log.warning("equity snapshot failed: %s", e)
+
+    @staticmethod
+    def _prior_close_row(rows: list[dict], day: str) -> Optional[dict]:
+        """The latest close/late row dated strictly before `day` that carries
+        an equity figure — the predecessor a close row's day_pl is measured
+        against (run-7 B1). Intraday and legacy (no basis) rows are skipped;
+        a run-6 close row without the new fields still qualifies."""
+        prior = [
+            r for r in rows
+            if (r.get("date") or "") < day
+            and r.get("basis") in _CLOSE_BASES
+            and _as_float(r.get("equity")) is not None   # a malformed row is no predecessor
+        ]
+        return max(prior, key=lambda r: r["date"]) if prior else None
+
+    def _stamp_close_day_pl(
+        self, row: dict, status: AccountStatus, existing: list[dict], day: str,
+    ) -> None:
+        """Run-7 B1: on a close/late row always keep the broker's day_pl as
+        `broker_day_pl`, and make `day_pl` equity - previous close/late row
+        equity when such a row exists (`day_pl_basis`='self'); otherwise the
+        broker figure stands (`day_pl_basis`='broker')."""
+        row["broker_day_pl"] = status.day_pl
+        row["day_pl_basis"] = "broker"
+        # Own guard, separate from snapshot()'s: a bad predecessor must
+        # DEGRADE this row to the broker figure, not lose it. Inside the
+        # outer try the exception would abort the write, has_close_row would
+        # stay False, every 30 s tick would retry into the same failure until
+        # midnight, and the date would end with NO close row — a VOID verdict
+        # day for the contract v3 checker.
+        try:
+            prev = self._prior_close_row(existing, day)
+            if prev is None:
+                log.info(
+                    "Equity close row %s day_pl keeps the broker figure %.2f "
+                    "(no prior close/late row).", day, status.day_pl,
+                )
+                return
+            prev_equity = float(prev["equity"])
+            day_pl = round(float(status.equity) - prev_equity, 2)
+        except Exception as e:  # noqa: BLE001 — degrade, never drop the row
+            log.warning(
+                "Equity close row %s day_pl keeps the broker figure %.2f: "
+                "predecessor unusable (%s: %s).", day, status.day_pl,
+                e.__class__.__name__, e,
+            )
+            return
+        row["day_pl"] = day_pl
+        row["day_pl_basis"] = "self"
+        log.info(
+            "Equity close row %s day_pl self-consistent: %.2f = equity %.2f - "
+            "prev %s equity %.2f; broker_day_pl %.2f (last_equity restatement "
+            "%+.2f).", day, row["day_pl"], status.equity, prev.get("date"),
+            prev_equity, status.day_pl, round(row["day_pl"] - status.day_pl, 2),
+        )
 
     def _read(self) -> list[dict]:
         if not self.path.exists():

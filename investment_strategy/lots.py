@@ -23,7 +23,7 @@ import logging
 from datetime import datetime, timedelta
 from typing import Optional
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from .ledger import TradeRecord
 
@@ -47,6 +47,17 @@ class Lot(BaseModel):
     entry_price: float
     entry_ts: datetime
     order_id: Optional[str] = None
+    # Run-7 4a-18: the opening buy's decision context, carried on the lot so a
+    # SELL row can be stamped with its entry attributes AT CLOSE (ledger
+    # TradeLedger._stamp_entry_lots). Before this the pooled analysis had to
+    # re-join 197 sells to their buys offline and 39 rows (pre-run-5) never
+    # joined; with the stamp every sell row is self-describing. All optional:
+    # core fills / pre-tracking rows carry none of them (None, not 0).
+    fill_price: Optional[float] = None    # broker fill when stamped (set_fill)
+    conviction: Optional[float] = None
+    composite_score: Optional[float] = None
+    stop_loss_pct: Optional[float] = None
+    key_signals: list[str] = Field(default_factory=list)
 
 
 class RealizedLot(BaseModel):
@@ -109,6 +120,21 @@ def build_lot_history(
                 qty=rec.qty, remaining=rec.qty,
                 entry_price=rec.entry_price, entry_ts=rec.ts,
                 order_id=rec.order_id,
+                # 4a-18: 0.0 in the ledger means "not recorded" (core fills,
+                # pre-tracking rows), not zero conviction / zero stop.
+                fill_price=(
+                    float(rec.fill_price)
+                    if (rec.fill_price or 0.0) > 0 else None
+                ),
+                conviction=(
+                    float(rec.conviction) if (rec.conviction or 0.0) > 0 else None
+                ),
+                composite_score=rec.composite_score,
+                stop_loss_pct=(
+                    float(rec.stop_loss_pct)
+                    if (rec.stop_loss_pct or 0.0) > 0 else None
+                ),
+                key_signals=list(rec.key_signals or []),
             ))
             buys_by_symbol.setdefault(rec.symbol, []).append(rec.ts)
         elif rec.action == "sell":
@@ -194,3 +220,23 @@ def fifo_basis(lots: list[Lot], qty: float) -> tuple[float, float]:
     if covered <= 0:
         return 0.0, 0.0
     return cost / covered, covered
+
+
+def fifo_lots(lots: list[Lot], qty: float) -> list[Lot]:
+    """The lots (oldest first) a sell of `qty` would consume — WITHOUT
+    consuming them; qty <= 0 (a legacy full close of unknown size) = every
+    open lot. The sell-row stamp (run-7 4a-18) takes the OLDEST of these as
+    the trip's entry and counts them as `lots_n`, so a multi-lot exit is
+    attributed to the buy that opened the episode, not to the last top-up."""
+    if qty <= 0:
+        return list(lots)
+    out: list[Lot] = []
+    remaining = qty
+    for lot in lots:
+        if remaining <= 1e-9:
+            break
+        if lot.remaining <= 1e-9:
+            continue
+        out.append(lot)
+        remaining -= lot.remaining
+    return out
