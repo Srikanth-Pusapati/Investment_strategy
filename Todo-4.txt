@@ -302,3 +302,504 @@ https://claude.ai/code/artifact/9099ad65-64b1-495c-82b9-db7226a1bbbf
             STILL PENDING USER GO (unchanged): run-6 switch, proposed Mon
             Aug 31 09:31 ET — that is TOMORROW MORNING. PR #55 + two .env
             edits per docs/RUN6_SWITCH.md need your word tonight/early am.
+
+2026-08-31  RUN-6 SWITCH EXECUTED (user GO ~11:30 ET; mid-session, not 09:31 —
+            deviation recorded in the pre-registered contract header).
+            SEQUENCE: merged feature/run6-changeset -> feature/preview
+            (580915d, --no-ff), 1221 tests passed (one sandboxed-run false
+            fail: RH callback test needs localhost bind). Contract
+            pre-registered BEFORE flatten (545fe7e). .env: SCREENER_SOURCES
+            robinhood entries dropped + AUTO_HEDGE_MAX_PCT 15->40 in place,
+            full run-6 key block appended, no dup keys. Curated QQQ lesson
+            struck (text-matched; file had drifted to line 11). User merged
+            preview -> main same morning.
+            FLATTEN 11:41 ET: equity at flatten start $989,679.12; 15 orders
+            cancelled, 17 positions closed — EXCEPT long IWM260930P00295000
+            x30: Alpaca refused the long-leg sell while the short 280P it
+            covered was still open (naked-short guard) and the script never
+            retried after the short leg filled -> "Could not fully flatten",
+            script aborted (correctly, no relaunch). LESSON for the flatten
+            script: close SHORT option legs first, or retry long legs after.
+            Manual fix 11:57 ET: sell-to-close 30 @ limit 6.20, filled 6.34
+            ($19,020; quote was tight two-sided 6.25/6.29). Re-ran script:
+            reset printed "churn carry: OFF (clean state — RESET_CARRY_CHURN=
+            off, run-6 default)", preflight OK, bot relaunched pid 73580 at
+            11:58 ET. DAY-0 EQUITY (flat, all cash): $989,246.22.
+            COSMETIC: old bot pid 25071 showed "survived SIGKILL" in the
+            script log — it was a zombie (panel is unreaping parent); lock
+            was free. Also 13 one-time "Backfill SKIP (no ledger basis)"
+            ERROR lines at first reconcile — flatten fills predate the fresh
+            ledger; correctly skipped, run-5's own ledger was archived before
+            they could be written there (its realized P&L misses the flatten
+            closes; run-5 is CONFOUNDED regardless).
+            DAY-0 ERRATUM (full text in run-6 EVAL_CONTRACT.md): the first
+            reconcile's exchange-exit backfill re-stamped exit_times/
+            exit_prices from run-5's broker sell fills (last-500 closed
+            orders, no time filter, per-process skip memory) — deterministic
+            on any restart, would have hit the 09:31 flow too; clearing is
+            futile, fixing = patching frozen code. Accepted as frozen-code
+            behavior: 24h LLM re-entry cooldown on run-5 names (visible in
+            Buy-excluded lines), price guard <=7d, loss_streaks EMPTY, core
+            fill + beta hedge unaffected (verified live). Freeze holds.
+            FIRST CYCLE (12:00 ET): FEEDS 3/3 healthy news=vader-fallback
+            (as pre-declared); BOOK BETA line live (0.00 on empty book);
+            core fill bought $49,462 QQQ (10%->15%, target 75%); 3 proposals,
+            BE 121sh entered with working protective sell; bearish funnel
+            citing (CPAY/LTH gate-blocked); cooldown exclusions cited (NOK,
+            SPCX). Expectancy report-only line correctly absent (empty
+            ledger has no negative families — prints once trips exist).
+            Run-5 state archived: state/archive/20260831T155810Z/ copied to
+            runs/pre-final-test-run-5/state/ (this commit).
+            WINDOW: Aug 31 -> Sep 11 (Labor Day Sep 7 closed), extend Sep 18
+            if N<24. Verify after 16:00 ET today: "Equity close row stamped
+            for 2026-08-31 (basis=close)" carrying book_beta_spy.
+            16:19 ET CLOSE-ROW VERIFIED: "Equity close row stamped for
+            2026-08-31 (basis=close)"; row carries book_beta_spy=0.63.
+            Day-0 close $991,189.29 = +$1,943 (+0.20%) vs flatten baseline
+            $989,246.22. (Row's day_pl/realized include run-5's morning +
+            flatten losses — window curve reads from the baseline.) All
+            step-4 checks now complete; next: daily eval-contract watch.
+
+2026-08-31  EVENING — RUN-6 RE-BASED TO A FRESH ACCOUNT (user request; full
+            text = Amendment 1 in run-6 EVAL_CONTRACT.md). New paper acct
+            PA3B09IK4MGS, $1,000,000, options L3 (user said "100000" but the
+            account reads $1M — flagged to user, proceeding with reality).
+            Old acct PA394CJ4TNL5 abandoned; its run-6 half-day (+$1,943, BE
+            entry) DISCARDED, archived state/archive/20260831T221813Z.
+            WINDOW NOW: Tue Sep 1 -> Fri Sep 11 (9 sessions), Sep 18 N<24
+            extension unchanged. DAY-0 BASELINE: $1,000,000. The fresh
+            account VOIDS the day-0 backfill erratum (no order history ->
+            exit clocks truly empty; fresh-state condition holds literally).
+            SEQUENCE: bot 73580 stopped (needed TERM->KILL escalation after
+            SIGINT 30s — watch this on future stops), .env keys swapped
+            (credential only, no knob), reset --yes (churn carry OFF line
+            printed), preflight 5/6 green, bot restarted pid 7536 via panel,
+            confirmed bound to PA3B09IK4MGS $1M, idle (market closed), one
+            basis='late' row stamped for Aug 31 (by design; curve starts at
+            Sep 1 close row).
+            PREFLIGHT ❌ = ROBINHOOD ONLY: OAuth refresh token DIED 11:52 CT
+            (auth_dead latched, CRITICAL email sent). NOT a window dependency
+            (RH is not among the 3 contract feeds since run-6 dropped it) —
+            bot trades fine without RH context. Re-login handshake launched
+            from resident session; user must complete browser step
+            (localhost:8765) + possible phone push-approve. Latch self-heals
+            ~1 min after the new token lands, no restart needed.
+            VERIFY TOMORROW AT OPEN (09:35-10:30 ET): FEEDS 3/3 vader-
+            fallback, BOOK BETA line, first buys on the new account, single
+            instance; after 16:00: Sep 1 close row basis='close' with
+            book_beta_spy.
+
+2026-08-31  POST-SWITCH DECISIONS (user, evening): (1) RUN-7 SHAPE IS
+            DELIBERATELY UNDECIDED until the run-6 verdict (Sep 11, or
+            Sep 18 on extension) — the choice on the table: continue the
+            equity chain per contract vs an options-only run vs a PARALLEL
+            new options-only project (own account/contract/design; current
+            options layer's record: MSFT +$11,645 then MSFT -$5,248,
+            PLTR -$9,940, AMZN group -$13,398, T -100% — an options-only
+            run REQUIRES a fresh design, not the current layer unleashed).
+            Key verdict-day input: how run-6's beta hedge + proxy puts
+            performed on red days (the user's downtrend concern).
+            (2) FUTURE WINDOWS RUN ~30 DAYS (~21 sessions) starting run-7 —
+            N>=24 becomes reachable, verdicts stop defaulting to PENDING.
+            Run-6's own window is unchanged (pre-registered).
+
+2026-09-01  RUN-6 DAY 1 — HEADLESS FALLBACK RAN (resident session went 18.5h
+            without a turn; last turn Mon 23:07 CT = last commit b9283b6).
+            Full report: runs/pre-final-test-run-6/FALLBACK_2026-09-01.md.
+            ARTIFACT NOT REPUBLISHED (no artifact tool headless) — phone view
+            STALE at Aug 31; ops/status_page.html on disk is current.
+            DAY 1 RESULT: close row $1,000,943.64 = +$943.64 (+0.094%),
+            basis='close', book_beta_spy=0.7698, vs SPY -0.69% / QQQ -1.27% /
+            IWM -1.14% => +0.78pp ahead of SPY on a red day. 11 equity
+            positions, 0 options, 13 buys / 0 sells / 0 closed trips. 48.5%
+            invested, cash $515,403. Drawdown 0.00%. API spend $1.55/9 calls.
+            (Live read 17:40 CT $1,000,128.77 — $815 after-hours mark drift,
+            not a discrepancy; stamped row is the contract number.)
+            YOUR 5 DAY-1 VERIFY ITEMS: ALL PASS — FEEDS 3/3 vader-fallback on
+            all 8 cycles; BOOK BETA line live 0.00->0.77 (0 cap hits); first
+            buys on PA3B09IK4MGS with fill prices; single instance (pid 7536);
+            close row stamped 16:28 ET with book_beta_spy.
+            CONTRACT: checker = PENDING (exit 0), designed at N=0. Freeze held
+            (zero commits to investment_strategy/ or .env in window). Fresh
+            state held — exit_times/exit_prices/loss_streaks empty, Amendment 1
+            confirmed in practice. Measurement clean: telescoping delta = $0.00,
+            no null-P&L sells, all FILLED lines priced. Rule 7 = 0.
+            PROTECTION 11/11 (10 brackets w/ HELD stop legs verified leg-by-leg;
+            QQQ standalone GTC stop 601.40 covers 211 of 211.834 sh — 0.83 sh
+            ~$590 bare, known fractional wart).
+            INCIDENTS: 3x QQQ wash-trade reject on the core stop (08:34-08:36,
+            entry buy still open) — anticipated in code, watchdog placed the
+            stop 08:36:31, self-healed in 104s, NOT a bug. 1x yfinance $ACLOX
+            delisted (noise). Zero CRITICAL / halts / IGNORED funnel stages.
+            ROBINHOOD RECOVERED — auth_dead=false, holdings + 443-name earnings
+            calendar every cycle. Your Aug 31 re-login landed.
+            FINDING (logged, NOT fixed — freeze): the put-liquidity fallback can
+            die twice on the same rule. LTH failed OI>=100, proxy correctly
+            re-expressed as IWM 291/276 Oct-9 — and that leg has OI 38 < 100, so
+            the option layer rejected it. The proxy picks strike/expiry WITHOUT
+            consulting the floor it will be judged by (an Oct monthly would
+            pass). Fix = option-selection code inside the freeze => Sep 11
+            change-set candidate. Bearish sleeve 0/1 on the window. Also the
+            first datapoint for the run-7 verdict question "how did the hedge +
+            proxy puts do on red days": on a -0.69% SPY day the hedge never
+            armed (auto_hedge=flat x8) and the one put never reached the book.
+            WATCH: ex-ante book beta closed 0.77, just under rule 4's 0.8-1.2
+            band, because the book is 48.5% invested vs the core's 75% target
+            (regime neutral, size x0.70). Rule 4 is judged on OLS realized beta
+            at >=5 sessions so nothing is breached — but if deployment stalls
+            near half-invested, rule 4 could fail on under-deployment rather
+            than strategy. CHECK THIS THURSDAY (Sep 3), not on verdict day.
+            OPS DEBT: (a) ops/status_page.html is gitignored (.gitignore:32) so
+            the fallback's "rewrite it and commit+push" instruction still cannot
+            be obeyed literally — flagged Aug 27, unchanged; track the file or
+            reword ops/claude_daily.sh. (b) ops/away_mode.md header still says
+            "2026-08-13 -> ~2026-08-27" and names account PA3IRR2BT9FT (two
+            accounts stale; live = PA3B09IK4MGS) — checklist still valid, only
+            the identifiers are wrong. (c) For the NEXT fallback: session .jsonl
+            mtimes are NOT a liveness signal — both idle sessions had mtimes
+            within the hour from artifact-autoreact-ledger metadata rows; only
+            timestamped user/assistant turns count.
+            NOT DONE (deliberate): no trade, flatten, restart, reconcile; no
+            knob/gate/prompt/.env/risk/watchdog change; no merge or force-push;
+            no RH re-auth; no artifact publish.
+
+2026-09-03  AWAY-MODE FALLBACK (headless) — run-6 day 3 of 9
+            Primary dark ~47h (last commit Sep 1 17:45; last timestamped
+            transcript turn Wed Sep 2 08:57 CT). Verified via timestamped turns,
+            NOT mtimes — the two idle sessions again had fresh mtimes from
+            artifact-autoreact-ledger rows, exactly as the Sep 1 run warned.
+            HEALTH: all green. pid 7536 up 3d, single lock, tick fresh, KILL
+            absent, RH auth_dead=false, FEEDS 3/3 x8 cycles, deadman 241 ok /
+            0 restarts / 0 pages over Sep 1-3. Zero CRITICAL, zero halts.
+            NUMBERS: close $1,016,452.05 +$9,401.01 (+0.94%), beta 1.108;
+            live $1,017,173.58 (+1.005%) vs SPY +1.04 / QQQ +1.18 / IWM +0.40.
+            Window 3 sessions: book +1.72% vs SPY +0.82% (+0.90pp). Cash $20,380
+            (2.0%), 98.0% invested. 16 equity + 1 option. 23 buys / 0 sells /
+            0 closed trips. DD 0.00%. API $1.91 today, $5.18 window.
+            CONTRACT: v2 verdict PENDING, every counted check passes. Freeze
+            verified empty on investment_strategy/ and .env.
+            PROTECTION: 15/16 stop-covered. NOTE FOR FUTURE AUDITS — bracket
+            stop legs are status=held and DO NOT appear under
+            /v2/orders?status=open; that view alone showed 15 false
+            "unprotected". Use status=all + non-terminal filter. PSQ ($265,669,
+            26.1% of equity) has no stop BY DESIGN (_hedge_submit sends a bare
+            notional buy; orchestrator.py:3514).
+            RESOLVED (the Sep 1 "check this Thursday" item): beta 0.77 -> 1.04
+            -> 1.11, deployment 48.5% -> 98.0%. Rule 4's 0.8-1.2 band is met;
+            under-deployment risk is gone.
+            NEW + INVERTED: the beta hedge is now CASH-LOCKED. Today's tranche
+            wanted $407,601, got $265,307 — blocked not by the 40% ceiling but
+            by spendable cash against MIN_CASH_BUFFER_PCT=2.0. Cash $20,380 vs
+            a ~$20,343 floor: the book sits exactly on it, so the hedge CANNOT
+            GROW. If beta pushes past 1.2 the controller has no room and rule 4
+            could fail on funding, not strategy. Knob question => did not touch.
+            DECIDE BEFORE VERDICT DAY.
+            REPEAT FINDING (2nd datapoint): put-liquidity proxy rejected again
+            on its own OI floor — Sep 1 IWM261009P00291000 OI 38, Sep 3
+            IWM261009P00294000 OI 47, both < 100. Proxy picks strike/expiry
+            without consulting the floor that judges it; both chose the Oct-9
+            weekly, a monthly would clear. Inside the freeze => Sep 11 change-set.
+            NEW FINDING: contract telescoping FAIL $1,421.49 on Sep 3 (validity,
+            not verdict). Root cause: we stamp the close row at 20:28Z but
+            day_pl = equity - last_equity (models.py:213) and Alpaca RESTATES
+            last_equity to the official close overnight. Alpaca's Sep 2
+            last_equity $1,007,051.04 vs our stamped $1,005,629.55 = $1,421.49,
+            the gap to the cent. Two clocks, one series. Not fixed — changing
+            measurement mid-window breaks comparability. Sep 11 change-set.
+            GOOD NEWS: bearish sleeve finally armed. FIRST put approval of the
+            program (HD Oct-16 350 put, Sep 2, put_approved=1; run-5 was 0/83),
+            and the beta hedge armed for the first time (2 tranches, $265,307
+            PSQ). Both run-6 item 7-8 paths are live. 0 "-> IGNORED" all 3 days.
+            WATCH: 0 closed trips in 3 sessions => N>=24 floor will NOT be met
+            by Sep 11; expect PENDING on verdict day, decided on pooled data.
+            OPS DEBT: (a) status_page.html still gitignored (3rd flag) — this
+            run committed a tracked HTML copy at runs/pre-final-test-run-6/
+            STATUS_2026-09-03.html rather than force-adding an ignored file, so
+            "read it on GitHub" is finally satisfied; still track it or reword
+            ops/claude_daily.sh. (b) NEW — the liveness heuristic counts FALLBACK
+            commits as primary activity: Sep 2 was skipped as "healthy (commit
+            23h ago)" when that was the Sep 1 fallback's own commit; a day of
+            oversight was lost. Ignore commits matching "Away-mode fallback", or
+            compare against the last timestamped transcript turn. (c) away_mode.md
+            header still says 2026-08-13 -> ~2026-08-27 and names PA3IRR2BT9FT
+            (live = PA3B09IK4MGS). (d) NEW — the runbook's ledger gotcha is
+            half-wrong: per tests/test_ledger.py:185 SINGLE-leg options ARE keyed
+            by OCC symbol by design (underlying kept as a field); only MULTI-leg
+            keys by underlying. The HD row is correct; the note would send you
+            hunting a non-bug.
+            NOT DONE (deliberate): no trade, flatten, restart, reconcile; no
+            knob/gate/prompt/.env/risk/watchdog change; no merge or force-push;
+            no RH re-auth; no artifact publish. investment_strategy/ untouched.
+            PHONE ARTIFACT STALE AT AUG 31 — republish from the resident session.
+
+2026-09-03  RESIDENT SESSION BACK (late evening) — status review + ops-debt cleanup
+            Reviewed the day-3 fallback report and verified live state: bot pid
+            7536 alive, tick fresh, 0 CRITICAL, close row stamped, postmortem ran.
+            Day 3 close $1,016,452.05 (+0.94%); window +1.72% vs SPY +0.82%.
+            FIXED (all outside the freeze — ops/ and docs only, zero touches to
+            investment_strategy/ or .env):
+            (a) ops/claude_daily.sh prompt reworded: fallback now commits a
+                tracked HTML copy at runs/<run>/STATUS_<date>.html instead of
+                being told to commit the gitignored ops/status_page.html, and
+                must prefix commits "Away-mode fallback".
+            (b) ops/claude_daily.sh liveness: both git-log signals now exclude
+                commits matching "Away-mode.*fallback" (--invert-grep), so a
+                fallback's own commit can never read as primary liveness again
+                (the Sep 2 skipped-oversight bug). Verified: both signals now
+                resolve to b9283b6 / ba49e2c, skipping the two fallback commits.
+            (c) ops/away_mode.md header: standing runbook, account corrected to
+                PA3B09IK4MGS (PA3IRR2BT9FT/PA3HBZ8ODAMD marked dead).
+            (d) ops/away_mode.md ledger gotcha corrected: single-leg options ARE
+                keyed by OCC symbol (tests/test_ledger.py:185); only multi-leg
+                keys by underlying.
+            PHONE ARTIFACT REPUBLISHED — live again at the standing URL with the
+            fallback's day-3 numbers; banner back to green (resident online).
+            STILL OPEN, deliberately (freeze / user decision):
+            - Cash-locked beta hedge (MIN_CASH_BUFFER_PCT vs trim-funding) —
+              USER DECISION before Sep 11 verdict day.
+            - Proxy-put OI-floor defect — Sep 11 change-set.
+            - Telescoping day_pl restatement artifact — Sep 11 change-set.
+
+2026-09-07  AWAY-MODE FALLBACK (headless) — Labor Day session; covers the
+            UNREVIEWED Sep 4 trading day. Run-6 day 4 of 9, acct PA3B09IK4MGS.
+            Full report: runs/pre-final-test-run-6/FALLBACK_2026-09-07.md
+            Status page copy: runs/pre-final-test-run-6/STATUS_2026-09-07.html
+            LIVENESS: primary genuinely dead this time — last commit AND last
+            status_page.html write both Sep 3 23:58/23:59 (~90h). NOTE the Sep 4
+            fallback CORRECTLY stood down (primary was 17.6h fresh + 4 live
+            sessions), but the primary then never ran its Sep 4 evening session.
+            So Sep 4 — the window's most eventful day — went unreviewed 3.5 days.
+            NUMBERS: Sep 4 close $1,025,915.86 (+$8,318, +0.93% close-to-close)
+            on a SPY -0.39% day. Window 4/9 sessions: book +2.59% vs SPY +0.41%
+            (+2.18pp), QQQ +0.31%, IWM +0.71%. Cash $31,829 (3.10%), 97.1%
+            invested. 15 equity + 3 option legs. Drawdown 0.00%. API $6.90 window.
+            CONTRACT: PENDING, every counted rule passes. Freeze VERIFIED empty.
+            FEEDS 3/3 healthy 8/8 cycles all four days. 0 "-> IGNORED".
+            *** RULE 4 IS THE PROBLEM — USER DECISION NEEDED BEFORE SEP 9 ***
+            Realized OLS beta = 0.06 (required 0.8-1.2), r2=0.02, alpha
+            +0.802%/day. Becomes a COUNTED rule at the Sep 9 close (checker
+            counts sessions as return-PAIRS: 6 close rows -> 5 pairs). The hedge
+            is NOT broken — ex-ante book_beta_spy held 1.04-1.11 all window,
+            inside its band on 8/8 cycles. Rule 4 grades REALIZED beta, and the
+            pairs are Sep2 (+0.47/+0.44), Sep3 (+1.08/+1.05), Sep4 (+0.93/-0.39).
+            Friday alone flattens the slope. EVERY down-day the book profits on
+            drives rule 4 further toward NO-GO — the strategy working is what
+            breaks the rule. Also: the checker drops Sep 1 (no in-window
+            predecessor), discarding the window's best relative day (+0.09% vs
+            SPY -0.69%); rules 3/4 measure 3 of 4 sessions. CONTRACT question,
+            not a knob — untouched. Options, all needing a pre-registered
+            amendment before Sep 9: (i) grade rule 4 on stamped ex-ante
+            book_beta_spy; (ii) keep OLS but require the >=20-session sample
+            rule 3 already demands of its t-stat; (iii) accept and let it fail.
+            FIRST CLOSED TRIP OF THE WINDOW: MKL +$108.90 (+0.66%), exit_reason
+            'decision'. Exit went through REPLACE-on-the-resting-leg (never
+            cancel-then-resell — the pending_cancel wedge), and SELL AUTHORITY
+            allowed it because it was a WINNER (the gate rejects losing
+            decision-sells with no event, as with BLK twice Sep 3). Rule 7 clean.
+            NEW FINDING — ROTATION IS NOT ATOMIC (highest-value Sep 11 item):
+            09:26:01 SELL MKL approved "rotate out of weakest winner to fund a
+            stronger name"; 09:26:07 REJECT buy MU: At max open positions (15).
+            The paired buy was judged against a position count that STILL
+            INCLUDED the name being sold (MKL's fill landed 10:14). MU (composite
+            +1.50) was never re-proposed; MKL then locked out by its own 24h
+            re-entry cooldown. Net: gave up a winner, never bought the upgrade,
+            ran a slot light for the rest of the window. Frozen code, not fixed.
+            PROXY PUT FINALLY FILLED — BUT BY LUCK, NOT A FIX. IWM Oct-9 295/280
+            bear put spread, 13 contracts, $5,083 debit, filled @3.90. All three
+            attempts picked the SAME Oct-9 weekly; the only change is drifting
+            spot pushed the strike onto 295 — a MULTIPLE OF 5, where IWM weekly
+            OI actually lives (291->OI 38, 294->OI 47, both rejected). Selection
+            logic still never consults the OI floor it is judged by. Makes the
+            Sep 11 fix concrete and cheap: SNAP PROXY STRIKES TO THE LIQUID
+            5-POINT GRID instead of raw spot. (The bot's own Sep 4 postmortem
+            reached the same conclusion.)
+            NETWORK INCIDENT TODAY (holiday, nothing at risk, but read it):
+            two outages — 03:10-03:54 ET (57 skipped watchdog ticks) and
+            15:06-16:57 ET (174 ticks, 111 min). Escalation fired as designed
+            from skip 5: 75 CRITICAL "Watchdog BLIND". *** ALL 75 PAGES FAILED
+            TO SEND *** — "ALERT not delivered (no working sink)", SMTP could not
+            resolve DNS because it rides the same dead network. The alert sink
+            cannot report a network fault. healthchecks.io IS the backstop that
+            survives (heartbeats stopped for the whole window -> it pages
+            independently). Two smaller frozen-code items: the throttle does not
+            throttle (severity= rises each skip, so it re-fires every tick, 75
+            pages where 1-2 were wanted), and _overlaps_paging_hours is pure
+            clock math with NO HOLIDAY CALENDAR, so today's CRITICALs all claim
+            "during market hours" on a closed day. Bot self-recovered 15:58 CT.
+            CASH LOCK EASED: cash $20,380 (2.0%, zero headroom) -> $31,829
+            (3.10%), ~$11.5k restored by the MKL sale + marks; hedge held 8/8
+            cycles and never needed it. The MIN_CASH_BUFFER_PCT decision is now
+            LESS urgent than rule 4 above (no amount of cash fixes rule 4).
+            TELESCOPING: still FAIL $1,421.49 (Sep 3). Root cause CORROBORATED
+            with a second datapoint — Alpaca's current last_equity for Sep 4 is
+            $1,027,333.13 vs our stamped $1,025,915.86 = $1,417.27, same shape.
+            WATCH: ledger vs broker realized $7.63 apart on the MKL trip (ledger
+            $108.90 vs broker-derived $101.27) against the contract's <$5
+            condition — judged AT WINDOW CLOSE so not breached now; check Sep 11.
+            OPS DEBT: Sep 3 resident session's fixes (a)-(d) CONFIRMED in place.
+            Remaining: the liveness guards are STRUCTURALLY UNSATISFIABLE — guard
+            1 wants a primary dated-log commit <30h old but the fallbacks now do
+            all the archiving so that commit can never land again; guard 2 (<12h)
+            always fails because the primary works ~23:58 while the check fires
+            17:37 (~17.6h gap). Both fail every weekday, so it fires daily
+            regardless of primary state — a broken clock (false-fired Sep 4,
+            correctly fired Sep 7, same logic). Durable fix: key liveness off
+            ops/status_page.html mtime, or move the launchd slot after the
+            primary's window. NOT applied — bug-fix authority assumes the primary
+            is absent, and Sep 4 declined the same patch for the same reason.
+            SEP 11 CHANGE-SET LIST NOW: (1) rotation atomicity [highest value],
+            (2) proxy-put strike grid snap, (3) telescoping day_pl restatement,
+            (4) alert sink independent of the network path, (5) alert-storm
+            throttle, (6) holiday-aware paging window, (7) liveness heuristic.
+            NOT DONE (deliberate): no trade, flatten, restart, reconcile; no
+            knob/gate/prompt/.env/risk/watchdog change; no merge or force-push;
+            no RH re-auth (headless); no artifact publish (headless).
+            investment_strategy/ untouched — RUN-6 FREEZE SURVIVES.
+            PHONE ARTIFACT STALE AT SEP 3 — republish from the resident session.
+
+2026-09-09  ~11:00 CT RESIDENT SESSION (user back, "fix all the related items
+            as required") — acted on the Sep 7 day-4 report within the freeze.
+            AMENDMENT 2 REGISTERED (EVAL_CONTRACT.md) before the Sep 9 close:
+            rule 4 graded on the MEAN stamped ex-ante book_beta_spy (+/-0.2 of
+            1.0) while sessions < 20 — the same interpretability floor rule 3
+            uses — reverting to realized OLS at >= 20 sessions. OLS beta stays
+            printed/recorded every run. Disclosure + counterfactual are in the
+            amendment text (OLS read +0.06 / -0.31 / +0.13 on Sep 7/8/9; the
+            unamended rule was already counting at the Sep 8 close row and
+            read OUTSIDE -> NO-GO track). Implemented in
+            scripts/eval_contract_check.py (ops/measurement surface, NOT
+            investment_strategy/ or .env — freeze intact) with 4 new selftest
+            cases (pass/fail on stamps, no-stamps N/A, OLS reversion at >=20).
+            Amended checker on the live window: mean ex-ante 0.98 over 5
+            stamped closes (range 0.77..1.11) -> PASS; verdict PENDING with
+            every counted rule passing; N=9 closed trips; max DD -0.57%.
+            LIVENESS GUARDS FIXED (ops/claude_daily.sh, Sep-11 list item 7
+            pulled forward — ops tooling, not frozen code): one threshold T
+            (30h weekdays, 78h Mondays to span the weekend); signal 1 = any
+            non-fallback commit < T; signal 2 = ops/status_page.html mtime < T
+            (runbook-mandated nightly rewrite), with
+            state/claude_daily_run.stamp recording each fallback launch so the
+            fallback's own page rewrite can never read as primary liveness.
+            Replaces the unsatisfiable dated-log-commit and 12h guards; sh -n
+            clean; guard logic dry-run verified. Plist/schedule unchanged.
+            ROBINHOOD: no action needed — tokens re-issued Aug 31 17:21 CT
+            (post-death re-login), access token expires ~Sep 9 16:20 CT and
+            the SDK auto-refreshes headlessly; refresh token good to ~Sep 28.
+            RH imports succeeding in this morning's log. Watch for an
+            auth_dead latch after tonight's first refresh.
+            PHONE ARTIFACT republished with Sep-7 data on Sep 7 ~21:45 CT
+            (resident session; noted here since no commit recorded it).
+            NOT touched (frozen until Sep 11): rotation atomicity, proxy-put
+            strike grid, telescoping day_pl restatement, alert sink/throttle/
+            holiday window. Freeze re-verified: git log --since=2026-08-31
+            --until=2026-09-12 -- investment_strategy/ .env is empty.
+
+2026-09-11  LAST SCHEDULED SESSION OF RUN-6 (resident session; verdict-day review
+            ran Fri afternoon through Sat 2026-09-12 ~01:00 CT — a usage cap
+            killed the first workflow pass at ~13:40 CT and the work resumed
+            after the reset; nothing below was lost, only delayed).
+            CLOSE: Sep 11 basis=close row $1,038,988.75 = +3.90% window vs SPY
+            -0.36% / QQQ -0.26% / IWM -1.71%. Session +1.04% vs SPY +0.85%.
+            CHECKER v2 on the close row (runs/.../CHECKER_2026-09-11_close.txt):
+            N=14, +$26,962.66, t=1.733 vs 1.771 (miss by 0.04), bootstrap
+            [$118,$4,204]; DD -1.41%; ex-ante beta 0.96 PASS; OLS alpha
+            +0.513%/day t=1.46 beta 0.50 (7 pairs, not counted); capture 3u/4d
+            not counted; rule 7 = 0. VERDICT: PENDING, every counted rule passes.
+            N<24 -> RULE 1 EXTENSION APPLIES. AMENDMENT 3 REGISTERED (Option B):
+            window runs to Fri Sep 18, freeze re-registered to Sep 19, verdict on
+            the Sep 18 close row; telescoping (6/7 rows, max $1,421.49), ledger
+            realized-at-quote (-$72.24) + 7 null fill_price rows, the two verdict
+            commands, and Amendment 2's intraday Sep 9 reading are all disclosed
+            and accepted BEFORE the last close row (so run-6 is not CONFOUNDED).
+            Option A (close at N=14 = PENDING-TERMINATED + CONFOUNDED-by-letter)
+            is recorded in the contract as the alternative if the user overrides.
+            Run-7 under B: fresh account, day 0 = Fri Sep 18 after the bell
+            (restart after 16:00 ET so a 'late' day-0 row exists), day 1 = Mon
+            Sep 21, 21 sessions, contract v3 DRAFT at runs/pre-final-test-run-7/
+            EVAL_CONTRACT.md (pre-register before day 1).
+            REVIEW (8 analysts, 43 adversarial votes; full text in the run-6
+            RUN_SUMMARY.md + report artifact): GRADE B+ PROVISIONAL (from B-):
+            strategy B (98.8% of realized in 3 trips; ex-top-3 +$325), downside
+            A- (green on 3 of 5 SPY red days, DD -1.41%), bearish C+ (2 fills,
+            both green; 5/5 single-name puts died on far-from-money strikes; 3
+            'ELIGIBLE but IGNORED' on Sep 10 hidden by the funnel line's top-6
+            truncation), options B, ops B, measurement B-, process B.
+            LOAD-BEARING FINDINGS (verified): (1) 'rotation not atomic' was
+            WRONG — the fold is atomic; MU/HOOD/PCG were rejected because
+            MAX_OPEN_POSITIONS counts the QQQ core + PSQ hedge rows (16/15 on
+            Sep 3-4; 15/15 with QQQ alone on Sep 2). (2) The hedge sizer assumes
+            PSQ beta -1.0; the bot's own estimate is -1.51 -> every arm ~50%
+            over-sized, lands 0.04-0.05 above the unwind line, and the Sep 3
+            'cash lock' was this (MIN_CASH_BUFFER explains 14%). (3) The Sep 9
+            unwind was rule-correct (ex-hedge beta 0.82-0.99); N-cycle
+            persistence would NOT have kept it; whipsaw cost $2,754 through the
+            Sep 11 close. (4) Core defense fired on Sep 11's UP open from Sep
+            10's stale falling map, failed only on a cancel->sell race, and left
+            the QQQ core stopless 4m53s. (5) Regime label flipped 5x in 8 reads
+            on Sep 10 (QQQ +/-0.35% of its 50dma on a partial bar); SMCI top-up
+            slipped in on a risk-on read. (6) Top-ups: 37 of 77 risk-judged buys
+            died on the +0.05 bar the prompt never states; the gate compares raw
+            floats so a proposal exactly at the bar is rejected. (7) Proxy put
+            builder ignores OI (2 of 3 attempts self-rejected; Oct-16 monthly had
+            100-265x the OI). (8) 'Fresh buys on SPY-red days lose' is NOT
+            supported by the pooled ledger (red +$88 vs green +$187 avg, CIs
+            overlap) -> shadow logging only, no haircut. (9) events_only sell
+            authority removed the pre-run-6 loss engine (-$32k in 58 LLM exits;
+            run-6: 0 decision losses). (10) Sep 7 alert storm = retry without
+            backoff + no holiday calendar; OAuth wait has no deadline; liveness
+            check needs a ps gate.
+            CHANGE-SET being built on feature/run7-changeset (isolated worktree,
+            live tree untouched): 14 ops/measurement items (built: telescoping
+            day_pl, OAuth deadline, flatten leg order, alert backoff+spool,
+            session-calendar paging, 5xx transient, beta-read liveness, funnel
+            '-> IGNORED', backfill fill_price, earnings-fallback FEEDS token,
+            ledger restate-at-fill knob, checker v3, signal_ic calibrated p,
+            claude_daily ps gate) + strategy items S-1..S-8 (slot exemption,
+            hedge sizing by measured beta, OI-aware proxy strikes, put strike
+            snap, regime persistence, HELD-line top-up bar + 4dp gate, core-
+            defense stale-map/race/stop filter, unwind-persistence knob default
+            1). PR opens from that branch when tests + review pass; MERGE ONLY
+            AFTER THE SEP 18 CLOSE (freeze).
+            OPERATOR DECISIONS (defaults in parentheses, applied unless changed):
+            1 Amendment 3 B vs A (B registered); 2 MAX_OPEN_POSITIONS after S-1
+            = 15 model names (keep 15); 3 regime stabiliser persistence vs band
+            (persistence); 4 core-defense trim via replace-qty-down vs cancel-
+            poll (replace); 5 HEDGE_UNWIND_MIN_CYCLES 1 vs 2 (1); 6
+            MAX_BOOK_BETA_SPY keep 1.2 vs 1.10 (keep); 7 ship the strike snap
+            in run-7 vs defer (ship).
+            USER ACTIONS Sep 14-18: none required for the window (bot runs
+            frozen); verify the Sep 18 close row + run the checker; create the
+            fresh run-7 paper account keys before Fri Sep 18 16:00 ET.
+2026-09-12  ~11:30 CT — RUN-7 CHANGE-SET BUILT, REVIEWED, PR OPEN (resident session,
+            continuation of the Sep 11 entry). Branch feature/run7-changeset, PR #57
+            -> feature/preview: https://github.com/Srikanth-Pusapati/Investment_stratergy/pull/57
+            MERGE ONLY AFTER THE SEP 18 CLOSE (Amendment 3 freeze to Sep 19), then
+            docs/RUN7_SWITCH.md (day 0 = Sep 18 after the bell on a FRESH account so a
+            'late' day-0 row exists; day 1 = Mon Sep 21; 21 sessions; contract v3 at
+            runs/pre-final-test-run-7/EVAL_CONTRACT.md — flip its header to
+            pre-registered + record the merge SHA before day 1).
+            CONTENT: part 1 (6e33426) = 14 ops/measurement items (pooling-safe);
+            part 2 (74c73fa) = strategy S-1..S-8 + ENTRY TAPE shadow fields +
+            floor6 shadow + sell-row lot stamps + phantom dedup + contract-handles
+            test + RUN7_SWITCH.md. Tests 1517 passed / 1 skipped (the skip needs the
+            v3 contract file, which lives on feature/preview -> passes after merge).
+            Four adversarial reviews (31 findings) applied; notable late catches:
+            S-7 replace-then-sell availability poll + restore-on-refusal, floor6
+            shadow moved off the watchdog thread, same-cycle hedge whipsaw guard
+            while a cross-day map is ignored, post-exec beta read stamped.
+            NEW STRATEGY KEYS (fingerprint): HEDGE_BETA_ASSUMED=-1.0,
+            PROXY_PUT_PREFER_MONTHLY=on, OPTION_STRIKE_SNAP=on,
+            OPTION_STRIKE_MAX_MONEYNESS_PCT=10, REGIME_LOOSEN_MIN_CYCLES=2,
+            HEDGE_UNWIND_MIN_CYCLES=1. NEW OPS KEYS: ALERT_RETRY_BASE_S,
+            ALERT_RETRY_CAP_S, ALERT_SPOOL_FILE, SESSION_CALENDAR_FILE,
+            ROBINHOOD_LOGIN_TIMEOUT_S, LEDGER_RESTATE_AT_FILL (defaults apply;
+            nothing written to .env yet — the switch checklist writes them).
+            DISCLOSED for the fingerprint note: LEDGER_RESTATE_AT_FILL feeds the
+            attribution prompt block once a source has >= TRACK_RECORD_MIN_TRIPS
+            trips (measurement-only for pooling, but a prompt input).
+            REPORT PAGE: https://claude.ai/code/artifact/52b9bfd0-cc0b-41b8-9d66-9a4bdfab5eca
+            USER ACTIONS: (1) read PR #57 + RUN_SUMMARY; override any of the 7 default
+            decisions before merge; (2) create the run-7 paper account keys before
+            Fri Sep 18 16:00 ET; (3) Sep 14-18: nothing — bot runs frozen; (4) Sep
+            18 after the close: run the run-6 checker (both --start commands),
+            archive state, merge PR #57, switch per RUN7_SWITCH.md.

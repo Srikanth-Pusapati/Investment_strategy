@@ -19,29 +19,55 @@ CLAUDE="$HOME/.local/bin/claude"
 cd "$ROOT"
 
 now=$(date +%s)
-last_log_ts=$(git log -1 --format=%ct -- 'logs/*_*_*.log' 2>/dev/null || echo 0)
-last_any_ts=$(git log -1 --format=%ct 2>/dev/null || echo 0)
-log_age_h=$(( (now - last_log_ts) / 3600 ))
+# Liveness must come from the PRIMARY session only. Fallback runs prefix their
+# commit messages "Away-mode fallback" (older runs: "Away-mode headless
+# fallback"); on 2026-09-02 the Sep-1 fallback's own 23h-old archive commit
+# read as "primary healthy" and a day of oversight was silently lost. The
+# commit signal therefore excludes fallback-authored commits.
+#
+# 2026-09-09 rework (guards were structurally unsatisfiable — Sep 4/7 reports):
+# the old guard 1 (dated-log archive commit < 30h) could never fire again once
+# the fallbacks took over all log archiving, and the old guard 2 (any commit
+# < 12h) always missed because the primary works ~23:58 CT while this check
+# fires 17:37 — a built-in ~17.6h gap. Both failed every weekday, so the
+# fallback launched daily regardless of primary state. Also fixed: the old
+# `--grep --invert-grep` exclusion matched the commit BODY, so a primary
+# commit that merely *discussed* the fallback excluded itself (that is what
+# false-fired Sep 4 against commit 9a9b05e); the subject-only awk match below
+# cannot. Now:
+#   * one freshness threshold T: 30h normally, 78h on Mondays (the primary's
+#     last session is Friday night; the weekend is not evidence of death)
+#   * signal 1: any non-fallback commit younger than T
+#   * signal 2: ops/status_page.html mtime younger than T — the runbook makes
+#     the primary rewrite it every session — UNLESS the rewrite falls inside
+#     a window started by our own last fallback launch (the fallback rewrites
+#     the same file; state/claude_daily_run.stamp records each launch so the
+#     fallback can never count its own rewrite as primary liveness)
+[ "$(date +%u)" = 1 ] && T=78 || T=30
+
+last_any_ts=$(git log -300 --format='%ct%x09%s' 2>/dev/null \
+    | awk -F'\t' '$2 !~ /^Away-mode.*fallback/ {print $1; exit}')
+[ -n "$last_any_ts" ] || last_any_ts=0
 any_age_h=$(( (now - last_any_ts) / 3600 ))
-
-if [ "$log_age_h" -lt 30 ]; then
-    echo "[$(date '+%F %T')] primary session healthy (last log-archive commit ${log_age_h}h ago) — skip"
+if [ "$any_age_h" -lt "$T" ]; then
+    echo "[$(date '+%F %T')] primary committed ${any_age_h}h ago (< ${T}h) — alive, skip"
     exit 0
 fi
 
-# Second liveness signal. The archive commit lands at most once a day, so it can
-# drift past 30h while the primary is demonstrably alive — that fired a false
-# fallback on 2026-08-13 that ran CONCURRENTLY with the live primary (both
-# sessions did the checklist; the primary won the shared-tree race). Any commit
-# at all in the last 12h means the primary is working, just late on the archive.
-# The fallback's own commits can't self-suppress: it runs once a day, so its
-# commits are ~24h old by the next fire.
-if [ "$any_age_h" -lt 12 ]; then
-    echo "[$(date '+%F %T')] archive stale (${log_age_h}h) but primary committed ${any_age_h}h ago — alive, skip"
+page_ts=$(stat -f %m "$ROOT/ops/status_page.html" 2>/dev/null || echo 0)
+page_age_h=$(( (now - page_ts) / 3600 ))
+stamp_ts=$(cat "$ROOT/state/claude_daily_run.stamp" 2>/dev/null || echo 0)
+fallback_wrote_page=0
+if [ "$page_ts" -ge "$stamp_ts" ] && [ "$page_ts" -lt $(( stamp_ts + 14400 )) ]; then
+    fallback_wrote_page=1   # rewrite landed within 4h of our own launch
+fi
+if [ "$page_age_h" -lt "$T" ] && [ "$fallback_wrote_page" = 0 ]; then
+    echo "[$(date '+%F %T')] no primary commit for ${any_age_h}h but status page rewritten ${page_age_h}h ago (< ${T}h, not by a fallback) — alive, skip"
     exit 0
 fi
 
-echo "[$(date '+%F %T')] primary quiet for ${log_age_h}h (no commits for ${any_age_h}h) — running headless fallback"
-"$CLAUDE" -p "FALLBACK away-mode run: the operator's interactive Claude session appears dead (no dated-log commit for ${log_age_h}h, no commits at all for ${any_age_h}h). Read ops/away_mode.md and execute the daily checklist end-to-end. You are HEADLESS: you have no artifact tool and no browser, so do NOT attempt to republish the phone status artifact or re-auth Robinhood — instead rewrite ops/status_page.html with fresh values, note that the fallback ran and that the artifact is therefore stale, and commit+push so the operator can read it on GitHub. Before doing anything, re-verify the primary really is dead (check for a recent ops/status_page.html mtime and recent commits); if it is alive, stop and report rather than racing it in the shared working tree. Honor every guardrail in the runbook." \
+echo "[$(date '+%F %T')] primary quiet (no commit for ${any_age_h}h; status page ${page_age_h}h old$([ "$fallback_wrote_page" = 1 ] && echo ', last rewrite was our own fallback')) — running headless fallback"
+echo "$now" > "$ROOT/state/claude_daily_run.stamp"
+"$CLAUDE" -p "FALLBACK away-mode run: the operator's interactive Claude session appears dead (no non-fallback commit for ${any_age_h}h; ops/status_page.html untouched by it for ${page_age_h}h). Read ops/away_mode.md and execute the daily checklist end-to-end. You are HEADLESS: you have no artifact tool and no browser, so do NOT attempt to republish the phone status artifact or re-auth Robinhood — instead rewrite ops/status_page.html with fresh values (it is gitignored — do NOT force-add it), commit a tracked HTML copy of it at runs/<current run dir>/STATUS_<YYYY-MM-DD>.html alongside your markdown report, note that the fallback ran and that the phone artifact is therefore stale, and push so the operator can read everything on GitHub. Prefix EVERY commit message with 'Away-mode fallback' — the next day's liveness check relies on that prefix to ignore your commits. Before doing anything, re-verify the primary really is dead (check for a recent ops/status_page.html mtime and recent commits); if it is alive, stop and report rather than racing it in the shared working tree. Honor every guardrail in the runbook." \
     --permission-mode bypassPermissions \
     --model opus 2>&1

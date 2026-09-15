@@ -1,0 +1,483 @@
+2026-09-10 00:10:07,238 INFO orchestrator | Market closed; skipping decision cycle.
+2026-09-10 01:02:20,040 INFO orchestrator | Market closed; skipping decision cycle.
+2026-09-10 01:54:32,356 INFO orchestrator | Market closed; skipping decision cycle.
+2026-09-10 02:46:44,431 INFO orchestrator | Market closed; skipping decision cycle.
+2026-09-10 03:38:56,816 INFO orchestrator | Market closed; skipping decision cycle.
+2026-09-10 04:31:09,320 INFO orchestrator | Market closed; skipping decision cycle.
+2026-09-10 05:23:22,035 INFO orchestrator | Market closed; skipping decision cycle.
+2026-09-10 06:15:34,125 INFO orchestrator | Market closed; skipping decision cycle.
+2026-09-10 07:07:46,894 INFO orchestrator | Market closed; skipping decision cycle.
+2026-09-10 07:59:59,274 INFO orchestrator | Market closed; skipping decision cycle.
+2026-09-10 08:30:06,653 INFO orchestrator | Order f6096055-df24-4d55-a032-5f2bf2d46c20 (SEI) FILLED (454/454) @ 68.3797 x 454 [ledger stamped].
+2026-09-10 08:30:08,259 INFO orchestrator | Market regime: SPY above 200dma (758 vs 712, today -0.6%), VIX 17.7, VIX3M 18.9 (contango) -> risk-on, size x1.00.
+2026-09-10 08:30:11,519 INFO orchestrator | BOOK BETA: spy=1.06 qqq=0.72 iwm=0.87 invested=58.3% [options at debit notional x underlying beta: HD,IWM]
+2026-09-10 08:30:11,818 INFO quiver | Quiver live/congresstrading -> 1000 row(s).
+2026-09-10 08:30:12,331 INFO screener | EDGAR Form-4 feed -> 58 filing(s) (scanning up to 100).
+2026-09-10 08:30:34,686 INFO screener | Options-flow most-actives pool -> 40 name(s).
+2026-09-10 08:31:02,169 INFO screener | Screener liquidity floor dropped 7/32 pre-cap: GAIA $1.53<$5, GRCE $2.12<$5, GRAB $3.01<$5, NVD $3.94<$5, NIO $3.62<$5, TSLG $4.64<$5, PLUG $2.10<$5
+2026-09-10 08:31:02,177 INFO screener | Discovered 18 candidate(s) from 3 source(s) (183 merged, 25 above min_score, capped to 18).
+2026-09-10 08:31:02,180 INFO screener |   candidate IRD [options_flow] score=+0.79 — Options flow: 8,218 call / 968 put vol (bullish call imbalance +0.79) on a most-active name.
+2026-09-10 08:31:02,185 INFO screener |   candidate NU [options_flow] score=+0.56 — Options flow: 57,794 call / 16,244 put vol (bullish call imbalance +0.56) on a most-active name.
+2026-09-10 08:31:02,187 INFO screener |   candidate INTC [congress+options_flow] score=+0.42 — Congress: 2 buy / 1 sell filings in last 60d (disclosures lag up to ~45d). | Options flow: 320,194 call / 149,002 put vol (bullish call imbalance +0.36) on a most-active name.
+2026-09-10 08:31:02,191 INFO screener |   candidate PCG [options_flow] score=+0.42 — Options flow: 49,762 call / 20,489 put vol (bullish call imbalance +0.42) on a most-active name.
+2026-09-10 08:31:02,194 INFO screener |   candidate TSLL [options_flow] score=+0.39 — Options flow: 46,356 call / 20,506 put vol (bullish call imbalance +0.39) on a most-active name.
+2026-09-10 08:31:02,196 INFO screener |   candidate CIFR [options_flow] score=+0.39 — Options flow: 73,634 call / 32,611 put vol (bullish call imbalance +0.39) on a most-active name.
+2026-09-10 08:31:02,198 INFO screener |   candidate ONDS [options_flow] score=+0.37 — Options flow: 38,966 call / 17,963 put vol (bullish call imbalance +0.37) on a most-active name.
+2026-09-10 08:31:02,200 INFO screener |   candidate TLT [options_flow] score=+0.35 — Options flow: 363,027 call / 175,005 put vol (bullish call imbalance +0.35) on a most-active name.
+2026-09-10 08:31:02,202 INFO screener |   candidate AAPL [congress+options_flow] score=+0.30 — Congress: 2 buy / 3 sell filings in last 60d (disclosures lag up to ~45d). | Options flow: 876,572 call / 421,202 put vol (bullish call imbalance +0.35) on a most-active name.
+2026-09-10 08:31:02,205 INFO screener |   candidate TOFB [insider] score=+0.30 — Insider: 1 open-market buy filing(s), 10,000 sh (SEC Form 4, last filings feed).
+2026-09-10 08:31:02,207 INFO screener |   candidate NVDA [congress+options_flow] score=+0.27 — Congress: 2 buy / 3 sell filings in last 60d (disclosures lag up to ~45d). | Options flow: 720,941 call / 377,002 put vol (bullish call imbalance +0.31) on a most-active name.
+2026-09-10 08:31:02,209 INFO screener |   candidate CLH [congress] score=-0.23 — Congress: 0 buy / 4 sell filings in last 60d (disclosures lag up to ~45d).
+2026-09-10 08:31:02,211 INFO screener |   candidate MKL [congress] score=-0.23 — Congress: 0 buy / 5 sell filings in last 60d (disclosures lag up to ~45d).
+2026-09-10 08:31:02,212 INFO screener |   candidate VIK [congress] score=-0.23 — Congress: 0 buy / 7 sell filings in last 60d (disclosures lag up to ~45d).
+2026-09-10 08:31:02,213 INFO screener |   candidate BE [congress] score=+0.23 — Congress: 4 buy / 0 sell filings in last 60d (disclosures lag up to ~45d).
+2026-09-10 08:31:02,215 INFO screener |   candidate LYV [congress] score=-0.23 — Congress: 0 buy / 5 sell filings in last 60d (disclosures lag up to ~45d).
+2026-09-10 08:31:02,216 INFO screener |   candidate STE [congress] score=-0.23 — Congress: 0 buy / 6 sell filings in last 60d (disclosures lag up to ~45d).
+2026-09-10 08:31:02,217 INFO screener |   candidate BRK.B [congress] score=+0.23 — Congress: 4 buy / 0 sell filings in last 60d (disclosures lag up to ~45d).
+2026-09-10 08:31:42,030 INFO quiver | Quiver live/offexchange -> 5555 row(s).
+2026-09-10 08:31:42,514 INFO quiver | Quiver live/govcontractsall -> 20000 row(s).
+2026-09-10 08:31:43,607 INFO quiver | Quiver live/lobbying -> 20000 row(s).
+2026-09-10 08:33:50,384 INFO ledger | Ledger: SELL ABT qty=192 $20078
+2026-09-10 08:33:50,389 INFO orchestrator | Backfilled exchange exit: ABT 192 sh @ 104.57 (stop -> bracket_stop, -4.5%).
+2026-09-10 08:33:58,194 INFO signals | options_chain: reading 25 of 32 symbols this cycle (cap).
+2026-09-10 08:34:06,788 INFO signals | Gathered signals for 32/32 symbols (+3 market signals).
+2026-09-10 08:34:06,844 INFO orchestrator | Composite index (32 scored, top: PFE +2.26, NOK +2.07, SEI +1.90, GRNT +1.87, SNXX +1.79, INTC +1.74, BRK.B +1.40, SPCX +1.40; bear tail: LYV -1.45, CLH -1.34, VIK -1.11, IWM -1.06, HD -1.00, STE -0.77).
+2026-09-10 08:34:06,845 INFO orchestrator | NAME FALLING: SNXX -5.1% today vs SPY -0.6% — defense read armed (loss-cut release + HELD-line note).
+2026-09-10 08:34:07,486 ERROR mcp.client.auth.oauth2 | OAuth flow error
+Traceback (most recent call last):
+  File "/Users/spusapati/Personal/Investment_stratergy/.venv/lib/python3.13/site-packages/mcp/client/auth/oauth2.py", line 597, in async_auth_flow
+    token_response = yield await self._perform_authorization()
+                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/spusapati/Personal/Investment_stratergy/.venv/lib/python3.13/site-packages/mcp/client/auth/oauth2.py", line 313, in _perform_authorization
+    auth_code, code_verifier = await self._perform_authorization_code_grant()
+                               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/spusapati/Personal/Investment_stratergy/.venv/lib/python3.13/site-packages/mcp/client/auth/oauth2.py", line 322, in _perform_authorization_code_grant
+    raise OAuthFlowError("No redirect handler provided for authorization code grant")  # pragma: no cover
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+mcp.client.auth.exceptions.OAuthFlowError: No redirect handler provided for authorization code grant
+2026-09-10 08:34:07,625 ERROR robinhood | Robinhood OAuth token is dead (refresh failed; a browser handshake is needed). Disabling ALL Robinhood context reads — the bot trades fine without them. To restore: run `python -m investment_strategy.portfolio.robinhood_auth login` on the host; reads auto-resume within ~1 minute of the new token landing (no restart needed).
+2026-09-10 08:34:07,628 INFO orchestrator | FEEDS: 3/3 healthy news=vader-fallback
+2026-09-10 08:34:07,632 INFO orchestrator | Buy-excluded from slate this cycle: AAPL (exited 19.3h ago (cooldown 24h)), NU (exited 24.0h ago (cooldown 24h)), NVDA (exited 23.5h ago (cooldown 24h)), TOFB (price $0.40 < $5 liquidity floor)
+2026-09-10 08:34:09,170 INFO notify | CRITICAL alert emailed to srikanthpusapati1@gmail.com: Robinhood OAuth dead — context reads disabled
+2026-09-10 08:34:59,411 INFO usage | decision call: 20982 in / 3645 out (cache r=0 w=6485) ~$0.2609 [claude-opus-4-8]
+2026-09-10 08:34:59,418 INFO decision | Claude returned 3 proposal(s), 4 bearish verdict(s).
+2026-09-10 08:34:59,422 WARNING orchestrator | Bearish verdict: ABT ELIGIBLE but IGNORED — model returned no bearish_verdicts entry for an ELIGIBLE name (the schema requires one per listed name).
+2026-09-10 08:34:59,425 INFO orchestrator | Bearish verdict: HD DECLINED — RSI 31 already oversold with bullish options flow +0.23 and buy-side off-exchange lean +0.14 contradicting the bearish thesis; chain neutral -0.03. No fresh dow
+2026-09-10 08:34:59,427 INFO orchestrator | Bearish verdict: STE DECLINED — RSI 30 oversold and bullish options flow +0.33 with fundamentals +0.42 contradict the breakdown; option volume thin (146/74) risks illiquid legs. No corroborate
+2026-09-10 08:34:59,431 INFO orchestrator | Bearish verdict: VIK DECLINED — Bearish read present (insider -1.00, congress 7 sells, flow -0.47) but option volume is thin (341 call/1178 put) — chain liquidity likely fails OI≥100 / spread 
+2026-09-10 08:34:59,482 INFO orchestrator | Cycle budget $408,215 split across 2 buy(s): INTC $234,116, BRK.B $174,099.
+2026-09-10 08:35:03,311 WARNING risk | BOOK BETA CAP: INTC 8.0% -> 5.0% (book 1.28 -> 1.20)
+2026-09-10 08:35:03,315 INFO orchestrator | BUY INTC -> resized: Sized to 503.695 sh ($51,092) within caps. Reduced from request. | Composite +1.74. Technical +0.80 uptrend (px>50>200), RSI 58 not extended. Hard open-market insider 
+2026-09-10 08:35:03,386 WARNING alpaca | INTC: floored 503.695 sh -> 503 for the exchange bracket; $70.68 of the $51092.34 allocation NOT deployed (stays cash; core sweep / next cycle can redeploy).
+2026-09-10 08:35:03,534 INFO alpaca | BUY market INTC qty=503.0 notional=None lim=None (order 9ef3f19a-be27-49fc-a297-a66e347509c6)
+2026-09-10 08:35:03,542 INFO ledger | Ledger: BUY INTC qty=503 $51127
+2026-09-10 08:35:04,226 WARNING risk | BOOK BETA CAP: BRK.B 4.5% -> rejected (book 1.20 -> 1.21 > cap 1.20; beta 0.26; room $0 < min order $514).
+2026-09-10 08:35:04,229 INFO risk | REJECT buy BRK.B: Book beta cap: post-trade SPY-beta 1.21 > 1.20 cap (book 1.20, BRK.B beta 0.26) and even the min order ($514) breaches it.
+2026-09-10 08:35:04,231 INFO orchestrator | BUY BRK.B -> rejected: Book beta cap: post-trade SPY-beta 1.21 > 1.20 cap (book 1.20, BRK.B beta 0.26) and even the min order ($514) breaches it. | Composite +1.40. Fundamentals +0.50 ($130.7B EBITDA, 34% margin, D/E 17 fortress balance sheet), tec
+2026-09-10 08:35:05,105 INFO risk | REJECT buy LYV: Leg LYV261016P00150000 open interest 5 < 100 floor — too illiquid to exit cleanly.
+2026-09-10 08:35:05,111 INFO orchestrator | OPTION OptionStrategy.LONG_PUT LYV -> rejected: Leg LYV261016P00150000 open interest 5 < 100 floor — too illiquid to exit cleanly. | Corroborated breakdown: composite -1.45, gate passes -5.8% vs 20d SMA, RSI 35 MACD bear, off-exchang
+2026-09-10 08:35:05,117 INFO orchestrator | BEARISH FUNNEL: slate_bearish=7 [LYV -1.45 ELIGIBLE (-5.8% vs 20d SMA breakdown) -> put proposed; CLH -1.34 gate-blocked; VIK -1.11 ELIGIBLE (-7.0% vs 20d SMA breakdown) -> declined: Bearish read present (insider -1.00, congress 7 sells, flow ; IWM -1.06 gate-blocked; HD -1.00 ELIGIBLE (below its 200dma) -> declined: RSI 31 already oversold with bullish options flow +0.23 and ; STE -0.77 ELIGIBLE (below its 200dma) -> declined: RSI 30 oversold and bullish options flow +0.33 with fundamen] put_proposals=1 put_approved=0 auto_hedge=flat proxy_put=IWM skipped: structure already open
+2026-09-10 08:35:05,123 INFO orchestrator | Cycle budget not fully deployed: $70.68 dropped by whole-share flooring across this cycle's buys (stays cash; core sweep / next cycle can redeploy).
+2026-09-10 08:35:05,189 INFO alpaca | Alpaca client ready (mode=paper).
+2026-09-10 08:35:07,436 INFO dashboard | Wrote dashboard with 46 trades -> dashboard.html
+2026-09-10 08:53:55,116 INFO ledger | Ledger: SELL SNXX qty=425 $6894
+2026-09-10 08:53:55,130 INFO orchestrator | Backfilled exchange exit: SNXX 425 sh @ 16.22 (stop -> bracket_stop, -10.1%).
+2026-09-10 09:22:18,666 INFO orchestrator | Order 9ef3f19a-be27-49fc-a297-a66e347509c6 (INTC) FILLED (503/503) @ 101.6973 x 503 [ledger stamped].
+2026-09-10 09:22:20,025 INFO orchestrator | Market regime: SPY above 200dma (758 vs 712, today -0.5%), VIX 17.9, VIX3M 19.7 (contango), QQQ+IWM below 50dma (narrow breadth) -> neutral, size x0.70.
+2026-09-10 09:22:21,856 INFO orchestrator | BOOK BETA: spy=1.13 qqq=0.79 iwm=0.94 invested=60.8% [options at debit notional x underlying beta: HD,IWM]
+2026-09-10 09:22:22,223 INFO quiver | Quiver live/congresstrading -> 1000 row(s).
+2026-09-10 09:22:22,481 INFO screener | EDGAR Form-4 feed -> 61 filing(s) (scanning up to 100).
+2026-09-10 09:22:49,690 INFO screener | Options-flow most-actives pool -> 40 name(s).
+2026-09-10 09:23:19,959 INFO screener | Screener liquidity floor dropped 6/29 pre-cap: GPRO $1.60<$5, NVD $3.98<$5, NIO $3.61<$5, OPEN $2.85<$5, MSTZ $4.43<$5, RXT $3.15<$5
+2026-09-10 09:23:19,969 INFO screener | Discovered 18 candidate(s) from 3 source(s) (182 merged, 23 above min_score, capped to 18).
+2026-09-10 09:23:19,972 INFO screener |   candidate SPDN [options_flow] score=+0.82 — Options flow: 103 call / 10 put vol (bullish call imbalance +0.82) on a most-active name.
+2026-09-10 09:23:19,977 INFO screener |   candidate CIFR [options_flow] score=+0.61 — Options flow: 65,913 call / 15,956 put vol (bullish call imbalance +0.61) on a most-active name.
+2026-09-10 09:23:19,981 INFO screener |   candidate SPCH [options_flow] score=+0.56 — Options flow: 7,632 call / 2,154 put vol (bullish call imbalance +0.56) on a most-active name.
+2026-09-10 09:23:19,984 INFO screener |   candidate SNDQ [options_flow] score=+0.54 — Options flow: 1,899 call / 573 put vol (bullish call imbalance +0.54) on a most-active name.
+2026-09-10 09:23:19,986 INFO screener |   candidate AAPL [congress+options_flow] score=+0.51 — Congress: 2 buy / 3 sell filings in last 60d (disclosures lag up to ~45d). | Options flow: 473,201 call / 137,179 put vol (bullish call imbalance +0.55) on a most-active name.
+2026-09-10 09:23:19,990 INFO screener |   candidate KORU [options_flow] score=-0.44 — Options flow: 4,774 call / 12,198 put vol (bearish put imbalance -0.44) on a most-active name.
+2026-09-10 09:23:19,993 INFO screener |   candidate VIPS [insider] score=-0.36 — Insider: 2 open-market SELL filing(s), 2,978 sh — bearish cluster (SEC Form 4, last filings feed).
+2026-09-10 09:23:19,995 INFO screener |   candidate GF [insider] score=+0.30 — Insider: 1 open-market buy filing(s), 800 sh (SEC Form 4, last filings feed).
+2026-09-10 09:23:19,997 INFO screener |   candidate DXYZ [insider] score=+0.30 — Insider: 1 open-market buy filing(s), 753 sh (SEC Form 4, last filings feed).
+2026-09-10 09:23:20,000 INFO screener |   candidate CLH [congress] score=-0.23 — Congress: 0 buy / 4 sell filings in last 60d (disclosures lag up to ~45d).
+2026-09-10 09:23:20,001 INFO screener |   candidate MKL [congress] score=-0.23 — Congress: 0 buy / 5 sell filings in last 60d (disclosures lag up to ~45d).
+2026-09-10 09:23:20,003 INFO screener |   candidate VIK [congress] score=-0.23 — Congress: 0 buy / 7 sell filings in last 60d (disclosures lag up to ~45d).
+2026-09-10 09:23:20,004 INFO screener |   candidate BE [congress] score=+0.23 — Congress: 4 buy / 0 sell filings in last 60d (disclosures lag up to ~45d).
+2026-09-10 09:23:20,006 INFO screener |   candidate LYV [congress] score=-0.23 — Congress: 0 buy / 5 sell filings in last 60d (disclosures lag up to ~45d).
+2026-09-10 09:23:20,007 INFO screener |   candidate STE [congress] score=-0.23 — Congress: 0 buy / 6 sell filings in last 60d (disclosures lag up to ~45d).
+2026-09-10 09:23:20,008 INFO screener |   candidate BRK.B [congress] score=+0.23 — Congress: 4 buy / 0 sell filings in last 60d (disclosures lag up to ~45d).
+2026-09-10 09:23:20,010 INFO screener |   candidate LH [congress] score=-0.23 — Congress: 0 buy / 4 sell filings in last 60d (disclosures lag up to ~45d).
+2026-09-10 09:23:20,011 INFO screener |   candidate WAB [congress] score=-0.23 — Congress: 0 buy / 4 sell filings in last 60d (disclosures lag up to ~45d).
+2026-09-10 09:23:41,666 INFO quiver | Quiver live/offexchange -> 5555 row(s).
+2026-09-10 09:23:42,386 INFO quiver | Quiver live/govcontractsall -> 20000 row(s).
+2026-09-10 09:23:45,055 INFO quiver | Quiver live/lobbying -> 20000 row(s).
+2026-09-10 09:24:48,241 INFO signals | options_chain: reading 25 of 31 symbols this cycle (cap).
+2026-09-10 09:24:55,783 INFO signals | Gathered signals for 31/31 symbols (+3 market signals).
+2026-09-10 09:24:55,827 INFO orchestrator | Composite index (31 scored, top: SEI +2.44, PFE +2.00, GRNT +1.85, NOK +1.85, DXYZ +1.76, SPCH +1.65, VALE +1.48, SPCX +1.47; bear tail: LYV -1.65, CLH -1.57, VIPS -1.27, HD -1.22, VIK -1.11, IWM -1.09).
+2026-09-10 09:24:55,829 INFO orchestrator | NAME FALLING: DRAM -4.4% today vs SPY -0.5% — defense read armed (loss-cut release + HELD-line note).
+2026-09-10 09:24:55,830 INFO orchestrator | NAME FALLING: INTC -5.9% today vs SPY -0.5% — defense read armed (loss-cut release + HELD-line note).
+2026-09-10 09:24:56,134 INFO orchestrator | FEEDS: 3/3 healthy news=vader-fallback
+2026-09-10 09:24:56,146 INFO orchestrator | Buy-excluded from slate this cycle: AAPL (exited 20.2h ago (cooldown 24h)), INTC (topped up 0.8h ago (next ok in 4h))
+2026-09-10 09:26:10,923 INFO usage | decision call: 21408 in / 5177 out (cache r=6485 w=0) ~$0.2397 [claude-opus-4-8]
+2026-09-10 09:26:10,931 INFO decision | Claude returned 4 proposal(s), 4 bearish verdict(s).
+2026-09-10 09:26:10,937 INFO orchestrator | Bearish verdict: HD DECLINED — Downtrend confirmed but RSI 31 oversold and options_chain is neutral (-0.07) at low ATM IV 26% with no bearish flow confirmation — downside looks exhausted/pric
+2026-09-10 09:26:10,940 WARNING orchestrator | Bearish verdict: KORU ELIGIBLE but IGNORED — model returned no bearish_verdicts entry for an ELIGIBLE name (the schema requires one per listed name).
+2026-09-10 09:26:10,943 INFO orchestrator | Bearish verdict: LYV DECLINED — Bearish thesis is real (composite -1.65, congress 5 sells, off-exchange short 72%) but eligible put strikes are illiquid — the prior LYV Oct put leg was auto-re
+2026-09-10 09:26:10,945 WARNING orchestrator | Bearish verdict: STE ELIGIBLE but IGNORED — model returned no bearish_verdicts entry for an ELIGIBLE name (the schema requires one per listed name).
+2026-09-10 09:26:10,947 INFO orchestrator | Bearish verdict: VIK DECLINED — Bearish flow -0.47 but on tiny absolute volume (300 call/1052 put) with no options_chain liquidity read, and RSI 33 already stretched down — insufficient liquid
+2026-09-10 09:26:10,949 INFO orchestrator | Bearish verdict: VIPS DECLINED — RSI 27 deeply oversold with off-exchange +0.20 buy-side lean contradicting further downside, and option flow is tiny (114 call/221 put) — no liquid, corroborate
+2026-09-10 09:26:11,000 INFO orchestrator | Cycle budget $383,967 split across 2 buy(s): NOK $213,958, SPCX $170,010.
+2026-09-10 09:26:14,112 INFO risk | REJECT buy NOK: Top-up conviction 0.66 shows no new edge over prior entry 0.66 (needs +0.05) — 'adding to a winner' is not a signal.
+2026-09-10 09:26:14,115 INFO orchestrator | BUY NOK -> rejected: Top-up conviction 0.66 shows no new edge over prior entry 0.66 (needs +0.05) — 'adding to a winner' is not a signal. | Top-up on strongest intact winner (+0.9%, 8.6pp stop room). Composite +1.85; technical +0.53 uptrend
+2026-09-10 09:26:14,593 INFO risk | REJECT buy SPCX: Top-up conviction 0.66 shows no new edge over prior entry 0.68 (needs +0.05) — 'adding to a winner' is not a signal.
+2026-09-10 09:26:14,596 INFO orchestrator | BUY SPCX -> rejected: Top-up conviction 0.66 shows no new edge over prior entry 0.68 (needs +0.05) — 'adding to a winner' is not a signal. | Top-up on intact winner (+2.8%, 12.8pp stop room). Fundamentals +0.71 ($5.9B EBITDA, +91.9% rev grow
+2026-09-10 09:26:14,706 INFO orchestrator | HOLD DRAM (no action) | Held -5.0%, NAME FALLING -4.4% today arms the loss-cut, but thesis remains net positive (composite +
+2026-09-10 09:26:14,890 INFO orchestrator | HOLD PFE (no action) | Held -5.1% with only 0.6pp of stop room; thesis intact (composite +2.00, insider open-market buying 
+2026-09-10 09:26:14,895 INFO orchestrator | BEARISH FUNNEL: slate_bearish=8 [LYV -1.65 ELIGIBLE (-5.3% vs 20d SMA breakdown) -> declined: Bearish thesis is real (composite -1.65, congress 5 sells, o; CLH -1.57 gate-blocked; VIPS -1.27 ELIGIBLE (below its 200dma) -> declined: RSI 27 deeply oversold with off-exchange +0.20 buy-side lean; HD -1.22 ELIGIBLE (below its 200dma) -> declined: Downtrend confirmed but RSI 31 oversold and options_chain is; VIK -1.11 ELIGIBLE (-6.6% vs 20d SMA breakdown) -> declined: Bearish flow -0.47 but on tiny absolute volume (300 call/105; IWM -1.09 gate-blocked] put_proposals=0 put_approved=0 auto_hedge=flat proxy_put=none
+2026-09-10 09:26:14,966 INFO alpaca | Alpaca client ready (mode=paper).
+2026-09-10 09:26:16,828 INFO dashboard | Wrote dashboard with 47 trades -> dashboard.html
+2026-09-10 10:14:30,053 INFO orchestrator | Market regime: SPY above 200dma (759 vs 712, today -0.4%), VIX 17.2, VIX3M 19.4 (contango) -> risk-on, size x1.00.
+2026-09-10 10:14:32,193 INFO orchestrator | BOOK BETA: spy=1.13 qqq=0.80 iwm=0.94 invested=60.9% [options at debit notional x underlying beta: HD,IWM]
+2026-09-10 10:14:32,493 INFO quiver | Quiver live/congresstrading -> 1000 row(s).
+2026-09-10 10:14:33,793 INFO screener | EDGAR Form-4 feed -> 62 filing(s) (scanning up to 100).
+2026-09-10 10:14:59,989 INFO screener | Options-flow most-actives pool -> 40 name(s).
+2026-09-10 10:15:31,373 INFO screener | Screener liquidity floor dropped 5/29 pre-cap: GPRO $1.58<$5, NVD $3.99<$5, NIO $3.61<$5, OPEN $2.87<$5, PLUG $2.12<$5
+2026-09-10 10:15:31,378 INFO screener | Discovered 18 candidate(s) from 3 source(s) (182 merged, 24 above min_score, capped to 18).
+2026-09-10 10:15:31,380 INFO screener |   candidate SPSB [options_flow] score=-0.90 — Options flow: 6 call / 115 put vol (bearish put imbalance -0.90) on a most-active name.
+2026-09-10 10:15:31,385 INFO screener |   candidate SPDN [options_flow] score=+0.82 — Options flow: 103 call / 10 put vol (bullish call imbalance +0.82) on a most-active name.
+2026-09-10 10:15:31,387 INFO screener |   candidate NU [options_flow] score=+0.64 — Options flow: 14,347 call / 3,153 put vol (bullish call imbalance +0.64) on a most-active name.
+2026-09-10 10:15:31,388 INFO screener |   candidate SNDQ [options_flow] score=+0.56 — Options flow: 2,123 call / 592 put vol (bullish call imbalance +0.56) on a most-active name.
+2026-09-10 10:15:31,392 INFO screener |   candidate ONDS [options_flow] score=+0.54 — Options flow: 20,093 call / 6,039 put vol (bullish call imbalance +0.54) on a most-active name.
+2026-09-10 10:15:31,393 INFO screener |   candidate AAPL [congress+options_flow] score=+0.52 — Congress: 2 buy / 3 sell filings in last 60d (disclosures lag up to ~45d). | Options flow: 734,340 call / 201,424 put vol (bullish call imbalance +0.57) on a most-active name.
+2026-09-10 10:15:31,396 INFO screener |   candidate SPCH [options_flow] score=+0.51 — Options flow: 7,863 call / 2,563 put vol (bullish call imbalance +0.51) on a most-active name.
+2026-09-10 10:15:31,398 INFO screener |   candidate CIFR [options_flow] score=+0.34 — Options flow: 91,223 call / 45,413 put vol (bullish call imbalance +0.34) on a most-active name.
+2026-09-10 10:15:31,399 INFO screener |   candidate SNXX [options_flow] score=+0.31 — Options flow: 17,020 call / 8,952 put vol (bullish call imbalance +0.31) on a most-active name.
+2026-09-10 10:15:31,401 INFO screener |   candidate ATLO [insider] score=+0.30 — Insider: 1 open-market buy filing(s), 300 sh (SEC Form 4, last filings feed).
+2026-09-10 10:15:31,403 INFO screener |   candidate CLH [congress] score=-0.23 — Congress: 0 buy / 4 sell filings in last 60d (disclosures lag up to ~45d).
+2026-09-10 10:15:31,404 INFO screener |   candidate MKL [congress] score=-0.23 — Congress: 0 buy / 5 sell filings in last 60d (disclosures lag up to ~45d).
+2026-09-10 10:15:31,406 INFO screener |   candidate VIK [congress] score=-0.23 — Congress: 0 buy / 7 sell filings in last 60d (disclosures lag up to ~45d).
+2026-09-10 10:15:31,407 INFO screener |   candidate BE [congress] score=+0.23 — Congress: 4 buy / 0 sell filings in last 60d (disclosures lag up to ~45d).
+2026-09-10 10:15:31,407 INFO screener |   candidate LYV [congress] score=-0.23 — Congress: 0 buy / 5 sell filings in last 60d (disclosures lag up to ~45d).
+2026-09-10 10:15:31,409 INFO screener |   candidate STE [congress] score=-0.23 — Congress: 0 buy / 6 sell filings in last 60d (disclosures lag up to ~45d).
+2026-09-10 10:15:31,410 INFO screener |   candidate BRK.B [congress] score=+0.23 — Congress: 4 buy / 0 sell filings in last 60d (disclosures lag up to ~45d).
+2026-09-10 10:15:31,411 INFO screener |   candidate LH [congress] score=-0.23 — Congress: 0 buy / 4 sell filings in last 60d (disclosures lag up to ~45d).
+2026-09-10 10:15:54,325 INFO quiver | Quiver live/offexchange -> 5555 row(s).
+2026-09-10 10:15:55,050 INFO quiver | Quiver live/govcontractsall -> 20000 row(s).
+2026-09-10 10:15:56,480 INFO quiver | Quiver live/lobbying -> 20000 row(s).
+2026-09-10 10:16:36,084 INFO signals | options_chain: reading 25 of 31 symbols this cycle (cap).
+2026-09-10 10:16:43,601 INFO signals | Gathered signals for 31/31 symbols (+3 market signals).
+2026-09-10 10:16:43,651 INFO orchestrator | Composite index (31 scored, top: SEI +2.75, GRNT +2.50, PFE +2.02, NOK +1.92, SPCH +1.67, VALE +1.48, SPCX +1.44, SNXX +1.42; bear tail: LYV -1.74, CLH -1.47, HD -1.21, SPSB -1.11, VIK -1.08, IWM -1.01).
+2026-09-10 10:16:43,880 INFO orchestrator | FEEDS: 3/3 healthy news=vader-fallback
+2026-09-10 10:16:43,891 INFO orchestrator | Buy-excluded from slate this cycle: AAPL (exited 21.0h ago (cooldown 24h)), INTC (topped up 1.7h ago (next ok in 4h)), SNXX (exited 1.4h ago (cooldown 24h))
+2026-09-10 10:18:13,943 INFO anthropic._base_client | Retrying request to /v1/messages in 0.383192 seconds
+2026-09-10 10:19:16,451 INFO usage | decision call: 21227 in / 4583 out (cache r=6485 w=0) ~$0.2240 [claude-opus-4-8]
+2026-09-10 10:19:16,459 INFO decision | Claude returned 5 proposal(s), 4 bearish verdict(s).
+2026-09-10 10:19:16,464 INFO orchestrator | Bearish verdict: HD DECLINED — RSI 31 near-oversold late entry; options chain neutral -0.04 and flow +0.03 give no bearish confirmation of the -1.21 composite.
+2026-09-10 10:19:16,467 INFO orchestrator | Bearish verdict: STE DECLINED — Options flow +0.35 bullish call lean contradicts the breakdown, insider net +0.17 mixed, RSI 29 oversold; no chain confirm, thin -0.75 composite.
+2026-09-10 10:19:16,513 INFO orchestrator | Cycle budget $383,892 split across 3 buy(s): SMCI $95,315, GRNT $198,681, BE $89,895.
+2026-09-10 10:19:19,691 WARNING risk | BOOK BETA CAP: SMCI 8.0% -> 2.6% (book 1.34 -> 1.20)
+2026-09-10 10:19:19,695 INFO orchestrator | BUY SMCI -> resized: Sized to 702.844 sh ($27,144) within caps. Reduced from request. | Top-up on intact winner (+6.3%, 16.3pp stop room). Composite +1.18, fundamentals +0.34 with +93.2% r
+2026-09-10 10:19:19,743 WARNING alpaca | SMCI: floored 702.844 sh -> 702 for the exchange bracket; $32.60 of the $27143.84 allocation NOT deployed (stays cash; core sweep / next cycle can redeploy).
+2026-09-10 10:19:19,808 INFO alpaca | BUY market SMCI qty=702.0 notional=None lim=None (order 4c181a63-0801-4439-8f4e-1e10e305af48)
+2026-09-10 10:19:19,819 INFO ledger | Ledger: BUY SMCI qty=702 $27111
+2026-09-10 10:19:20,460 INFO risk | REJECT buy GRNT: Top-up conviction 0.61 shows no new edge over prior entry 0.60 (needs +0.05) — 'adding to a winner' is not a signal.
+2026-09-10 10:19:20,463 INFO orchestrator | BUY GRNT -> rejected: Top-up conviction 0.61 shows no new edge over prior entry 0.60 (needs +0.05) — 'adding to a winner' is not a signal. | Top-up on strongest composite on slate (+2.50). Fundamentals +0.77 (59.8% margin, +37.3% rev growth)
+2026-09-10 10:19:21,051 WARNING risk | BOOK BETA CAP: BE 2.5% -> rejected (book 1.20 -> 1.30 > cap 1.20; beta 4.19; room $20 < min order $517).
+2026-09-10 10:19:21,055 INFO risk | REJECT buy BE: Book beta cap: post-trade SPY-beta 1.30 > 1.20 cap (book 1.20, BE beta 4.19) and even the min order ($517) breaches it.
+2026-09-10 10:19:21,058 INFO orchestrator | BUY BE -> rejected: Book beta cap: post-trade SPY-beta 1.30 > 1.20 cap (book 1.20, BE beta 4.19) and even the min order ($517) breaches it. | Fresh technical anchor: technical +0.80 improving (+0.09/d), uptrend px>50>200, MACD bull, RSI 64. F
+2026-09-10 10:19:21,220 WARNING options | one-sided/empty NBBO for LYV261016P00140000 (bid=0.0000 ask=0.7300) — no tradeable market, treating as no quote
+2026-09-10 10:19:21,272 WARNING options | one-sided/empty NBBO for LYV261016P00140000 (bid=0.0000 ask=0.7300) — no tradeable market, treating as no quote
+2026-09-10 10:19:21,696 INFO risk | REJECT buy LYV: Leg LYV261016P00140000 open interest 87 < 100 floor — too illiquid to exit cleanly.
+2026-09-10 10:19:21,700 INFO orchestrator | OPTION OptionStrategy.LONG_PUT LYV -> rejected: Leg LYV261016P00140000 open interest 87 < 100 floor — too illiquid to exit cleanly. | Corroborated breakdown: composite -1.74, MACD bear, -5.2% vs 20d SMA, off-exchange short 72%, inside
+2026-09-10 10:19:21,754 WARNING options | no quote available for VIK261016P00042000 — contract unknown to feed
+2026-09-10 10:19:21,812 WARNING options | no quote available for VIK261016P00042000 — contract unknown to feed
+2026-09-10 10:19:22,035 INFO risk | REJECT buy VIK: Net credit / no debit — not a bounded-loss debit play.
+2026-09-10 10:19:22,042 INFO orchestrator | OPTION OptionStrategy.LONG_PUT VIK -> rejected: Net credit / no debit — not a bounded-loss debit play. | Corroborated breakdown: composite -1.08, -6.5% vs 20d SMA, MACD bear, heavy insider open-market sell
+2026-09-10 10:19:22,049 INFO orchestrator | BEARISH FUNNEL: slate_bearish=7 [LYV -1.74 ELIGIBLE (-5.2% vs 20d SMA breakdown) -> put proposed; CLH -1.47 gate-blocked; HD -1.21 ELIGIBLE (below its 200dma) -> declined: RSI 31 near-oversold late entry; options chain neutral -0.04; SPSB -1.11 gate-blocked; VIK -1.08 ELIGIBLE (-6.5% vs 20d SMA breakdown) -> put proposed; IWM -1.01 gate-blocked] put_proposals=2 put_approved=0 auto_hedge=flat proxy_put=IWM skipped: structure already open
+2026-09-10 10:19:22,056 INFO orchestrator | Cycle budget not fully deployed: $32.60 dropped by whole-share flooring across this cycle's buys (stays cash; core sweep / next cycle can redeploy).
+2026-09-10 10:19:22,237 INFO alpaca | Alpaca client ready (mode=paper).
+2026-09-10 10:19:23,976 INFO dashboard | Wrote dashboard with 48 trades -> dashboard.html
+2026-09-10 11:06:35,697 INFO orchestrator | Order 4c181a63-0801-4439-8f4e-1e10e305af48 (SMCI) FILLED (702/702) @ 38.6300 x 702 [ledger stamped].
+2026-09-10 11:06:37,060 INFO orchestrator | Market regime: SPY above 200dma (759 vs 712, today -0.5%), VIX 17.5, VIX3M 19.4 (contango), QQQ+IWM below 50dma (narrow breadth) -> neutral, size x0.70.
+2026-09-10 11:06:39,291 INFO orchestrator | BOOK BETA: spy=1.20 qqq=0.85 iwm=1.01 invested=63.5% [options at debit notional x underlying beta: HD,IWM]
+2026-09-10 11:06:39,465 INFO alpaca | BUY market PSQ qty=None notional=204390.91 lim=None (order 436faf33-ad59-484b-8179-9a94d5bda86f)
+2026-09-10 11:06:39,470 INFO ledger | Ledger: BUY PSQ qty=7834.07 $204391
+2026-09-10 11:06:39,475 WARNING orchestrator | AUTO-HEDGE: beta: book spy-beta 1.20 > target 1.00 + 0.15 band — bought $204391 of PSQ (hedge $204391/$204391, ceiling 40% of equity).
+2026-09-10 11:06:39,756 INFO quiver | Quiver live/congresstrading -> 1000 row(s).
+2026-09-10 11:06:39,900 INFO screener | EDGAR Form-4 feed -> 57 filing(s) (scanning up to 100).
+2026-09-10 11:07:04,156 INFO screener | Options-flow most-actives pool -> 40 name(s).
+2026-09-10 11:07:32,181 INFO screener | Screener liquidity floor dropped 8/36 pre-cap: IRIX $0.67<$5, GPRO $1.51<$5, NVD $3.97<$5, GRAB $3.02<$5, PLUG $2.13<$5, OPEN $2.85<$5, TSLG $4.86<$5, NIO $3.62<$5
+2026-09-10 11:07:32,190 INFO screener | Discovered 18 candidate(s) from 3 source(s) (189 merged, 28 above min_score, capped to 18).
+2026-09-10 11:07:32,193 INFO screener |   candidate SPSB [options_flow] score=-0.90 — Options flow: 6 call / 115 put vol (bearish put imbalance -0.90) on a most-active name.
+2026-09-10 11:07:32,197 INFO screener |   candidate NU [options_flow] score=+0.84 — Options flow: 34,310 call / 2,989 put vol (bullish call imbalance +0.84) on a most-active name.
+2026-09-10 11:07:32,199 INFO screener |   candidate SPDN [options_flow] score=+0.82 — Options flow: 103 call / 10 put vol (bullish call imbalance +0.82) on a most-active name.
+2026-09-10 11:07:32,203 INFO screener |   candidate SNDQ [options_flow] score=+0.59 — Options flow: 2,324 call / 595 put vol (bullish call imbalance +0.59) on a most-active name.
+2026-09-10 11:07:32,206 INFO screener |   candidate ONDS [options_flow] score=+0.53 — Options flow: 23,293 call / 7,211 put vol (bullish call imbalance +0.53) on a most-active name.
+2026-09-10 11:07:32,209 INFO screener |   candidate SPCH [options_flow] score=+0.51 — Options flow: 8,083 call / 2,648 put vol (bullish call imbalance +0.51) on a most-active name.
+2026-09-10 11:07:32,211 INFO screener |   candidate AAPL [congress+options_flow] score=+0.49 — Congress: 2 buy / 3 sell filings in last 60d (disclosures lag up to ~45d). | Options flow: 1,047,933 call / 320,447 put vol (bullish call imbalance +0.53) on a most-active name.
+2026-09-10 11:07:32,213 INFO screener |   candidate CIFR [options_flow] score=+0.34 — Options flow: 95,957 call / 47,519 put vol (bullish call imbalance +0.34) on a most-active name.
+2026-09-10 11:07:32,215 INFO screener |   candidate SNXX [options_flow] score=+0.31 — Options flow: 17,875 call / 9,335 put vol (bullish call imbalance +0.31) on a most-active name.
+2026-09-10 11:07:32,217 INFO screener |   candidate SOXS [options_flow] score=+0.31 — Options flow: 17,253 call / 9,063 put vol (bullish call imbalance +0.31) on a most-active name.
+2026-09-10 11:07:32,219 INFO screener |   candidate TPL [insider] score=+0.30 — Insider: 1 open-market buy filing(s), 1 sh (SEC Form 4, last filings feed).
+2026-09-10 11:07:32,220 INFO screener |   candidate FUSB [insider] score=+0.30 — Insider: 1 open-market buy filing(s), 1,161 sh (SEC Form 4, last filings feed).
+2026-09-10 11:07:32,221 INFO screener |   candidate ATLO [insider] score=+0.30 — Insider: 1 open-market buy filing(s), 300 sh (SEC Form 4, last filings feed).
+2026-09-10 11:07:32,223 INFO screener |   candidate SQQQ [options_flow] score=+0.30 — Options flow: 32,357 call / 17,293 put vol (bullish call imbalance +0.30) on a most-active name.
+2026-09-10 11:07:32,224 INFO screener |   candidate CLH [congress] score=-0.23 — Congress: 0 buy / 4 sell filings in last 60d (disclosures lag up to ~45d).
+2026-09-10 11:07:32,225 INFO screener |   candidate MKL [congress] score=-0.23 — Congress: 0 buy / 5 sell filings in last 60d (disclosures lag up to ~45d).
+2026-09-10 11:07:32,227 INFO screener |   candidate VIK [congress] score=-0.23 — Congress: 0 buy / 7 sell filings in last 60d (disclosures lag up to ~45d).
+2026-09-10 11:07:32,228 INFO screener |   candidate BE [congress] score=+0.23 — Congress: 4 buy / 0 sell filings in last 60d (disclosures lag up to ~45d).
+2026-09-10 11:07:49,227 INFO quiver | Quiver live/offexchange -> 5555 row(s).
+2026-09-10 11:07:49,781 INFO quiver | Quiver live/govcontractsall -> 20000 row(s).
+2026-09-10 11:07:50,858 INFO quiver | Quiver live/lobbying -> 20000 row(s).
+2026-09-10 11:08:51,598 INFO signals | options_chain: reading 25 of 31 symbols this cycle (cap).
+2026-09-10 11:08:58,474 INFO signals | Gathered signals for 31/31 symbols (+3 market signals).
+2026-09-10 11:08:58,524 INFO orchestrator | Composite index (31 scored, top: SEI +2.74, GRNT +2.51, NOK +1.83, PFE +1.76, SNXX +1.61, INTC +1.47, VALE +1.47, SPCX +1.45; bear tail: CLH -1.49, HD -1.25, SPSB -1.11, VIK -1.08, IWM -1.01).
+2026-09-10 11:08:58,526 INFO orchestrator | NAME FALLING: DRAM -4.4% today vs SPY -0.5% — defense read armed (loss-cut release + HELD-line note).
+2026-09-10 11:08:58,527 INFO orchestrator | NAME FALLING: INTC -4.4% today vs SPY -0.5% — defense read armed (loss-cut release + HELD-line note).
+2026-09-10 11:08:58,779 INFO orchestrator | FEEDS: 3/3 healthy news=vader-fallback
+2026-09-10 11:08:58,791 INFO orchestrator | Buy-excluded from slate this cycle: AAPL (exited 21.9h ago (cooldown 24h)), INTC (topped up 2.6h ago (next ok in 4h)), SMCI (topped up 0.8h ago (next ok in 4h)), SNXX (exited 2.3h ago (cooldown 24h))
+2026-09-10 11:10:05,621 INFO usage | decision call: 21343 in / 4518 out (cache r=6485 w=0) ~$0.2229 [claude-opus-4-8]
+2026-09-10 11:10:05,628 INFO decision | Claude returned 4 proposal(s), 2 bearish verdict(s).
+2026-09-10 11:10:05,632 INFO orchestrator | Bearish verdict: HD DECLINED — RSI 31 near-oversold with neutral options positioning (chain -0.03, flow -0.02) and no fresh downside catalyst; downtrend/insider-selling thesis lacks flow conf
+2026-09-10 11:10:05,846 WARNING options | no quote available for VIK261016P00045000 — contract unknown to feed
+2026-09-10 11:10:06,035 WARNING options | no quote available for VIK261016P00045000 — contract unknown to feed
+2026-09-10 11:10:06,407 INFO risk | REJECT buy VIK: Net credit / no debit — not a bounded-loss debit play.
+2026-09-10 11:10:06,410 INFO orchestrator | OPTION OptionStrategy.LONG_PUT VIK -> rejected: Net credit / no debit — not a bounded-loss debit play. | Corroborated breakdown: -6.8% vs 20d SMA (gate passes), MACD bear/RSI 33, heavy insider open-market 
+2026-09-10 11:10:09,986 INFO risk | REJECT buy GRNT: Top-up conviction 0.62 shows no new edge over prior entry 0.60 (needs +0.05) — 'adding to a winner' is not a signal.
+2026-09-10 11:10:09,990 INFO orchestrator | BUY GRNT -> rejected: Top-up conviction 0.62 shows no new edge over prior entry 0.60 (needs +0.05) — 'adding to a winner' is not a signal. | Top-up on strongest composite on the slate (+2.51). Fundamentals +0.77 (59.8% margin, +37.3% rev gro
+2026-09-10 11:10:10,234 INFO orchestrator | HOLD DRAM (no action) | Held -5.0% with NAME FALLING armed, but composite still +1.06, technical +0.56 and bullish options p
+2026-09-10 11:10:10,477 INFO orchestrator | HOLD PFE (no action) | Held -5.2% with only 0.5pp of stop room; mechanical stop essentially owns this now. Thesis intact — 
+2026-09-10 11:10:10,484 INFO orchestrator | BEARISH FUNNEL: slate_bearish=5 [CLH -1.49 gate-blocked; HD -1.25 ELIGIBLE (below its 200dma) -> declined: RSI 31 near-oversold with neutral options positioning (chain; SPSB -1.11 gate-blocked; VIK -1.08 ELIGIBLE (-6.8% vs 20d SMA breakdown) -> put proposed; IWM -1.01 gate-blocked] put_proposals=1 put_approved=0 auto_hedge=$204,391 PSQ(beta:1.20) proxy_put=none
+2026-09-10 11:10:10,553 INFO alpaca | Alpaca client ready (mode=paper).
+2026-09-10 11:10:12,446 INFO dashboard | Wrote dashboard with 49 trades -> dashboard.html
+2026-09-10 11:58:53,911 INFO orchestrator | Order 436faf33-ad59-484b-8179-9a94d5bda86f (PSQ) FILLED (7834.07/0) @ 26.0900 x 7834.07 [ledger stamped].
+2026-09-10 11:58:55,260 INFO orchestrator | Market regime: SPY above 200dma (759 vs 712, today -0.4%), VIX 17.5, VIX3M 19.5 (contango) -> risk-on, size x1.00.
+2026-09-10 11:58:57,048 INFO orchestrator | BOOK BETA: spy=0.90 qqq=0.65 iwm=0.78 invested=83.3% [options at debit notional x underlying beta: HD,IWM]
+2026-09-10 11:58:57,055 INFO orchestrator | Auto-hedge: beta: book spy-beta 0.90 within 1.00 +/- 0.15 — holding $204156 PSQ.
+2026-09-10 11:58:57,354 INFO quiver | Quiver live/congresstrading -> 1000 row(s).
+2026-09-10 11:58:57,696 INFO screener | EDGAR Form-4 feed -> 62 filing(s) (scanning up to 100).
+2026-09-10 11:59:24,337 INFO screener | Options-flow most-actives pool -> 40 name(s).
+2026-09-10 11:59:51,693 INFO screener | Screener liquidity floor dropped 6/37 pre-cap: GPRO $1.50<$5, NVD $3.98<$5, PLUG $2.12<$5, TSLG $4.84<$5, NIO $3.62<$5, OPEN $2.84<$5
+2026-09-10 11:59:51,700 INFO screener | Discovered 18 candidate(s) from 3 source(s) (189 merged, 31 above min_score, capped to 18).
+2026-09-10 11:59:51,704 INFO screener |   candidate SPSB [options_flow] score=-0.90 — Options flow: 6 call / 115 put vol (bearish put imbalance -0.90) on a most-active name.
+2026-09-10 11:59:51,707 INFO screener |   candidate NU [options_flow] score=+0.84 — Options flow: 35,861 call / 3,186 put vol (bullish call imbalance +0.84) on a most-active name.
+2026-09-10 11:59:51,710 INFO screener |   candidate HYG [options_flow] score=-0.83 — Options flow: 22,590 call / 237,302 put vol (bearish put imbalance -0.83) on a most-active name.
+2026-09-10 11:59:51,713 INFO screener |   candidate SPDN [options_flow] score=+0.82 — Options flow: 103 call / 10 put vol (bullish call imbalance +0.82) on a most-active name.
+2026-09-10 11:59:51,715 INFO screener |   candidate SNDQ [options_flow] score=+0.57 — Options flow: 2,481 call / 676 put vol (bullish call imbalance +0.57) on a most-active name.
+2026-09-10 11:59:51,717 INFO screener |   candidate AAPL [congress+options_flow] score=+0.51 — Congress: 2 buy / 3 sell filings in last 60d (disclosures lag up to ~45d). | Options flow: 1,388,403 call / 399,539 put vol (bullish call imbalance +0.55) on a most-active name.
+2026-09-10 11:59:51,720 INFO screener |   candidate ONDS [options_flow] score=+0.50 — Options flow: 24,700 call / 8,246 put vol (bullish call imbalance +0.50) on a most-active name.
+2026-09-10 11:59:51,723 INFO screener |   candidate TLT [options_flow] score=-0.43 — Options flow: 191,653 call / 482,456 put vol (bearish put imbalance -0.43) on a most-active name.
+2026-09-10 11:59:51,725 INFO screener |   candidate AAL [options_flow] score=-0.38 — Options flow: 10,929 call / 24,163 put vol (bearish put imbalance -0.38) on a most-active name.
+2026-09-10 11:59:51,727 INFO screener |   candidate SQQQ [options_flow] score=+0.36 — Options flow: 51,232 call / 23,911 put vol (bullish call imbalance +0.36) on a most-active name.
+2026-09-10 11:59:51,729 INFO screener |   candidate CIFR [options_flow] score=+0.35 — Options flow: 102,080 call / 48,604 put vol (bullish call imbalance +0.35) on a most-active name.
+2026-09-10 11:59:51,731 INFO screener |   candidate F [options_flow] score=+0.35 — Options flow: 32,142 call / 15,530 put vol (bullish call imbalance +0.35) on a most-active name.
+2026-09-10 11:59:51,732 INFO screener |   candidate SNXX [options_flow] score=+0.31 — Options flow: 19,268 call / 10,202 put vol (bullish call imbalance +0.31) on a most-active name.
+2026-09-10 11:59:51,734 INFO screener |   candidate SOXS [options_flow] score=+0.31 — Options flow: 18,789 call / 9,990 put vol (bullish call imbalance +0.31) on a most-active name.
+2026-09-10 11:59:51,735 INFO screener |   candidate GIPL [insider] score=+0.30 — Insider: 1 open-market buy filing(s), 2,500 sh (SEC Form 4, last filings feed).
+2026-09-10 11:59:51,737 INFO screener |   candidate FRST [insider] score=+0.30 — Insider: 1 open-market buy filing(s), 1,565 sh (SEC Form 4, last filings feed).
+2026-09-10 11:59:51,738 INFO screener |   candidate UBER [congress+insider] score=+0.24 — Congress: 0 buy / 1 sell filings in last 60d (disclosures lag up to ~45d). | Insider: 1 open-market buy filing(s), 141,000 sh (SEC Form 4, last filings feed).
+2026-09-10 11:59:51,740 INFO screener |   candidate CLH [congress] score=-0.23 — Congress: 0 buy / 4 sell filings in last 60d (disclosures lag up to ~45d).
+2026-09-10 12:00:10,050 INFO quiver | Quiver live/offexchange -> 5555 row(s).
+2026-09-10 12:00:10,808 INFO quiver | Quiver live/govcontractsall -> 20000 row(s).
+2026-09-10 12:00:12,083 INFO quiver | Quiver live/lobbying -> 20000 row(s).
+2026-09-10 12:01:26,908 INFO signals | options_chain: reading 25 of 31 symbols this cycle (cap).
+2026-09-10 12:01:34,689 INFO signals | Gathered signals for 31/31 symbols (+3 market signals).
+2026-09-10 12:01:34,747 INFO orchestrator | Composite index (31 scored, top: SEI +2.90, GRNT +2.51, PFE +1.88, NOK +1.82, VALE +1.62, SPCX +1.43, INTC +1.37, SMCI +1.26; bear tail: AAL -1.76, CLH -1.47, HD -1.21, HYG -1.12, SPSB -1.11, IWM -1.03).
+2026-09-10 12:01:34,764 INFO orchestrator | NAME FALLING: DRAM -4.8% today vs SPY -0.4% — defense read armed (loss-cut release + HELD-line note).
+2026-09-10 12:01:34,770 INFO orchestrator | NAME FALLING: INTC -4.6% today vs SPY -0.4% — defense read armed (loss-cut release + HELD-line note).
+2026-09-10 12:01:35,146 INFO orchestrator | FEEDS: 3/3 healthy news=vader-fallback
+2026-09-10 12:01:35,159 INFO orchestrator | Buy-excluded from slate this cycle: AAPL (exited 22.8h ago (cooldown 24h)), GIPL (price $0.50 < $5 liquidity floor), INTC (topped up 3.4h ago (next ok in 4h)), SMCI (topped up 1.7h ago (next ok in 4h)), SNXX (exited 3.1h ago (cooldown 24h))
+2026-09-10 12:02:37,551 INFO usage | decision call: 20710 in / 4414 out (cache r=6485 w=0) ~$0.2171 [claude-opus-4-8]
+2026-09-10 12:02:37,557 INFO decision | Claude returned 3 proposal(s), 3 bearish verdict(s).
+2026-09-10 12:02:37,562 INFO orchestrator | Bearish verdict: HD DECLINED — Bearish thesis not confirmed by positioning: options flow neutral (+0.02) and chain neutral (-0.03); RSI 31 deeply oversold creates near-term bounce risk. No fr
+2026-09-10 12:02:37,565 INFO orchestrator | Bearish verdict: TLT DECLINED — Thin composite (-0.83) with no options_chain confirmation and RSI 39 not yet broken; rate-driven ETF at lowest since 2004 risks a mean-reversion bounce. Put flo
+2026-09-10 12:02:37,612 INFO orchestrator | Cycle budget $152,410 split across 2 buy(s): SEI $85,296, GRNT $67,114.
+2026-09-10 12:02:40,846 INFO risk | REJECT buy SEI: Top-up conviction 0.66 shows no new edge over prior entry 0.66 (needs +0.05) — 'adding to a winner' is not a signal.
+2026-09-10 12:02:40,852 INFO orchestrator | BUY SEI -> rejected: Top-up conviction 0.66 shows no new edge over prior entry 0.66 (needs +0.05) — 'adding to a winner' is not a signal. | Top-up on held name with the strongest composite on the slate (+2.90). Fundamentals +0.67 (35.4% mar
+2026-09-10 12:02:41,300 INFO risk | REJECT buy GRNT: Top-up conviction 0.60 shows no new edge over prior entry 0.60 (needs +0.05) — 'adding to a winner' is not a signal.
+2026-09-10 12:02:41,306 INFO orchestrator | BUY GRNT -> rejected: Top-up conviction 0.60 shows no new edge over prior entry 0.60 (needs +0.05) — 'adding to a winner' is not a signal. | Top-up on held name with the highest new-name composite (+2.51). Fundamentals +0.77 (59.8% margin, +
+2026-09-10 12:02:42,244 INFO risk | REJECT buy AAL: Leg AAL261016P00011000 bid-ask spread 12.5% > 10.0% cap — round-trip friction too high.
+2026-09-10 12:02:42,246 INFO orchestrator | OPTION OptionStrategy.BEAR_PUT_SPREAD AAL -> rejected: Leg AAL261016P00011000 bid-ask spread 12.5% > 10.0% cap — round-trip friction too high. | Corroborated breakdown: composite -1.76, name below its 200dma with MACD bear/downtrend, hard inside
+2026-09-10 12:02:42,250 INFO orchestrator | BEARISH FUNNEL: slate_bearish=7 [AAL -1.76 ELIGIBLE (below its 200dma) -> put proposed; CLH -1.47 gate-blocked; HD -1.21 ELIGIBLE (below its 200dma) -> declined: Bearish thesis not confirmed by positioning: options flow ne; HYG -1.12 gate-blocked; SPSB -1.11 gate-blocked; IWM -1.03 gate-blocked] put_proposals=1 put_approved=0 auto_hedge=$204,156 PSQ(beta:0.90) proxy_put=IWM skipped: structure already open
+2026-09-10 12:02:42,312 INFO alpaca | Alpaca client ready (mode=paper).
+2026-09-10 12:02:44,131 INFO dashboard | Wrote dashboard with 49 trades -> dashboard.html
+2026-09-10 12:50:57,666 INFO orchestrator | Market regime: SPY above 200dma (758 vs 712, today -0.5%), VIX 17.4, VIX3M 19.5 (contango), QQQ+IWM below 50dma (narrow breadth) -> neutral, size x0.70.
+2026-09-10 12:50:59,637 INFO orchestrator | BOOK BETA: spy=0.89 qqq=0.65 iwm=0.78 invested=83.2% [options at debit notional x underlying beta: HD,IWM]
+2026-09-10 12:50:59,646 INFO orchestrator | Auto-hedge: beta: book spy-beta 0.89 within 1.00 +/- 0.15 — holding $204530 PSQ.
+2026-09-10 12:51:00,104 INFO quiver | Quiver live/congresstrading -> 1000 row(s).
+2026-09-10 12:51:01,456 INFO screener | EDGAR Form-4 feed -> 58 filing(s) (scanning up to 100).
+2026-09-10 12:51:25,127 INFO screener | Options-flow most-actives pool -> 40 name(s).
+2026-09-10 12:51:50,879 INFO screener | Screener liquidity floor dropped 7/38 pre-cap: RCG $2.86<$5, GPRO $1.43<$5, NVD $3.99<$5, PLUG $2.12<$5, TSLG $4.86<$5, OPEN $2.83<$5, NIO $3.62<$5
+2026-09-10 12:51:50,886 INFO screener | Discovered 18 candidate(s) from 3 source(s) (189 merged, 31 above min_score, capped to 18).
+2026-09-10 12:51:50,889 INFO screener |   candidate NU [options_flow] score=+0.85 — Options flow: 36,745 call / 2,944 put vol (bullish call imbalance +0.85) on a most-active name.
+2026-09-10 12:51:50,892 INFO screener |   candidate HYG [options_flow] score=-0.83 — Options flow: 22,837 call / 240,042 put vol (bearish put imbalance -0.83) on a most-active name.
+2026-09-10 12:51:50,894 INFO screener |   candidate SPDN [options_flow] score=+0.82 — Options flow: 103 call / 10 put vol (bullish call imbalance +0.82) on a most-active name.
+2026-09-10 12:51:50,896 INFO screener |   candidate VTEB [options_flow] score=-0.68 — Options flow: 18 call / 96 put vol (bearish put imbalance -0.68) on a most-active name.
+2026-09-10 12:51:50,898 INFO screener |   candidate SNDQ [options_flow] score=+0.57 — Options flow: 2,537 call / 688 put vol (bullish call imbalance +0.57) on a most-active name.
+2026-09-10 12:51:50,900 INFO screener |   candidate AAPL [congress+options_flow] score=+0.50 — Congress: 2 buy / 3 sell filings in last 60d (disclosures lag up to ~45d). | Options flow: 1,662,210 call / 492,378 put vol (bullish call imbalance +0.54) on a most-active name.
+2026-09-10 12:51:50,904 INFO screener |   candidate ONDS [options_flow] score=+0.49 — Options flow: 27,073 call / 9,312 put vol (bullish call imbalance +0.49) on a most-active name.
+2026-09-10 12:51:50,906 INFO screener |   candidate KVUE [congress+options_flow] score=-0.43 — Congress: 0 buy / 2 sell filings in last 60d (disclosures lag up to ~45d). | Options flow: 731 call / 1,403 put vol (bearish put imbalance -0.32) on a most-active name.
+2026-09-10 12:51:50,909 INFO screener |   candidate LRCX [congress+insider] score=-0.42 — Congress: 0 buy / 1 sell filings in last 60d (disclosures lag up to ~45d). | Insider: 2 open-market SELL filing(s), 39,557 sh — bearish cluster (SEC Form 4, last filings feed).
+2026-09-10 12:51:50,911 INFO screener |   candidate SQQQ [options_flow] score=+0.40 — Options flow: 57,954 call / 24,658 put vol (bullish call imbalance +0.40) on a most-active name.
+2026-09-10 12:51:50,913 INFO screener |   candidate AAL [options_flow] score=-0.37 — Options flow: 11,536 call / 25,218 put vol (bearish put imbalance -0.37) on a most-active name.
+2026-09-10 12:51:50,914 INFO screener |   candidate CIFR [options_flow] score=+0.36 — Options flow: 105,578 call / 49,725 put vol (bullish call imbalance +0.36) on a most-active name.
+2026-09-10 12:51:50,916 INFO screener |   candidate F [options_flow] score=+0.34 — Options flow: 34,983 call / 17,078 put vol (bullish call imbalance +0.34) on a most-active name.
+2026-09-10 12:51:50,917 INFO screener |   candidate SNXX [options_flow] score=+0.34 — Options flow: 21,577 call / 10,734 put vol (bullish call imbalance +0.34) on a most-active name.
+2026-09-10 12:51:50,919 INFO screener |   candidate SOXS [options_flow] score=+0.31 — Options flow: 19,779 call / 10,400 put vol (bullish call imbalance +0.31) on a most-active name.
+2026-09-10 12:51:50,920 INFO screener |   candidate CSBB [insider] score=+0.30 — Insider: 1 open-market buy filing(s), 38 sh (SEC Form 4, last filings feed).
+2026-09-10 12:51:50,922 INFO screener |   candidate ELTP [insider] score=+0.30 — Insider: 1 open-market buy filing(s), 30,000 sh (SEC Form 4, last filings feed).
+2026-09-10 12:51:50,923 INFO screener |   candidate CLH [congress] score=-0.23 — Congress: 0 buy / 4 sell filings in last 60d (disclosures lag up to ~45d).
+2026-09-10 12:52:08,983 INFO quiver | Quiver live/offexchange -> 5555 row(s).
+2026-09-10 12:52:09,565 INFO quiver | Quiver live/govcontractsall -> 20000 row(s).
+2026-09-10 12:52:13,809 INFO quiver | Quiver live/lobbying -> 20000 row(s).
+2026-09-10 12:52:54,458 INFO signals | options_chain: reading 25 of 31 symbols this cycle (cap).
+2026-09-10 12:53:02,015 INFO signals | Gathered signals for 31/31 symbols (+3 market signals).
+2026-09-10 12:53:02,064 INFO orchestrator | Composite index (31 scored, top: SEI +3.12, GRNT +2.51, NOK +1.94, PFE +1.88, VALE +1.63, SPCX +1.47, INTC +1.41, SNDQ +1.31; bear tail: AAL -1.85, CLH -1.39, HD -1.19, HYG -1.12, IWM -1.03, VTEB -0.95).
+2026-09-10 12:53:02,065 INFO orchestrator | NAME FALLING: DRAM -4.9% today vs SPY -0.5% — defense read armed (loss-cut release + HELD-line note).
+2026-09-10 12:53:02,066 INFO orchestrator | NAME FALLING: INTC -4.9% today vs SPY -0.5% — defense read armed (loss-cut release + HELD-line note).
+2026-09-10 12:53:02,307 INFO orchestrator | FEEDS: 3/3 healthy news=vader-fallback
+2026-09-10 12:53:02,316 INFO orchestrator | Buy-excluded from slate this cycle: AAPL (exited 23.6h ago (cooldown 24h)), ELTP (price $0.25 < $5 liquidity floor), SMCI (topped up 2.6h ago (next ok in 4h)), SNXX (exited 4.0h ago (cooldown 24h))
+2026-09-10 12:53:51,437 INFO usage | decision call: 20814 in / 3480 out (cache r=6485 w=0) ~$0.1943 [claude-opus-4-8]
+2026-09-10 12:53:51,445 INFO decision | Claude returned 4 proposal(s), 3 bearish verdict(s).
+2026-09-10 12:53:51,451 INFO orchestrator | Bearish verdict: HD DECLINED — Downtrend and insider selling present, but RSI 30 is oversold (bounce risk) and options positioning is neutral (chain -0.01, flow +0.02) — no bearish flow confi
+2026-09-10 12:53:51,454 INFO orchestrator | Bearish verdict: VTEB DECLINED — Muni-bond ETF with RSI 16 deeply oversold and negligible option liquidity (18 call/96 put total volume) — legs would fail the OI≥100 / spread liquidity gate and
+2026-09-10 12:53:51,510 INFO orchestrator | Cycle budget $152,414 split across 3 buy(s): SEI $68,327, GRNT $51,636, VALE $32,451.
+2026-09-10 12:53:52,341 INFO risk | REJECT buy AAL: Leg AAL261016P00010000 bid-ask spread 15.4% > 10.0% cap — round-trip friction too high.
+2026-09-10 12:53:52,343 INFO orchestrator | OPTION OptionStrategy.BEAR_PUT_SPREAD AAL -> rejected: Leg AAL261016P00010000 bid-ask spread 15.4% > 10.0% cap — round-trip friction too high. | Corroborated bearish breakdown: composite -1.85, price below its own 200dma, MACD bear (technical -0
+2026-09-10 12:53:55,420 INFO risk | REJECT buy SEI: Top-up conviction 0.66 shows no new edge over prior entry 0.66 (needs +0.05) — 'adding to a winner' is not a signal.
+2026-09-10 12:53:55,425 INFO orchestrator | BUY SEI -> rejected: Top-up conviction 0.66 shows no new edge over prior entry 0.66 (needs +0.05) — 'adding to a winner' is not a signal. | Top-up on held name with the strongest composite on the slate (+3.12). Fundamentals +0.67 (35.4% mar
+2026-09-10 12:53:55,782 INFO risk | REJECT buy GRNT: Top-up conviction 0.62 shows no new edge over prior entry 0.60 (needs +0.05) — 'adding to a winner' is not a signal.
+2026-09-10 12:53:55,786 INFO orchestrator | BUY GRNT -> rejected: Top-up conviction 0.62 shows no new edge over prior entry 0.60 (needs +0.05) — 'adding to a winner' is not a signal. | Top-up on held name carrying the highest new-name composite (+2.51). Fundamentals +0.77 (59.8% margi
+2026-09-10 12:53:56,258 INFO risk | REJECT buy VALE: Top-up conviction 0.60 shows no new edge over prior entry 0.60 (needs +0.05) — 'adding to a winner' is not a signal.
+2026-09-10 12:53:56,262 INFO orchestrator | BUY VALE -> rejected: Top-up conviction 0.60 shows no new edge over prior entry 0.60 (needs +0.05) — 'adding to a winner' is not a signal. | Top-up on freshly held name, composite +1.63. Solid fundamentals +0.46 ($77.3B EBITDA, 35.5% margin)
+2026-09-10 12:53:56,267 INFO orchestrator | BEARISH FUNNEL: slate_bearish=6 [AAL -1.85 ELIGIBLE (below its 200dma) -> put proposed; CLH -1.39 gate-blocked; HD -1.19 ELIGIBLE (below its 200dma) -> declined: Downtrend and insider selling present, but RSI 30 is oversol; HYG -1.12 gate-blocked; IWM -1.03 gate-blocked; VTEB -0.95 ELIGIBLE (below its 200dma) -> declined: Muni-bond ETF with RSI 16 deeply oversold and negligible opt] put_proposals=1 put_approved=0 auto_hedge=$204,530 PSQ(beta:0.89) proxy_put=IWM skipped: structure already open
+2026-09-10 12:53:56,334 INFO alpaca | Alpaca client ready (mode=paper).
+2026-09-10 12:53:58,228 INFO dashboard | Wrote dashboard with 49 trades -> dashboard.html
+2026-09-10 13:43:11,124 INFO orchestrator | Market regime: SPY above 200dma (758 vs 712, today -0.6%), VIX 17.8, VIX3M 19.7 (contango), QQQ+IWM below 50dma (narrow breadth) -> neutral, size x0.70.
+2026-09-10 13:43:12,850 INFO orchestrator | BOOK BETA: spy=0.89 qqq=0.65 iwm=0.78 invested=83.2% [options at debit notional x underlying beta: HD,IWM]
+2026-09-10 13:43:12,858 INFO orchestrator | Auto-hedge: beta: book spy-beta 0.89 within 1.00 +/- 0.15 — holding $204626 PSQ.
+2026-09-10 13:43:13,198 INFO quiver | Quiver live/congresstrading -> 1000 row(s).
+2026-09-10 13:43:14,420 INFO screener | EDGAR Form-4 feed -> 56 filing(s) (scanning up to 100).
+2026-09-10 13:43:38,051 INFO screener | Options-flow most-actives pool -> 40 name(s).
+2026-09-10 13:44:17,190 INFO screener | Screener liquidity floor dropped 7/35 pre-cap: GPRO $1.43<$5, NVD $4.00<$5, TSLG $4.84<$5, PLUG $2.11<$5, OPEN $2.80<$5, RWT $3.62<$5, NIO $3.60<$5
+2026-09-10 13:44:17,201 INFO screener | Discovered 18 candidate(s) from 3 source(s) (187 merged, 28 above min_score, capped to 18).
+2026-09-10 13:44:17,204 INFO screener |   candidate HYG [options_flow] score=-0.84 — Options flow: 24,424 call / 277,683 put vol (bearish put imbalance -0.84) on a most-active name.
+2026-09-10 13:44:17,209 INFO screener |   candidate SPDN [options_flow] score=+0.82 — Options flow: 103 call / 10 put vol (bullish call imbalance +0.82) on a most-active name.
+2026-09-10 13:44:17,212 INFO screener |   candidate NU [options_flow] score=+0.81 — Options flow: 37,310 call / 3,829 put vol (bullish call imbalance +0.81) on a most-active name.
+2026-09-10 13:44:17,216 INFO screener |   candidate VTEB [options_flow] score=-0.68 — Options flow: 18 call / 96 put vol (bearish put imbalance -0.68) on a most-active name.
+2026-09-10 13:44:17,218 INFO screener |   candidate SNDQ [options_flow] score=+0.55 — Options flow: 2,659 call / 772 put vol (bullish call imbalance +0.55) on a most-active name.
+2026-09-10 13:44:17,221 INFO screener |   candidate NWPX [insider] score=-0.55 — Insider: 3 open-market SELL filing(s), 6,500 sh — bearish cluster (SEC Form 4, last filings feed).
+2026-09-10 13:44:17,223 INFO screener |   candidate AAPL [congress+options_flow] score=+0.46 — Congress: 2 buy / 3 sell filings in last 60d (disclosures lag up to ~45d). | Options flow: 1,797,482 call / 587,272 put vol (bullish call imbalance +0.51) on a most-active name.
+2026-09-10 13:44:17,226 INFO screener |   candidate ONDS [options_flow] score=+0.46 — Options flow: 28,001 call / 10,469 put vol (bullish call imbalance +0.46) on a most-active name.
+2026-09-10 13:44:17,229 INFO screener |   candidate KVUE [congress+options_flow] score=-0.43 — Congress: 0 buy / 2 sell filings in last 60d (disclosures lag up to ~45d). | Options flow: 765 call / 1,456 put vol (bearish put imbalance -0.31) on a most-active name.
+2026-09-10 13:44:17,232 INFO screener |   candidate IVZ [insider] score=-0.36 — Insider: 2 open-market SELL filing(s), 188,465 sh — bearish cluster (SEC Form 4, last filings feed).
+2026-09-10 13:44:17,235 INFO screener |   candidate CIFR [options_flow] score=+0.36 — Options flow: 108,401 call / 51,031 put vol (bullish call imbalance +0.36) on a most-active name.
+2026-09-10 13:44:17,237 INFO screener |   candidate SQQQ [options_flow] score=+0.35 — Options flow: 60,119 call / 28,951 put vol (bullish call imbalance +0.35) on a most-active name.
+2026-09-10 13:44:17,239 INFO screener |   candidate SOXS [options_flow] score=+0.33 — Options flow: 20,948 call / 10,596 put vol (bullish call imbalance +0.33) on a most-active name.
+2026-09-10 13:44:17,240 INFO screener |   candidate SNXX [options_flow] score=+0.33 — Options flow: 22,161 call / 11,246 put vol (bullish call imbalance +0.33) on a most-active name.
+2026-09-10 13:44:17,242 INFO screener |   candidate CLH [congress] score=-0.23 — Congress: 0 buy / 4 sell filings in last 60d (disclosures lag up to ~45d).
+2026-09-10 13:44:17,244 INFO screener |   candidate MKL [congress] score=-0.23 — Congress: 0 buy / 5 sell filings in last 60d (disclosures lag up to ~45d).
+2026-09-10 13:44:17,245 INFO screener |   candidate VIK [congress] score=-0.23 — Congress: 0 buy / 7 sell filings in last 60d (disclosures lag up to ~45d).
+2026-09-10 13:44:17,246 INFO screener |   candidate BE [congress] score=+0.23 — Congress: 4 buy / 0 sell filings in last 60d (disclosures lag up to ~45d).
+2026-09-10 13:44:33,310 INFO quiver | Quiver live/offexchange -> 5555 row(s).
+2026-09-10 13:44:33,947 INFO quiver | Quiver live/govcontractsall -> 20000 row(s).
+2026-09-10 13:44:39,856 INFO quiver | Quiver live/lobbying -> 20000 row(s).
+2026-09-10 13:45:26,491 INFO signals | options_chain: reading 25 of 31 symbols this cycle (cap).
+2026-09-10 13:45:34,355 INFO signals | Gathered signals for 31/31 symbols (+3 market signals).
+2026-09-10 13:45:34,406 INFO orchestrator | Composite index (31 scored, top: SEI +3.01, GRNT +2.51, NOK +1.85, PFE +1.83, VALE +1.62, SPCX +1.43, INTC +1.34, NU +1.32; bear tail: CLH -1.36, HD -1.19, HYG -1.13, IWM -1.13, VIK -0.94, VTEB -0.94).
+2026-09-10 13:45:34,407 INFO orchestrator | NAME FALLING: DRAM -4.8% today vs SPY -0.6% — defense read armed (loss-cut release + HELD-line note).
+2026-09-10 13:45:34,408 INFO orchestrator | NAME FALLING: INTC -4.6% today vs SPY -0.6% — defense read armed (loss-cut release + HELD-line note).
+2026-09-10 13:45:34,732 INFO orchestrator | FEEDS: 3/3 healthy news=vader-fallback
+2026-09-10 13:45:34,740 INFO orchestrator | Buy-excluded from slate this cycle: SMCI (topped up 3.4h ago (next ok in 4h)), SNXX (exited 4.9h ago (cooldown 24h))
+2026-09-10 13:46:16,110 INFO usage | decision call: 22725 in / 2760 out (cache r=6485 w=0) ~$0.1859 [claude-opus-4-8]
+2026-09-10 13:46:16,118 INFO decision | Claude returned 2 proposal(s), 3 bearish verdict(s).
+2026-09-10 13:46:16,123 INFO orchestrator | Bearish verdict: HD DECLINED — RSI 30 oversold and options_chain is neutral (+0.03, skew +0.5pts, P/C OI 0.90) with flow imbalance flat (-0.01) — no fresh bearish flow/chain confirmation to t
+2026-09-10 13:46:16,127 INFO orchestrator | Bearish verdict: VIK DECLINED — Breakdown and insider/congress selling are genuine, but options flow is thin and only mildly bearish (-0.29 on 526/1082 contracts), fundamentals are positive (+
+2026-09-10 13:46:16,130 INFO orchestrator | Bearish verdict: VTEB DECLINED — Muni-bond ETF at RSI 15 (extreme oversold) with negligible option volume (18 call / 96 put) — chain is illiquid and would fail the OI≥100 / spread gate, and an 
+2026-09-10 13:46:19,706 INFO risk | REJECT buy BE: At/over the 60% exposure-ladder cap (neutral regime; risk deployed $858,325 of $618,836).
+2026-09-10 13:46:19,710 INFO orchestrator | BUY BE -> rejected: At/over the 60% exposure-ladder cap (neutral regime; risk deployed $858,325 of $618,836). | NEW scanner name with strongest corroborated composite (+1.16). Technical +0.80 improving (RSI 62 no
+2026-09-10 13:46:19,830 INFO orchestrator | HOLD DRAM (no action) | Held -5.4% with NAME FALLING armed (-4.8% vs SPY -0.6%), but composite still +0.92 and technical +0.
+2026-09-10 13:46:19,837 INFO orchestrator | BEARISH FUNNEL: slate_bearish=6 [CLH -1.36 gate-blocked; HD -1.19 ELIGIBLE (below its 200dma) -> declined: RSI 30 oversold and options_chain is neutral (+0.03, skew +0; HYG -1.13 gate-blocked; IWM -1.13 gate-blocked; VIK -0.94 ELIGIBLE (-7.2% vs 20d SMA breakdown) -> declined: Breakdown and insider/congress selling are genuine, but opti; VTEB -0.94 ELIGIBLE (below its 200dma) -> declined: Muni-bond ETF at RSI 15 (extreme oversold) with negligible o] put_proposals=0 put_approved=0 auto_hedge=$204,626 PSQ(beta:0.89) proxy_put=none
+2026-09-10 13:46:19,902 INFO alpaca | Alpaca client ready (mode=paper).
+2026-09-10 13:46:21,703 INFO dashboard | Wrote dashboard with 49 trades -> dashboard.html
+2026-09-10 14:35:34,944 INFO orchestrator | Market regime: SPY above 200dma (758 vs 712, today -0.6%), VIX 18.1, VIX3M 19.8 (contango), QQQ+IWM below 50dma (narrow breadth) -> neutral, size x0.70.
+2026-09-10 14:35:37,518 INFO orchestrator | BOOK BETA: spy=0.89 qqq=0.65 iwm=0.78 invested=83.2% [options at debit notional x underlying beta: HD,IWM]
+2026-09-10 14:35:37,525 INFO orchestrator | Auto-hedge: beta: book spy-beta 0.89 within 1.00 +/- 0.15 — holding $204743 PSQ.
+2026-09-10 14:35:37,872 INFO quiver | Quiver live/congresstrading -> 1000 row(s).
+2026-09-10 14:35:38,120 INFO screener | EDGAR Form-4 feed -> 63 filing(s) (scanning up to 100).
+2026-09-10 14:36:04,724 INFO screener | Options-flow most-actives pool -> 40 name(s).
+2026-09-10 14:36:32,676 INFO screener | Screener liquidity floor dropped 7/35 pre-cap: GPRO $1.42<$5, NVD $3.99<$5, TSLG $4.80<$5, PLUG $2.10<$5, OPEN $2.80<$5, RWT $3.71<$5, NIO $3.60<$5
+2026-09-10 14:36:32,685 INFO screener | Discovered 18 candidate(s) from 3 source(s) (188 merged, 28 above min_score, capped to 18).
+2026-09-10 14:36:32,689 INFO screener |   candidate HYG [options_flow] score=-0.85 — Options flow: 26,017 call / 328,710 put vol (bearish put imbalance -0.85) on a most-active name.
+2026-09-10 14:36:32,693 INFO screener |   candidate SPDN [options_flow] score=+0.82 — Options flow: 103 call / 10 put vol (bullish call imbalance +0.82) on a most-active name.
+2026-09-10 14:36:32,696 INFO screener |   candidate NU [options_flow] score=+0.77 — Options flow: 38,724 call / 5,006 put vol (bullish call imbalance +0.77) on a most-active name.
+2026-09-10 14:36:32,698 INFO screener |   candidate VTEB [options_flow] score=-0.77 — Options flow: 18 call / 136 put vol (bearish put imbalance -0.77) on a most-active name.
+2026-09-10 14:36:32,701 INFO screener |   candidate AAL [options_flow] score=-0.51 — Options flow: 15,993 call / 49,524 put vol (bearish put imbalance -0.51) on a most-active name.
+2026-09-10 14:36:32,703 INFO screener |   candidate AAPL [congress+options_flow] score=+0.44 — Congress: 2 buy / 3 sell filings in last 60d (disclosures lag up to ~45d). | Options flow: 1,931,629 call / 667,080 put vol (bullish call imbalance +0.49) on a most-active name.
+2026-09-10 14:36:32,707 INFO screener |   candidate ONDS [options_flow] score=+0.40 — Options flow: 30,409 call / 12,989 put vol (bullish call imbalance +0.40) on a most-active name.
+2026-09-10 14:36:32,709 INFO screener |   candidate SQQQ [options_flow] score=+0.38 — Options flow: 64,724 call / 29,274 put vol (bullish call imbalance +0.38) on a most-active name.
+2026-09-10 14:36:32,711 INFO screener |   candidate TFSL [insider] score=-0.36 — Insider: 2 open-market SELL filing(s), 20,000 sh — bearish cluster (SEC Form 4, last filings feed).
+2026-09-10 14:36:32,713 INFO screener |   candidate SNXX [options_flow] score=+0.35 — Options flow: 24,181 call / 11,668 put vol (bullish call imbalance +0.35) on a most-active name.
+2026-09-10 14:36:32,714 INFO screener |   candidate SOXS [options_flow] score=+0.35 — Options flow: 22,617 call / 10,903 put vol (bullish call imbalance +0.35) on a most-active name.
+2026-09-10 14:36:32,716 INFO screener |   candidate MARA [options_flow] score=+0.34 — Options flow: 54,986 call / 26,907 put vol (bullish call imbalance +0.34) on a most-active name.
+2026-09-10 14:36:32,718 INFO screener |   candidate CIFR [options_flow] score=+0.34 — Options flow: 117,116 call / 57,604 put vol (bullish call imbalance +0.34) on a most-active name.
+2026-09-10 14:36:32,719 INFO screener |   candidate RIG [options_flow] score=+0.32 — Options flow: 7,002 call / 3,633 put vol (bullish call imbalance +0.32) on a most-active name.
+2026-09-10 14:36:32,721 INFO screener |   candidate CLH [congress] score=-0.23 — Congress: 0 buy / 4 sell filings in last 60d (disclosures lag up to ~45d).
+2026-09-10 14:36:32,722 INFO screener |   candidate MKL [congress] score=-0.23 — Congress: 0 buy / 5 sell filings in last 60d (disclosures lag up to ~45d).
+2026-09-10 14:36:32,723 INFO screener |   candidate VIK [congress] score=-0.23 — Congress: 0 buy / 7 sell filings in last 60d (disclosures lag up to ~45d).
+2026-09-10 14:36:32,724 INFO screener |   candidate BE [congress] score=+0.23 — Congress: 4 buy / 0 sell filings in last 60d (disclosures lag up to ~45d).
+2026-09-10 14:36:48,878 INFO quiver | Quiver live/offexchange -> 5555 row(s).
+2026-09-10 14:36:49,444 INFO quiver | Quiver live/govcontractsall -> 20000 row(s).
+2026-09-10 14:36:50,474 INFO quiver | Quiver live/lobbying -> 20000 row(s).
+2026-09-10 14:38:45,027 INFO signals | options_chain: reading 25 of 31 symbols this cycle (cap).
+2026-09-10 14:38:52,395 INFO signals | Gathered signals for 31/31 symbols (+3 market signals).
+2026-09-10 14:38:52,441 INFO orchestrator | Composite index (31 scored, top: SEI +3.19, GRNT +2.51, NOK +2.06, PFE +1.76, VALE +1.59, RIG +1.37, INTC +1.34, SPCX +1.31; bear tail: AAL -1.84, HD -1.38, CLH -1.35, IWM -1.20, HYG -1.14, VTEB -1.03).
+2026-09-10 14:38:52,443 INFO orchestrator | NAME FALLING: DRAM -4.8% today vs SPY -0.6% — defense read armed (loss-cut release + HELD-line note).
+2026-09-10 14:38:52,444 INFO orchestrator | NAME FALLING: INTC -4.9% today vs SPY -0.6% — defense read armed (loss-cut release + HELD-line note).
+2026-09-10 14:38:52,444 INFO orchestrator | NAME FALLING: SEI -4.3% today vs SPY -0.6% — defense read armed (loss-cut release + HELD-line note).
+2026-09-10 14:38:52,445 INFO orchestrator | BREADTH RE-ARM: 3 name-falling reads >= 3-name bar — re-running core defense + auto-hedge on this cycle's breadth.
+2026-09-10 14:38:52,446 INFO orchestrator | FALLING-TAPE TRIGGER (breadth:3-names): 3 held names falling at once (>= 3-name breadth bar: DRAM, INTC, SEI) — core defense / auto-hedge / index-put sanction keying on this read.
+2026-09-10 14:38:52,580 INFO alpaca | REDUCE QQQ qty=54 (order 546aeead-0341-460d-ac72-241a6ac6caf9)
+2026-09-10 14:38:52,586 WARNING orchestrator | CORE DEFENSE: 3 held names falling at once (>= 3-name breadth bar: DRAM, INTC, SEI) — sold 54 of 217.498 QQQ sh (25% trim); core fill paused while the falling read holds.
+2026-09-10 14:38:52,590 INFO ledger | Ledger: derived realized_pl $27.56 for SELL QQQ from pct/price/qty (caller sent None).
+2026-09-10 14:38:52,594 INFO ledger | Ledger: SELL QQQ qty=54 $38298
+2026-09-10 14:38:52,808 INFO alpaca | SELL stop QQQ qty=163.0 notional=None lim=None (order 10951625-95c5-420a-93eb-062b1c1cf8ab)
+2026-09-10 14:38:52,812 INFO orchestrator | Core stop: GTC stop resting for 163 QQQ @ 602.41 (15% under basis 708.72).
+2026-09-10 14:38:52,815 INFO orchestrator | Auto-hedge: beta: book spy-beta 0.84 within 0.80 +/- 0.15 — holding $204743 PSQ.
+2026-09-10 14:38:53,095 INFO orchestrator | FEEDS: 3/3 healthy news=vader-fallback
+2026-09-10 14:38:53,106 INFO orchestrator | Buy-excluded from slate this cycle: SNXX (exited 5.8h ago (cooldown 24h))
+2026-09-10 14:39:43,025 INFO usage | decision call: 23469 in / 3657 out (cache r=6485 w=0) ~$0.2120 [claude-opus-4-8]
+2026-09-10 14:39:43,034 INFO decision | Claude returned 3 proposal(s), 4 bearish verdict(s).
+2026-09-10 14:39:43,040 INFO orchestrator | Bearish verdict: HD DECLINED — RSI 30 already oversold (bounce risk) and options flow only -0.16 with neutral chain (-0.01) — no fresh bearish flow confirm to trigger a put; breakdown looks l
+2026-09-10 14:39:43,044 INFO orchestrator | Bearish verdict: VIK DECLINED — Bearish read rests mainly on congress/insider selling (lagged) with only modest options flow -0.27 and positive fundamentals +0.21; RSI 32 oversold. No timely b
+2026-09-10 14:39:43,048 INFO orchestrator | Bearish verdict: VTEB DECLINED — Muni-bond ETF with RSI 15 extreme oversold and negligible option volume (18 call/136 put) — leg liquidity would fail and mean-reversion risk is high; thin evide
+2026-09-10 14:39:43,178 INFO orchestrator | Cycle budget $190,782 split across 2 buy(s): BE $89,840, RIG $100,942.
+2026-09-10 14:39:44,044 INFO risk | REJECT buy AAL: Leg AAL261016P00010000 bid-ask spread 90.9% > 10.0% cap — round-trip friction too high.
+2026-09-10 14:39:44,049 INFO orchestrator | OPTION OptionStrategy.BEAR_PUT_SPREAD AAL -> rejected: Leg AAL261016P00010000 bid-ask spread 90.9% > 10.0% cap — round-trip friction too high. | Corroborated breakdown: composite -1.84, below 200dma, MACD bear, bearish options flow -0.51 (w=1.0)
+2026-09-10 14:39:47,475 INFO risk | REJECT buy BE: At/over the 60% exposure-ladder cap (neutral regime; risk deployed $818,366 of $617,848).
+2026-09-10 14:39:47,479 INFO orchestrator | BUY BE -> rejected: At/over the 60% exposure-ladder cap (neutral regime; risk deployed $818,366 of $617,848). | New name with strongest composite among fresh candidates (+1.18). Technical +0.80 improving (+0.09/d
+2026-09-10 14:39:48,255 INFO risk | REJECT buy RIG: At/over the 60% exposure-ladder cap (neutral regime; risk deployed $818,366 of $617,848).
+2026-09-10 14:39:48,259 INFO orchestrator | BUY RIG -> rejected: At/over the 60% exposure-ladder cap (neutral regime; risk deployed $818,366 of $617,848). | Composite +1.37 with hard insider open-market buying (35k sh bought, 0 sold), fundamentals +0.38 ($1
+2026-09-10 14:39:48,263 INFO orchestrator | BEARISH FUNNEL: slate_bearish=7 [AAL -1.84 ELIGIBLE (below its 200dma) -> put proposed; HD -1.38 ELIGIBLE (below its 200dma) -> declined: RSI 30 already oversold (bounce risk) and options flow only ; CLH -1.35 gate-blocked; IWM -1.20 gate-blocked; HYG -1.14 gate-blocked; VTEB -1.03 ELIGIBLE (below its 200dma) -> declined: Muni-bond ETF with RSI 15 extreme oversold and negligible op] put_proposals=1 put_approved=0 auto_hedge=$204,743 PSQ(breadth:3-names) proxy_put=IWM skipped: structure already open
+2026-09-10 14:39:48,397 INFO alpaca | Alpaca client ready (mode=paper).
+2026-09-10 14:39:50,184 INFO dashboard | Wrote dashboard with 50 trades -> dashboard.html
+2026-09-10 15:28:01,243 INFO orchestrator | Market closed; skipping decision cycle.
+2026-09-10 15:28:01,565 INFO orchestrator | Equity close row stamped for 2026-09-10 (basis=close).
+2026-09-10 15:28:01,567 INFO orchestrator | Running nightly post-mortem for 2026-09-10 …
+2026-09-10 15:28:01,580 INFO alpaca | Alpaca client ready (mode=paper).
+2026-09-10 15:28:02,929 INFO postmortem | Postmortem day attribution (close-to-close): 16 name(s); Day WINNER by close-to-close: PSQ +548 USD; Day LOSER by close-to-close: SMCI -3,318 USD
+2026-09-10 15:28:15,139 INFO usage | postmortem call: 5168 in / 631 out (cache r=0 w=0) ~$0.0416 [claude-opus-4-8]
+2026-09-10 15:28:15,146 INFO postmortem | Post-mortem written to state/lessons/2026-09-10.md
+2026-09-10 15:28:15,148 INFO postmortem | Post-mortem lessons: Newly-bought momentum longs (SMCI, INTC) lost same-day; require fresh technical confirmation before adding tech/semis names late-session.
+2026-09-10 15:28:15,161 INFO orchestrator | API spend today: $1.80 across 9 calls (177,846 in / 32,865 out tokens).
+2026-09-10 15:28:15,215 INFO alpaca | Alpaca client ready (mode=paper).
+2026-09-10 15:28:17,195 INFO dashboard | Wrote dashboard with 50 trades -> dashboard.html
+2026-09-10 16:20:29,002 INFO orchestrator | Market closed; skipping decision cycle.
+2026-09-10 17:12:41,383 INFO orchestrator | Market closed; skipping decision cycle.
+2026-09-10 18:04:54,676 INFO orchestrator | Market closed; skipping decision cycle.
+2026-09-10 18:57:08,160 INFO orchestrator | Market closed; skipping decision cycle.
+2026-09-10 19:49:20,229 INFO orchestrator | Market closed; skipping decision cycle.
+2026-09-10 20:41:31,972 INFO orchestrator | Market closed; skipping decision cycle.
+2026-09-10 21:33:43,631 INFO orchestrator | Market closed; skipping decision cycle.
+2026-09-10 22:25:54,872 INFO orchestrator | Market closed; skipping decision cycle.
+2026-09-10 23:18:07,511 INFO orchestrator | Market closed; skipping decision cycle.

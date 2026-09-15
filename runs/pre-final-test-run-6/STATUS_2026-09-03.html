@@ -1,0 +1,216 @@
+<title>Trading Bot Status</title>
+<style>
+  :root {
+    --paper: #FAFAF7; --ink: #1A1D21; --muted: #6B6E66;
+    --rule: #E3E2DA; --accent: #3D6B99;
+    --ok: #1E7A46; --ok-bg: #E7F2EA;
+    --warn: #A8730F; --warn-bg: #F7EEDC;
+    --crit: #B3402E; --crit-bg: #F9E8E4;
+    --mono: ui-monospace, "SF Mono", Menlo, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --paper: #16181D; --ink: #E8E6E1; --muted: #9A9DA5;
+      --rule: #2C2F36; --accent: #7FA8D0;
+      --ok: #55B37E; --ok-bg: #1B2B22;
+      --warn: #D9A23E; --warn-bg: #2E2718;
+      --crit: #E0705C; --crit-bg: #33201C;
+    }
+  }
+  :root[data-theme="light"] {
+    --paper: #FAFAF7; --ink: #1A1D21; --muted: #6B6E66;
+    --rule: #E3E2DA; --accent: #3D6B99;
+    --ok: #1E7A46; --ok-bg: #E7F2EA;
+    --warn: #A8730F; --warn-bg: #F7EEDC;
+    --crit: #B3402E; --crit-bg: #F9E8E4;
+  }
+  :root[data-theme="dark"] {
+    --paper: #16181D; --ink: #E8E6E1; --muted: #9A9DA5;
+    --rule: #2C2F36; --accent: #7FA8D0;
+    --ok: #55B37E; --ok-bg: #1B2B22;
+    --warn: #D9A23E; --warn-bg: #2E2718;
+    --crit: #E0705C; --crit-bg: #33201C;
+  }
+  body {
+    background: var(--paper); color: var(--ink);
+    font: 16px/1.55 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    margin: 0; padding: 1.5rem 1rem 3rem;
+  }
+  main { max-width: 640px; margin: 0 auto; }
+  h1 { font-size: 1.15rem; font-weight: 650; margin: 0; letter-spacing: -0.01em; }
+  .asof { color: var(--muted); font-size: 0.85rem; margin: 0.2rem 0 1.2rem; }
+  .banner {
+    display: flex; align-items: center; gap: 0.7rem;
+    background: var(--ok-bg); border-left: 4px solid var(--ok);
+    padding: 0.8rem 1rem; margin: 0 0 1.6rem; border-radius: 0 6px 6px 0;
+  }
+  .banner.warn { background: var(--warn-bg); border-color: var(--warn); }
+  .banner.crit { background: var(--crit-bg); border-color: var(--crit); }
+  .banner .verdict { font-weight: 700; font-size: 1.05rem; }
+  .banner.ok .verdict { color: var(--ok); }
+  .banner.warn .verdict { color: var(--warn); }
+  .banner.crit .verdict { color: var(--crit); }
+  .banner p { margin: 0.1rem 0 0; font-size: 0.9rem; }
+  section { margin: 0 0 1.7rem; }
+  section > h2 {
+    font-size: 0.72rem; font-weight: 650; letter-spacing: 0.09em;
+    text-transform: uppercase; color: var(--accent);
+    border-bottom: 1px solid var(--rule); padding-bottom: 0.35rem;
+    margin: 0 0 0.6rem;
+  }
+  table { width: 100%; border-collapse: collapse; font-size: 0.92rem; }
+  .tablewrap { overflow-x: auto; }
+  th { text-align: left; font-weight: 600; color: var(--muted); font-size: 0.8rem; padding: 0.3rem 0.6rem 0.3rem 0; }
+  td { padding: 0.32rem 0.6rem 0.32rem 0; border-top: 1px solid var(--rule); vertical-align: top; }
+  td.num, th.num { text-align: right; font-family: var(--mono); font-variant-numeric: tabular-nums; font-size: 0.88rem; white-space: nowrap; }
+  .kv td:first-child { color: var(--muted); width: 46%; }
+  .kv td:last-child { font-family: var(--mono); font-variant-numeric: tabular-nums; font-size: 0.88rem; }
+  .up { color: var(--ok); } .down { color: var(--crit); }
+  .pill {
+    display: inline-block; font-size: 0.72rem; font-weight: 650;
+    padding: 0.1rem 0.5rem; border-radius: 99px; vertical-align: 1px;
+  }
+  .pill.ok { color: var(--ok); background: var(--ok-bg); }
+  .pill.warn { color: var(--warn); background: var(--warn-bg); }
+  .pill.crit { color: var(--crit); background: var(--crit-bg); }
+  ul { margin: 0.3rem 0 0; padding-left: 1.2rem; }
+  li { margin-bottom: 0.45rem; font-size: 0.92rem; }
+  .note { color: var(--muted); font-size: 0.85rem; }
+  footer { border-top: 1px solid var(--rule); padding-top: 0.8rem; color: var(--muted); font-size: 0.82rem; }
+</style>
+<main>
+  <h1>Trading bot &mdash; daily status</h1>
+  <p class="asof">Updated Thu Sep 3, 2026 &middot; ~17:55 CT &middot; paper account <strong>PA3B09IK4MGS</strong> &middot;
+  <strong>headless fallback session</strong> &middot; <strong>RUN-6 day 3 of 9</strong></p>
+
+  <div class="banner warn">
+    <div>
+      <div class="verdict">Book is healthy and ahead of SPY &mdash; but your session has been dark ~2 days and the phone artifact is stale</div>
+      <p>Day 3 closed at <strong>$1,016,452.05, +$9,401 (+0.94%)</strong> on the contract basis; the live after-hours read is
+      <strong>$1,017,173.58, +1.01%</strong>. Three sessions in, the book is <strong>+1.72% vs SPY +0.82%</strong>.
+      Zero halts, zero CRITICALs, zero restarts, drawdown 0.00%, and <strong>15 of 16 equity positions carry a working stop</strong>
+      (the 16th is the PSQ hedge, unbracketed by design). The banner is <em>warn</em> for two operational reasons, not for the book:
+      your interactive session's last real turn was <strong>Wed Sep 2, 08:57 CT (~33 h ago)</strong> and there has been
+      <strong>no commit for 47 h</strong>, so the launchd fallback fired again; and because this run is headless there is
+      <strong>no artifact tool</strong>, so <strong>the phone artifact is STALE at Aug 31</strong>. Republish it from your resident session.
+      Note the Sep 2 fallback check wrongly read "healthy" &mdash; it was looking at the <em>Sep 1 fallback's own commit</em>.</p>
+    </div>
+  </div>
+
+  <section>
+    <h2>Day 3 &middot; Thu Sep 3</h2>
+    <table class="kv">
+      <tr><td>Stamped close (contract basis)</td><td>$1,016,452.05 <span class="up">+$9,401.01 (+0.94%)</span> &middot; <code>basis='close'</code> &middot; <code>book_beta_spy=1.108</code></td></tr>
+      <tr><td>Live equity (after-hours)</td><td>$1,017,173.58 <span class="up">+$10,122.54 (+1.005%)</span> vs Alpaca <code>last_equity</code></td></tr>
+      <tr><td>Benchmarks, same day</td><td>SPY <span class="up">+1.04%</span> &middot; QQQ <span class="up">+1.18%</span> &middot; IWM <span class="up">+0.40%</span></td></tr>
+      <tr><td>vs SPY today</td><td><span class="down">&minus;0.04 pp</span> &mdash; a hair behind on an up day, with a 26% inverse-ETF hedge on. Expected drag.</td></tr>
+      <tr><td>Window to date (3 sessions)</td><td><strong><span class="up">+1.72%</span></strong> ($1,000,000 &rarr; $1,017,174) vs <strong>SPY <span class="up">+0.82%</span></strong> &middot; <span class="up">+0.90 pp ahead</span></td></tr>
+      <tr><td>Deployment</td><td>cash $20,380 (<strong>2.0%</strong>) &middot; long MV $996,794 &middot; <strong>98.0% invested</strong></td></tr>
+      <tr><td>Positions</td><td>16 equity &middot; <strong>1 option</strong> (HD Oct-16 350 put) &middot; 4 buys, <strong>0 sells</strong>, 0 closed round trips</td></tr>
+      <tr><td>Day winner / loser</td><td>SPCX <span class="up">+$2,968</span> / PSQ <span class="down">&minus;$575</span> (postmortem, close-to-close)</td></tr>
+      <tr><td>Drawdown</td><td>0.00% &mdash; nowhere near the &minus;5% rule</td></tr>
+      <tr><td>API spend</td><td>$1.91 across 9 calls &middot; window total $5.18</td></tr>
+    </table>
+  </section>
+
+  <section>
+    <h2>Health &mdash; all green</h2>
+    <table class="kv">
+      <tr><td>Bot process</td><td><span class="pill ok">alive</span> pid 7536, single lock holder, up 3d since Aug 31 17:19</td></tr>
+      <tr><td>Last tick</td><td><span class="pill ok">fresh</span> stamped 17:37 CT, ticking after the bell as designed</td></tr>
+      <tr><td>Deadman</td><td><span class="pill ok">quiet</span> 241 <code>ok</code> / 560 market-closed skips over Sep 1&ndash;3 &mdash; <strong>zero restarts, zero pages</strong></td></tr>
+      <tr><td>Robinhood</td><td><span class="pill ok">live</span> <code>auth_dead=false</code></td></tr>
+      <tr><td>KILL file</td><td><span class="pill ok">absent</span></td></tr>
+      <tr><td>Feeds</td><td><span class="pill ok">3/3</span> healthy on all 8 cycles, <code>news=vader-fallback</code> (pre-declared degraded mode)</td></tr>
+    </table>
+  </section>
+
+  <section>
+    <h2>Protection &mdash; 15/16 stop-covered, verified leg by leg</h2>
+    <p class="note">Checked against the full order book, not the <code>status=open</code> view: bracket stop legs sit in
+    <code>held</code> status and do <em>not</em> appear there. Reading only the open list would have shown 15 false "unprotected".</p>
+    <table class="kv">
+      <tr><td>Bracketed (limit <code>new</code> + stop <code>held</code>)</td><td>SPCX, BE, NVDA, SMCI, INTC, NU, F, NOK, PFE, AAPL, ABT, BLK, MKL, RIG &mdash; <strong>14 names, full qty</strong></td></tr>
+      <tr><td>QQQ</td><td>standalone GTC stop at 602.24 covering 212 of 212.58 sh (0.58 fractional remainder &mdash; stops can't hold fractions)</td></tr>
+      <tr><td>PSQ hedge</td><td><span class="pill warn">no stop &mdash; by design</span> $265,669 (26.1% of equity). <code>_hedge_submit</code> sends a bare notional buy; the beta controller unwinds it, it is not stopped out.</td></tr>
+      <tr><td>HD Oct-16 350 put</td><td>1 contract, mv $3,090, <span class="down">&minus;$340</span>. Watchdog premium/DTE exit covers it; 43 DTE.</td></tr>
+    </table>
+  </section>
+
+  <section>
+    <h2>Contract validity &amp; verdict (day 3)</h2>
+    <table class="kv">
+      <tr><td>Checker verdict</td><td><strong>PENDING</strong> &mdash; every counted rule passes; expectancy undecided at N=0 closed trips. Designed outcome.</td></tr>
+      <tr><td>Freeze</td><td><span class="pill ok">held</span> zero commits touching <code>investment_strategy/</code> or <code>.env</code> since the Aug 31 merge SHA</td></tr>
+      <tr><td>Max drawdown</td><td><span class="pill ok">pass</span> 0.00% vs the &minus;5% rule</td></tr>
+      <tr><td>Rule 7 (sell authority)</td><td><span class="pill ok">pass</span> 0 decision-sell losses below 0.5&times; stop &mdash; and 0 sells at all</td></tr>
+      <tr><td>Sample floor</td><td><span class="pill warn">N=0 of 24</span> informational, not a fail &mdash; but see below: <strong>nothing has closed in 3 sessions</strong></td></tr>
+      <tr><td>Telescoping</td><td><span class="pill warn">FAIL $1,421.49</span> validity check, root-caused &mdash; measurement artifact, not a book error. Detail below.</td></tr>
+    </table>
+  </section>
+
+  <section>
+    <h2>What changed since day 1 &mdash; the bearish sleeve finally armed</h2>
+    <ul>
+      <li><strong>First put approval of the whole program.</strong> HD Oct-16 350 put went on Sep 2
+      (<code>put_proposals=1 put_approved=1</code>). Run-5 was 0 approvals in 83 eligible reads; this is the first one to reach the book.</li>
+      <li><strong>The beta hedge armed today, twice</strong> &mdash; $203,605 then $62,174 of PSQ, taking the hedge to $265,307
+      as ex-ante beta hit 1.20 then 1.21 against the 1.00 target + 0.15 band. Both the discretionary put path and the
+      deterministic hedge path are now live, which is exactly what run-6 items 7&ndash;8 were for.</li>
+      <li><strong>0 <code>-&gt; IGNORED</code> terminal stages</strong> across all three days &mdash; the schema forcing from PR #48 is still holding.</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>Watch items</h2>
+    <ul>
+      <li><strong>Day 1's beta worry resolved &mdash; and inverted.</strong> You asked me to check this today. Ex-ante beta went
+      <strong>0.77 &rarr; 1.04 &rarr; 1.11</strong> and deployment <strong>48.5% &rarr; 98.0%</strong>, so rule 4's 0.8&ndash;1.2 band
+      is comfortably met and the under-deployment risk is gone. <strong>But the opposite constraint now binds:</strong> the hedge
+      wanted $407,601 and could only get $265,307 because spendable cash ran out against the 2% <code>MIN_CASH_BUFFER_PCT</code> floor.
+      The beta hedge is cash-funded, and the book is now at its cash floor &mdash; <strong>the hedge can no longer grow.</strong>
+      If beta pushes past 1.2 from here, the controller has no room to respond. Worth a decision before verdict day.</li>
+
+      <li><strong>The put-liquidity proxy failed on the same rule a second time.</strong> Sep 1 it was
+      <code>IWM261009P00291000</code> at OI 38; today it was <code>IWM261009P00294000</code> at OI 47 &mdash; both rejected by the
+      same <code>OI &ge; 100</code> floor that triggered the proxy. Two datapoints now: the proxy picks strike/expiry
+      without consulting the floor it will be judged by. An IWM monthly would pass. Still <strong>not fixed</strong> &mdash;
+      that is option-selection code inside the freeze, so touching it would make run-6 CONFOUNDED. Sep 11 change-set candidate.</li>
+
+      <li><strong>Zero closed trips in three sessions.</strong> 23 buys, 0 sells. Nothing has round-tripped, so the contract's
+      expectancy test has no sample at all and rule 7 passes vacuously. At this rate the N&ge;24 floor will not be met by Sep 11
+      and the verdict will land on pooled data rather than this window. Not a malfunction &mdash; the sell authority is
+      deliberately holding names to the mechanical stack (it rejected two BLK decision-sells today at &minus;1.3% and &minus;0.7%
+      against a &minus;4.0% stop) &mdash; but you should expect PENDING again on verdict day.</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>Telescoping FAIL &mdash; root-caused, not a book error</h2>
+    <p class="note">The checker flags <code>|&Delta;equity &minus; day_pl| = $1,421.49</code> on Sep 3 against a $1.00 limit.
+    Cause: we stamp the close row at 20:28 UTC (16:28 ET), but <code>day_pl</code> is
+    <code>equity &minus; last_equity</code> read from Alpaca, and Alpaca <em>restates</em> <code>last_equity</code> to the
+    official close overnight. Alpaca's Sep 2 <code>last_equity</code> is $1,007,051.04; our stamped Sep 2 row is
+    $1,005,629.55. The difference is <strong>$1,421.49 &mdash; the gap to the cent.</strong> Two clocks, one series.
+    It is a validity check, not a verdict check, so nothing is breached. I did <strong>not</strong> fix it: changing the
+    measurement mid-window would break comparability with day 1 and 2. Flagging for the Sep 11 change-set.</p>
+  </section>
+
+  <section>
+    <h2>Incidents &mdash; nothing material</h2>
+    <table class="kv">
+      <tr><td>CRITICAL / halts</td><td><span class="pill ok">0</span> across Sep 1, 2 and 3</td></tr>
+      <tr><td>Errors seen</td><td>benign only &mdash; yfinance delisted tickers (ACLOX, XIVYX, CTKYY), one Polygon chain timeout (SOXL), and three Sep-1 QQQ wash-trade rejects that the bracket logic already handles</td></tr>
+      <tr><td>Risk layer</td><td>working &mdash; beta cap trimmed SPCX 8.0%&rarr;5.5%, sell authority held BLK twice, single-name bullish options gate correctly off</td></tr>
+      <tr><td>Watchdog</td><td>no exits fired (consistent with 0 closed trips)</td></tr>
+    </table>
+  </section>
+
+  <footer>
+    <p><strong>Written by the headless away-mode fallback</strong>, Thu Sep 3 2026 ~17:55 CT, because the resident session
+    had been dark for ~2 days. No trade, flatten, restart, reconcile, RH re-auth or artifact publish. No knob, gate, prompt,
+    <code>.env</code>, risk or watchdog change &mdash; <code>investment_strategy/</code> untouched, so the run-6 freeze survives.</p>
+    <p><strong>The phone artifact is stale at Aug 31</strong> &mdash; headless has no artifact tool. A tracked copy of this page
+    and the full report are committed on <code>feature/preview</code> so you can read them on GitHub.</p>
+  </footer>
+</main>

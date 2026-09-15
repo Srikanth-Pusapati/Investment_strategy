@@ -1,0 +1,30 @@
+2026-08-30 00:25:21,768 INFO orchestrator | Market closed; skipping decision cycle.
+2026-08-30 01:17:22,847 INFO orchestrator | Market closed; skipping decision cycle.
+2026-08-30 02:09:23,849 INFO orchestrator | Market closed; skipping decision cycle.
+2026-08-30 03:01:24,790 INFO orchestrator | Market closed; skipping decision cycle.
+2026-08-30 03:53:25,859 INFO orchestrator | Market closed; skipping decision cycle.
+2026-08-30 04:45:26,881 INFO orchestrator | Market closed; skipping decision cycle.
+2026-08-30 05:37:27,848 INFO orchestrator | Market closed; skipping decision cycle.
+2026-08-30 06:29:28,764 INFO orchestrator | Market closed; skipping decision cycle.
+2026-08-30 07:21:29,607 INFO orchestrator | Market closed; skipping decision cycle.
+2026-08-30 13:38:56,864 WARNING orchestrator | DARK GAP (market closed): no loop tick for 366 min (sleep/suspend?) — positions could not move; not paging.
+2026-08-30 13:39:00,037 INFO orchestrator | Resumed after a 366-min gap — settling the network (<= 20s) before the first cycle.
+2026-08-30 13:39:06,652 INFO orchestrator | Market closed; skipping decision cycle.
+2026-08-30 13:39:12,656 WARNING alpaca | get_account: transient network error (ReadTimeout); retry 1/2.
+2026-08-30 13:40:18,098 INFO alpaca | Alpaca client ready (mode=paper).
+2026-08-30 13:40:18,484 INFO orchestrator | Discovery-driven mode: trading scanner-found names + holdings.
+2026-08-30 13:40:18,485 INFO orchestrator | Starting orchestrator (paper). Kill switch: off. Options: on. Benchmark: QQQ.
+2026-08-30 13:40:18,765 INFO orchestrator | Market closed; skipping decision cycle.
+2026-08-30 13:40:18,834 INFO alpaca | Alpaca client ready (mode=paper).
+2026-08-30 13:40:19,821 WARNING alpaca | latest_price(NVDA261016C00180000) failed: {"message":"code=400, message=invalid symbol: NVDA261016C00180000"}
+
+2026-08-30 13:40:21,140 INFO dashboard | Wrote dashboard with 35 trades -> dashboard.html
+2026-08-30 22:54:52,531 INFO alpaca | Alpaca client ready (mode=paper).
+2026-08-30 22:54:52,919 INFO orchestrator | Discovery-driven mode: trading scanner-found names + holdings.
+2026-08-30 22:54:52,920 INFO orchestrator | Starting orchestrator (paper). Kill switch: off. Options: on. Benchmark: QQQ.
+2026-08-30 22:54:53,240 INFO orchestrator | Market closed; skipping decision cycle.
+2026-08-30 22:54:53,302 INFO alpaca | Alpaca client ready (mode=paper).
+2026-08-30 22:54:53,760 WARNING alpaca | latest_price(NVDA261016C00180000) failed: {"message":"code=400, message=invalid symbol: NVDA261016C00180000"}
+
+2026-08-30 22:54:55,030 INFO dashboard | Wrote dashboard with 35 trades -> dashboard.html
+2026-08-30 23:47:07,076 INFO orchestrator | Market closed; skipping decision cycle.
