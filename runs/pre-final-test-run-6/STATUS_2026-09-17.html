@@ -1,0 +1,256 @@
+<title>Trading Bot Status</title>
+<style>
+  :root {
+    --paper: #FAFAF7; --ink: #1A1D21; --muted: #6B6E66;
+    --rule: #E3E2DA; --accent: #3D6B99;
+    --ok: #1E7A46; --ok-bg: #E7F2EA;
+    --warn: #A8730F; --warn-bg: #F7EEDC;
+    --crit: #B3402E; --crit-bg: #F9E8E4;
+    --mono: ui-monospace, "SF Mono", Menlo, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --paper: #16181D; --ink: #E8E6E1; --muted: #9A9DA5;
+      --rule: #2C2F36; --accent: #7FA8D0;
+      --ok: #55B37E; --ok-bg: #1B2B22;
+      --warn: #D9A23E; --warn-bg: #2E2718;
+      --crit: #E0705C; --crit-bg: #33201C;
+    }
+  }
+  :root[data-theme="light"] {
+    --paper: #FAFAF7; --ink: #1A1D21; --muted: #6B6E66;
+    --rule: #E3E2DA; --accent: #3D6B99;
+    --ok: #1E7A46; --ok-bg: #E7F2EA;
+    --warn: #A8730F; --warn-bg: #F7EEDC;
+    --crit: #B3402E; --crit-bg: #F9E8E4;
+  }
+  :root[data-theme="dark"] {
+    --paper: #16181D; --ink: #E8E6E1; --muted: #9A9DA5;
+    --rule: #2C2F36; --accent: #7FA8D0;
+    --ok: #55B37E; --ok-bg: #1B2B22;
+    --warn: #D9A23E; --warn-bg: #2E2718;
+    --crit: #E0705C; --crit-bg: #33201C;
+  }
+  body {
+    background: var(--paper); color: var(--ink);
+    font: 16px/1.55 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    margin: 0; padding: 1.5rem 1rem 3rem;
+  }
+  main { max-width: 640px; margin: 0 auto; }
+  h1 { font-size: 1.15rem; font-weight: 650; margin: 0; letter-spacing: -0.01em; }
+  .asof { color: var(--muted); font-size: 0.85rem; margin: 0.2rem 0 1.2rem; }
+  .banner {
+    display: flex; align-items: center; gap: 0.7rem;
+    background: var(--ok-bg); border-left: 4px solid var(--ok);
+    padding: 0.8rem 1rem; margin: 0 0 1.6rem; border-radius: 0 6px 6px 0;
+  }
+  .banner.warn { background: var(--warn-bg); border-color: var(--warn); }
+  .banner.crit { background: var(--crit-bg); border-color: var(--crit); }
+  .banner .verdict { font-weight: 700; font-size: 1.05rem; }
+  .banner.ok .verdict { color: var(--ok); }
+  .banner.warn .verdict { color: var(--warn); }
+  .banner.crit .verdict { color: var(--crit); }
+  .banner p { margin: 0.1rem 0 0; font-size: 0.9rem; }
+  section { margin: 0 0 1.7rem; }
+  section > h2 {
+    font-size: 0.72rem; font-weight: 650; letter-spacing: 0.09em;
+    text-transform: uppercase; color: var(--accent);
+    border-bottom: 1px solid var(--rule); padding-bottom: 0.35rem;
+    margin: 0 0 0.6rem;
+  }
+  table { width: 100%; border-collapse: collapse; font-size: 0.92rem; }
+  .tablewrap { overflow-x: auto; }
+  th { text-align: left; font-weight: 600; color: var(--muted); font-size: 0.8rem; padding: 0.3rem 0.6rem 0.3rem 0; }
+  td { padding: 0.32rem 0.6rem 0.32rem 0; border-top: 1px solid var(--rule); vertical-align: top; }
+  td.num, th.num { text-align: right; font-family: var(--mono); font-variant-numeric: tabular-nums; font-size: 0.88rem; white-space: nowrap; }
+  .kv td:first-child { color: var(--muted); width: 46%; }
+  .kv td:last-child { font-family: var(--mono); font-variant-numeric: tabular-nums; font-size: 0.88rem; }
+  .up { color: var(--ok); } .down { color: var(--crit); }
+  .pill {
+    display: inline-block; font-size: 0.72rem; font-weight: 650;
+    padding: 0.1rem 0.5rem; border-radius: 99px; vertical-align: 1px;
+  }
+  .pill.ok { color: var(--ok); background: var(--ok-bg); }
+  .pill.warn { color: var(--warn); background: var(--warn-bg); }
+  .pill.crit { color: var(--crit); background: var(--crit-bg); }
+  ul { margin: 0.3rem 0 0; padding-left: 1.2rem; }
+  li { margin-bottom: 0.45rem; font-size: 0.92rem; }
+  .note { color: var(--muted); font-size: 0.85rem; }
+  footer { border-top: 1px solid var(--rule); padding-top: 0.8rem; color: var(--muted); font-size: 0.82rem; }
+</style>
+<main>
+<main>
+  <h1>Trading bot &mdash; daily status</h1>
+  <p class="asof">Updated Thu Sep 17, 2026 &middot; ~18:45 CT &middot; paper account <strong>PA3B09IK4MGS</strong> &middot;
+  <strong>written by the HEADLESS away-mode fallback</strong> &middot; <strong>RUN-6 session 13 of 14</strong>
+  (final session is tomorrow, Fri Sep 18)</p>
+
+  <div class="banner warn">
+    <div>
+      <div class="verdict">Best day of the window &mdash; but the bearish funnel silently dropped 1 in 4 names, and the contract is still NO-GO on one rule</div>
+      <p>The book is in good shape: today closed at <strong>$1,038,502.92, +$19,636 (+1.93%)</strong> against
+      <strong>SPY +1.13%</strong> &mdash; the strongest session of run-6. Thirteen sessions in it is
+      <strong>+3.85% vs SPY &minus;0.58%</strong>, <strong>+4.43 pp ahead</strong>. Zero CRITICALs, zero errors, no halt,
+      drawdown &minus;3.29% against the &minus;5% floor, and <strong>the QQQ stopless gap from Sep 15 is closed</strong>
+      (stop live at 602.04). <strong>Three things need you.</strong>
+      (1) <strong>The bearish funnel dropped 10 eligible names with no verdict today</strong> &mdash;
+      <code>ELIGIBLE but IGNORED</code>, the schema violation the runbook says to escalate. That is
+      <strong>25% of all eligible bearish names, in 7 of 8 cycles</strong>, and <strong>TDY alone was dropped 6 times</strong>.
+      The window ran 0 of these on every day except Sep 10 (3) and Sep 11 (1), so this is a sharp new spike, not background noise.
+      Fixing it means touching the decision prompt or schema, which is strategy &mdash; so I escalated and changed nothing.
+      (2) <strong>The interim contract verdict is still NO-GO, on exactly one rule</strong>, under both pinned
+      <code>--start</code> commands: rule 7, the single Sep 14 INTC decision-sell that lost 0.49&times; its planned stop.
+      Every other counted rule now passes &mdash; <strong>including capture, which started counting today</strong>.
+      (3) <strong>Amendment 4 was never written.</strong> Your interactive session died mid-draft and the branch that
+      promises it carries only the log archive.</p>
+    </div>
+  </div>
+
+  <section>
+    <h2>Why a fallback wrote this page</h2>
+    <table class="kv">
+      <tr><td>Primary session</td><td><span class="pill crit">dead 30h</span> hit <code>You've hit your session limit</code> at <strong>Sep 16 11:41 CT</strong> mid-task and never resumed</td></tr>
+      <tr><td>Evidence</td><td>last model turn <code>2026-09-16T16:41:47Z</code>; today's file mtime is artifact bookkeeping only, not a turn</td></tr>
+      <tr><td>Phone artifact</td><td><span class="pill crit">stale since Sep 7</span> headless fallback has no artifact tool &mdash; <strong>this page is only on GitHub</strong></td></tr>
+      <tr><td>Robinhood re-auth</td><td><span class="pill ok">not needed</span> <code>auth_dead=false</code> &mdash; and never attempted (no browser here)</td></tr>
+      <tr><td>Live tree</td><td><span class="pill ok">freeze intact</span> no pull, no merge, still at <code>31ba93e</code> content &mdash; run-7 code stayed out</td></tr>
+    </table>
+  </section>
+
+  <section>
+    <h2>Today &middot; Thu Sep 17</h2>
+    <table class="kv">
+      <tr><td>Equity (stamped close)</td><td><strong>$1,038,502.92</strong> &middot; <span class="up">+$19,636.18 (+1.93%)</span></td></tr>
+      <tr><td>vs SPY</td><td>SPY <span class="up">+1.13%</span> &mdash; <span class="up">+0.80 pp ahead</span> on the day</td></tr>
+      <tr><td>Live read after close</td><td>$1,038,616.71 &middot; cash $71,288 &middot; invested <strong>92.7%</strong></td></tr>
+      <tr><td>Closed trips today</td><td><span class="pill ok">0</span> today's move is entirely mark-to-market</td></tr>
+      <tr><td>Day winner / loser</td><td>SMCI <span class="up">+$7,984</span> / HBAN <span class="down">&minus;$1,050</span> (close-to-close)</td></tr>
+      <tr><td>CRITICAL / ERROR / halt</td><td><span class="pill ok">0 / 0 / 0</span> clean log</td></tr>
+      <tr><td>API spend</td><td>$1.85 across 9 calls (216,465 in / 27,106 out)</td></tr>
+    </table>
+  </section>
+
+  <section>
+    <h2>Window &middot; Aug 31 &rarr; Sep 17 (13 of 14 sessions)</h2>
+    <table class="kv">
+      <tr><td>Book</td><td>$1,000,000 &rarr; $1,038,502.92 &middot; <span class="up">+3.85%</span></td></tr>
+      <tr><td>SPY over the same span</td><td><span class="down">&minus;0.58%</span> &mdash; <strong><span class="up">+4.43 pp ahead</span></strong></td></tr>
+      <tr><td>Peak equity</td><td>$1,047,272.30 &mdash; currently <strong>0.83% off peak</strong></td></tr>
+      <tr><td>Max drawdown</td><td><span class="pill ok">pass</span> &minus;3.29% vs the &minus;5% rule (peak Sep 8 &rarr; trough Sep 15)</td></tr>
+      <tr><td>Worst session</td><td><span class="down">Sep 14, &minus;$23,587</span> (8 closed losses that day)</td></tr>
+      <tr><td>Closed trips</td><td>N=30 &middot; win rate <strong>40.0%</strong> (12W / 18L)</td></tr>
+      <tr><td>Expectancy / trade</td><td><span class="up">+$499.85</span> &middot; sum <span class="up">+$14,995.54</span> &middot; avg win $3,134 vs avg loss &minus;$1,256</td></tr>
+      <tr><td>Regime</td><td><code>risk-on</code> &middot; ex-ante book beta vs SPY <strong>1.12</strong></td></tr>
+    </table>
+    <p class="note">Win rate and expectancy both fell hard since the Sep 11 interim (64.3% / $1,925.90 &rarr; 40.0% / $499.85).
+    That is one day &mdash; Sep 14 &mdash; not a trend break: it closed 8 losers in a single session.</p>
+  </section>
+
+  <section>
+    <h2>Interim contract verdict &mdash; NO-GO on one rule</h2>
+    <table class="kv">
+      <tr><td>Verdict</td><td><span class="pill crit">NO-GO</span> identical under <code>--start 2026-08-31</code> and <code>--start 2026-09-01</code></td></tr>
+      <tr><td>Rule 7 (sell authority)</td><td><span class="pill crit">FAIL</span> 1 decision-sell loss below 0.5&times; stop: <strong>Sep 14 INTC &minus;4.33% vs 8.91% stop = 0.49&times;</strong></td></tr>
+      <tr><td>Max drawdown</td><td><span class="pill ok">pass</span> &minus;3.29%</td></tr>
+      <tr><td>Rule 4 (beta, Amendment 2)</td><td><span class="pill ok">pass</span> mean ex-ante <code>book_beta_spy</code> 0.97 over 12 close rows (range 0.77&ndash;1.12)</td></tr>
+      <tr><td>Capture vs SPY</td><td><span class="pill ok">pass &mdash; now counting</span> 4 up / 8 down days clears the 4/4 gate: <strong>up 129.8% vs down 16.1%</strong></td></tr>
+      <tr><td>Pooled expectancy</td><td><span class="pill warn">PENDING</span> N=30 &lt; 60 &mdash; undecided until the next same-config window pools in</td></tr>
+      <tr><td>Sample floor</td><td><span class="pill ok">met</span> N=30 of 24</td></tr>
+      <tr><td>Telescoping (validity)</td><td><span class="pill warn">FAIL $1,421.49</span> the known Sep 3 gap, already disclosed &mdash; not a verdict rule</td></tr>
+      <tr><td>Equity basis</td><td>12 <code>close</code> rows + 1 <code>late</code> row (Aug 31 day-0 switch, admitted under the v3 late-row rule)</td></tr>
+    </table>
+    <p class="note">Rule 7 is the wording defect you already identified: that INTC sell was <code>name_falling</code>-<strong>sanctioned</strong>,
+    so the sell-authority gate did exactly what it was built to do. The rule's premise &mdash; "item 2 makes them impossible" &mdash;
+    is simply wrong, and <strong>contract v3 rule 8 inherits the same defect</strong>. Deciding that wording is a
+    pre-registration call, so I left it untouched.</p>
+  </section>
+
+  <section>
+    <h2>Escalation &mdash; bearish funnel dropping eligible names</h2>
+    <table class="kv">
+      <tr><td>Today</td><td><span class="pill crit">10 IGNORED</span> <code>model returned no bearish_verdicts entry for an ELIGIBLE name</code></td></tr>
+      <tr><td>Rate</td><td><strong>10 of 40 eligible names = 25.0%</strong>, spread across <strong>7 of 8 cycles</strong></td></tr>
+      <tr><td>Concentration</td><td><strong>TDY &times;6</strong>, then SMR, AAL, ONDS</td></tr>
+      <tr><td>Window history</td><td>Sep 10: 3 &middot; Sep 11: 1 &middot; <strong>every other day: 0</strong> &middot; Sep 17: <strong>10</strong></td></tr>
+      <tr><td>Action taken</td><td><span class="pill warn">escalated, not fixed</span> the fix is prompt/schema &mdash; strategy, barred unattended</td></tr>
+    </table>
+    <p class="note">Why it matters: an IGNORED name is not a declined name. It is a bearish candidate that got no verdict at all,
+    so the funnel can neither act on it nor record why it passed. At 25% the bearish sleeve is measuring itself on three
+    quarters of its own slate.</p>
+  </section>
+
+  <section>
+    <h2>Protection &mdash; 14/14 stop-covered, PSQ excepted by design</h2>
+    <table class="kv">
+      <tr><td>Audit method</td><td><code>status=all</code> + <code>nested</code> &mdash; 79 orders / 167 incl. legs (<code>status=open</code> hides <code>held</code> bracket stops)</td></tr>
+      <tr><td>Equity names</td><td><span class="pill ok">14 / 14</span> every conviction position carries a live stop leg</td></tr>
+      <tr><td>QQQ</td><td><span class="pill ok">fixed</span> stop live at <strong>602.04 &times;214</strong> &mdash; the Sep 15 stopless-overnight gap is closed</td></tr>
+      <tr><td>PSQ hedge</td><td><span class="pill warn">no stop &mdash; by design</span> $172,588 (<strong>16.6% of equity</strong>). <code>_hedge_submit</code> sends a bare fractional notional buy; the beta controller unwinds it, it is never stopped out.</td></tr>
+      <tr><td>Halt / KILL</td><td><span class="pill ok">clear</span> <code>halted: false</code>, no <code>state/KILL</code>, <code>pending_decision_sells: {}</code></td></tr>
+    </table>
+  </section>
+
+  <section>
+    <h2>Open option risk</h2>
+    <table class="kv">
+      <tr><td>Net unrealized</td><td><span class="up">+$1,345</span> across 4 legs / 3 groups</td></tr>
+      <tr><td>IWM 285/270 Oct-23</td><td><strong>new today</strong> &middot; 14 contracts &middot; $3.56 net debit &middot; filled 14/14 both legs &middot; net <span class="pill ok">flat</span></td></tr>
+      <tr><td>HD 350P Oct-16</td><td>1 contract long &middot; <span class="up">+$1,095</span></td></tr>
+      <tr><td>HBAN 16P Oct-16</td><td>50 contracts long &middot; <span class="up">+$250</span></td></tr>
+      <tr><td>MLEG cap</td><td><span class="pill ok">safe</span> largest group is 2 legs, well under the Alpaca 4-leg ceiling</td></tr>
+    </table>
+    <p class="note"><strong>The put-liquidity fallback is working end to end.</strong> Today PATH's own chain was rejected on
+    a 13.3% bid-ask (10% cap), so the bearish read re-expressed as an IWM 285/270 spread and filled clean. On Sep 16 an
+    earlier IWM option trip closed <span class="up">+$5,135</span> on a <code>take</code>. That is roadmap item 1 from
+    the Aug 14 session paying for itself.</p>
+  </section>
+
+  <section>
+    <h2>Incidents since the last report</h2>
+    <table class="kv">
+      <tr><td>Sep 17 (today)</td><td><span class="pill ok">clean</span> 0 CRITICAL / 0 ERROR / 0 halt</td></tr>
+      <tr><td>Sep 16 &mdash; RIG close FAILED</td><td><span class="pill ok">self-healed</span> CRITICAL emailed 10:18:38; watchdog retry closed it <strong>12s later</strong>, filled 227/227 @ 5.63</td></tr>
+      <tr><td>Sep 16 &mdash; yfinance 404s</td><td><span class="pill ok">benign</span> 2 errors, delisted symbol <code>TLAC</code></td></tr>
+      <tr><td>Sep 14 &mdash; battery storm</td><td><span class="pill ok">resolved</span> 16 CRITICALs on battery during market hours; <strong>zero recurrence</strong> Sep 15/16/17</td></tr>
+    </table>
+  </section>
+
+  <section>
+    <h2>Health</h2>
+    <table class="kv">
+      <tr><td>Bot process</td><td><span class="pill ok">alive</span> pid 7536, single lock holder, <strong>up 17d</strong> since the Aug 31 day-0 switch</td></tr>
+      <tr><td>Last tick</td><td><span class="pill ok">fresh</span> 0.2 min old at audit time</td></tr>
+      <tr><td>Deadman</td><td><span class="pill ok">quiet</span> 5-min cadence, market-closed skips, zero restarts</td></tr>
+      <tr><td>Control panel</td><td><span class="pill ok">HTTP 200</span> restart path available if needed</td></tr>
+      <tr><td>Robinhood</td><td><span class="pill ok">live</span> <code>auth_dead=false</code> &mdash; "token refreshed; reads re-enabled"</td></tr>
+      <tr><td>Postmortem</td><td><span class="pill ok">ran</span> <code>state/lessons/2026-09-17.md</code> &mdash; no notable patterns</td></tr>
+    </table>
+  </section>
+
+  <section>
+    <h2>What needs you</h2>
+    <ul>
+      <li><strong>Tomorrow is the last session of run-6</strong> (Fri Sep 18). Nothing to do during it &mdash; the bot runs frozen.
+      After the close: run the checker under both <code>--start</code> commands, archive state, then merge and switch per
+      <code>RUN7_SWITCH.md</code>.</li>
+      <li><strong>Decide the rule 7 / v3 rule 8 wording before run-7 day 1 (Mon Sep 21).</strong> As written, a
+      <code>name_falling</code>-sanctioned loss-cut fails a rule that assumes such a sell cannot happen. It will fail again in run-7
+      unless the wording changes, and changing it after seeing the INTC row is moving the goalposts unless you register it explicitly.</li>
+      <li><strong>Amendment 4 does not exist.</strong> The branch <code>docs/run6-amendment4-freeze-disclosure</code> carries the
+      log archive and this report only. Your session died at "I'll finalize the amendment, the PR, and the full status".</li>
+      <li><strong>The bearish-funnel IGNORED spike</strong> &mdash; 25% of eligible names today, TDY six times. Worth a look before
+      run-7 locks in, since run-7 keeps this funnel.</li>
+      <li><strong>Local <code>feature/preview</code> has diverged from origin</strong> and cannot be pushed without a merge (freeze)
+      or a force-push (barred). Your Sep 16 liveness commit <code>1a82724</code> exists <strong>only on this machine</strong>.</li>
+      <li><strong>Create the run-7 paper account keys</strong> before tomorrow's close, if you have not already.</li>
+    </ul>
+  </section>
+
+  <footer>
+    Written by the headless away-mode fallback &mdash; no artifact tool, no browser, so the phone artifact URL still shows
+    <strong>Sep 7</strong> data. This page is committed at
+    <code>runs/pre-final-test-run-6/STATUS_2026-09-17.html</code> with the full report alongside it at
+    <code>FALLBACK_2026-09-17.md</code>. No strategy, knob, prompt or <code>.env</code> change was made; the live tree was
+    never pulled or merged.
+  </footer>
+</main>

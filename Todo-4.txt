@@ -803,3 +803,178 @@ https://claude.ai/code/artifact/9099ad65-64b1-495c-82b9-db7226a1bbbf
             Fri Sep 18 16:00 ET; (3) Sep 14-18: nothing — bot runs frozen; (4) Sep
             18 after the close: run the run-6 checker (both --start commands),
             archive state, merge PR #57, switch per RUN7_SWITCH.md.
+
+2026-09-16  ~11:30 CT — STATUS CHECK + A+ READINESS AUDIT (resident session; the user
+            merged PR #56 feature/preview -> main at 21:46:19Z Sep 15 and PR #57
+            feature/run7-changeset -> feature/preview at 21:46:33Z Sep 15).
+            WHERE THE CODE IS: origin/main 07e1fe1 = run-6 docs only (NO run-7 code);
+            origin/feature/preview adb91a7 = run-7 change-set merged (6e33426 part 1,
+            74c73fa part 2: 18 files in investment_strategy/, +4812/-299). The LIVE
+            checkout is still feature/preview @ 31ba93e, `git status` clean, and
+            `git log --since=2026-08-31 -- investment_strategy/ .env` is EMPTY; pid
+            7536 has run unchanged since Aug 31 17:18 CT. So the freeze holds ON DISK
+            and IN THE PROCESS, but Amendment 3 point 2 ("zero commits to
+            investment_strategy/ on the live branch through Sep 18") is breached BY
+            THE LETTER on the remote branch. OPERATING RULE UNTIL THE SEP 18 CLOSE
+            ROW EXISTS: NO `git pull` / checkout / merge in the live tree (a pull
+            would put run-7 code on disk under the running bot); commits here are
+            docs/logs only and are NOT pushed until the Sep 18 switch. A disclosure
+            (Amendment 4) goes into runs/pre-final-test-run-6/EVAL_CONTRACT.md via
+            an isolated worktree branch (docs/run6-amendment4-freeze-disclosure,
+            based on origin/feature/preview) + PR into feature/preview — must be
+            registered BEFORE the Sep 18 close row so run-6 is not CONFOUNDED.
+            SESSIONS: Sep 14 close $1,015,796.22 (broker day_pl -23,587.13, c2c
+            -2.23% vs SPY -0.45%): 8 names gapped -5..-10% at the open and were sold
+            (bracket stops NOK/DRAM/AVGO/SEI/VALE/RIG; name_falling decision sells
+            NOK -1,288 / INTC -2,217; QQQ 40-sh core_defense trim; PSQ hedge
+            UNWOUND 09:22 CT at book beta 0.54 < 0.65 — i.e. the stops themselves
+            dropped beta and closed the hedge into the down tape); regime flipped
+            neutral -> risk-on 11:59-14:36 while the book was -1.9% intraday; 8
+            'On BATTERY' CRITICAL emails 11:08-14:40 (true positive, no missed
+            cycle). Sep 15 close $1,008,613.38 (day_pl -6,310.43, c2c -0.71% vs SPY
+            -0.46%): PFE/NU/IBIT bracket stops, fresh SPCX ($38.5k) / SNAP buys
+            closed red, QQQ core fill $50,720 at 09:26; 14:40:07 core-fill top-up
+            BUY rejected by Alpaca 40310000 'wash trade ... opposite side stop
+            exists' AFTER the resting stop had been cancelled -> QQQ core (195 sh,
+            $137.6k) STOPLESS from 14:40 CT Sep 15 until the 08:35:22 CT Sep 16
+            re-placement (the Sep 11 finding-7 shape again; S-7 covers the trim
+            side only, NOT the core-fill BUY path -> run-8 item). WINDOW through
+            Sep 15: +0.86% vs SPY -1.26% / QQQ -1.70% / IWM -2.99%; DD from the Sep
+            8 close peak -3.29%.
+            INTERIM CHECKER v2 (NOT the verdict; --end 2026-09-15, both --start
+            commands agree; files in the session scratchpad): N=28 (incl. 5 system
+            rows), sum +$9,922.96, WR 39.3%, mean $354.39, t=0.548 vs 1.703,
+            bootstrap95 [-$760, +$1,743]; DD -3.29% PASS; ex-ante beta 0.94 PASS;
+            capture 3 up / 7 down N/A; OLS alpha +0.194%/day t 0.54 (10 sessions);
+            RULE 7 [FAIL]: 2026-09-14 INTC decision sell realized -4.33% vs planned
+            stop 8.91% = 0.49x -> VERDICT NO-GO. The INTC sell was SANCTIONED by
+            the frozen code ('SELL AUTHORITY: INTC decision-sell allowed on
+            event(s) name_falling:-5.6% today vs SPY -0.7%'): rule 7's premise
+            ("events_only makes these impossible; a count > 0 means the gate that
+            ran is not the frozen one") is simply wrong since NAME_DROP_DEFENSE
+            (Aug 1). Same wording sits in contract v3 rule 8 -> must be fixed at
+            pre-registration (exempt event-sanctioned sells or define the metric
+            as decision sells WITHOUT a SELL AUTHORITY sanction line). For run-6
+            the Sep 18 verdict prints whatever it prints; both readings (as
+            written = NO-GO; sanction-aware = 0 breaches) go into Amendment 4 as
+            disclosure, no counted rule changes (run-6 is a reference sample
+            regardless: run-7 has a new fingerprint).
+            SEP 16 SO FAR: 08:35:22 QQQ stop re-placed (195 sh @ 602.04); 09:25
+            HBAN 2026-10-16 16P LONG_PUT 50 contracts $1,650 filled @0.35 (first
+            single-name put fill in the window) — but the 10:18 prompt rendered it
+            as 'Account holds HBAN long (starter bought today)' and the model
+            declined the next HBAN put for 'contradicting the open long' (options
+            are ledgered under the underlying; the HELD line mislabels a put as a
+            long -> run-8 fix), and the watchdog logged 'premium mark unreliable
+            (absurd 27-102% spread > 10% cap)' 72x in 40 min — the put cannot be
+            marked, so its premium stop/take is blind (junk-quote class, see the
+            Jul 23 T incident); 10:17 NAME FALLING RIG -5.2% -> decision sell
+            approved 10:18:36, first close FAILED (CRITICAL emailed), retried and
+            filled 10:18:50 @5.63 (14 s; realized ~-$64); 10:18:42 core fill
+            $13,938 QQQ, stop re-placed for 214 sh 6 s later; regime risk-on from
+            10:14; BOOK BETA 0.96 invested 61.7% at 11:07.
+            FALLBACK NEAR-MISS: ops/claude_daily.sh fired at 17:37 CT Sep 15
+            ("primary quiet: no commit for 78h") against a LIVE primary and was
+            stopped only by the usage cap ("session limit, resets 7pm"). Its
+            threshold is 30h on Tue-Fri (78h Mondays); the last non-fallback
+            commit was 96h old at 11:30 CT today -> it WOULD fire again tonight,
+            headless with bypassPermissions in the frozen live tree, and a push
+            against the moved origin could tempt a pull. THIS COMMIT is the
+            liveness signal that stops tonight's fire (age < 30h at 17:37). Thu
+            Sep 17: another docs commit before 17:37 CT is required (or unload
+            com.investment-strategy.claude-daily until the switch); the C3 ps gate
+            that fixes this ships with run-7 on Sep 18.
+            AUDIT: 9-analyst / adversarial-refuter workflow running (first pass
+            died on the usage cap after 6 analysts; resumed 11:28 CT). Verified
+            results + the A+ coverage table + Amendment 4 text + the v3 rule-8
+            wording land in the next entry and the report artifact.
+            USER ACTIONS: (1) do NOT pull/merge in the live tree before the Sep 18
+            close row; (2) create the fresh run-7 paper account keys before Fri
+            Sep 18 16:00 ET (still not verifiable from here); (3) Thu Sep 17: any
+            docs commit in the live tree before 17:37 CT (see above); (4) Fri Sep
+            18 after the close: run-6 checker (both commands), archive state,
+            `git pull` (brings PR #57 + the Amendment 4 PR), switch per
+            docs/RUN7_SWITCH.md, restart after 16:00 ET, verify the 'late' row;
+            (5) decide the v3 rule-8 wording before day 1 (Mon Sep 21).
+
+2026-09-17  AWAY-MODE FALLBACK (headless) — run-6 session 13 of 14, acct
+            PA3B09IK4MGS. Fired at 17:37 CT exactly as the Sep 16 entry
+            predicted (no docs commit landed before the deadline — the primary
+            was dead by then). Full report:
+            runs/pre-final-test-run-6/FALLBACK_2026-09-17.md
+            Status page copy: runs/pre-final-test-run-6/STATUS_2026-09-17.html
+            Checker: runs/pre-final-test-run-6/CHECKER_2026-09-17_interim.txt
+            LIVENESS: primary genuinely dead — session bd391b29's last model turn
+            was 2026-09-16T16:41:47Z (11:41 CT) and it ended on "You've hit your
+            session limit · resets 4:20pm"; it never resumed after the reset.
+            30h no turn, status_page.html 237h stale. The transcript file has a
+            TODAY mtime (16:55) which looks alive but is artifact-autoreact-ledger
+            bookkeeping, not a turn — new false-fire shape, worth remembering:
+            check the last user/assistant TIMESTAMP inside the jsonl, not mtime.
+            2 VS Code claude PIDs resident since Sep 11 but idle (ps gate passed).
+            NUMBERS: Sep 17 close $1,038,502.92, +$19,636.18 (+1.93%) vs SPY
+            +1.13% — best session of the window. 13 sessions: +3.85% vs SPY
+            -0.58% = +4.43pp. Peak $1,047,272.30 (-0.83% off). Max DD -3.29%.
+            N=30 closed, win rate 40.0%, expectancy +$499.85 (was 64.3%/$1,925.90
+            on Sep 11 — the whole delta is Sep 14's 8-loss day, not a trend
+            break). Zero closed trips today; the move is all mark-to-market.
+            Invested 92.7%, cash $71,288, ex-ante beta 1.12, regime risk-on.
+            INTERIM CHECKER: NO-GO under BOTH pinned --start commands, on rule 7
+            alone — the same single Sep 14 INTC row (-4.33% vs 8.91% stop =
+            0.49x). NEW: capture now COUNTS (4 up/8 down SPY days clears 4/4) and
+            PASSES, up 129.8% vs down 16.1%. DD passes, beta rule passes (mean
+            ex-ante 0.97 over 12 close rows). Pooled expectancy still PENDING
+            (N=30<60). Telescoping still FAILs on the known Sep 3 $1,421.49 gap.
+            Basis: 12 close + 1 late (Aug 31 day-0) per the v3 late-row rule.
+            ESCALATION — BEARISH FUNNEL DROPPING NAMES: 10 "ELIGIBLE but IGNORED"
+            today = 25.0% of eligible bearish names (10 of 40), across 7 of 8
+            cycles, TDY x6 + SMR/AAL/ONDS. Window history: Sep 10=3, Sep 11=1,
+            every other day=0. Sharp new spike concentrated on one ticker. An
+            IGNORED name is not a declined name — no verdict at all, so the
+            funnel can't act on it or record why it passed, and this day's funnel
+            stats sit on an incomplete denominator. ESCALATED ONLY, nothing
+            changed (prompt/schema = strategy; the agreed deterministic-puts
+            response is the user's call).
+            PROTECTION: 14/14 equity names stop-covered (audited status=all +
+            nested; status=open would have shown 14 false "unprotected").
+            QQQ STOPLESS GAP FROM SEP 15 IS CLOSED — stop live 602.04 x214.
+            PSQ $172,588 (16.6% of equity) unstopped BY DESIGN, verified in code:
+            _hedge_submit -> submit_notional_buy, bare fractional buy, no
+            bracket; the beta controller unwinds it. Largest position in the
+            book, stays a watch item.
+            OPTIONS: net +$1,345 / 4 legs / 3 groups. PUT-LIQUIDITY FALLBACK
+            WORKING END TO END — PATH's own chain rejected on a 13.3% bid-ask
+            (10% cap), re-expressed as IWM 285/270 Oct-23, 14 contracts, $3.56
+            net debit, filled 14/14 both legs; and Sep 16's IWM option trip
+            closed +$5,135 on a take. Roadmap item 1 from Aug 14 is paying off.
+            Largest group 2 legs (MLEG cap safe).
+            INCIDENTS: today 0 CRITICAL/0 ERROR/0 halt, API $1.85/9 calls. Sep 16
+            RIG close FAILED (CRITICAL emailed) -> watchdog retry closed it 12s
+            later, filled 227/227 @5.63; pending_decision_sells now {} and RIG's
+            loss streak is 3. Sep 16 2x yfinance 404 (delisted TLAC, benign).
+            Sep 14 battery storm (16 CRITICALs): ZERO recurrence Sep 15/16/17.
+            GIT STATE — NEEDS A DECISION: local feature/preview (1a82724, the Sep
+            16 liveness commit) has DIVERGED from origin/feature/preview
+            (adb91a7, PR #57 merged Sep 15). Unpushable without a merge (breaks
+            the freeze) or a force-push (barred), so 1a82724 is LOCAL-ONLY. All
+            fallback output went to docs/run6-amendment4-freeze-disclosure, which
+            is based cleanly on origin and fast-forwards when the freeze lifts;
+            this Todo-4 carries 1a82724's Sep 16 entry forward so nothing is lost
+            on GitHub. Authored in an ISOLATED WORKTREE — the live tree was never
+            pulled, merged or checked out, still 31ba93e content.
+            AMENDMENT 4 STILL DOES NOT EXIST: the primary died on "I'll finalize
+            the amendment, the PR, and the full status"; its worktree was clean,
+            no draft to recover. Branch name promises it, branch carries only the
+            log archive + this report. Writing a contract amendment is outside
+            fallback authority — untouched and waiting.
+            USER ACTIONS: (1) Fri Sep 18 is the FINAL run-6 session — nothing to
+            do during it; after the close run the checker (both commands),
+            archive state, merge, switch per RUN7_SWITCH.md; (2) decide the rule
+            7 / v3 rule-8 wording before day 1 (Mon Sep 21) — as written a
+            name_falling-SANCTIONED loss-cut fails a rule that assumes such a
+            sell is impossible, and rewording it after seeing the INTC row is
+            goalpost-moving unless registered explicitly; (3) write Amendment 4;
+            (4) look at the funnel IGNORED spike before run-7 locks in (run-7
+            keeps this funnel); (5) create the run-7 paper account keys before
+            Fri 16:00 ET; (6) the phone artifact is STALE since Sep 7 — headless
+            can't republish; GitHub is the only current status.

@@ -1,0 +1,110 @@
+# eval_contract_check v2 INTERIM through the Sep 17 close
+# run by the HEADLESS away-mode fallback on Thu Sep 17 17:47:54 CDT 2026
+# benchmark bars exported from the Alpaca read-only bars endpoint per SPY_CSV_HELP
+# NOTE: interim only — the contract's final readout is taken after the Fri Sep 18 close.
+
+################ PRIMARY: --start 2026-08-31 (pinned) ################
+=== EVAL-CONTRACT pre-final-test-run-6 (v2) | window 2026-08-31..2026-09-17 | contract v2 ===
+--- (1) closed trades ---
+closed trades (realized_pl non-null, ts in window): N=30
+sum realized P&L: $14,995.54
+win rate: 40.0% (12W / 18L / 0 flat)
+avg win: $3,134.10   avg loss: $-1,256.32
+expectancy/trade: $499.85
+--- (2) one-sided 95% t-test (H1: mean realized_pl > 0) ---
+t-stat: 0.801  df=29  crit(95%, one-sided)=1.699
+result: FAIL (t <= crit)
+--- (2b) expectancy pooled across same-config windows ---
+this window 2026-08-31..2026-09-17: N=30 mean=$499.85 t=0.801 (df=29) bootstrap95=[$-601.98, $1,807.39]
+POOLED: N=30 (1 window(s)) mean=$499.85 t=0.801 crit=1.699 bootstrap95=[$-601.98, $1,807.39]  -> PENDING (needs N >= 60)
+--- (3) drawdown (daily equity closes in window) ---
+max drawdown: -3.29% (peak 2026-09-08 -> trough 2026-09-15, 13 days)
+worst day: 2026-09-14 day_pl $-23,587.13
+equity basis: close=12 row(s), late=1 row(s)  (close rows win per date)
+--- (3b) telescoping: sum(day_pl) vs equity difference (validity, not a verdict check) ---
+sum day_pl: $36,317.29   equity diff (first->last row): $38,502.92   pairs=12 skipped=0
+max per-day gap |Δequity - day_pl|: $1,421.49 on 2026-09-03  -> FAIL (limit $1.00)
+--- (4) up/down capture vs SPY ---
+SPY days in window: 4 up / 8 down
+up-capture: 129.8%   down-capture: 16.1%
+--- (4b) capture vs IWM (informational, not judged) ---
+IWM days in window: 5 up / 7 down
+up-capture: 193.8%   down-capture: 27.7%   (INSUFFICIENT SAMPLE)
+--- (4b) capture vs QQQ (informational, not judged) ---
+QQQ days in window: 6 up / 6 down
+up-capture: 153.0%   down-capture: 62.5%
+--- (4c) daily alpha (OLS book return ~ SPY return, per session) ---
+sessions=12  alpha/day=+0.364%  t(alpha)=1.16  beta=0.91  r2=0.27  (< 20 sessions: t NOT interpretable)
+realized beta vs target 1.00 +/- 0.2: WITHIN
+--- (4d) beta-adjusted capture: book / (beta_exante x index) (informational) ---
+ex-ante beta source: 12 stamped close row(s) (book_beta_spy); fallback beta=1.00 for the rest
+IWM: up-capture 210.5%   down-capture 29.5%   (5 up / 7 down, 11 stamped-beta days)
+QQQ: up-capture 150.3%   down-capture 66.5%   (6 up / 6 down, 11 stamped-beta days)
+SPY: up-capture 131.6%   down-capture 16.7%   (4 up / 8 down, 11 stamped-beta days)
+--- (4e) decision-sell losses below 0.5x planned stop (validity) ---
+decision-sell losses in window: 3  below 0.5x stop: 1  no joinable stop: 0
+  2026-09-14 INTC realized -4.33% vs stop 8.91% (0.49x)
+--- (5) verdict: pre-final-test-run-6 contract v2 ---
+[INFO] sample floor N >= 24: N=30 (met)
+[PEND] pooled expectancy: pooled N=30 < 60 — undecided; pool the next same-config window
+[PASS] max drawdown > -5%  (-3.29%)
+[PASS] beta rule (Amendment 2, 12 sessions < 20): mean ex-ante book_beta_spy=0.97 over 12 stamped close row(s) (range 0.77..1.12) within +/-0.2 of 1.00
+[INFO] realized OLS beta=0.91 (r2=0.27) recorded, NOT counted below 20 sessions (Amendment 2)
+[INFO] daily alpha +0.364%/day, t=1.16 over 12 sessions — < 20 sessions, not interpretable
+[PASS] up-capture > down-capture  (up 129.8% vs down 16.1%)
+[FAIL] zero decision-sell losses below 0.5x stop  (count=1, unknown stop=0)
+VERDICT: NO-GO
+exit=2
+
+################ SECONDARY: --start 2026-09-01 ################
+=== EVAL-CONTRACT pre-final-test-run-6 (v2) | window 2026-09-01..2026-09-17 | contract v2 ===
+--- (1) closed trades ---
+closed trades (realized_pl non-null, ts in window): N=30
+sum realized P&L: $14,995.54
+win rate: 40.0% (12W / 18L / 0 flat)
+avg win: $3,134.10   avg loss: $-1,256.32
+expectancy/trade: $499.85
+--- (2) one-sided 95% t-test (H1: mean realized_pl > 0) ---
+t-stat: 0.801  df=29  crit(95%, one-sided)=1.699
+result: FAIL (t <= crit)
+--- (2b) expectancy pooled across same-config windows ---
+this window 2026-09-01..2026-09-17: N=30 mean=$499.85 t=0.801 (df=29) bootstrap95=[$-601.98, $1,807.39]
+POOLED: N=30 (1 window(s)) mean=$499.85 t=0.801 crit=1.699 bootstrap95=[$-601.98, $1,807.39]  -> PENDING (needs N >= 60)
+--- (3) drawdown (daily equity closes in window) ---
+max drawdown: -3.29% (peak 2026-09-08 -> trough 2026-09-15, 12 days)
+worst day: 2026-09-14 day_pl $-23,587.13
+equity basis: close=12 row(s)  (close rows win per date)
+--- (3b) telescoping: sum(day_pl) vs equity difference (validity, not a verdict check) ---
+sum day_pl: $35,373.65   equity diff (first->last row): $37,559.28   pairs=11 skipped=0
+max per-day gap |Δequity - day_pl|: $1,421.49 on 2026-09-03  -> FAIL (limit $1.00)
+--- (4) up/down capture vs SPY ---
+SPY days in window: 4 up / 7 down
+up-capture: 129.8%   down-capture: 22.2%
+--- (4b) capture vs IWM (informational, not judged) ---
+IWM days in window: 5 up / 6 down
+up-capture: 193.8%   down-capture: 36.7%   (INSUFFICIENT SAMPLE)
+--- (4b) capture vs QQQ (informational, not judged) ---
+QQQ days in window: 6 up / 5 down
+up-capture: 153.0%   down-capture: 93.3%   (INSUFFICIENT SAMPLE)
+--- (4c) daily alpha (OLS book return ~ SPY return, per session) ---
+sessions=11  alpha/day=+0.331%  t(alpha)=0.97  beta=0.96  r2=0.28  (< 20 sessions: t NOT interpretable)
+realized beta vs target 1.00 +/- 0.2: WITHIN
+--- (4d) beta-adjusted capture: book / (beta_exante x index) (informational) ---
+ex-ante beta source: 12 stamped close row(s) (book_beta_spy); fallback beta=1.00 for the rest
+IWM: up-capture 210.5%   down-capture 39.8%   (5 up / 6 down, 11 stamped-beta days)
+QQQ: up-capture 150.3%   down-capture 102.2%   (6 up / 5 down, 11 stamped-beta days)
+SPY: up-capture 131.6%   down-capture 23.2%   (4 up / 7 down, 11 stamped-beta days)
+--- (4e) decision-sell losses below 0.5x planned stop (validity) ---
+decision-sell losses in window: 3  below 0.5x stop: 1  no joinable stop: 0
+  2026-09-14 INTC realized -4.33% vs stop 8.91% (0.49x)
+--- (5) verdict: pre-final-test-run-6 contract v2 ---
+[INFO] sample floor N >= 24: N=30 (met)
+[PEND] pooled expectancy: pooled N=30 < 60 — undecided; pool the next same-config window
+[PASS] max drawdown > -5%  (-3.29%)
+[PASS] beta rule (Amendment 2, 11 sessions < 20): mean ex-ante book_beta_spy=0.97 over 12 stamped close row(s) (range 0.77..1.12) within +/-0.2 of 1.00
+[INFO] realized OLS beta=0.96 (r2=0.28) recorded, NOT counted below 20 sessions (Amendment 2)
+[INFO] daily alpha +0.331%/day, t=0.97 over 11 sessions — < 20 sessions, not interpretable
+[PASS] up-capture > down-capture  (up 129.8% vs down 22.2%)
+[FAIL] zero decision-sell losses below 0.5x stop  (count=1, unknown stop=0)
+VERDICT: NO-GO
+exit=2
