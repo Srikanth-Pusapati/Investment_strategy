@@ -1,0 +1,33 @@
+CORE DEFENSE / EXECUTION MECHANICS AUDIT — evidence log (Sep 15 2026, after the close)
+Trees: run6 = scratchpad/run6_tree (== live tree, as running); run7 = scratchpad/run7_tree (origin/feature/preview adb91a7, not deployed)
+
+QQQ event trace (CT timestamps, logs/Sep_14_2026.log and logs/bot.log = Sep 15):
+Sep 14 08:30:33,813 FALLING-TAPE TRIGGER (book:-2.3%) -> _apply_core_defense: cancel_open_orders_for(QQQ) [fire-and-forget, no log] then reduce_position(QQQ,40)
+Sep 14 08:30:33,992 ERROR reduce_position(QQQ, 40) failed: available 0.4975 / held_for_orders 163 / related_orders [cccc2ed2 = Sep 11 08:35:11 GTC stop 163 @ 602.74]
+Sep 14 08:30:33,999 WARNING "trim failed ... retrying next cycle (GTC stop re-placement armed)"; inline _ensure_core_stop matched the pending_cancel stop (no "Core stop" line) -> gap flag cleared
+Sep 14 08:35:50,540 SELL stop QQQ qty=163 (303e9282) -> STOPLESS WINDOW <= 5m16.5s (cancel accepted => new 163-sh stop accepted; old order gone)
+Sep 14 09:22:37,289 REDUCE QQQ 40 (6aa1d5dc) OK; 09:22:37,538 SELL stop 123 (ab8653b7) -> 0.25 s gap (race won)
+Sep 14 10:15:02 6aa1d5dc FILLED 40 @ 705.9525; ledger realized -128.77 derived (caller sent None) -> fill_price null for this core_defense row
+Sep 15 08:30:16,685 ERROR reduce_position(QQQ, 30) failed: held_for_orders 123 / related ab8653b7 -> NO FALLING-TAPE TRIGGER line: source = breadth:3-names carried from Sep 14 14:39 map {BE, ORCL, SMCI} (17h51m stale; dedupe on same source string) => finding-7 stale-map recurrence #2
+Sep 15 08:34:53,042 SELL stop QQQ 123 (2b012102) -> STOPLESS WINDOW <= 4m36.4s
+Sep 15 09:22:40 DEFENSIVE ROTATION (falling read clear) -> fresh map cleared the stale read
+Sep 15 09:26:06,240 BUY market QQQ notional 50719.53 (8116e923) after cancel of 2b012102; 09:26:07,661 SELL stop 195 (83b224d7) -> 1.4 s gap (by design)
+Sep 15 14:36:29 BOOK BETA invested=58.8% (< 60% neutral rung) -> core fill gap ~1.2% eq ~ $12k
+Sep 15 14:40:07,514 ERROR submit(QQQ) failed 40310000 "potential wash trade detected. use complex orders" reject_reason "opposite side market/stop order exists" existing_order_id 83b224d7
+  => caller = _apply_core_fill (run6 orchestrator.py:3692-3697: cancel_open_orders_for(etf) then submit_notional_buy -> submit()); `if not oid: return` (3698) silent
+  => _ensure_core_stop (called at :1253) then saw 83b224d7 (pending_cancel) via open_stop_sells (:975-998, no status filter) as "already right" (:3806-3812) -> _core_stop_gap=False, no Core stop line
+  => 17:50 ET status=open snapshot: NO QQQ order => cancel settled, stop never replaced. QQQ 195.3 sh ($137.6k) STOPLESS from 14:40:07 CT Sep 15 until the Sep 16 08:30 cycle's _ensure_core_stop (~08:34-08:35 CT) = ~17h50m-17h55m, spanning the Sep 16 open.
+  => watchdog does NOT guard QQQ: run6 monitor/watchdog.py:161-176 trail exempt when core_stop_pct>0; :600-612 time-stop exempt; :492-500 hard exits need state.exits[QQQ] -> risk_state.json exits == {} (verified). Only equity floor / daily-loss flatten remain.
+
+'wash trade' grep over logs/*.log: 26 dated-log hits since first 2026-07-07 09:55:24 (Jul 7 x5, Jul 9 x2, Jul 13 x1, Jul 24 x1, Jul 27 x3, Jul 28 x2, Aug 24 x8, Sep 1 x3, Sep 15 x1). Direction by existing_order_id:
+  STOP SELL rejected because entry BUY open (known, handled by _retry_core_stop): 22 hits (Jul 7 10:42/11:14, Jul 9 x2, Jul 13, Jul 24, Jul 27 x3, Jul 28 x2, Aug 24 x8, Sep 1 x3)
+  BUY rejected because SELL STOP resting: 4 hits: Jul 7 09:55/10:05/10:37 (b3b77ce1 = Jul 6 08:59 stop, pre-dates the cancel-before-buy fix) and Sep 15 14:40:07 (83b224d7) = FIRST in-window occurrence; not in RUN_SUMMARY findings 1-10 (finding 7 covers the REDUCE side only).
+
+Stopless windows measured (cancel-request time -> next 'Core stop: GTC stop resting' line):
+  Sep 11 08:30:18 -> 08:35:11 = 4m53s (known); Sep 14 08:30:34 -> 08:35:50 = 5m16.5s; Sep 15 08:30:17 -> 08:34:53 = 4m36.4s; Sep 15 14:40:07 -> (Sep 16 ~08:34 CT) = ~17h54m ONGOING.
+  Successful paths: Sep 14 09:22:37 trim 0.25 s; Sep 15 09:26:06 core fill 1.4 s.
+
+Run-7 S-7 coverage (run7 tree cites):
+ (a) held_for_orders reduce failure -> replace-qty-down: COVERED. orchestrator.py:3736-3835 (_core_trim_sell: replace_order_qty then poll qty_available then reduce; cancel->poll<=5s fallback; restore on refusal); alpaca_client.py:1085-1105 replace_order_qty; tests/test_core_defense.py:284,313,343,555. Trim deferred if a BUY is working (:3752-3760; test :585).
+ (b) wash reject on core-fill BUY while a stop rests: PARTIAL. _apply_core_fill still cancel->immediate submit (orchestrator.py:4673-4680, unchanged in run7_code.diff; `if not oid: return` silent). Mitigation only via open_stop_sells resting_only filter (alpaca_client.py:1042-1082) so _ensure_core_stop (:4787-4869) sees no resting stop, submits a fresh one, and on a venue reject arms _core_stop_gap for the 30 s watchdog retry -> window shrinks from a full cycle/overnight to <= ~30-60 s; the BUY itself is lost for the cycle with no log line except the alpaca ERROR. No test exercises the BUY-rejected-by-resting-stop sequence (tests grep: test_core_defense.py has none; other tests only cover the STOP-rejected-by-BUY direction).
+ (c) stale-map new-day rule: COVERED. orchestrator.py:1245-1250 (_breadth_map_date/_stamp), :3461-3483 (cross_day ignore + BREADTH STALE MAP line), :3572-3582 (_falling_names_today); tests :191, :239, :464, :511.

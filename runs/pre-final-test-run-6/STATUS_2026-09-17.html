@@ -101,8 +101,13 @@
       (2) <strong>The interim contract verdict is still NO-GO, on exactly one rule</strong>, under both pinned
       <code>--start</code> commands: rule 7, the single Sep 14 INTC decision-sell that lost 0.49&times; its planned stop.
       Every other counted rule now passes &mdash; <strong>including capture, which started counting today</strong>.
-      (3) <strong>Amendment 4 was never written.</strong> Your interactive session died mid-draft and the branch that
-      promises it carries only the log archive.</p>
+      (3) <strong>I recovered 248 KB of your Sep 15&ndash;16 work from <code>/tmp</code>, where it would have been deleted</strong>
+      &mdash; a developed <strong>Amendment 4 draft</strong> (two placeholders still unfilled) and the <strong>68-agent audit</strong>.
+      The audit <strong>completed in name only: 57 of its 58 log lines are the same usage-cap error</strong>, including all 53
+      verifiers, the critic and the synthesizer &mdash; so its two findings are <strong>unverified</strong>, and
+      <code>refuted: []</code> means nothing was checked, not that nothing was wrong. One of them replicates on today's
+      ledger and reframes the headline: <strong>the top 3 trips are 2 names at +$26,638, while the other 27 trips lose
+      &minus;$11,642.</strong></p>
     </div>
   </div>
 
@@ -144,6 +149,13 @@
     </table>
     <p class="note">Win rate and expectancy both fell hard since the Sep 11 interim (64.3% / $1,925.90 &rarr; 40.0% / $499.85).
     That is one day &mdash; Sep 14 &mdash; not a trend break: it closed 8 losers in a single session.</p>
+    <table class="kv">
+      <tr><td>Top 3 trips</td><td><span class="pill warn">2 names only</span> <span class="up">+$26,637.68</span> &mdash; BE &times;2 and INTC</td></tr>
+      <tr><td>The other 27 trips</td><td><span class="down">&minus;$11,642.14</span> &middot; mean <span class="down">&minus;$431.19</span></td></tr>
+      <tr><td>Satellite only (system symbols out)</td><td>N=24 &middot; win rate <strong>29.2%</strong> &middot; ex-top-3 mean <span class="down">&minus;$859.86</span></td></tr>
+    </table>
+    <p class="note">The +3.85% vs SPY and the capture pass are real. But the closed-trip side of run-6 is
+    <strong>two winners plus a long tail of small losses</strong> &mdash; worth weighing before Friday's verdict.</p>
   </section>
 
   <section>
@@ -236,8 +248,12 @@
       <li><strong>Decide the rule 7 / v3 rule 8 wording before run-7 day 1 (Mon Sep 21).</strong> As written, a
       <code>name_falling</code>-sanctioned loss-cut fails a rule that assumes such a sell cannot happen. It will fail again in run-7
       unless the wording changes, and changing it after seeing the INTC row is moving the goalposts unless you register it explicitly.</li>
-      <li><strong>Amendment 4 does not exist.</strong> The branch <code>docs/run6-amendment4-freeze-disclosure</code> carries the
-      log archive and this report only. Your session died at "I'll finalize the amendment, the PR, and the full status".</li>
+      <li><strong>Amendment 4 is a recovered draft, not a registered amendment.</strong> Two placeholders are unfilled and one
+      of them depends on an audit synthesis that never ran, so <strong>it cannot be finished from what survives</strong>.
+      Committed verbatim under <code>runs/pre-final-test-run-6/recovered-2026-09-16/</code> &mdash; I wrote none of it.</li>
+      <li><strong>Re-run the audit once the cap resets.</strong> All 53 verifiers, the critic and the synthesizer died on it.
+      Its two surviving findings both point at <strong>entry selection and the top-up evidence gate</strong>, and both assert
+      run-7 does not address them &mdash; switch-relevant if they hold, but nobody has checked them.</li>
       <li><strong>The bearish-funnel IGNORED spike</strong> &mdash; 25% of eligible names today, TDY six times. Worth a look before
       run-7 locks in, since run-7 keeps this funnel.</li>
       <li><strong>Local <code>feature/preview</code> has diverged from origin</strong> and cannot be pushed without a merge (freeze)

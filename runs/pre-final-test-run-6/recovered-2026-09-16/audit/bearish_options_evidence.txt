@@ -1,0 +1,9 @@
+bearish_options audit evidence (2026-09-15 ~17:50 ET) -- commands + numbers
+Funnel tally (python over logs/Sep_*.log + bot.log, BEARISH FUNNEL entries containing ELIGIBLE):
+  Sep 14: 8 cycles, 17 ELIGIBLE name-cycles, 0 proposed, 17 declined, 0 IGNORED, put_approved 0  (HD x8, AAL x4, KORU x2, STE x2, ONDS x1)
+  Sep 15: 8 cycles, 17 ELIGIBLE name-cycles, 2 proposed (STE 10:18, 11:10), 15 declined, 0 IGNORED, put_approved 0 (STE DDPPDDDD, HD x8 D, AAL x1 D)
+  Run-6 window Sep 1-15: 80 cycles, 167 ELIGIBLE, 17 proposed (10.2%), 150 declined (89.8%), 0 IGNORED-rendered, 2 approved (HD Sep 2, IWM proxy Sep 4)
+  OPTION reject reasons in window: OI n=9 (LTH, IWM, HD, IWM, HD, SCI, LYV, LYV, STE), spread n=4 (AAL x4), no-debit n=3 (VIK x2 Sep 10, STE Sep 15 -- all 'contract unknown to feed'), bullish-off n=3, per-underlying cap n=2 (HD Sep 4)
+STE Sep 15: 10:18:38,145 WARNING no quote for STE261017P00200000 (2026-10-17 = Saturday) -> 10:18:38,416 REJECT 'Net credit / no debit' -> proxy_put=none; 11:10:32,127 REJECT STE261016P00220000 OI 1 < 100 -> proxy_put=IWM skipped: structure already open; 12:02+ model self-declines citing the OI reject.
+IWM spread: net debit 3.90 (ledger 2026-09-04T18:46:36Z qty 13 fill_price 3.9 cost 5083). pl_pct = (0.915L - 1.075(L-3.90))/3.90 = (4.1925-0.16L)/3.90 -> +75..+85% for L in [5.5,8.0]. Take +100% = net 7.80 (52% of 15 width); max +285%.
+Tests: .venv/bin/python -m pytest tests/test_options_snap.py tests/test_put_proxy.py (run7_tree) -> 38 passed.

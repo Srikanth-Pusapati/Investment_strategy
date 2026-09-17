@@ -962,18 +962,57 @@ https://claude.ai/code/artifact/9099ad65-64b1-495c-82b9-db7226a1bbbf
             this Todo-4 carries 1a82724's Sep 16 entry forward so nothing is lost
             on GitHub. Authored in an ISOLATED WORKTREE — the live tree was never
             pulled, merged or checked out, still 31ba93e content.
-            AMENDMENT 4 STILL DOES NOT EXIST: the primary died on "I'll finalize
-            the amendment, the PR, and the full status"; its worktree was clean,
-            no draft to recover. Branch name promises it, branch carries only the
-            log archive + this report. Writing a contract amendment is outside
-            fallback authority — untouched and waiting.
+            RECOVERED 248KB FROM /tmp (correcting my own first pass — the
+            worktree was clean so I first said "no draft"; the work was in the
+            SCRATCHPAD one level up, which macOS clears). Now committed verbatim
+            at runs/pre-final-test-run-6/recovered-2026-09-16/ with a README on
+            provenance; the fallback wrote/edited NONE of it.
+            AMENDMENT4_DRAFT.md = developed 3-part draft (a: freeze-by-the-letter
+            — PR #57 on the remote live branch while the checkout provably stayed
+            31ba93e; b: rule 7 defect with BOTH readings — as-written NO-GO,
+            sanction-aware 0 breaches; c: re-verification notes) but UNFINISHED:
+            2 unfilled <fill> placeholders + a literal "~HH:MM CT" header.
+            Placeholder 1 (which repo files the live process re-reads after
+            start) the primary ANSWERED in its last message — "re-reads no repo
+            file after start ... the pull ban is the only residual control" — but
+            never transferred it in; recorded as README metadata, NOT merged into
+            the draft (contract text = not fallback authority). Placeholder 2
+            (corrected v3 rule-8 wording) awaited the synthesizer, which died.
+            AUDIT COMPLETED IN NAME ONLY: AUDIT_WORKFLOW_RESULT.json shows 57 of
+            58 log lines = "You've hit your session limit" — all 53 verify
+            agents, both remaining audit agents, the critic AND the synthesizer.
+            synth=null. TRAP: refuted=[] means NOTHING WAS CHECKED, not that
+            nothing was wrong; the 2 entries in confirmed[] carry
+            verdict="confirmed" from the agents that RAISED them. Treat as
+            unverified. STR-1: expectancy is a 2-name/3-trip artefact, fresh-entry
+            funnel 0-for-11 since Sep 8, entry score NEGATIVELY rank-correlated
+            with realized P&L (rho -0.264 composite / -0.293 conviction), A+
+            strategy bar fails 4 of 5 substantive sub-bars, run-7 change-set has
+            NO entry-selection item. STR-2: top-up evidence gate has a 7-day
+            memory hole (state.py prunes last_buy_convictions past 7d, gate fails
+            open on missing prior) -> 2 top-ups totaling $65,573 (SMCI Sep 10,
+            SPCX Sep 15) passed a bar they'd otherwise fail, and run-7 S-6
+            PRESERVES the hole by design.
+            I RE-RAN STR-1's CORE ARITHMETIC AND IT REPLICATES through the Sep 17
+            close: top 3 trips = +$26,637.68 across 2 NAMES (BE x2, INTC) while
+            the other 27 trips = -$11,642.14 (mean -$431.19); satellite-only
+            (system symbols out) N=24, WR 29.2%, ex-top-3 mean -$859.86 vs
+            STR-1's -$899.73 at Sep 15. So the +3.85% vs SPY -0.58% and the
+            capture pass are honest, but the CLOSED-TRIP side of run-6 is two
+            winners plus a long tail of small losses. I did NOT verify the
+            Spearman figures, the A+ sub-bar grading, or ANY of STR-2.
+            Both surviving findings point at ENTRY SELECTION + TOP-UP EVIDENCE
+            and both assert run-7 doesn't address them — switch-relevant if they
+            hold. Amendment 4 CANNOT be completed from what survives.
             USER ACTIONS: (1) Fri Sep 18 is the FINAL run-6 session — nothing to
             do during it; after the close run the checker (both commands),
             archive state, merge, switch per RUN7_SWITCH.md; (2) decide the rule
             7 / v3 rule-8 wording before day 1 (Mon Sep 21) — as written a
             name_falling-SANCTIONED loss-cut fails a rule that assumes such a
             sell is impossible, and rewording it after seeing the INTC row is
-            goalpost-moving unless registered explicitly; (3) write Amendment 4;
+            goalpost-moving unless registered explicitly; (3) Amendment 4 is a recovered UNFINISHED draft — finish it yourself
+            (placeholder 2 needs a synthesis that doesn't exist) and RE-RUN THE
+            AUDIT once the cap resets;
             (4) look at the funnel IGNORED spike before run-7 locks in (run-7
             keeps this funnel); (5) create the run-7 paper account keys before
             Fri 16:00 ET; (6) the phone artifact is STALE since Sep 7 — headless
