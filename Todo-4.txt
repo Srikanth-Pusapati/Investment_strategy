@@ -1017,3 +1017,85 @@ https://claude.ai/code/artifact/9099ad65-64b1-495c-82b9-db7226a1bbbf
             keeps this funnel); (5) create the run-7 paper account keys before
             Fri 16:00 ET; (6) the phone artifact is STALE since Sep 7 — headless
             can't republish; GitHub is the only current status.
+
+2026-09-18  RUN-6 WINDOW CLOSED — FINAL VERDICT NO-GO (away-mode FALLBACK, headless;
+            primary dead 54h, cap-killed Sep 16 11:41 CT, 2nd true-positive fire;
+            its transcript mtime was 49 min old at start but the trailing rows are
+            artifact-autoreact-ledger bookkeeping, NOT model turns — only the last
+            type:user|assistant timestamp settles liveness).
+            FINAL CHECKER (runs/pre-final-test-run-6/CHECKER_2026-09-18_close.txt;
+            --end 2026-09-18, BOTH pinned --start commands agree, exit=2): N=31,
+            sum +$13,836.79, WR 38.7% (12W/19L), expectancy $446.35, t=0.736 vs
+            1.697, bootstrap95 [-$612.70, +$1,768.22]; DD -3.29% PASS; ex-ante beta
+            0.98 PASS; CAPTURE COUNTED FOR THE FIRST TIME (4 up / 9 down SPY days)
+            up 129.8% vs down 30.1% PASS; expectancy [PEND] pooled N=31 < 60; sample
+            floor N>=24 MET. RULE 7 [FAIL] on the SAME single row as the Sep 15/17
+            interims: 2026-09-14 INTC realized -4.33% vs planned stop 8.91% = 0.49x
+            -> VERDICT NO-GO. Rule 7's premise is false (frozen code SANCTIONED the
+            sell: 'SELL AUTHORITY: INTC decision-sell allowed on event(s)
+            name_falling:-5.6% today vs SPY -0.7%'); NAME_DROP_DEFENSE has made
+            events_only decision sells possible since Aug 1. Both readings into
+            Amendment 4 as disclosure, NO counted rule changed after the fact (as
+            written = NO-GO; sanction-aware = 0 breaches / all counted rules pass).
+            Defect was registered Sep 16, TWO DAYS BEFORE the verdict day.
+            v3 RULE 8 INHERITS THE SAME WORDING -> must be fixed at pre-registration
+            before run-7 day 1 (Mon Sep 21). Telescoping validity FAIL unchanged
+            (one $1,421.49 gap on Sep 3).
+            WINDOW RESULT: book $1,000,000 -> $1,032,231.08 = +3.22% vs SPY -0.70%
+            (+3.92pp), QQQ +0.65%, IWM -3.34%; DD -3.29%; worst day Sep 14 -$23,587.
+            CONCENTRATION (final, replicates the Sep 17 interim finding): top 3 trips
+            +$26,637.68 (BE +12,525 trail, INTC +8,930 bracket_take, BE +5,182
+            bracket_take) vs the other 28 trips -$12,800.89. Strip the top 3 and the
+            closed-trip book is a loser — weigh before locking run-7's tree.
+            SEP 18 SESSION: close $1,032,231.08, day -$6,789.44 (-0.65%) vs SPY
+            -0.12% (-0.48pp). One realized loss: GRNT -$1,159 bracket_stop -4.4% at
+            the open. Two buys: GOOGL $40,975, PSQ $34.7k hedge top-up, both ~flat.
+            Day's damage was give-back on HELD names (SMCI -$2,874, SPCX -$1,924,
+            BE -$1,785 close-to-close). 0 halts, 0 FAILED, no KILL, not halted.
+            LESSON-FILE ERRATUM: state/lessons/2026-09-18.md claims GRNT was
+            'excluded from the slate at $4.94 (<$5 floor) yet still traded and
+            stopped'. WRONG — GRNT was ENTERED 2026-09-08, ten days before the stop;
+            the $5 floor is a BUY-side gate and correctly blocked new GRNT buys on
+            Sep 17 + Sep 18 while the old position rode down. No gate leaked. The
+            postmortem writer conflated a buy-side exclusion with an old position's
+            exit (measurement rot, this time in the reviewer). Its disposition-effect
+            finding (losers held 7.0d vs winners 5.5d) IS sound.
+            HEALTH: bot pid 7536 up 18d, tick seconds old, deadman ok every
+            market-hours poll through 16:02 ET. *** ON BATTERY during market hours:
+            3 CRITICAL pages 14:00/14:30/15:00 ET, still 50% discharging ~6h32m at
+            session end — nothing was missed but PLUG IN AC before run-7. *** RH
+            OAuth died 08:34 (CRITICAL emailed, all context reads disabled) and
+            SELF-HEALED 11:09 when the token file changed; importing each cycle
+            since, auth_dead=false. Not re-authed from here (headless, none needed).
+            PROTECTION: 14/15 equity names fully stop-covered (bracket stop+limit);
+            PSQ $205,508 unstopped BY DESIGN (_hedge_submit bare fractional notional
+            buy, verified in code Sep 17) and now the largest line at 20% weight;
+            QQQ covers 214 of 214.92 sh (fractional remainder, immaterial). Options:
+            HD 350P +42.9%, IWM 285/270 +$560 net, HBAN 16P flat with a BLIND premium
+            stop (quote still unmarkable, carried from Sep 16).
+            AUDIT GOTCHA (re-learned): get_orders(nested=True) buries bracket legs
+            inside the parent -> first pass reported 14 FALSE 'UNPROTECTED'. Need
+            nested=False + walk order.legs + status=ALL (stop legs sit in HELD).
+            status=ALL alone is NOT sufficient — that is a second, distinct trap from
+            the one in the bracket-stop memory.
+            FUNNEL: IGNORED spike RECEDED — 2 today (PATH, TDY) in the 08:35 cycle
+            only, vs 10 across 7 of 8 cycles on Sep 17; looks cycle-local, not a
+            persistent regression. put_approved=0 but all 3 rejects were CORRECT
+            guards (HBAN 15P spread 142.9%>10% cap; HD 350P per-underlying premium
+            cap; LYV 140P OI 87<100). Auto-hedge PSQ $171.8k -> $206.3k.
+            FREEZE HELD: live tree still feature/preview @ 1a82724, only the 6
+            untracked dated logs; authored in an isolated worktree; no pull/merge/
+            force-push/restart/strategy change. ops/status_page.html rewritten in
+            place (gitignored); tracked copy STATUS_2026-09-18.html. PHONE ARTIFACT
+            STALE SINCE SEP 7 — headless cannot republish; GitHub is the only status.
+            Local feature/preview still diverged from origin, so 1a82724 remains
+            LOCAL-ONLY (pushing needs a merge = breaks freeze, or force-push =
+            barred); its content is carried on the pushed branch.
+            USER ACTIONS: (1) FIX v3 RULE 8 WORDING before Mon Sep 21 — blocking;
+            (2) PLUG IN AC; (3) finish Amendment 4 with both readings, and re-run or
+            drop the Sep 16 audit (57/58 log lines were the same usage-cap error, so
+            refuted:[] means nothing was checked); (4) run the run-7 switch per
+            docs/RUN7_SWITCH.md — `git pull` is SAFE NOW (close row stamped, verdict
+            taken), brings PR #57 + PR #59, restart after the close, verify the
+            'late' row; (5) create the run-7 paper account keys; (6) weigh the top-3
+            concentration before locking run-7's strategy tree.
