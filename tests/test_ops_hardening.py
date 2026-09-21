@@ -9,6 +9,8 @@ import time
 import uuid
 from types import SimpleNamespace
 
+import pytest
+
 from investment_strategy import orchestrator as orch_mod
 from investment_strategy.orchestrator import Orchestrator
 
@@ -323,6 +325,92 @@ def test_overlaps_paging_hours_clock_math():
         ts(2026, 7, 18, 10, 0), ts(2026, 7, 19, 10, 0))
 
 
+# -- holiday-aware paging window (run-7 A2) ------------------------------------ #
+# Labor Day 2026-09-07: 75 CRITICAL "positions unwatched during market hours"
+# pages for a closed market — the window was weekday clock math. It now reads
+# the decision loop's cached exchange calendar (state/session_calendar.json);
+# the static signature (start_ts, end_ts) and the weekday fallback are kept.
+
+def _sep_calendar(path=None):
+    from datetime import date
+    from investment_strategy.session_calendar import SessionCalendar
+    cal = SessionCalendar(path)
+    sessions = {d: ("09:30", "16:00") for d in [
+        "2026-09-01", "2026-09-02", "2026-09-03", "2026-09-04",
+        "2026-09-08", "2026-09-09", "2026-09-10", "2026-09-11",
+        "2026-09-14", "2026-09-15", "2026-09-16", "2026-09-17", "2026-09-18"]}
+    assert cal.update(sessions, date(2026, 9, 1), date(2026, 9, 21), date(2026, 9, 11))
+    return cal
+
+
+def _et_ts(*a) -> float:
+    from datetime import datetime
+    from zoneinfo import ZoneInfo
+    return datetime(*a, tzinfo=ZoneInfo("America/New_York")).timestamp()
+
+
+def test_overlaps_paging_hours_skips_holiday_in_cached_calendar():
+    cal = _sep_calendar()
+    # Labor Day Mon 2026-09-07 10:00 ET: cache says not a session -> no page.
+    assert not Orchestrator._overlaps_paging_hours(
+        _et_ts(2026, 9, 7, 10, 0), _et_ts(2026, 9, 7, 10, 0), cal)
+    # Tue 2026-09-08 10:00 ET -> page.
+    assert Orchestrator._overlaps_paging_hours(
+        _et_ts(2026, 9, 8, 10, 0), _et_ts(2026, 9, 8, 10, 0), cal)
+    # The pre-fix behaviour (no calendar) paged on Labor Day: still the
+    # explicit fallback when nothing is cached.
+    assert Orchestrator._overlaps_paging_hours(
+        _et_ts(2026, 9, 7, 10, 0), _et_ts(2026, 9, 7, 10, 0), None)
+
+
+def test_overlaps_paging_hours_honors_early_close():
+    from datetime import date
+    from investment_strategy.session_calendar import SessionCalendar
+    cal = SessionCalendar(None)
+    sessions = {"2026-11-20": ("09:30", "16:00"), "2026-11-23": ("09:30", "16:00"),
+                "2026-11-24": ("09:30", "16:00"), "2026-11-25": ("09:30", "16:00"),
+                "2026-11-27": ("09:30", "13:00"), "2026-11-30": ("09:30", "16:00")}
+    assert cal.update(sessions, date(2026, 11, 20), date(2026, 12, 4), date(2026, 11, 25))
+    # Fri 2026-11-27 closes 13:00 -> window ends 13:05.
+    assert Orchestrator._overlaps_paging_hours(
+        _et_ts(2026, 11, 27, 12, 50), _et_ts(2026, 11, 27, 12, 50), cal)
+    assert not Orchestrator._overlaps_paging_hours(
+        _et_ts(2026, 11, 27, 13, 20), _et_ts(2026, 11, 27, 15, 0), cal)
+
+
+def test_overlaps_paging_hours_falls_back_outside_cache_range():
+    cal = _sep_calendar()   # covers Sep 1-21 only
+    # Tue 2026-10-06 10:00 ET: uncovered -> weekday math -> page.
+    assert Orchestrator._overlaps_paging_hours(
+        _et_ts(2026, 10, 6, 10, 0), _et_ts(2026, 10, 6, 10, 0), cal)
+    # Sat 2026-10-10 -> no page.
+    assert not Orchestrator._overlaps_paging_hours(
+        _et_ts(2026, 10, 10, 10, 0), _et_ts(2026, 10, 10, 10, 0), cal)
+
+
+def test_watchdog_blind_page_respects_labor_day(monkeypatch):
+    """The production caller (_maybe_page_on_skip_run) reads the module-level
+    active calendar registered by __init__ — no self reference, no network."""
+    from investment_strategy import session_calendar as sc
+    cal = _sep_calendar()
+    prev = sc.active()
+    fixed = _et_ts(2026, 9, 7, 10, 0)       # Labor Day, 10:00 ET
+    monkeypatch.setattr(orch_mod.time, "time", lambda: fixed)
+    try:
+        sc.set_active(cal)
+        o = _orch()
+        o._watchdog_skips = o.WATCHDOG_SKIP_ESCALATE
+        o._blind_paged_at = 0
+        o._maybe_page_on_skip_run()
+        assert o.alerter.calls == [], "Labor Day is not market hours"
+        sc.set_active(None)                 # no cache: weekday math pages
+        o._blind_paged_at = 0
+        o._maybe_page_on_skip_run()
+        assert [c[0] for c in o.alerter.calls] == ["watchdog_blind"]
+    finally:
+        sc.set_active(prev)
+
+
 def test_normal_tick_is_silent():
     o = _orch()
     o._note_loop_tick()
@@ -444,3 +532,250 @@ def test_expired_entry_order_still_halts():
     assert o.risk.kill_switch is True
     assert os.path.exists(o.cfg.kill_switch_file)
     os.remove(o.cfg.kill_switch_file)
+
+
+# -- flatten script: leg order + per-symbol retry (Aug 31 2026 abort) --------- #
+# scripts/flatten_and_restart.py used close_all_positions: 17 closes fired at
+# once, Alpaca rejected the long IWM 295P (the cover of the short IWM 280P —
+# selling it first would leave the short naked), the per-position response
+# was discarded and nothing retried, so after 15 min the script quit with
+# "NOT FLAT — 1 positions remain: IWM260930P00295000" and the run-6 switch
+# needed a manual sell (logs/flatten_restart.log 2026-08-31 11:41-11:56 ET).
+
+def _flatten_script(monkeypatch):
+    """Import scripts/flatten_and_restart with the hold marker redirected to a
+    temp path (never the real state/flatten.hold), sleeps no-op'd and say()
+    captured. Importing the script has no side effects (module constants only)."""
+    import sys
+    from pathlib import Path
+    scripts_dir = os.path.join(
+        os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "scripts")
+    if scripts_dir not in sys.path:
+        sys.path.insert(0, scripts_dir)
+    import flatten_and_restart as fr  # noqa: E402
+    monkeypatch.setattr(fr, "HOLD_MARKER", Path(tempfile.mkdtemp()) / "flatten.hold")
+    monkeypatch.setattr(fr.time, "sleep", lambda s: None)
+    lines = []
+    monkeypatch.setattr(fr, "say", lines.append)
+    return fr, lines
+
+
+def _pos(symbol, qty, asset_class="us_equity"):
+    # Alpaca Position rows: qty is a STRING, negative for a short option leg.
+    return SimpleNamespace(symbol=symbol, qty=str(qty), asset_class=asset_class)
+
+
+def _aug31_book():
+    # The 17 rows the Aug 31 flatten listed, in the order Alpaca returned them.
+    return [
+        _pos("AAPL", 176), _pos("ASND", 169), _pos("BHVN", 934), _pos("HLF", 1819),
+        _pos("HOOD", 1139), _pos("INTC", 340),
+        _pos("IWM260930P00280000", -30, "us_option"),   # short leg of the put spread
+        _pos("IWM260930P00295000", 30, "us_option"),    # its cover (long leg)
+        _pos("NEXA", 1812), _pos("NOK", 2904), _pos("NVDA", 181),
+        _pos("NVDA261016C00180000", 1, "us_option"),
+        _pos("PYPL", 554), _pos("QQQ", "207.481670383"), _pos("SMCI", 1576),
+        _pos("SOFI", 1646), _pos("SPCX", 216),
+    ]
+
+
+class _FakeTC:
+    """Scripted TradingClient. An accepted close_position removes the row at
+    once (marketable closes fill in seconds in RTH). `naked_guard` mirrors the
+    Alpaca options rule that bit on Aug 31: selling a LONG option while a
+    SHORT option on the same underlying is still held is rejected. `reject`
+    maps symbol -> how many closes to refuse first (-1 = every time)."""
+
+    def __init__(self, positions, *, naked_guard=False, reject=None):
+        self.positions = {p.symbol: p for p in positions}
+        self.naked_guard = naked_guard
+        self.reject = dict(reject or {})
+        self.closes = []                 # every close_position call, in order
+        self.close_all_calls = 0
+
+    def get_orders(self):
+        return []
+
+    def cancel_orders(self):
+        pass
+
+    def get_all_positions(self):
+        return list(self.positions.values())
+
+    def close_all_positions(self, cancel_orders=None):
+        self.close_all_calls += 1
+        raise AssertionError("close_all_positions fires every leg at once — the Aug 31 bug")
+
+    @staticmethod
+    def _underlying(symbol):
+        return symbol[:-15] if len(symbol) > 15 else symbol
+
+    def close_position(self, symbol):
+        from alpaca.common.exceptions import APIError
+        self.closes.append(symbol)
+        p = self.positions[symbol]
+        n = self.reject.get(symbol, 0)
+        if n:
+            if n > 0:
+                self.reject[symbol] = n - 1
+            raise APIError('{"code":40310000,"message":"insufficient qty available for order"}')
+        if self.naked_guard and float(p.qty) > 0 and p.asset_class == "us_option":
+            und = self._underlying(symbol)
+            if any(float(q.qty) < 0 and q.asset_class == "us_option"
+                   and self._underlying(s) == und
+                   for s, q in self.positions.items()):
+                raise APIError('{"code":40310000,"message":"selling this leg would leave an uncovered short option"}')
+        del self.positions[symbol]
+        return SimpleNamespace(id=f"oid-{symbol}", status="accepted")
+
+
+def test_order_close_legs_short_options_first(monkeypatch):
+    fr, _ = _flatten_script(monkeypatch)
+    book = _aug31_book() + [_pos("XYZ", -5)]        # plus a short stock row
+    ordered = [p.symbol for p in fr.order_close_legs(book)]
+    # Short option leg first, short stock next, then long options, then equities.
+    assert ordered[0] == "IWM260930P00280000"
+    assert ordered[1] == "XYZ"
+    assert ordered[2:4] == ["IWM260930P00295000", "NVDA261016C00180000"]
+    assert ordered.index("IWM260930P00280000") < ordered.index("IWM260930P00295000")
+    assert all(p.asset_class == "us_equity" for p in fr.order_close_legs(book)[4:])
+    assert sorted(ordered) == sorted(p.symbol for p in book)   # nothing lost/dup'd
+    assert [p.symbol for p in book][0] == "AAPL"                # pure: input untouched
+    # Rows without asset_class fall back to the OCC symbol shape.
+    bare = [SimpleNamespace(symbol="AAPL", qty="1"),
+            SimpleNamespace(symbol="IWM260930P00280000", qty="-1")]
+    assert [p.symbol for p in fr.order_close_legs(bare)][0] == "IWM260930P00280000"
+
+
+def test_flatten_closes_short_leg_before_its_cover(monkeypatch):
+    # The Aug 31 book under the naked-short guard: the old close-all would have
+    # left the 295P; the new choreography closes the 280P first, waits for it to
+    # leave the book, then sells the 295P — flat in ONE round, no close_all.
+    fr, lines = _flatten_script(monkeypatch)
+    tc = _FakeTC(_aug31_book(), naked_guard=True)
+    assert fr.flatten(tc) is True
+    assert tc.close_all_calls == 0
+    assert tc.closes.index("IWM260930P00280000") < tc.closes.index("IWM260930P00295000")
+    assert len(tc.closes) == 17                          # one close per row, no retries
+    assert not any("REJECTED" in ln for ln in lines)
+    assert any("close round 1/3" in ln for ln in lines)
+    assert not any("close round 2/3" in ln for ln in lines)
+    assert any("short close IWM260930P00280000 qty=-30 -> order=oid-IWM260930P00280000" in ln
+               for ln in lines)
+    assert lines[-1] == "account is flat: no orders, no positions"
+
+
+def test_flatten_retries_rejected_leg_and_stops_when_flat(monkeypatch):
+    # A transient per-symbol rejection is printed with the broker's body and
+    # retried next round; the loop stops as soon as the book is flat.
+    fr, lines = _flatten_script(monkeypatch)
+    tc = _FakeTC(_aug31_book(), reject={"AAPL": 1})
+    assert fr.flatten(tc) is True
+    assert tc.closes.count("AAPL") == 2
+    assert len(tc.closes) == 18                          # 17 + the one retry
+    rej = [ln for ln in lines if "REJECTED" in ln]
+    assert len(rej) == 1
+    assert "long close AAPL qty=176 REJECTED: APIError HTTP ?: insufficient qty available" in rej[0]
+    assert any("round 1/3: 1 remain: AAPL" in ln for ln in lines)
+    assert any("close round 2/3: 1 positions" in ln for ln in lines)
+    assert not any("close round 3/3" in ln for ln in lines)
+
+
+def test_flatten_returns_false_on_persistent_leftover(monkeypatch):
+    # A leg the broker refuses every time is retried CLOSE_ROUNDS times, each
+    # refusal logged, and the script still reports NOT FLAT (exit-1 path in
+    # _flatten_reset_restart, bot NOT started) — never a silent success.
+    fr, lines = _flatten_script(monkeypatch)
+    tc = _FakeTC(_aug31_book(), reject={"IWM260930P00295000": -1})
+    assert fr.flatten(tc) is False
+    assert tc.closes.count("IWM260930P00295000") == fr.CLOSE_ROUNDS == 3
+    rej = [ln for ln in lines
+           if "long close IWM260930P00295000 qty=30 REJECTED: APIError HTTP ?: " in ln]
+    assert len(rej) == 3                                 # every refusal logged with its body
+    assert lines[-1].startswith("NOT FLAT — 1 positions remain after 3 rounds: IWM260930P00295000")
+    assert len(tc.positions) == 1                        # everything else got closed
+
+
+class _SlowFillTC(_FakeTC):
+    """A close the broker ACCEPTS but does not fill within CLOSE_WAIT_S (an
+    illiquid option cover): the order stays open, the position stays on the
+    book for `slow[symbol]` more position polls, and a SECOND close for that
+    symbol is rejected on qty available — the open order holds it (what
+    Alpaca does to a duplicate close)."""
+
+    def __init__(self, positions, *, slow):
+        super().__init__(positions)
+        self.slow = dict(slow)          # symbol -> position polls until the fill lands
+        self.working = {}               # symbol -> polls left while the order is open
+
+    def get_orders(self):
+        return [SimpleNamespace(symbol=s, id=f"oid-{s}") for s in self.working]
+
+    def get_all_positions(self):
+        for s in list(self.working):
+            self.working[s] -= 1
+            if self.working[s] <= 0:
+                del self.working[s]
+                del self.positions[s]
+        return list(self.positions.values())
+
+    def close_position(self, symbol):
+        from alpaca.common.exceptions import APIError
+        if symbol in self.working:
+            self.closes.append(symbol)
+            raise APIError('{"code":40310000,"message":"insufficient qty available for order (requested: 30, available: 0)"}')
+        if symbol in self.slow:
+            self.closes.append(symbol)
+            self.working[symbol] = self.slow.pop(symbol)
+            return SimpleNamespace(id=f"oid-{symbol}", status="accepted")
+        return super().close_position(symbol)
+
+
+def test_flatten_round_two_waits_on_a_working_close_instead_of_resending(monkeypatch):
+    # Review finding (run-7 C2): round 2 re-sent close_position for a symbol
+    # whose round-1 close was accepted but unfilled past CLOSE_WAIT_S; Alpaca
+    # rejects the duplicate on qty available (the open order holds it), so
+    # the leg kept "failing" and the script reported NOT FLAT although the
+    # first order fills minutes later. Now a leftover with a working close
+    # order is skipped and waited on.
+    fr, lines = _flatten_script(monkeypatch)
+    polls_per_wait = fr.CLOSE_WAIT_S // fr.CLOSE_POLL_S      # 36 (+1 initial poll)
+    book = [_pos("AAPL", 176), _pos("IWM260930P00295000", 30, "us_option")]
+    tc = _SlowFillTC(book, slow={"IWM260930P00295000": polls_per_wait + 14})
+    assert fr.flatten(tc) is True
+    assert tc.closes == ["IWM260930P00295000", "AAPL"]      # ONE close each, never re-sent
+    assert not any("REJECTED" in ln for ln in lines)
+    assert any("long closes still open after 180s: IWM260930P00295000" in ln for ln in lines)
+    assert any("round 1/3: 1 remain: IWM260930P00295000" in ln for ln in lines)
+    assert any(ln == "  long close IWM260930P00295000 qty=30 SKIPPED: a close order is "
+                     "still working from an earlier round — waiting on it" for ln in lines)
+    assert any("close round 2/3: 1 positions" in ln for ln in lines)
+    assert not any("close round 3/3" in ln for ln in lines)
+    assert lines[-1] == "account is flat: no orders, no positions"
+    # The fake really would have rejected a duplicate (the pre-fix path).
+    from alpaca.common.exceptions import APIError
+    tc2 = _SlowFillTC([_pos("IWM260930P00295000", 30, "us_option")],
+                      slow={"IWM260930P00295000": 99})
+    tc2.close_position("IWM260930P00295000")
+    with pytest.raises(APIError):
+        tc2.close_position("IWM260930P00295000")
+    # Round 1 never consults the order list (step 2 just cancelled everything);
+    # an unreadable order list in a later round falls back to re-sending.
+    tc3 = _FakeTC(_aug31_book())
+    tc3.get_orders = lambda: (_ for _ in ()).throw(RuntimeError("orders endpoint down"))
+    assert fr._working_close_orders(tc3) == set()
+    assert any("open-order check failed (RuntimeError HTTP ?: orders endpoint down)" in ln
+               for ln in lines)
+
+
+def test_flatten_refuses_non_paper_base_url(monkeypatch):
+    # PAPER-ONLY guard is untouched: a live endpoint exits 1 before the
+    # open-wait, before the hold marker, before any broker call.
+    fr, lines = _flatten_script(monkeypatch)
+    monkeypatch.setattr(fr, "env_val", lambda n: "https://api.alpaca.markets")
+    monkeypatch.setattr(fr, "wait_until", lambda t: (_ for _ in ()).throw(AssertionError("waited")))
+    monkeypatch.setattr(fr, "_flatten_reset_restart",
+                        lambda: (_ for _ in ()).throw(AssertionError("flattened")))
+    assert fr.main() == 1
+    assert any(ln.startswith("REFUSING: ALPACA_BASE_URL is not the paper endpoint") for ln in lines)
+    assert not fr.HOLD_MARKER.exists()

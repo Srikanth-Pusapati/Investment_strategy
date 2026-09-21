@@ -25,6 +25,17 @@ OAuth-level read-vs-trade split. The token IS trade-capable. Our read-only guara
 therefore lives in the CLIENT (we only ever call read tools) and in you authorizing a
 separate, funded agentic account — NOT in the token's scope. Guard this file like a
 credential.
+
+CONSENT DEADLINE (Sep 10 2026 incident): the redirect catcher used to loop
+``while not result: handle_request()`` with only a per-request socket timeout, so a
+login nobody approved blocked its caller forever — a re-auth started 14:55 CT sat
+2h44m holding the callback port and wedged the resident session that launched it
+(which then false-fired the away-mode fallback). ``wait_for_code`` now runs against a
+wall-clock deadline (ROBINHOOD_LOGIN_TIMEOUT_S / ``login --timeout``, default 600s)
+and raises ``OAuthConsentTimeout``; the ``login`` command turns that into exit code
+3 with the runbook line ("consent stalled — leaving Robinhood DEGRADED") and never
+touches the token file, so the bot keeps trading on Alpaca without RH context and
+the operator decides whether to retry (ops/away_mode.md: stop after two stalls).
 """
 from __future__ import annotations
 
@@ -32,6 +43,7 @@ import asyncio
 import json
 import logging
 import os
+import time
 import webbrowser
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
@@ -41,6 +53,25 @@ from urllib.parse import parse_qs, urlparse
 from ..config import Config
 
 log = logging.getLogger("robinhood")
+
+#: Wall-clock budget for the operator to approve the consent screen. 10 minutes is
+#: generous for a phone push + browser click and short enough that a stalled login
+#: cannot wedge the session that launched it (the Sep 10 login sat 2h44m).
+DEFAULT_LOGIN_TIMEOUT_S = 600.0
+#: Env override for the deadline (read at the CLI boundary — `login` is a one-shot
+#: operator command, not a bot-runtime path, so it is not a Config field).
+LOGIN_TIMEOUT_ENV = "ROBINHOOD_LOGIN_TIMEOUT_S"
+#: `login` exit code when consent never arrived (1 = other failure, 2 = not configured).
+EXIT_CONSENT_STALLED = 3
+#: Upper bound on one handle_request() wait so the deadline is re-checked regularly.
+_POLL_S = 5.0
+#: How often the wait prints a "still waiting" line (greppable progress for an
+#: operator tailing a backgrounded login).
+_WAIT_PROGRESS_S = 60.0
+
+
+class OAuthConsentTimeout(TimeoutError):
+    """Nobody approved the Robinhood consent screen before the login deadline."""
 
 
 # --------------------------------------------------------------------------- #
@@ -115,13 +146,18 @@ def _redirect_uri(cfg: Config) -> str:
     return f"http://localhost:{cfg.robinhood_callback_port}/callback"
 
 
-def build_provider(cfg: Config, *, interactive: bool):
+def build_provider(
+    cfg: Config, *, interactive: bool, login_timeout_s: float = DEFAULT_LOGIN_TIMEOUT_S
+):
     """An ``OAuthClientProvider`` (an httpx.Auth) wired to our file storage.
 
     interactive=True installs browser + localhost-callback handlers for the one-time
     login. interactive=False omits them: refreshes still work unattended, but if the
     refresh token is dead the SDK raises instead of silently popping a browser during
     a trading loop — the reader catches that and logs "re-run login".
+
+    login_timeout_s bounds the interactive wait for the consent redirect (see the
+    module docstring); it is ignored when interactive=False.
     """
     from mcp.client.auth import OAuthClientProvider
     from mcp.shared.auth import OAuthClientMetadata
@@ -155,8 +191,11 @@ def build_provider(cfg: Config, *, interactive: bool):
             pass
 
     async def callback_handler() -> tuple[str, str | None]:
-        print(f"Waiting for the redirect on {_redirect_uri(cfg)} …")
-        code, state = await asyncio.to_thread(callback.wait_for_code)
+        print(
+            f"Waiting for the redirect on {_redirect_uri(cfg)} "
+            f"(giving up after {login_timeout_s:.0f}s) …"
+        )
+        code, state = await asyncio.to_thread(callback.wait_for_code, login_timeout_s)
         return code, state
 
     return OAuthClientProvider(
@@ -176,14 +215,22 @@ class _CallbackServer:
 
     Ignores incidental hits (e.g. /favicon.ico) and keeps serving until the real
     callback with a ``code`` (or an ``error``) arrives, so a browser prefetch can't
-    end the wait early.
+    end the wait early — but only until a wall-clock deadline, after which it raises
+    ``OAuthConsentTimeout`` (a ``TimeoutError``) and releases the port.
     """
 
     def __init__(self, port: int):
         self.port = port
         self.result: dict[str, str] = {}
 
-    def wait_for_code(self, timeout: float = 300.0) -> tuple[str, str | None]:
+    def wait_for_code(
+        self, timeout: float = DEFAULT_LOGIN_TIMEOUT_S
+    ) -> tuple[str, str | None]:
+        """Block until the redirect lands or ``timeout`` seconds of wall clock pass.
+
+        Raises ``OAuthConsentTimeout`` on expiry and ``RuntimeError`` if Robinhood
+        redirected with ``?error=``. The port is released on every exit path.
+        """
         outer = self
 
         class Handler(BaseHTTPRequestHandler):
@@ -214,24 +261,91 @@ class _CallbackServer:
                 pass
 
         httpd = HTTPServer(("127.0.0.1", self.port), Handler)
-        httpd.timeout = timeout
+        # socketserver's `timeout` bounds ONE handle_request() and returns silently on
+        # expiry, so a loop keyed only on it never ends (Sep 10 2026: 2h44m wedge).
+        # Track a monotonic deadline and re-derive the per-call timeout every pass —
+        # a favicon/prefetch hit consumes budget instead of restarting the clock.
+        started = time.monotonic()
+        deadline = started + max(0.0, float(timeout))
+        next_progress = started + _WAIT_PROGRESS_S
         try:
             while not self.result:
+                now = time.monotonic()
+                remaining = deadline - now
+                if remaining <= 0:
+                    break
+                if now >= next_progress:
+                    print(
+                        f"Still waiting for the Robinhood redirect "
+                        f"({remaining:.0f}s left before giving up) …"
+                    )
+                    next_progress = now + _WAIT_PROGRESS_S
+                httpd.timeout = min(_POLL_S, remaining)
                 httpd.handle_request()  # one request; loop past favicon/prefetch
         finally:
-            httpd.server_close()
+            httpd.server_close()  # release the port on success, error AND timeout
 
         if "error" in self.result:
             raise RuntimeError(f"Robinhood denied authorization: {self.result['error']}")
         if "code" not in self.result:
-            raise TimeoutError("Timed out waiting for the Robinhood OAuth redirect.")
+            raise OAuthConsentTimeout(
+                f"No Robinhood OAuth redirect within {float(timeout):.0f}s — "
+                "consent was never approved."
+            )
         return self.result["code"], self.result.get("state") or None
+
+
+def _find_consent_timeout(exc: BaseException) -> OAuthConsentTimeout | None:
+    """Locate an ``OAuthConsentTimeout`` inside whatever reached ``asyncio.run``.
+
+    The callback runs inside the SDK's anyio task groups (streamablehttp_client and
+    ClientSession), so anyio 4.x delivers it wrapped in one or more
+    ``ExceptionGroup``s; the SDK may also chain it as ``__cause__``/``__context__``.
+    Walks all three, cycle-safe, so the CLI can name the stall precisely instead of
+    printing a generic "Login failed: unhandled errors in a TaskGroup".
+    """
+    seen: set[int] = set()
+    stack: list[BaseException] = [exc]
+    while stack:
+        cur = stack.pop()
+        if id(cur) in seen:
+            continue
+        seen.add(id(cur))
+        if isinstance(cur, OAuthConsentTimeout):
+            return cur
+        if isinstance(cur, BaseExceptionGroup):
+            stack.extend(cur.exceptions)
+        for linked in (cur.__cause__, cur.__context__):
+            if linked is not None:
+                stack.append(linked)
+    return None
+
+
+def login_timeout_from_env(default: float = DEFAULT_LOGIN_TIMEOUT_S) -> float:
+    """Resolve the consent deadline from ROBINHOOD_LOGIN_TIMEOUT_S (blank/garbage/
+    non-positive → ``default``, with a warning so a typo can't silently mean 0s)."""
+    raw = os.getenv(LOGIN_TIMEOUT_ENV, "").strip()
+    if not raw:
+        return default
+    try:
+        val = float(raw)
+    except ValueError:
+        val = -1.0
+    if val <= 0:
+        log.warning(
+            "%s=%r is not a positive number of seconds; using %.0fs",
+            LOGIN_TIMEOUT_ENV, raw, default,
+        )
+        return default
+    return val
 
 
 # --------------------------------------------------------------------------- #
 # The one-time login handshake
 # --------------------------------------------------------------------------- #
-async def _login_async(cfg: Config) -> list[str]:
+async def _login_async(
+    cfg: Config, *, timeout_s: float = DEFAULT_LOGIN_TIMEOUT_S
+) -> list[str]:
     """Drive the full OAuth flow by opening an authenticated MCP session.
 
     Connecting triggers the SDK's lazy handshake on the first 401; on success the
@@ -241,7 +355,7 @@ async def _login_async(cfg: Config) -> list[str]:
     from mcp import ClientSession
     from mcp.client.streamable_http import streamablehttp_client
 
-    provider = build_provider(cfg, interactive=True)
+    provider = build_provider(cfg, interactive=True, login_timeout_s=timeout_s)
     async with streamablehttp_client(cfg.robinhood_mcp_url, auth=provider) as (r, w, _):
         async with ClientSession(r, w) as session:
             await session.initialize()
@@ -249,22 +363,56 @@ async def _login_async(cfg: Config) -> list[str]:
             return [t.name for t in tools.tools]
 
 
-def login(cfg: Config) -> int:
-    """Interactive entry point. Returns a process exit code."""
+def login(cfg: Config, *, timeout_s: float | None = None) -> int:
+    """Interactive entry point. Returns a process exit code.
+
+    0 = authorized, 1 = handshake failed, 2 = not configured, 3 = consent stalled
+    (no redirect within ``timeout_s``; token file untouched, Robinhood left DEGRADED).
+    ``timeout_s=None`` — or an explicit non-positive value — resolves
+    ROBINHOOD_LOGIN_TIMEOUT_S (default 600); a 0 s deadline would never wait.
+    """
     if not cfg.robinhood_mcp_url:
         print("ROBINHOOD_MCP_URL is empty — nothing to authorize against.")
         return 2
+    if timeout_s is not None and timeout_s <= 0:
+        # `--timeout 0` used to reach wait_for_code and raise the consent
+        # timeout at once (exit 3, no wait at all) — the same guard the env
+        # path applies belongs here too.
+        log.warning(
+            "--timeout %r is not a positive number of seconds; using %s / default",
+            timeout_s, LOGIN_TIMEOUT_ENV,
+        )
+        timeout_s = None
+    if timeout_s is None:
+        timeout_s = login_timeout_from_env()
     print("Robinhood Agentic MCP — OAuth login")
     print(f"  endpoint : {cfg.robinhood_mcp_url}")
     print(f"  scope    : {cfg.robinhood_scope or '(server default)'}")
     print(f"  tokens   : {cfg.robinhood_oauth_file}")
+    print(f"  deadline : {timeout_s:.0f}s for consent ({LOGIN_TIMEOUT_ENV} / --timeout)")
     print(
         "\nAuthorize the DEDICATED agentic account you fund for the bot — NOT your "
         "main portfolio. The token is trade-capable; we only ever call read tools.\n"
     )
     try:
-        tools = asyncio.run(_login_async(cfg))
+        tools = asyncio.run(_login_async(cfg, timeout_s=timeout_s))
     except Exception as e:
+        stalled = _find_consent_timeout(e)
+        if stalled is not None:
+            # Runbook (ops/away_mode.md): a stalled consent is DEGRADED, not broken.
+            # Nothing was written — the token file only changes on a successful
+            # exchange — so the reader's existing latch/self-heal state is intact.
+            log.warning("Robinhood OAuth login: consent stalled after %.0fs", timeout_s)
+            print(
+                f"\nNo Robinhood redirect within {timeout_s:.0f}s: consent stalled — "
+                "leaving Robinhood DEGRADED; the bot trades without RH context."
+            )
+            print(
+                f"Token file untouched ({cfg.robinhood_oauth_file}). Re-run login when "
+                "you can approve the consent screen; per ops/away_mode.md, after two "
+                "stalls stop and leave it DEGRADED."
+            )
+            return EXIT_CONSENT_STALLED
         log.exception("Robinhood OAuth login failed")
         print(f"\nLogin failed: {e}")
         return 1
@@ -316,9 +464,22 @@ def main(argv: list[str] | None = None) -> int:
         choices=["login", "status", "logout"],
         help="login (default): run the handshake; status: check; logout: delete tokens.",
     )
+    parser.add_argument(
+        "--timeout",
+        type=float,
+        default=None,
+        metavar="SECONDS",
+        help=(
+            "login only: give up waiting for the consent redirect after this many "
+            f"seconds (default: ${LOGIN_TIMEOUT_ENV} or {DEFAULT_LOGIN_TIMEOUT_S:.0f}); "
+            f"exit code {EXIT_CONSENT_STALLED} on expiry, token file untouched."
+        ),
+    )
     args = parser.parse_args(argv)
-    cfg = load_config()
-    return {"login": login, "status": status, "logout": logout}[args.command](cfg)
+    cfg = load_config()  # also loads .env, so the env override below sees it
+    if args.command == "login":
+        return login(cfg, timeout_s=args.timeout)
+    return {"status": status, "logout": logout}[args.command](cfg)
 
 
 if __name__ == "__main__":

@@ -3,10 +3,15 @@
 (a) post-mortem: open option groups are marked close-to-close (or reported
     UNMARKED explicitly), core_fill rows are excluded, the name count no
     longer counts the summary line, read_curated honours max_lines
-(b) equity_history: one fixed basis='close' row per ET day, never overwritten
+(b) equity_history: one fixed basis='close' row per ET day, never overwritten;
+    run-7 B1: a close/late row's day_pl is equity - the previous close/late
+    row's equity (self-consistent, telescopes by construction) and the
+    broker's figure is preserved as broker_day_pl
 (c) eval_contract_check: telescoping + basis + extra benchmarks
 (d) dashboard: no latest_price() on OCC symbols
-(e) fill prices stamped onto the ledger row at FILLED confirmation
+(e) fill prices stamped onto the ledger row at FILLED confirmation;
+    run-7 B2: an equity SELL row's exit_price / realized_pl / realized_pl_pct
+    are restated at that fill (as-recorded figures kept as quote_*)
 """
 from __future__ import annotations
 
@@ -305,6 +310,158 @@ def test_closing_snapshot_legacy_path_when_knob_off():
     assert o.equity_history.all() == []   # legacy: no row today -> nothing
 
 
+# ---- run-7 B1: self-consistent close-row day_pl ----------------------------
+# Real run-6 rows (state/equity_history.jsonl). The broker's day_pl is
+# equity - Alpaca last_equity, and Alpaca restates last_equity overnight, so
+# the broker figure disagreed with our own close-to-close delta by -776.77
+# (Sep 2) and +1,421.49 (Sep 3) — the checker's telescoping FAIL every run.
+_RUN6_ROWS = [  # (day, basis, equity, broker day_pl)
+    ("2026-08-31", "late", 1_000_000.00, 0.0),
+    ("2026-09-01", "close", 1_000_943.64, 943.64),
+    ("2026-09-02", "close", 1_005_629.55, 5_462.68),
+    ("2026-09-03", "close", 1_016_452.05, 9_401.01),
+]
+
+
+def test_close_rows_telescope_exactly_across_three_sessions():
+    h = EquityHistory(path=_tmp(".jsonl"))
+    for day, basis, eq, pl in _RUN6_ROWS:
+        h.snapshot(_status(eq, day_pl=pl), basis=basis, day=day)
+    rows = h.all()
+    closes = [r for r in rows if r["basis"] == "close"]
+    assert [r["day_pl"] for r in closes] == [943.64, 4_685.91, 10_822.50]
+    assert [r["day_pl_basis"] for r in closes] == ["self"] * 3
+    # the broker's figure is preserved verbatim next to the derived one
+    assert [r["broker_day_pl"] for r in closes] == [943.64, 5_462.68, 9_401.01]
+    # telescoping: sum(day_pl) over the three close rows == delta-equity, to the cent
+    assert round(sum(r["day_pl"] for r in closes), 2) == round(1_016_452.05 - 1_000_000.0, 2)
+    for prev, cur in zip(rows, rows[1:]):
+        assert abs((cur["equity"] - prev["equity"]) - cur["day_pl"]) < 0.005
+    # Sep 3's restatement is exactly the $1,421.49 gap the run-6 checker flagged
+    assert round(closes[2]["day_pl"] - closes[2]["broker_day_pl"], 2) == 1_421.49
+
+
+def test_late_baseline_is_the_predecessor_of_the_first_close_row():
+    h = EquityHistory(path=_tmp(".jsonl"))
+    h.snapshot(_status(1_000_000.0, day_pl=0.0), basis="late", day="2026-08-31")
+    # broker restated last_equity overnight -> its day_pl is NOT our delta
+    h.snapshot(_status(1_000_943.64, day_pl=1_720.41), basis="close", day="2026-09-01")
+    rows = h.all()
+    assert rows[0]["basis"] == "late" and rows[0]["day_pl_basis"] == "broker"
+    assert rows[0]["day_pl"] == 0.0 and rows[0]["broker_day_pl"] == 0.0
+    assert rows[1]["day_pl"] == 943.64 and rows[1]["day_pl_basis"] == "self"
+    assert rows[1]["broker_day_pl"] == 1_720.41
+
+
+def test_first_close_row_without_predecessor_keeps_broker_day_pl():
+    h = EquityHistory(path=_tmp(".jsonl"))
+    h.snapshot(_status(1_000_456.0, day_pl=456.0), basis="close", day="2026-08-24")
+    r = h.all()[0]
+    assert r["day_pl"] == 456.0 and r["broker_day_pl"] == 456.0
+    assert r["day_pl_basis"] == "broker"
+    # legacy (no basis) and intraday rows are not predecessors either
+    h2 = EquityHistory(path=_tmp(".jsonl"))
+    h2.snapshot(_status(100.0, day_pl=1.0), day="2026-08-21")                    # legacy
+    h2.snapshot(_status(101.0, day_pl=2.0), basis="intraday", day="2026-08-24")
+    h2.snapshot(_status(105.0, day_pl=3.0), basis="close", day="2026-08-25")
+    r = h2.all()[-1]
+    assert r["day_pl"] == 3.0 and r["broker_day_pl"] == 3.0
+    assert r["day_pl_basis"] == "broker"
+
+
+def test_intraday_rows_are_unchanged_and_skipped_as_predecessors():
+    h = EquityHistory(path=_tmp(".jsonl"))
+    h.snapshot(_status(100.0, day_pl=0.0), basis="close", day="2026-09-01")
+    # Sep 2: bell tick missed (bot down) -> only an intraday read survives
+    h.snapshot(_status(104.0, day_pl=4.0), basis="intraday", day="2026-09-02")
+    h.snapshot(_status(110.0, day_pl=7.0), basis="intraday", day="2026-09-03")
+    intraday = h.all()[1]
+    assert intraday["day_pl"] == 4.0
+    assert "broker_day_pl" not in intraday and "day_pl_basis" not in intraday
+    h.snapshot(_status(109.0, day_pl=6.0), basis="close", day="2026-09-03")  # replaces Sep 3 intraday
+    rows = h.all()
+    assert [r["basis"] for r in rows] == ["close", "intraday", "close"]
+    # predecessor is the Sep 1 CLOSE row, not the Sep 2 intraday read
+    assert rows[-1]["day_pl"] == 9.0 and rows[-1]["broker_day_pl"] == 6.0
+    assert rows[-1]["day_pl_basis"] == "self"
+    # legacy writer path (no basis) untouched: broker figure, no new fields
+    h.snapshot(_status(50.0, day_pl=-1.0,
+                       as_of=datetime(2026, 9, 4, 15, 0, tzinfo=timezone.utc)))
+    r = h.all()[-1]
+    assert r["day_pl"] == -1.0 and "broker_day_pl" not in r and "basis" not in r
+
+
+def test_legacy_rows_without_the_new_fields_still_load_and_predecess():
+    p = _tmp(".jsonl")
+    legacy = [
+        {"date": "2026-08-24", "equity": 1_000_110.0, "day_pl": 110.0},   # pre run-6 row
+        {"date": "2026-08-25", "equity": 1_006_145.0, "day_pl": 5689.0,
+         "basis": "close", "book_beta_spy": 0.9},                          # run-6 close row
+        {"date": "2026-08-26", "equity": 1_006_500.0, "day_pl": 355.0, "basis": "intraday"},
+    ]
+    p.write_text("".join(json.dumps(r) + "\n" for r in legacy), encoding="utf-8")
+    h = EquityHistory(path=p)
+    rows = h.all()
+    assert rows == legacy
+    assert h.has_close_row("2026-08-25") and not h.has_close_row("2026-08-24")
+    # a run-6 close row (no broker_day_pl / day_pl_basis) is still a valid predecessor
+    h.snapshot(_status(1_005_145.0, day_pl=-1_600.0), basis="close", day="2026-08-26")
+    rows = h.all()
+    assert len(rows) == 3 and rows[-1]["basis"] == "close"
+    assert rows[-1]["day_pl"] == -1_000.0 and rows[-1]["broker_day_pl"] == -1_600.0
+    assert rows[-1]["day_pl_basis"] == "self"
+    assert rows[:2] == legacy[:2]   # older rows are never rewritten
+
+
+def test_malformed_predecessor_degrades_to_broker_day_pl_never_a_lost_row(caplog):
+    # Review finding (run-7 B1): float(prev["equity"]) on a malformed legacy
+    # value raised inside snapshot()'s single try -> "equity snapshot failed",
+    # nothing written, has_close_row stayed False, every 30 s tick retried into
+    # the same failure until midnight -> NO close row -> v3 VOID for the date.
+    # (a) a non-numeric predecessor is skipped (an older sound one is used)
+    p = _tmp(".jsonl")
+    p.write_text(json.dumps({"date": "2026-09-01", "equity": 100.0, "day_pl": 0.0,
+                             "basis": "close"}) + "\n"
+                 + json.dumps({"date": "2026-09-02", "equity": "n/a", "day_pl": 0.0,
+                               "basis": "close"}) + "\n", encoding="utf-8")
+    h = EquityHistory(path=p)
+    h.snapshot(_status(104.0, day_pl=3.0), basis="close", day="2026-09-03")
+    r = h.all()[-1]
+    assert r["date"] == "2026-09-03" and r["basis"] == "close"
+    assert r["day_pl"] == 4.0 and r["day_pl_basis"] == "self" and r["broker_day_pl"] == 3.0
+    assert h.has_close_row("2026-09-03")
+    # (b) the stamp itself blowing up degrades the row to the broker figure
+    h2 = EquityHistory(path=_tmp(".jsonl"))
+    h2.snapshot(_status(100.0, day_pl=0.0), basis="close", day="2026-09-01")
+    with patch.object(EquityHistory, "_prior_close_row",
+                      side_effect=RuntimeError("corrupt predecessor")), \
+            caplog.at_level(logging.WARNING, logger="status"):
+        h2.snapshot(_status(105.0, day_pl=7.0), basis="close", day="2026-09-02")
+    r = h2.all()[-1]
+    assert r["date"] == "2026-09-02" and h2.has_close_row("2026-09-02")
+    assert r["day_pl"] == 7.0 and r["broker_day_pl"] == 7.0 and r["day_pl_basis"] == "broker"
+    assert any("keeps the broker figure" in rec.getMessage() and "predecessor unusable"
+               in rec.getMessage() for rec in caplog.records)
+    assert not any("equity snapshot failed" in rec.getMessage() for rec in caplog.records)
+
+
+def test_closing_snapshot_second_session_telescopes_from_prior_close_row():
+    o = _orch_with_history()
+    o.cfg.equity_close_fixed_stamp = True
+    o._refresh_closing_snapshot(now_et=datetime(2026, 9, 1, 16, 1, tzinfo=_ET))
+    # next session: Alpaca restated last_equity overnight -> broker day_pl
+    # 4,852.78 while our own close-to-close delta is 5,629.55
+    o.broker.get_account = lambda: SimpleNamespace(
+        positions=[], equity=1_005_629.55, cash=1.0, buying_power=1.0,
+        day_pl=4_852.78, day_pl_pct=0.48, pattern_day_trader=False, daytrade_count=0)
+    o._refresh_closing_snapshot(now_et=datetime(2026, 9, 2, 16, 1, tzinfo=_ET))
+    rows = o.equity_history.all()
+    assert [r["date"] for r in rows] == ["2026-09-01", "2026-09-02"]
+    assert rows[0]["day_pl_basis"] == "broker" and rows[0]["day_pl"] == 0.0
+    assert rows[1]["day_pl"] == 5_629.55 and rows[1]["broker_day_pl"] == 4_852.78
+    assert rows[1]["day_pl_basis"] == "self"
+
+
 # ---------------------------------------------------------------- (c) -------
 
 _PY = sys.executable
@@ -458,3 +615,201 @@ def test_from_option_records_leg_sides():
     assert rec.occ_symbols == [CALL_LO, CALL_HI]
     assert rec.occ_sides == ["buy", "sell"]
     assert pm_mod._option_leg_signs(rec) == [(CALL_LO, 1.0), (CALL_HI, -1.0)]
+
+
+# ---- run-7 B2: equity SELL rows restated at the broker's fill --------------
+# The 7 priced closed run-6 rows (state/trades.jsonl, Sep 4-10): exit_price
+# is the submission-time quote, fill_price the broker's filled_avg_price.
+# The other 7 closed rows (exchange bracket exits) had fill_price=None.
+_RUN6_PRICED = [  # sym, exit_reason, qty, exit_price, fill_price, realized_pl, pct
+    ("MKL", "decision", 9.0, 1836.39, 1835.62, 108.9, 0.663),
+    ("F", "decision", 2140.0, 14.1529, 14.15, 348.606, 1.164),
+    ("BE", "trail", 299.0, 276.28, 277.0338, 12525.11, 17.872),
+    ("NU", "trail", 2061.0, 15.045, 15.0394, 1076.924025, 3.598),
+    ("NVDA", "trail", 370.0, 223.9401, 223.9, 2893.437, 3.618),
+    ("PSQ", "hedge_unwind", 10283.17942229, 25.85, 25.84, 41.759991, 0.016),
+    ("QQQ", "core_defense", 54.0, 709.23, 709.03, 27.56, 0.072),
+]
+_RUN6_BRACKET = [  # sym, exit_reason, qty, exit_price (== the fill), realized_pl
+    ("BE", "bracket_take", 83.0, 272.13, 5182.105),
+    ("INTC", "bracket_take", 462.0, 105.89, 8930.46),
+    ("BLK", "bracket_stop", 18.0, 1082.48, -835.92),
+    ("RIG", "bracket_stop", 1419.0, 5.72, -688.215),
+    ("AAPL", "bracket_stop", 64.0, 310.65375, -923.92),
+    ("ABT", "bracket_stop", 192.0, 104.574427, -951.47),
+    ("SNXX", "bracket_stop", 425.0, 16.22193, -772.67975),
+]
+
+
+def _run6_ledger() -> TradeLedger:
+    led = TradeLedger(path=_tmp(".jsonl"), restate_at_fill=True)
+    for sym, why, qty, px, _fill, pl, pct in _RUN6_PRICED:
+        led.record(_rec(symbol=sym, action="sell", qty=qty, exit_price=px,
+                        realized_pl=pl, realized_pl_pct=pct, exit_reason=why,
+                        order_id=f"oid-{sym}-{why}"))
+    for sym, why, qty, px, pl in _RUN6_BRACKET:
+        led.record(_rec(symbol=sym, action="sell", qty=qty, exit_price=px,
+                        realized_pl=pl, realized_pl_pct=pl / (px * qty - pl) * 100,
+                        exit_reason=why, order_id=f"oid-{sym}-{why}"))
+    return led
+
+
+def test_run6_priced_sell_rows_restate_to_the_fill_sum():
+    led = _run6_ledger()
+    assert round(sum(r.realized_pl for r in led.effective()), 2) == 26_962.66
+    for sym, why, qty, _px, fill, _pl, _pct in _RUN6_PRICED:
+        assert led.set_fill(f"oid-{sym}-{why}", fill, qty) is True
+    rows = {r.order_id: r for r in led.effective()}
+    # fill-restated sum = ledger sum + $72.24 (the analyst's table D, to the cent)
+    assert round(sum(r.realized_pl for r in rows.values()), 2) == 27_034.90
+    assert round(sum(r.realized_pl - r.quote_realized_pl
+                     for r in rows.values() if r.quote_realized_pl is not None), 2) == 72.24
+    deltas = {sym: round(rows[f"oid-{sym}-{why}"].realized_pl
+                         - rows[f"oid-{sym}-{why}"].quote_realized_pl, 2)
+              for sym, why, *_ in _RUN6_PRICED}
+    assert deltas == {"MKL": -6.93, "F": -6.21, "BE": 225.39, "NU": -11.54,
+                      "NVDA": -14.84, "PSQ": -102.83, "QQQ": -10.80}
+    psq = rows["oid-PSQ-hedge_unwind"]
+    assert round(psq.realized_pl, 2) == -61.07 and psq.quote_realized_pl == 41.759991
+    assert psq.exit_price == 25.84 and psq.quote_exit_price == 25.85
+    # sum of the quote figures reproduces the run-6 ledger exactly
+    assert round(sum(r.quote_realized_pl if r.quote_realized_pl is not None
+                     else r.realized_pl for r in rows.values()), 2) == 26_962.66
+    # the unstamped bracket rows are untouched
+    for sym, why, _qty, px, pl in _RUN6_BRACKET:
+        r = rows[f"oid-{sym}-{why}"]
+        assert r.exit_price == px and r.realized_pl == pl and r.fill_price is None
+        assert r.quote_exit_price is None
+
+
+def _ledger_msgs(fn) -> list[str]:
+    """Run fn() and return the 'ledger' logger's messages (INFO included)."""
+    from test_orchestrator import _LogCapture
+    cap = _LogCapture()
+    lg = logging.getLogger("ledger")
+    old_level = lg.level
+    lg.addHandler(cap)
+    lg.setLevel(logging.INFO)
+    try:
+        fn()
+    finally:
+        lg.removeHandler(cap)
+        lg.setLevel(old_level)
+    return [r.getMessage() for r in cap.records]
+
+
+def test_backfill_style_row_recorded_from_the_fill_is_stamped_not_restated():
+    """An exchange-backfill SELL row is recorded FROM the broker fill, so a
+    later set_fill at the same price is a numeric no-op: quote_* == fill and
+    the log says so (no RESTATED line)."""
+    led = TradeLedger(path=_tmp(".jsonl"), restate_at_fill=True)
+    led.record(_rec(symbol="INTC", action="sell", qty=462.0, exit_price=105.89,
+                    realized_pl=8930.46, realized_pl_pct=22.331,
+                    exit_reason="bracket_take", order_id="oid-1"))
+    msgs = _ledger_msgs(lambda: led.set_fill("oid-1", 105.89, 462.0))
+    row = led.effective()[0]
+    assert row.fill_price == 105.89 and row.exit_price == 105.89
+    assert row.realized_pl == 8930.46 and row.quote_realized_pl == 8930.46
+    assert row.quote_exit_price == 105.89
+    assert any("fill 105.8900 matches recorded exit_price on SELL INTC" in m
+               for m in msgs), msgs
+    assert not any("RESTATED" in m for m in msgs)
+
+
+# ---- run-7 A6: exchange-backfilled bracket exits carry the fill they were
+# recorded from (analyst C8: 7/14 closed run-6 rows had fill_price=null) ----
+def _backfill_msgs(o) -> list[str]:
+    """Run _backfill_exchange_exits and return the orchestrator's
+    'Backfilled exchange exit' log lines (INFO; WARNING-level under pytest)."""
+    from test_orchestrator import _LogCapture
+    cap = _LogCapture()
+    lg = logging.getLogger("orchestrator")
+    old_level = lg.level
+    lg.addHandler(cap)
+    lg.setLevel(logging.INFO)
+    try:
+        o._backfill_exchange_exits()
+    finally:
+        lg.removeHandler(cap)
+        lg.setLevel(old_level)
+    return [r.getMessage() for r in cap.records
+            if r.getMessage().startswith("Backfilled exchange exit")]
+
+
+def test_run6_bracket_exits_backfilled_with_fill_fields_stamped():
+    """Replay run-6's 7 exchange bracket exits (half the closed sample; all
+    ledgered with fill_price=null in the window) through the REAL backfill
+    into a file-backed ledger: every row carries fill_price == the broker's
+    filled_avg_price (== exit_price), fill_qty == filled_qty, fill_ts ==
+    filled_at, and realized_pl computed AT that fill — so the contract-v3
+    '100% of closed rows carry fill_price' validity line holds and the B2
+    set_fill at the same fill is a numeric no-op (nothing to restate)."""
+    from datetime import timedelta
+    from test_orchestrator import _backfill_orch, _closed
+    fill_ts = datetime(2026, 9, 8, 14, 31, 7, tzinfo=timezone.utc)
+    buys, closed = [], []
+    for i, (sym, why, qty, px, pl) in enumerate(_RUN6_BRACKET):
+        basis = px - pl / qty                     # the FIFO lot the exit sold
+        buys.append(_rec(symbol=sym, action="buy", qty=qty, entry_price=basis,
+                         cost_usd=basis * qty, order_id=f"buy-{sym}"))
+        closed.append(_closed(
+            f"leg-{sym}", symbol=sym, qty=qty, price=px,
+            otype="limit" if why == "bracket_take" else "stop",
+            filled_at=(fill_ts + timedelta(minutes=i)).isoformat()))
+    o = _backfill_orch(closed)
+    o.ledger = TradeLedger(path=_tmp(".jsonl"), restate_at_fill=True)
+    for b in buys:
+        o.ledger.record(b)
+    msgs = _backfill_msgs(o)
+    sells = {r.symbol: r for r in o.ledger.effective() if r.action == "sell"}
+    assert len(sells) == 7 and len(msgs) == 7
+    assert all("[fill stamped 2026-09-08T14:" in m for m in msgs), msgs
+    for i, (sym, why, qty, px, pl) in enumerate(_RUN6_BRACKET):
+        r = sells[sym]
+        assert r.exit_reason == why and r.order_id == f"leg-{sym}"
+        assert r.fill_price == px == r.exit_price      # == filled_avg_price
+        assert r.fill_qty == qty                       # == filled_qty
+        assert r.fill_ts == fill_ts + timedelta(minutes=i) == r.ts
+        assert abs(r.realized_pl - pl) < 1e-6          # realized AT the fill
+        assert r.quote_exit_price is None              # never restated
+    assert round(sum(r.realized_pl for r in sells.values()), 2) == round(
+        sum(pl for *_, pl in _RUN6_BRACKET), 2)
+    assert all(r.fill_price is not None for r in sells.values())  # 7/7, not 0/7
+    # The reconcile path (B2) re-stamping one at the same fill changes nothing.
+    led_msgs = _ledger_msgs(
+        lambda: o.ledger.set_fill("leg-INTC", 105.89, 462.0, fill_ts))
+    intc = [r for r in o.ledger.effective()
+            if r.action == "sell" and r.symbol == "INTC"][0]
+    assert abs(intc.realized_pl - 8930.46) < 1e-6 and intc.fill_price == 105.89
+    assert intc.quote_exit_price == 105.89
+    assert not any("RESTATED" in m for m in led_msgs), led_msgs
+
+
+def test_reconcile_filled_sell_restates_the_ledger_row_and_logs_it():
+    """The orchestrator's FILLED reconcile -> _stamp_fill -> set_fill path on
+    a SELL row: the PSQ Sep 9 hedge_unwind, +$41.76 at the quote, -$61.07 at
+    the fill. orchestrator.py is not edited by this item — the ledger does it."""
+    from test_orchestrator import _orch
+    o = _orch()
+    o.cfg.ledger_fill_prices = True
+    o.ledger = TradeLedger(path=_tmp(".jsonl"), restate_at_fill=True)
+    qty = 10283.17942229
+    o.ledger.record(_rec(symbol="PSQ", action="sell", qty=qty, exit_price=25.85,
+                         realized_pl=41.759991, realized_pl_pct=0.016,
+                         exit_reason="hedge_unwind", order_id="oid-1"))
+    ts = datetime(2026, 9, 9, 14, 22, 45, tzinfo=timezone.utc)
+    o.broker.order_fill_full = lambda oid: (
+        "filled", qty, qty, {"price": 25.84, "qty": qty, "filled_at": ts})
+    o._pending_oids = [("oid-1", "PSQ")]
+    orch_msgs: list[str] = []
+    led_msgs = _ledger_msgs(lambda: orch_msgs.extend(_reconcile_msgs(o)))
+    assert any("FILLED" in m and "@ 25.8400" in m and "[ledger stamped]" in m
+               for m in orch_msgs), orch_msgs
+    assert any(m.startswith("Ledger: RESTATED SELL PSQ at fill 25.8400 (quote 25.8500): "
+                            "realized $41.76 -> $-61.07 (-102.83) [order oid-1]")
+               for m in led_msgs), led_msgs
+    row = o.ledger.effective()[0]
+    assert row.fill_price == 25.84 and row.fill_ts == ts
+    assert round(row.realized_pl, 2) == -61.07 and row.quote_realized_pl == 41.759991
+    assert row.exit_price == 25.84 and row.quote_exit_price == 25.85
+    assert o._pending_oids == []

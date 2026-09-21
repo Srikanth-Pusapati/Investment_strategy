@@ -303,3 +303,85 @@ def _run_all():
 
 if __name__ == "__main__":
     sys.exit(1 if _run_all() else 0)
+
+
+# -- holiday-aware market_hours (run-7 A2) ------------------------------------ #
+# Labor Day 2026-09-07: 80 in-hours "ok" checks for a closed market. The
+# dead-man now reads the bot's cached exchange calendar (the same JSON the
+# paging window uses); missing/stale cache = the old weekday 09:25-16:05 math.
+
+def _write_calendar(path: Path) -> None:
+    from investment_strategy.session_calendar import SessionCalendar
+    cal = SessionCalendar(path)
+    sessions = {d: ("09:30", "16:00") for d in [
+        "2026-09-01", "2026-09-02", "2026-09-03", "2026-09-04",
+        "2026-09-08", "2026-09-09", "2026-09-10", "2026-09-11",
+        "2026-09-14", "2026-09-15", "2026-09-16", "2026-09-17", "2026-09-18"]}
+    sessions["2026-09-18"] = ("09:30", "13:00")   # pretend early close
+    assert cal.update(sessions, dt.date(2026, 9, 1), dt.date(2026, 9, 21),
+                      dt.date(2026, 9, 11))
+
+
+def test_market_hours_uses_calendar_file(monkeypatch, tmp_path):
+    p = tmp_path / "state" / "session_calendar.json"
+    _write_calendar(p)
+    monkeypatch.setattr(deadman, "SESSION_CALENDAR_FILE", p)
+    ET = deadman.ET
+    # Labor Day 10:00 ET -> closed; Tue Sep 8 10:00 -> open.
+    assert deadman.market_hours(dt.datetime(2026, 9, 7, 10, 0, tzinfo=ET)) is False
+    assert deadman.market_hours(dt.datetime(2026, 9, 8, 10, 0, tzinfo=ET)) is True
+    # Window pads 5 min each side like before.
+    assert deadman.market_hours(dt.datetime(2026, 9, 8, 9, 25, tzinfo=ET)) is True
+    assert deadman.market_hours(dt.datetime(2026, 9, 8, 16, 6, tzinfo=ET)) is False
+    # Early close 13:00 shrinks the window to 13:05.
+    assert deadman.market_hours(dt.datetime(2026, 9, 18, 12, 50, tzinfo=ET)) is True
+    assert deadman.market_hours(dt.datetime(2026, 9, 18, 13, 20, tzinfo=ET)) is False
+
+
+def test_market_hours_weekday_fallback_without_file(monkeypatch, tmp_path):
+    monkeypatch.setattr(deadman, "SESSION_CALENDAR_FILE", tmp_path / "missing.json")
+    ET = deadman.ET
+    # No cache: Labor Day is a weekday -> the old behaviour (pages) is kept.
+    assert deadman.market_hours(dt.datetime(2026, 9, 7, 10, 0, tzinfo=ET)) is True
+    assert deadman.market_hours(dt.datetime(2026, 9, 7, 8, 0, tzinfo=ET)) is False
+    assert deadman.market_hours(dt.datetime(2026, 9, 12, 10, 0, tzinfo=ET)) is False
+    # A cache that doesn't cover the date also falls back to weekday math.
+    p = tmp_path / "old.json"
+    _write_calendar(p)
+    monkeypatch.setattr(deadman, "SESSION_CALENDAR_FILE", p)
+    assert deadman.market_hours(dt.datetime(2026, 10, 6, 10, 0, tzinfo=ET)) is True
+    assert deadman.market_hours(dt.datetime(2026, 10, 10, 10, 0, tzinfo=ET)) is False
+
+
+def test_market_hours_caches_the_calendar_and_never_trips_its_fallback_warning(
+        monkeypatch, tmp_path, caplog):
+    # Review finding (run-7 A2): a fresh SessionCalendar per market_hours()
+    # call re-read the JSON and, on an uncovered date, re-emitted the module's
+    # "Session calendar fallback" WARNING every 5-min run via Python's
+    # last-resort stderr handler — the bot dead > 10 days, or the first day
+    # after a deploy, is exactly when the dead-man matters.
+    import logging
+    p = tmp_path / "state" / "session_calendar.json"
+    _write_calendar(p)                                  # covers Sep 1..21 2026
+    monkeypatch.setattr(deadman, "SESSION_CALENDAR_FILE", p)
+    deadman._CAL_CACHE["key"] = deadman._CAL_CACHE["cal"] = None
+    ET = deadman.ET
+    with caplog.at_level(logging.WARNING, logger="session_calendar"):
+        for _ in range(3):                              # uncovered date, 3 runs
+            assert deadman.market_hours(dt.datetime(2026, 10, 6, 10, 0, tzinfo=ET)) is True
+        assert deadman.market_hours(dt.datetime(2026, 9, 7, 10, 0, tzinfo=ET)) is False
+    assert not any("Session calendar fallback" in r.getMessage() for r in caplog.records)
+    # One instance per process while the file is unchanged...
+    assert deadman._session_calendar() is deadman._session_calendar()
+    first = deadman._session_calendar()
+    # ...reloaded when the bot rewrites it (mtime/size change): Sep 7 becomes a session.
+    from investment_strategy.session_calendar import SessionCalendar
+    cal = SessionCalendar(p)
+    sessions = {d: ("09:30", "16:00") for d in ["2026-09-07", "2026-09-08", "2026-09-09",
+                                                  "2026-09-10", "2026-09-11", "2026-09-14"]}
+    assert cal.update(sessions, dt.date(2026, 9, 1), dt.date(2026, 9, 21), dt.date(2026, 9, 12))
+    os.utime(p, (time.time() + 5, time.time() + 5))     # force a distinct mtime
+    assert deadman._session_calendar() is not first
+    assert deadman.market_hours(dt.datetime(2026, 9, 7, 10, 0, tzinfo=ET)) is True
+    # A naive datetime is taken as ET wall time, like the calendar itself.
+    assert deadman.market_hours(dt.datetime(2026, 9, 8, 10, 0)) is True

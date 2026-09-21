@@ -280,3 +280,147 @@ def test_edgar_slow_empty_200_is_degraded(monkeypatch):
     s = _insider()
     assert s.scan() == []
     assert s.degraded == "edgar: timeout"
+
+
+# --------------------------------------------------------------------------- #
+# Run-7 A7: FEEDS carries the earnings-blackout gate's source. Sep 10 2026 the
+# RH OAuth token died at 08:34; the gate ran on per-symbol yfinance for 12
+# decision cycles and all 8 FEEDS lines that day still read '3/3 healthy
+# news=vader-fallback' (RH is not a SCREENER_SOURCE, so the n/n cannot see it).
+# --------------------------------------------------------------------------- #
+from investment_strategy.earnings import EarningsCalendar
+
+
+class _RHReader:
+    """RobinhoodReader shape for the calendar: enabled + a callable auth_dead."""
+    def __init__(self, enabled=True, dead=False, payload=None):
+        self.enabled = enabled
+        self._dead = dead
+        self.payload = payload
+
+    def auth_dead(self):
+        return self._dead
+
+    def call_json(self, tool, arguments=None):
+        return self.payload
+
+
+def _orch_with_calendar(reader, **kw):
+    o = _orch(**kw)
+    o.earnings = EarningsCalendar(reader=reader)
+    return o
+
+
+def test_feeds_earnings_rh_when_robinhood_healthy(monkeypatch):
+    monkeypatch.setattr(RobinhoodReader, "_auth_dead", False)
+    o = _orch_with_calendar(_RHReader(enabled=True))
+    assert o._feed_health_line() == "FEEDS: 5/5 healthy earnings=rh"
+    # Order with the existing degraded token is fixed: news first, earnings last.
+    o = _orch_with_calendar(_RHReader(enabled=True), vader=True)
+    assert o._feed_health_line() == "FEEDS: 5/5 healthy news=vader-fallback earnings=rh"
+
+
+def test_feeds_earnings_yfinance_fallback_when_rh_calendar_unavailable(monkeypatch):
+    monkeypatch.setattr(RobinhoodReader, "_auth_dead", False)
+    monkeypatch.setattr(EarningsCalendar, "_yf_importable", staticmethod(lambda: True))
+    # Dead-auth latch (the Sep 10 shape) — the token flips on the reader's
+    # enabled flag alone, before any calendar call this cycle.
+    o = _orch_with_calendar(_RHReader(enabled=False, dead=True), vader=True)
+    assert o._feed_health_line() \
+        == "FEEDS: 5/5 healthy news=vader-fallback earnings=yfinance-fallback"
+    # A failed calendar read on an enabled reader is reported from the next
+    # line onward (the read happens after FEEDS in the cycle).
+    o = _orch_with_calendar(_RHReader(enabled=True, payload=None))
+    o.earnings._yf_lookup = lambda sym, today: None
+    assert o._feed_health_line().endswith("earnings=rh")
+    o.earnings.days_until_earnings("AAPL")
+    assert o._feed_health_line().endswith("earnings=yfinance-fallback")
+    # The n/n and the outage suffix keep their shape; earnings stays last.
+    both = _orch_with_calendar(_RHReader(enabled=False, dead=True),
+                               degraded="edgar: timeout")._feed_health_line()
+    assert both.startswith("FEEDS: 4/5 — insider UNHEALTHY (edgar: timeout)")
+    assert "EVAL WINDOW VALIDITY AT RISK" in both
+    assert both.endswith("earnings=yfinance-fallback")
+
+
+def test_feeds_earnings_token_absent_when_knob_off_or_no_calendar(monkeypatch):
+    monkeypatch.setattr(RobinhoodReader, "_auth_dead", False)
+    assert _orch_with_calendar(_RHReader(enabled=False, dead=True), knob=False) \
+        ._feed_health_line() == "FEEDS: 5/5 healthy"
+    assert _orch()._feed_health_line() == "FEEDS: 5/5 healthy"   # no calendar wired
+
+
+def test_feeds_earnings_token_failure_drops_token_not_line(monkeypatch):
+    monkeypatch.setattr(RobinhoodReader, "_auth_dead", False)
+    o = _orch()
+    o.earnings = SimpleNamespace(source=lambda: (_ for _ in ()).throw(RuntimeError("boom")))
+    assert o._feed_health_line() == "FEEDS: 5/5 healthy"
+
+
+def test_feeds_earnings_none_logs_at_warning_fallback_stays_info(caplog, monkeypatch):
+    monkeypatch.setattr(RobinhoodReader, "_auth_dead", False)
+    monkeypatch.setattr(EarningsCalendar, "_yf_importable", staticmethod(lambda: False))
+    o = _orch_with_calendar(_RHReader(enabled=False, dead=True))
+    with caplog.at_level(logging.INFO, logger="orchestrator"):
+        o._check_robinhood_health()
+    hit = next(r for r in caplog.records if "FEEDS:" in r.getMessage())
+    assert hit.getMessage().endswith("earnings=none")
+    assert hit.levelno == logging.WARNING
+    caplog.clear()
+    monkeypatch.setattr(EarningsCalendar, "_yf_importable", staticmethod(lambda: True))
+    with caplog.at_level(logging.INFO, logger="orchestrator"):
+        o._check_robinhood_health()
+    hit = next(r for r in caplog.records if "FEEDS:" in r.getMessage())
+    assert hit.getMessage().endswith("earnings=yfinance-fallback")
+    assert hit.levelno == logging.INFO      # the alarm is earnings.py's own line
+
+
+def test_feeds_earnings_fallback_with_the_real_reader_under_dead_latch(monkeypatch):
+    # The duck-typed seam (a callable `auth_dead` classmethod) proven against
+    # the REAL RobinhoodReader: the class-wide dead-auth latch alone flips the
+    # token, no calendar call is attempted, and the fallback line names OAuth.
+    # Nonexistent token path -> _maybe_recover() returns at sig is None; the
+    # `enabled` property short-circuits on the latch before has_tokens().
+    monkeypatch.setattr(RobinhoodReader, "_auth_dead", True)
+    monkeypatch.setattr(RobinhoodReader, "_auth_dead_token_sig", None)
+    monkeypatch.setattr(RobinhoodReader, "_last_recovery_check", 0.0)
+    monkeypatch.setattr(EarningsCalendar, "_yf_importable", staticmethod(lambda: True))
+    rr = RobinhoodReader(SimpleNamespace(
+        robinhood_enabled=True, robinhood_mcp_url="https://rh.invalid/mcp",
+        robinhood_mcp_token="", robinhood_oauth_file="/nonexistent/rh_oauth.json",
+        state_file="/nonexistent/state.json",
+    ))
+    calls = []
+    monkeypatch.setattr(rr, "call_json", lambda *a, **k: calls.append(a) or None)
+    o = _orch_with_calendar(rr)
+    assert o._feed_health_line() == "FEEDS: 5/5 healthy earnings=yfinance-fallback"
+    o.earnings._yf_lookup = lambda sym, today: None
+    with caplog_for("earnings") as recs:
+        o.earnings.days_until_earnings("AAPL")
+    assert calls == []
+    assert o.earnings.rh_status() == "oauth-dead"
+    hit = next(r for r in recs if r.getMessage().startswith("Earnings calendar:"))
+    assert hit.levelno == logging.WARNING and "OAuth dead" in hit.getMessage()
+
+
+import contextlib as _contextlib
+
+
+@_contextlib.contextmanager
+def caplog_for(name):
+    recs = []
+
+    class _H(logging.Handler):
+        def emit(self, r):
+            recs.append(r)
+
+    lg = logging.getLogger(name)
+    h = _H(level=logging.DEBUG)
+    lvl = lg.level
+    lg.addHandler(h)
+    lg.setLevel(logging.DEBUG)
+    try:
+        yield recs
+    finally:
+        lg.removeHandler(h)
+        lg.setLevel(lvl)

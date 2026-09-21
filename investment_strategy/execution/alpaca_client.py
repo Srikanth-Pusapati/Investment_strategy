@@ -22,6 +22,7 @@ from requests.exceptions import ConnectionError as RequestsConnectionError
 from requests.exceptions import Timeout as RequestsTimeout
 from urllib3.exceptions import ProtocolError
 
+from alpaca.common.exceptions import APIError
 from alpaca.data.historical import StockHistoricalDataClient
 from alpaca.data.requests import StockBarsRequest, StockLatestTradeRequest
 from alpaca.data.timeframe import TimeFrame
@@ -104,25 +105,81 @@ def bound_client(client: _T, timeout: tuple[int, int] = HTTP_TIMEOUT) -> _T:
 # single blip fail a whole watchdog/decision tick.
 _TRANSIENT_NET = (RequestsConnectionError, RequestsTimeout, ProtocolError)
 
+# A SERVER-side failure (HTTP 5xx) is the same kind of blip, but alpaca-py
+# reports it as APIError — the type it also uses for 4xx "your request is wrong"
+# replies (422 wash-trade, 403 insufficient qty …) which must NOT be retried.
+# The SDK only retries 429 itself. Sep 11 2026: /v2/clock answered 500 for ~4.5
+# min; `_retry_read` re-raised on the first try, the decision loop treated it
+# as a bug (8 consecutive 37-line tracebacks at ERROR, one per 30 s tick) and
+# the 11:58 cycle ran 4.5 min late. The status usually rides on the wrapped
+# HTTPError; an APIError built without one (older SDK paths, tests) is still
+# recognised by Alpaca's canonical 5xx body text.
+_SERVER_ERROR_TEXT = "internal server error"
+
+
+def broker_5xx_status(e: BaseException) -> Optional[int]:
+    """HTTP status when `e` is an alpaca APIError for a SERVER-side (5xx)
+    failure — 500 when only the body says 'Internal Server Error' — else None
+    (4xx, non-APIError, unknown). The one place the bot decides "the broker
+    is down, retry" vs "the request is wrong, surface it"."""
+    if not isinstance(e, APIError):
+        return None
+    try:
+        status = e.status_code
+    except Exception:  # noqa: BLE001 — defensive: SDK shape may drift
+        status = None
+    if isinstance(status, int) and 500 <= status <= 599:
+        return status
+    if status is None and _SERVER_ERROR_TEXT in str(e).lower():
+        return 500
+    return None
+
+
+def broker_error_summary(e: BaseException) -> str:
+    """One-line 'METHOD url: body' for a broker APIError (greppable, no
+    traceback) — falls back to str(e) when the SDK attached no request."""
+    req = None
+    try:
+        req = getattr(e, "request", None)
+    except Exception:  # noqa: BLE001
+        req = None
+    method = getattr(req, "method", None)
+    url = getattr(req, "url", None) or getattr(getattr(e, "response", None), "url", None)
+    prefix = " ".join(str(x) for x in (method, url) if x)
+    body = str(e).strip() or e.__class__.__name__
+    return f"{prefix}: {body}" if prefix else body
+
 
 def _retry_read(fn: Callable[[], _T], *, what: str, tries: int = 3,
                 backoff_s: float = 0.5) -> _T:
-    """Call `fn` (an IDEMPOTENT read) and retry on a transient network fault with a
-    short linear backoff. Only reads go through here — never order submits, which
-    aren't safe to blind-retry (a reset can drop the response AFTER the order was
-    accepted, so a retry could double-submit). Re-raises the last error if every
-    attempt fails, so real outages still surface."""
+    """Call `fn` (an IDEMPOTENT read) and retry on a transient network fault OR
+    a broker 5xx with a short linear backoff. Only reads go through here — never
+    order submits, which aren't safe to blind-retry (a reset can drop the
+    response AFTER the order was accepted, so a retry could double-submit).
+    Re-raises the last error if every attempt fails, so real outages still
+    surface (the decision loop then classifies it via broker_5xx_status rather
+    than treating it as a bug). A 4xx APIError is raised on the first try —
+    the request itself is wrong and no retry can fix it."""
     last: Exception | None = None
     for attempt in range(1, tries + 1):
         try:
             return fn()
-        except _TRANSIENT_NET as e:
+        except (*_TRANSIENT_NET, APIError) as e:
+            status = broker_5xx_status(e)
+            if isinstance(e, APIError) and status is None:
+                raise
             last = e
             if attempt < tries:
-                log.warning(
-                    "%s: transient network error (%s); retry %d/%d.",
-                    what, e.__class__.__name__, attempt, tries - 1,
-                )
+                if status is not None:
+                    log.warning(
+                        "%s: broker HTTP %d (%s); retry %d/%d.",
+                        what, status, broker_error_summary(e), attempt, tries - 1,
+                    )
+                else:
+                    log.warning(
+                        "%s: transient network error (%s); retry %d/%d.",
+                        what, e.__class__.__name__, attempt, tries - 1,
+                    )
                 time.sleep(backoff_s * attempt)
     assert last is not None  # loop only exits early via return
     raise last
@@ -298,6 +355,11 @@ class AlpacaClient:
         return (closes[-1] / closes[0] - 1.0) * 100.0
 
     def is_market_open(self) -> bool:
+        """Broker clock read at the top of every decision cycle. A 5xx from
+        /v2/clock is retried by _retry_read and, if it persists, propagates
+        as the APIError so the decision loop can classify it as a transient
+        broker outage (broker_5xx_status) and skip the tick with one WARNING
+        instead of a traceback — the caller must NOT guess open/closed."""
         clock = _retry_read(self.trading.get_clock, what="get_clock")
         return bool(clock.is_open)
 
@@ -972,12 +1034,31 @@ class AlpacaClient:
             log.warning("cancel order %s failed: %s", order_id, e)
             return False
 
-    def open_stop_sells(self, symbol: str) -> list[dict]:
-        """OPEN stop-type SELL orders for `symbol` as (id, qty, stop_price)
-        dicts — how the core-stop maintainer (GA-2.3) sees the protection that
-        is ALREADY resting at the exchange before deciding to replace it.
-        Best-effort: [] on failure (caller then leaves the resting stop alone
-        rather than risking a cancel with no replacement)."""
+    #: Order states in which a stop is NOT protection: a cancel is in flight
+    #: (the venue will drop it, but until it settles the shares stay reserved)
+    #: or the order is already terminal. Run-7 S-7 (Sep 11 2026 08:30 ET): the
+    #: core-defense trim canceled the 163-sh QQQ GTC stop and the same-instant
+    #: reduce_position got 40310000 "available 0.4975 / held_for_orders 163"
+    #: — then _ensure_core_stop read the pending_cancel stop back as "already
+    #: right", cleared the retry flag, and the core sat stopless 4m53s.
+    _STOP_NOT_RESTING = frozenset({
+        "pending_cancel", "canceled", "cancelled", "expired", "replaced",
+        "filled", "rejected", "done_for_day", "stopped", "suspended",
+    })
+
+    def open_stop_sells(self, symbol: str, resting_only: bool = True) -> list[dict]:
+        """OPEN stop-type SELL orders for `symbol` as (id, qty, stop_price,
+        status) dicts — how the core-stop maintainer (GA-2.3) sees the
+        protection that is ALREADY resting at the exchange before deciding to
+        replace it. With `resting_only` (the default) an order whose status is
+        in _STOP_NOT_RESTING — pending_cancel above all — is NOT returned: it
+        cannot fire, so treating it as the resting stop leaves the position
+        unprotected while the retry flag reads "healthy" (Sep 11 2026). Pass
+        `resting_only=False` to see those too — the core-defense cancel
+        fallback polls that view to learn when the venue-side cancel has
+        actually settled and the reserved shares are free. Best-effort: [] on
+        failure (caller then leaves the resting stop alone rather than risking
+        a cancel with no replacement)."""
         out: list[dict] = []
         try:
             for o in self.trading.get_orders():
@@ -988,14 +1069,42 @@ class AlpacaClient:
                 otype = getattr(o, "order_type", None) or getattr(o, "type", "")
                 if "stop" not in str(getattr(otype, "value", otype)).lower():
                     continue
+                status = self._order_status(o)
+                if resting_only and status in self._STOP_NOT_RESTING:
+                    continue  # a cancel in flight / terminal: not protection
                 out.append({
                     "id": str(o.id),
                     "qty": float(getattr(o, "qty", 0) or 0),
                     "stop_price": float(getattr(o, "stop_price", 0) or 0),
+                    "status": status,
                 })
         except Exception as e:
             log.warning("open_stop_sells(%s) failed: %s", symbol, e)
         return out
+
+    def replace_order_qty(self, order_id: str, qty: float) -> Optional[str]:
+        """PATCH a resting order's qty DOWN to `qty` whole shares and return
+        the NEW order id (Alpaca issues a fresh id per replace; the old one
+        goes to status `replaced`), or None when the venue refuses. This is
+        how the core-defense trim frees exactly the shares it sells from the
+        GTC core stop (run-7 S-7): a replace is atomic at the venue, so the
+        remainder never rides stopless and there is no cancel to settle before
+        the sell can go in — the "replace on live legs, never cancel-then-
+        resell" rule (Alpaca pending_cancel wedge, Jul 2026). Whole shares
+        only (GTC stops cannot be fractional); None for qty < 1 so a caller
+        can never shrink a stop to nothing through this path."""
+        if qty is None or qty < 1:
+            return None
+        try:
+            new = self.trading.replace_order_by_id(
+                order_id, ReplaceOrderRequest(qty=int(qty)),
+            )
+        except Exception as e:
+            log.warning(
+                "replace order %s qty -> %d failed: %s", order_id, int(qty), e,
+            )
+            return None
+        return str(new.id)
 
     @staticmethod
     def _fill_detail_of(o) -> dict:
@@ -1053,6 +1162,33 @@ class AlpacaClient:
             )
         except Exception as e:
             log.warning("is_trading_day(%s) failed: %s", day, e)
+            return None
+
+    def get_session_calendar(self, start, end) -> Optional[dict[str, tuple[str, str]]]:
+        """Exchange sessions in [start, end] (dates, inclusive) as
+        {iso_date: ("HH:MM", "HH:MM")} ET open/close — early closes carry
+        their real close (13:00); holidays are simply absent. None when the
+        calendar read fails (callers keep their previous cache). Feeds the
+        decision loop's once-a-day session_calendar refresh (run-7 A2) that
+        the watchdog's paging window and ops/deadman.py read network-free."""
+        try:
+            cal = _retry_read(
+                lambda: self.trading.get_calendar(
+                    GetCalendarRequest(start=start, end=end)),
+                what="get_calendar",
+            )
+            out: dict[str, tuple[str, str]] = {}
+            for c in cal or []:
+                day = getattr(c, "date", None)
+                opn = getattr(c, "open", None)
+                cls = getattr(c, "close", None)
+                if day is None or opn is None or cls is None:
+                    continue
+                fmt = lambda t: t.strftime("%H:%M") if hasattr(t, "strftime") else str(t)[:5]  # noqa: E731
+                out[str(day)[:10]] = (fmt(opn), fmt(cls))
+            return out
+        except Exception as e:
+            log.warning("get_session_calendar(%s..%s) failed: %s", start, end, e)
             return None
 
     def closed_sell_orders(self, limit: int = 500) -> list[dict]:

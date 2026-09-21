@@ -66,6 +66,11 @@ TICK_STAMP_STALE_MINUTES = 5.0
 # failed flatten can never mute the dead-man forever.
 FLATTEN_HOLD_FILE = ROOT / "state" / "flatten.hold"
 FLATTEN_HOLD_STALE_S = 7200.0
+# Exchange calendar cache the bot's DECISION loop refreshes once per ET date
+# (investment_strategy/session_calendar.py). market_hours() reads it so a
+# holiday (Labor Day 2026-09-07: 80 in-hours checks for a closed market) or an
+# early close no longer counts as market hours; missing/stale = weekday math.
+SESSION_CALENDAR_FILE = ROOT / "state" / "session_calendar.json"
 
 
 def stale_log_minutes() -> float:
@@ -80,10 +85,59 @@ def stale_log_minutes() -> float:
     return max(40.0, interval_s / 60.0 + STALE_GRACE_MINUTES)
 
 
+# One SessionCalendar per process, reloaded only when the cache file changes
+# (mtime/size), keyed by the path so tests that repoint SESSION_CALENDAR_FILE
+# get a fresh load. A fresh instance per market_hours() call re-read the JSON
+# every 5-min check and — on an uncovered date — re-emitted the module's
+# "Session calendar fallback" WARNING each time through Python's last-resort
+# stderr handler (the bot dead > REFRESH_SPAN_DAYS, or the first day after a
+# deploy before a decision cycle: exactly when the dead-man matters).
+_CAL_CACHE: dict = {"key": None, "cal": None}
+
+
+def _session_calendar():
+    """The bot's cached exchange calendar (pure python over
+    SESSION_CALENDAR_FILE; no network), or None when the module can't be
+    imported — never raises, the caller falls back to weekday math."""
+    try:
+        path = Path(SESSION_CALENDAR_FILE)
+        try:
+            st = path.stat()
+            key = (str(path), st.st_mtime_ns, st.st_size)
+        except OSError:
+            key = (str(path), None, None)
+        if _CAL_CACHE["key"] == key and _CAL_CACHE["cal"] is not None:
+            return _CAL_CACHE["cal"]
+        if str(ROOT) not in sys.path:
+            sys.path.insert(0, str(ROOT))
+        from investment_strategy.session_calendar import SessionCalendar
+        cal = SessionCalendar(path)
+        _CAL_CACHE["key"], _CAL_CACHE["cal"] = key, cal
+        return cal
+    except Exception:  # noqa: BLE001 — stdlib-only module, but stay standalone
+        return None
+
+
 def market_hours(now: dt.datetime | None = None) -> bool:
-    """Weekday 09:25-16:05 ET — slightly wider than the session so a bot that
-    died overnight pages BEFORE the open, not 40 minutes into it."""
+    """Session open-5min .. close+5min ET per the bot's cached exchange
+    calendar (holidays skipped, early closes shrink the window) — the same
+    window the bot's own paging uses (Orchestrator._overlaps_paging_hours).
+    Falls back to weekday 09:25-16:05 ET when the cache is missing or doesn't
+    cover `now` — slightly wider than the session so a bot that died overnight
+    pages BEFORE the open, not 40 minutes into it. The cover check is done
+    HERE so the calendar's own per-date fallback WARNING never fires from this
+    short-lived process (one line per 5-min run, forever, while the bot is
+    down); the skip/ok heartbeat line main() prints is the dead-man's
+    visibility."""
     now = now or dt.datetime.now(ET)
+    cal = _session_calendar()
+    if cal is not None:
+        try:
+            et_now = now if now.tzinfo else now.replace(tzinfo=ET)
+            if cal.covers(et_now.astimezone(ET).date()):
+                return cal.in_paging_window(now)
+        except Exception:  # noqa: BLE001 — fall through to the clock math
+            pass
     if now.weekday() >= 5:
         return False
     t = now.hour * 60 + now.minute

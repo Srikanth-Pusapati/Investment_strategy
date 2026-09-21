@@ -127,6 +127,23 @@ class PortfolioState:
         # the nightly post-mortem and scripts/eval_contract_check.py can
         # read the ex-ante exposure the cycle traded against. Informational.
         self.book_beta: dict = {}
+        # SPY-beta the LAST beta-hedge arm was sized against and where it
+        # came from (run-7 S-2): 'measured' = BookBeta.beta_of(HEDGE_ETF),
+        # shrunk, cycle-cached; 'assumed' = Config.hedge_beta_assumed
+        # because the ETF's own series could not be read or read outside
+        # [-3.0, -0.5]. Stamped beside book_beta so the eval checker can
+        # verify each arm's notional = gap x equity / |hedge_beta| without
+        # re-deriving the ETF's beta. Informational; None = never armed.
+        self.hedge_beta: float | None = None
+        self.hedge_beta_source: str = ""
+        # Last hedge-ETF unwind lot (run-7 S-8 / 4a-17 observability):
+        # {symbol, qty, price (decision-exit quote), date (ET), at (UTC iso),
+        # sessions: [ET dates the counterfactual line was logged on]}. The
+        # orchestrator prints 'HEDGE COUNTERFACTUAL: last unwind lot ...
+        # would be +$X today' for the five sessions after an unwind so a
+        # whipsaw (Sep 9 exit 25.84 -> Sep 10 re-arm 26.09) is priced in
+        # the log instead of reconstructed by hand. Informational.
+        self.last_unwind: dict = {}
         # The watchdog (its own thread) and the decision/risk path both touch this
         # state. A reentrant lock keeps reads/writes and the file save consistent.
         self._lock = threading.RLock()
@@ -196,6 +213,11 @@ class PortfolioState:
             self.core_defense_day = str(d.get("core_defense_day", ""))
             bb = d.get("book_beta", {})
             self.book_beta = dict(bb) if isinstance(bb, dict) else {}
+            hb = d.get("hedge_beta")
+            self.hedge_beta = float(hb) if isinstance(hb, (int, float)) else None
+            self.hedge_beta_source = str(d.get("hedge_beta_source", "") or "")
+            lu = d.get("last_unwind", {})
+            self.last_unwind = dict(lu) if isinstance(lu, dict) else {}
             if self.halted:
                 log.warning("Loaded LATCHED HALT from state: %s", self.halt_reason)
         except Exception as e:  # corrupt state must not crash startup
@@ -233,6 +255,9 @@ class PortfolioState:
                         "streak_times": self.streak_times,
                         "core_defense_day": self.core_defense_day,
                         "book_beta": self.book_beta,
+                        "hedge_beta": self.hedge_beta,
+                        "hedge_beta_source": self.hedge_beta_source,
+                        "last_unwind": self.last_unwind,
                     },
                     indent=2,
                 ),
@@ -647,6 +672,56 @@ class PortfolioState:
         with self._lock:
             self.book_beta = dict(reading or {})
             self._save()
+
+    def get_hedge_beta(self) -> tuple[float | None, str]:
+        """(hedge SPY-beta the last beta-hedge arm divided by, its source
+        'measured' | 'assumed' | '' when never armed) — run-7 S-2."""
+        return self.hedge_beta, self.hedge_beta_source
+
+    def set_hedge_beta(self, beta: float, source: str) -> None:
+        """Stamp the divisor used for a beta-hedge arm beside book_beta so
+        the arm's notional is auditable from risk_state alone (run-7 S-2)."""
+        with self._lock:
+            self.hedge_beta = float(beta)
+            self.hedge_beta_source = str(source or "")
+            self._save()
+
+    # -- last hedge unwind lot (run-7 S-8 / 4a-17) --------------------------- #
+    def get_last_unwind(self) -> dict:
+        return dict(self.last_unwind)
+
+    def set_last_unwind(
+        self, symbol: str, qty: float, price: float, date: str, at: str,
+    ) -> None:
+        """Stamp the lot a hedge unwind just closed (decision-exit quote —
+        the fill lands asynchronously; see ledger.set_fill). Replaces the
+        previous lot: the counterfactual line prices the LAST unwind only."""
+        with self._lock:
+            self.last_unwind = {
+                "symbol": str(symbol or "").upper(), "qty": float(qty or 0.0),
+                "price": float(price or 0.0), "date": str(date or ""),
+                "at": str(at or ""), "sessions": [],
+            }
+            self._save()
+
+    def mark_unwind_session(self, date: str) -> int:
+        """Record that the counterfactual line was logged on ET `date` and
+        return its 1-based session index after the unwind (0 = the unwind
+        day itself). Persisted so a restart does not re-count sessions."""
+        with self._lock:
+            lu = self.last_unwind
+            if not lu:
+                return 0
+            if date == lu.get("date", ""):
+                return 0
+            sessions = [str(s) for s in lu.get("sessions", []) or []]
+            if date not in sessions:
+                if len(sessions) >= 6:
+                    return len(sessions) + 1      # past the window: no growth
+                sessions.append(date)
+                lu["sessions"] = sessions
+                self._save()
+            return sessions.index(date) + 1
 
     def set_regime_label(self, label: str) -> None:
         with self._lock:
