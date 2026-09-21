@@ -1139,22 +1139,30 @@ def test_held_notes_state_the_topup_bar():
 
 
 def test_held_notes_topup_bar_absent_when_state_pruned():
-    """The gate reads the STATE stamp and fails open once the 7-day buy clock
-    prunes it; the ledger fallback still supplies the rotation baseline
-    ('entry conviction') but must NOT print a bar the gate will not hold."""
+    """printed == enforced. The bar comes from the STATE stamp only: with no
+    state stamp the gate fails open, so the ledger fallback supplies the
+    rotation baseline ('entry conviction') but NO bar is printed.
+
+    A-8 (Sep 21 2026): the stamp now OUTLIVES the 7-day buy clock, so a name
+    held 8 days still prints — and the gate still enforces — its bar (run-6:
+    $65,573 of SMCI/SPCX top-ups passed through the old 7-day hole)."""
     from datetime import datetime, timedelta, timezone
     o = _orch()
     o.cfg.risk.topup_min_conviction_delta = 0.05
     o.state.register_buy(
         "CVX", when=datetime.now(timezone.utc) - timedelta(days=8), conviction=0.46,
     )
-    assert o.state.last_buy_conviction("CVX") is None  # pruned with the clock
+    assert o.state.last_buy_conviction("CVX") == 0.46   # survives the clock prune
     o.ledger = SimpleNamespace(effective=lambda: [
         SimpleNamespace(action="buy", symbol="CVX", conviction=0.46, rationale=""),
+        SimpleNamespace(action="buy", symbol="XOM", conviction=0.52, rationale=""),
     ])
-    notes = o._held_notes(_acct(positions=[_pos("CVX", 100.0)]))
+    notes = o._held_notes(_acct(positions=[_pos("CVX", 100.0), _pos("XOM", 100.0)]))
     assert "entry conviction 0.46" in notes["CVX"]
-    assert "top-up needs" not in notes["CVX"]
+    assert "top-up needs conviction >= 0.51" in notes["CVX"]
+    # XOM has NO state stamp (ledger fallback only): baseline yes, bar no.
+    assert "entry conviction 0.52" in notes["XOM"]
+    assert "top-up needs" not in notes["XOM"]
 
 
 def test_held_notes_marks_rejected_topup_verdict():

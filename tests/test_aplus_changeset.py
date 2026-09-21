@@ -382,3 +382,33 @@ def test_a6_legacy_rows_without_a_strategy_prefix_render_as_option():
     j = _journal_with(_rec("HD", "option", "approved", 3430.0,
                            "1 contract(s), $3,430 debit (cap $5,000)."))
     assert "HD option 1x ($3,430 debit" in j.render_today(equity=1_000_000.0)
+
+
+# --------------------------------------------------------------------------- #
+# A-8 — the top-up conviction bar outlives the 7-day buy clock.
+# Run-6: SMCI (Sep 10) and SPCX (Sep 15) top-ups, $65,573, passed only because
+# the prior conviction had been pruned with the week-old buy stamp.
+# --------------------------------------------------------------------------- #
+from datetime import timedelta
+
+
+def test_a8_conviction_survives_the_seven_day_clock_prune():
+    st = _state()
+    old = datetime.now(timezone.utc) - timedelta(days=9)
+    st.register_buy("SMCI", when=old, conviction=0.66)
+    st.register_buy("BWIN", conviction=0.61)        # a later buy prunes the clock
+    assert "SMCI" not in st.last_buy_times           # 9-day-old stamp is gone...
+    assert st.last_buy_conviction("SMCI") == 0.66    # ...the bar is not
+    # and it survives a reload
+    assert PortfolioState(path=st.path).last_buy_conviction("SMCI") == 0.66
+
+
+def test_a8_conviction_map_is_bounded_by_count_oldest_first():
+    st = _state()
+    st._CONVICTION_MAX_ENTRIES = 3
+    for i, sym in enumerate(["A", "B", "C", "D"]):
+        st.register_buy(sym, conviction=0.5 + i / 100)
+    assert list(st.last_buy_convictions) == ["B", "C", "D"]
+    st.register_buy("B", conviction=0.9)             # a re-buy moves B to newest
+    st.register_buy("E", conviction=0.7)
+    assert list(st.last_buy_convictions) == ["D", "B", "E"]
