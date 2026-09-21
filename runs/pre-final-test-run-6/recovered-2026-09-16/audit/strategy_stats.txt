@@ -1,0 +1,116 @@
+ledger rows total: 79 in-window (ts>=2026-08-31): 79
+sells in window: 28
+excluded sells (system/exit_reason): [('PSQ', 'hedge_unwind', 41.76), ('QQQ', 'core_defense', 27.56), ('QQQ', 'core_defense', -128.77), ('PSQ', 'hedge_unwind', 1331.79), ('SGOV', 'defensive_rotate', 7.59)]
+sells with null realized_pl: []
+N=23 sum=8643.03 mean=375.78 WR=0.304 (7W/16L)
+gross_win=31065.54 gross_loss=22422.51 PF=1.385
+top3=[12525.11, 8930.46, 5182.11] top3_sum=26637.68 top3_share_of_sum=3.082
+mean_ex_top3=-899.73 sum_ex_top3=-17994.65
+sd=3784.80 t=0.476 (crit one-sided 95% df=22: ~1.70)
+bootstrap95 two-sided [-940.62, 2044.64]  one-sided 5th pct=-775.22
+P(mean<=0) bootstrap=0.328
+median= -835.920000000001 avg win= 4437.934575 avg loss= -1401.4070792500008
+
+--- satellite rows (ts, sym, exit_reason, realized_pl, pct, fill_price) ---
+2026-09-04T14:26:01 MKL    decision           108.90    0.66% 1835.62 equity
+2026-09-08T13:31:40 BE     bracket_take      5182.11   29.77% None equity
+2026-09-08T16:10:39 F      decision           348.61    1.16% 14.15 equity
+2026-09-08T16:50:47 INTC   bracket_take      8930.46   22.33% None equity
+2026-09-09T13:30:18 BE     trail            12525.11   17.87% 277.0338 equity
+2026-09-09T13:37:00 NU     trail             1076.92    3.60% 15.0394 equity
+2026-09-09T13:49:41 BLK    bracket_stop      -835.92   -4.11% None equity
+2026-09-09T14:03:15 NVDA   trail             2893.44    3.62% 223.9 equity
+2026-09-09T17:10:52 RIG    bracket_stop      -688.22   -7.82% None equity
+2026-09-09T18:14:57 AAPL   bracket_stop      -923.92   -4.44% None equity
+2026-09-10T13:33:28 ABT    bracket_stop      -951.47   -4.52% None equity
+2026-09-10T13:53:39 SNXX   bracket_stop      -772.68  -10.08% None equity
+2026-09-14T13:33:52 NOK    bracket_stop      -109.75   -0.52% None equity
+2026-09-14T13:34:40 DRAM   bracket_stop     -2137.61  -11.78% None equity
+2026-09-14T13:34:50 AVGO   bracket_stop     -3728.11   -5.87% None equity
+2026-09-14T13:34:52 SEI    bracket_stop     -3064.50   -9.86% None equity
+2026-09-14T13:35:02 VALE   bracket_stop      -870.99   -4.20% None equity
+2026-09-14T14:25:43 NOK    decision         -1287.87   -4.12% 10.0392 equity
+2026-09-14T14:25:43 INTC   decision         -2216.87   -4.33% 97.28 equity
+2026-09-14T15:08:24 RIG    bracket_stop     -1124.55   -5.45% None equity
+2026-09-15T13:33:21 PFE    bracket_stop     -1286.50   -5.72% None equity
+2026-09-15T14:29:18 NU     bracket_stop     -1782.77   -5.76% None equity
+2026-09-15T18:45:51 IBIT   bracket_stop      -640.79   -5.04% None equity
+
+--- by exit_reason ---
+bracket_stop     n= 14 sum= -18917.77 wins= 0
+decision         n= 4 sum= -3047.23 wins= 2
+bracket_take     n= 2 sum= 14112.57 wins= 2
+trail            n= 3 sum= 16495.47 wins= 3
+
+--- by instrument ---
+equity n= 23 sum= 8643.03
+
+--- holding period (sell ts minus most recent prior buy of same symbol) ---
+('MKL', 1.89, 108.9, 'decision', '2026-09-02', '2026-09-04', 0.83, 0.6)
+('BE', 4.85, 5182.11, 'bracket_take', '2026-09-03', '2026-09-08', 1.66, 0.66)
+('F', 7.11, 348.61, 'decision', '2026-09-01', '2026-09-08', 0.86, 0.6)
+('INTC', 7.14, 8930.46, 'bracket_take', '2026-09-01', '2026-09-08', 1.09, 0.62)
+('BE', 5.85, 12525.11, 'trail', '2026-09-03', '2026-09-09', 1.66, 0.66)
+('NU', 8.0, 1076.92, 'trail', '2026-09-01', '2026-09-09', 0.73, 0.6)
+('BLK', 7.87, -835.92, 'bracket_stop', '2026-09-01', '2026-09-09', 0.61, 0.6)
+('NVDA', 8.02, 2893.44, 'trail', '2026-09-01', '2026-09-09', 1.31, 0.73)
+('RIG', 6.9, -688.22, 'bracket_stop', '2026-09-02', '2026-09-09', 1.42, 0.62)
+('AAPL', 8.16, -923.92, 'bracket_stop', '2026-09-01', '2026-09-09', 1.12, 0.63)
+('ABT', 8.93, -951.47, 'bracket_stop', '2026-09-01', '2026-09-10', 1.1, 0.6)
+('SNXX', 0.98, -772.68, 'bracket_stop', '2026-09-09', '2026-09-10', 1.58, 0.6)
+('NOK', 5.0, -109.75, 'bracket_stop', '2026-09-09', '2026-09-14', 2.15, 0.66)
+('DRAM', 4.96, -2137.61, 'bracket_stop', '2026-09-09', '2026-09-14', 1.15, 0.62)
+('AVGO', 5.89, -3728.11, 'bracket_stop', '2026-09-08', '2026-09-14', 1.09, 0.66)
+('SEI', 4.75, -3064.5, 'bracket_stop', '2026-09-09', '2026-09-14', 2.39, 0.66)
+('VALE', 4.93, -870.99, 'bracket_stop', '2026-09-09', '2026-09-14', 1.08, 0.6)
+('NOK', 5.03, -1287.87, 'decision', '2026-09-09', '2026-09-14', 2.15, 0.66)
+('INTC', 4.04, -2216.87, 'decision', '2026-09-10', '2026-09-14', 1.74, 0.66)
+('RIG', 3.06, -1124.55, 'bracket_stop', '2026-09-11', '2026-09-14', 1.27, 0.6)
+('PFE', 14.0, -1286.5, 'bracket_stop', '2026-09-01', '2026-09-15', 2.07, 0.64)
+('NU', 4.04, -1782.77, 'bracket_stop', '2026-09-11', '2026-09-15', 1.16, 0.62)
+('IBIT', 1.0, -640.79, 'bracket_stop', '2026-09-14', '2026-09-15', 0.93, 0.6)
+trips held <=1.5d: 2 sum= -1413.47
+trips held >1.5d: 21 sum= 10056.5
+
+--- realized P&L by ENTRY date ---
+2026-09-01 n= 8 sum= 9251.62
+2026-09-02 n= 2 sum= -579.32
+2026-09-03 n= 2 sum= 17707.22
+2026-09-08 n= 1 sum= -3728.11
+2026-09-09 n= 6 sum= -8243.4
+2026-09-10 n= 1 sum= -2216.87
+2026-09-11 n= 2 sum= -2907.32
+2026-09-14 n= 1 sum= -640.79
+
+--- realized P&L by EXIT date ---
+2026-09-04 n= 1 sum= 108.9
+2026-09-08 n= 3 sum= 14461.17
+2026-09-09 n= 6 sum= 14047.42
+2026-09-10 n= 2 sum= -1724.15
+2026-09-14 n= 8 sum= -14540.25
+2026-09-15 n= 3 sum= -3710.06
+
+--- top-ups whose prior-buy anchor was >7d old (state._CLOCK_RETENTION_DAYS=7 prunes last_buy_convictions -> gate fails open) ---
+2026-09-03T14:25 SPCX  top-up $  54,993 conv 0.68 comp 1.48 | prior 2026-09-01 conv 0.63 comp 1.28 gap 2.0d -> anchored, passes bar
+2026-09-03T17:03 BE    top-up $  70,190 conv 0.66 comp 1.66 | prior 2026-09-02 conv 0.60 comp 0.9 gap 1.1d -> anchored, passes bar
+2026-09-09T13:35 NOK   top-up $  23,067 conv 0.66 comp 2.15 | prior 2026-09-01 conv 0.60 comp 1.46 gap 8.0d -> PRUNED-ANCHOR, passes bar
+2026-09-10T15:19 SMCI  top-up $  27,111 conv 0.62 comp 1.18 | prior 2026-09-02 conv 0.66 comp 1.56 gap 8.0d -> PRUNED-ANCHOR, would FAIL bar
+2026-09-15T15:18 BWIN  top-up $  56,737 conv 0.66 comp 1.93 | prior 2026-09-14 conv 0.60 comp 0.83 gap 1.0d -> anchored, passes bar
+2026-09-15T15:18 SPCX  top-up $  38,462 conv 0.62 comp 0.62 | prior 2026-09-03 conv 0.68 comp 1.48 gap 12.0d -> PRUNED-ANCHOR, would FAIL bar
+
+Spearman rho(entry composite, realized_pl) n=23: -0.264
+Spearman rho(entry conviction, realized_pl) n=23: -0.293
+mean entry composite: winners 1.16 (n=7) vs losers 1.44 (n=16)
+entries Sep 1-3 closed: n=12 sum=26379.52 | entries Sep 8+ closed: n=11 sum=-17736.49 wins=0
+satellite exits after 2026-09-09T14:03Z (NVDA trail): n=15 wins=0 sum=-21586.59
+
+=== AUDIT HEADLINE (strategy group, computed 2026-09-15 after the close; command: python3 audit/strategy_stats.py) ===
+v3 satellite definition (sell, realized_pl non-null, exit_reason not in system set, symbol not in {QQQ,PSQ,SGOV}):
+  N=23 sum=+8,643.03 mean=+375.78 WR=30.4% (7W/16L) PF=1.385 (gross_win 31,065.54 / gross_loss 22,422.51)
+  top-3 = BE +12,525.11, INTC +8,930.46, BE +5,182.11 = 26,637.68 = 308% of the window sum; ex-top-3 mean = -899.73 (20 rows, sum -17,994.65)
+  t=0.476 vs 1.717 (df 22) FAIL; bootstrap-95 (seed 0, 10k) [-940.62, +2,044.64]; P(mean<=0)=0.328
+  v2 checker N=28 = same 23 + 5 system rows (PSQ +41.76, QQQ +27.56, QQQ -128.77, PSQ +1,331.79, SGOV +7.59 = +1,279.93)
+  exits since 2026-09-09T14:03Z (NVDA trail): 15 consecutive losses, sum -21,586.59; entries Sep 8+ closed: 11/11 losses, -17,736.49; entries Sep 1-3 closed: 12 rows +26,379.52
+  bracket_stop n=14 sum -18,917.77 (0 wins); avg win 4,437.93 / avg loss -1,401.41 (payoff 3.17) -> PF>=1.5 needs WR>=32.1%
+  Spearman rho(entry composite, realized) = -0.264; rho(conviction, realized) = -0.293; winners' mean composite 1.16 vs losers' 1.44
+alpha residual (audit/alpha_residual.txt): cumulative idiosyncratic residual +3.93pp through Sep 11 -> +1.75pp through Sep 15 (Sep 14 -1.88pp, Sep 15 -0.30pp)

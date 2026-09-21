@@ -1,0 +1,13 @@
+last-buy composite     avg-rank (standard)  rho=-0.250 t=-1.18 n.s.
+last-buy composite     ordinal-rank         rho=-0.264 t=-1.25 n.s.
+last-buy composite     min-rank             rho=-0.261 t=-1.24 n.s.
+last-buy conviction    avg-rank (standard)  rho=-0.116 t=-0.53 n.s.
+last-buy conviction    ordinal-rank         rho=-0.293 t=-1.41 n.s.
+last-buy conviction    min-rank             rho=-0.116 t=-0.54 n.s.
+first-lot composite    avg-rank (standard)  rho=-0.531 t=-2.87 sig
+first-lot composite    ordinal-rank         rho=-0.544 t=-2.97 sig
+first-lot composite    min-rank             rho=-0.537 t=-2.92 sig
+first-lot conviction   avg-rank (standard)  rho=-0.438 t=-2.23 sig
+first-lot conviction   ordinal-rank         rho=-0.587 t=-3.32 sig
+first-lot conviction   min-rank             rho=-0.430 t=-2.18 sig
+first-lot composite: winners mean 0.95 (n=7) losers mean 1.35 (n=16)

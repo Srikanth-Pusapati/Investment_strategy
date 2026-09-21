@@ -1,0 +1,11 @@
+08:30 (book -2.32%): equity~1,014,884 PSQ w=0.2035 pull=-0.307 hedged=0.84 -> unhedged=1.15 (PSQ beta -1.51)
+08:30 (book -2.32%): equity~1,014,884 PSQ w=0.2035 pull=-0.309 hedged=0.84 -> unhedged=1.15 (PSQ beta -1.5174)
+09:22 pre-trim (book ~-2.2%): equity~1,016,131 PSQ w=0.2025 pull=-0.306 hedged=0.58 -> unhedged=0.89 (PSQ beta -1.51)
+09:22 pre-trim (book ~-2.2%): equity~1,016,131 PSQ w=0.2025 pull=-0.307 hedged=0.58 -> unhedged=0.89 (PSQ beta -1.5174)
+09:22 post-QQQ-trim: equity~1,016,131 PSQ w=0.2025 pull=-0.306 hedged=0.54 -> unhedged=0.85 (PSQ beta -1.51)
+09:22 post-QQQ-trim: equity~1,016,131 PSQ w=0.2025 pull=-0.307 hedged=0.54 -> unhedged=0.85 (PSQ beta -1.5174)
+PSQ Sep11 close implied 25.934
+PSQ ~close Sep14 26.141 Sep15 26.312
+held to Sep14 close vs sold 26.26: -933 ; held to Sep15 close: 407 ; Sep15-only gain: 1340
+S-2 hedge $ 135358 pull at 08:30: 0.201 hedged read 08:30 -> 0.95 09:22 post-trim -> 0.64
+BE 12:02 x1.00 $30,602 -> x0.70 $ 21421

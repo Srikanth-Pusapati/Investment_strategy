@@ -1,0 +1,60 @@
+INDEPENDENT: N=23 sum=8643.03 mean=375.78 WR=0.3043 (7W/16L) PF=1.3855 gw=31065.54 gl=22422.51
+top3=[12525.11, 8930.46, 5182.11] mean_ex_top3=-899.73
+t=0.476
+seed 0: bootstrap95 [-940.62, 2044.64] one-sided5=-775.22
+seed 1: bootstrap95 [-967.75, 2026.41] one-sided5=-793.56
+seed 2: bootstrap95 [-978.45, 2045.91] one-sided5=-796.66
+seed 42: bootstrap95 [-970.67, 2060.30] one-sided5=-802.36
+seed 123: bootstrap95 [-967.70, 2044.54] one-sided5=-792.78
+exits after NVDA trail: n=16 wins=1 sum=-18693.16
+
+--- per-sell: most-recent-buy vs first-buy-since-last-flat ---
+2026-09-04T14:26 MKL    pl=   108.90 recent_buy=2026-09-02 comp=0.83 conv=0.6 | first_buy=2026-09-02 comp=0.83 | qty_before_sell=9.0 sell_qty=9.0
+2026-09-08T13:31 BE     pl=  5182.11 recent_buy=2026-09-03 comp=1.66 conv=0.66 | first_buy=2026-09-02 comp=0.9 | qty_before_sell=382.0 sell_qty=83.0
+2026-09-08T16:10 F      pl=   348.61 recent_buy=2026-09-01 comp=0.86 conv=0.6 | first_buy=2026-09-01 comp=0.86 | qty_before_sell=2140.0 sell_qty=2140.0
+2026-09-08T16:50 INTC   pl=  8930.46 recent_buy=2026-09-01 comp=1.09 conv=0.62 | first_buy=2026-09-01 comp=1.09 | qty_before_sell=462.0 sell_qty=462.0
+2026-09-09T13:30 BE     pl= 12525.11 recent_buy=2026-09-03 comp=1.66 conv=0.66 | first_buy=2026-09-02 comp=0.9 | qty_before_sell=299.0 sell_qty=299.0
+2026-09-09T13:37 NU     pl=  1076.92 recent_buy=2026-09-01 comp=0.73 conv=0.6 | first_buy=2026-09-01 comp=0.73 | qty_before_sell=2061.0 sell_qty=2061.0
+2026-09-09T13:49 BLK    pl=  -835.92 recent_buy=2026-09-01 comp=0.61 conv=0.6 | first_buy=2026-09-01 comp=0.61 | qty_before_sell=18.0 sell_qty=18.0
+2026-09-09T14:03 NVDA   pl=  2893.44 recent_buy=2026-09-01 comp=1.31 conv=0.73 | first_buy=2026-09-01 comp=1.31 | qty_before_sell=370.0 sell_qty=370.0
+2026-09-09T17:10 RIG    pl=  -688.22 recent_buy=2026-09-02 comp=1.42 conv=0.62 | first_buy=2026-09-02 comp=1.42 | qty_before_sell=1419.0 sell_qty=1419.0
+2026-09-09T18:14 AAPL   pl=  -923.92 recent_buy=2026-09-01 comp=1.12 conv=0.63 | first_buy=2026-09-01 comp=1.12 | qty_before_sell=64.0 sell_qty=64.0
+2026-09-10T13:33 ABT    pl=  -951.47 recent_buy=2026-09-01 comp=1.1 conv=0.6 | first_buy=2026-09-01 comp=1.1 | qty_before_sell=192.0 sell_qty=192.0
+2026-09-10T13:53 SNXX   pl=  -772.68 recent_buy=2026-09-09 comp=1.58 conv=0.6 | first_buy=2026-09-09 comp=1.58 | qty_before_sell=425.0 sell_qty=425.0
+2026-09-14T13:33 NOK    pl=  -109.75 recent_buy=2026-09-09 comp=2.15 conv=0.66 | first_buy=2026-09-01 comp=1.46 | qty_before_sell=5063.0 sell_qty=2080.0
+2026-09-14T13:34 DRAM   pl= -2137.61 recent_buy=2026-09-09 comp=1.15 conv=0.62 | first_buy=2026-09-09 comp=1.15 | qty_before_sell=293.0 sell_qty=293.0
+2026-09-14T13:34 AVGO   pl= -3728.11 recent_buy=2026-09-08 comp=1.09 conv=0.66 | first_buy=2026-09-08 comp=1.09 | qty_before_sell=172.0 sell_qty=172.0
+2026-09-14T13:34 SEI    pl= -3064.50 recent_buy=2026-09-09 comp=2.39 conv=0.66 | first_buy=2026-09-09 comp=2.39 | qty_before_sell=454.0 sell_qty=454.0
+2026-09-14T13:35 VALE   pl=  -870.99 recent_buy=2026-09-09 comp=1.08 conv=0.6 | first_buy=2026-09-09 comp=1.08 | qty_before_sell=1352.0 sell_qty=1352.0
+2026-09-14T14:25 NOK    pl= -1287.87 recent_buy=2026-09-09 comp=2.15 conv=0.66 | first_buy=2026-09-01 comp=1.46 | qty_before_sell=2983.0 sell_qty=2983.0
+2026-09-14T14:25 INTC   pl= -2216.87 recent_buy=2026-09-10 comp=1.74 conv=0.66 | first_buy=2026-09-10 comp=1.74 | qty_before_sell=503.0 sell_qty=503.0
+2026-09-14T15:08 RIG    pl= -1124.55 recent_buy=2026-09-11 comp=1.27 conv=0.6 | first_buy=2026-09-11 comp=1.27 | qty_before_sell=3570.0 sell_qty=3570.0
+2026-09-15T13:33 PFE    pl= -1286.50 recent_buy=2026-09-01 comp=2.07 conv=0.64 | first_buy=2026-09-01 comp=2.07 | qty_before_sell=775.0 sell_qty=775.0
+2026-09-15T14:29 NU     pl= -1782.77 recent_buy=2026-09-11 comp=1.16 conv=0.62 | first_buy=2026-09-11 comp=1.16 | qty_before_sell=2061.0 sell_qty=2061.0
+2026-09-15T18:45 IBIT   pl=  -640.79 recent_buy=2026-09-14 comp=0.93 conv=0.6 | first_buy=2026-09-14 comp=0.93 | qty_before_sell=283.0 sell_qty=283.0
+recent-buy cohort early: n=12 sum=26379.52 wins=7
+recent-buy cohort late: n=11 sum=-17736.49 wins=0
+first-buy cohort  early: n=14 sum=24981.90 wins=7
+first-buy cohort  late: n=9 sum=-16338.87 wins=0
+recent-buy: rho(composite,pl)=-0.250 rho(conviction,pl)=-0.116 winners mean comp=1.16 losers mean comp=1.44
+first-buy: rho(composite,pl)=-0.531 rho(conviction,pl)=-0.438 winners mean comp=0.95 losers mean comp=1.35
+
+--- re-entry cohort (buy after the symbol was fully flat from a prior in-window sell) ---
+  INTC 2026-09-01T13:34 buy qty=462.0 FRESH pl=None cost=39990.72 q_after=462.0
+  INTC 2026-09-08T16:50 sell qty=462.0 bracket_take pl=8930.46 cost=0.0 q_after=0.0
+  INTC 2026-09-10T13:35 buy qty=503.0 FRESH pl=None cost=51127.43 q_after=503.0
+  INTC 2026-09-14T14:25 sell qty=503.0 decision pl=-2216.869888 cost=0.0 q_after=0.0
+  NU 2026-09-01T13:34 buy qty=2061.0 FRESH pl=None cost=29987.55 q_after=2061.0
+  NU 2026-09-09T13:37 sell qty=2061.0 trail pl=1076.924025 cost=0.0 q_after=0.0
+  NU 2026-09-11T13:35 buy qty=2061.0 FRESH pl=None cost=30915.0 q_after=2061.0
+  NU 2026-09-15T14:29 sell qty=2061.0 bracket_stop pl=-1782.7650000000003 cost=0.0 q_after=0.0
+  RIG 2026-09-02T19:39 buy qty=1419.0 FRESH pl=None cost=8804.9 q_after=1419.0
+  RIG 2026-09-09T17:10 sell qty=1419.0 bracket_stop pl=-688.2150000000005 cost=0.0 q_after=0.0
+  RIG 2026-09-11T13:35 buy qty=3570.0 FRESH pl=None cost=20616.75 q_after=3570.0
+  RIG 2026-09-14T15:08 sell qty=3570.0 bracket_stop pl=-1124.5500000000013 cost=0.0 q_after=0.0
+  RIG 2026-09-15T17:02 buy qty=227.0 FRESH pl=None cost=1340.43 q_after=227.0
+  RIG 2026-09-16T15:18 sell qty=227.0 decision pl=-62.425 cost=0.0 q_after=0.0
+  NOK 2026-09-01T13:34 buy qty=2983.0 FRESH pl=None cost=29994.06 q_after=2983.0
+  NOK 2026-09-09T13:35 buy qty=2080.0 TOPUP pl=None cost=23067.2 q_after=5063.0
+  NOK 2026-09-14T13:33 sell qty=2080.0 bracket_stop pl=-109.7491199999996 cost=0.0 q_after=2983.0
+  NOK 2026-09-14T14:25 sell qty=2983.0 decision pl=-1287.868488 cost=0.0 q_after=0.0

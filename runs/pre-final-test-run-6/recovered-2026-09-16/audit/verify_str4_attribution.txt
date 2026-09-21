@@ -1,0 +1,24 @@
+SEP 4 (Sep3 close -> Sep4 close) per-name $ mark change, positions held at Sep 3 close:
+  BE        +6616
+  SMCI      +2716
+  INTC      +1908
+  NOK        +776
+  NVDA       +707
+  F          +449
+  PFE        -279
+  NU         -639
+  SPCX      -1167
+  book dEq=+9464  beta-expected=-4219  residual$=+13683  BE+INTC=+8524 = 62% of residual; SMCI=20%
+SEP 8 (Sep4 close -> Sep8 close); BE 83sh sold @272.13 open, INTC 462 sold @105.89 11:51 CT, F 2140 sold @14.15, rest held:
+  BE        +8879
+  INTC      +4662
+  SPCX      +3599
+  NOK       +1849
+  SMCI      +1058
+  NU          -82
+  PFE        -512
+  F         -1006
+  NVDA      -1713
+  book dEq=+17062  beta-expected=-5200  residual$=+22262  BE+INTC=+13541 = 61% of residual; SPCX+NOK=24%
+COMBINED Sep4+Sep8: residual$=+35945; BE+INTC=+22065 = 61%
+Ledger exits on Sep 4: MKL decision +108.90 ONLY (no BE/INTC exit). Sep 8 exits: BE 83sh bracket_take +5,182.11, INTC bracket_take +8,930.46, F decision +348.61. BE 299sh trail +12,525.11 exited Sep 9 (a -0.25pp residual day; BE 277.22->277.03 fill ~flat).
