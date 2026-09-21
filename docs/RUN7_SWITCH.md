@@ -10,6 +10,44 @@ Modelled on `docs/RUN6_SWITCH.md`. Everything in section 3 runs in the LIVE tree
 the run-6 Sep 18 close row exists (the freeze is re-registered to Sep 19 — zero
 commits to `investment_strategy/` or `.env` on the live branch through Sep 18).
 
+## 0. RE-BASED SWITCH (written Mon 2026-09-21) — read this first
+
+The Sep 18 switch in section 3 did not happen: run-6's verdict WAS taken on the
+Sep 18 close row (steps 1-2 of section 3 are DONE — do not re-run them), but the
+bot kept running run-6 code on the old account (`PA3B09IK4MGS`) and was
+restarted on it Mon Sep 21 09:17 CT. Sep 21 is therefore outside both windows.
+Since then the A+ items (A-1..A-9; `tests/test_aplus_changeset.py`) joined the
+change-set — four new STRATEGY KEYS in sections 1c / 2 below.
+
+**The switch, any evening after 16:00 ET (day 0); day 1 = the next session:**
+
+1. GitHub: merge PR #59 (run-6 close records) and then the A+ PR into
+   `feature/preview`.
+2. Alpaca dashboard: create a NEW paper account, generate keys; in the live
+   `.env` replace `ALPACA_API_KEY` / `ALPACA_SECRET_KEY` with them and paste the
+   section-1c block (twelve lines + the ops lines). Never commit `.env`.
+3. Live tree, after 16:00 ET:
+
+       DRY_RUN=1 sh scripts/run7_switch.sh     # every check, changes nothing
+       sh scripts/run7_switch.sh               # the switch
+
+   The script refuses to run before the bell, on the old account, with an
+   account that has positions or orders, with a missing/duplicated key line, or
+   if the merged change-set is not on `origin/feature/preview`. It then archives
+   the old state under `runs/pre-final-test-run-6/state-post-window/`, stops the
+   bot, stashes the live tree's local docs (they are already on origin), moves
+   `feature/preview` to `origin/feature/preview`, runs the test suite, runs
+   `scripts/fresh_cycle.py --yes`, and verifies the `basis='late'` day-0 row and
+   the new-code config line. It prints the merge SHA for the contract.
+4. Pre-register: put that SHA and the section-2 block into the Config row of
+   `runs/pre-final-test-run-7/EVAL_CONTRACT.md`, flip the header to
+   "Pre-registered <date>, BEFORE day 1", fix the two dates in the pinned verdict
+   command if day 1 is not Sep 22, commit, push.
+5. Next morning: section 4's checks, plus `grep -nE 'CORE STOPLESS|CORE FILL|AUTO-HEDGE STARVED|REGIME FALLING-TAPE CAP|Options opened' logs/bot.log`.
+
+Rollback (market closed, any step failed): `git checkout -B feature/preview <old sha printed by the script>`,
+restore the old keys in `.env`, restart from the control panel.
+
 ## 1. New `.env` keys introduced by the run-7 change-set
 
 Compiled from every changelog (`A1..A7`, `B1..B4`, `C1..C3`, `S-1..S-8`,
@@ -79,6 +117,14 @@ entry references it).
     TOPUP_MIN_CONVICTION_DELTA=0.05
     # S-8 beta-hedge unwind noise guard — ship at 1 (= run-6 behaviour)
     HEDGE_UNWIND_MIN_CYCLES=1
+    # ---- A+ change-set (2026-09-21) — all four are STRATEGY KEYS ----
+    # A-4a core-ETF sweep sized to the room under the hedge arm line
+    CORE_FILL_BETA_CLAMP=on
+    # A-4b hedge has no cash -> sell core-ETF shares toward the beta target
+    HEDGE_STARVED_CORE_TRIM=on
+    HEDGE_STARVED_TRIM_MAX_PCT=50
+    # A-9 a live falling-tape read caps a risk-on regime at neutral
+    REGIME_FALLING_TAPE_CAP=on
     # ops / measurement (not in the fingerprint)
     ALERT_RETRY_BASE_S=60
     ALERT_RETRY_CAP_S=900
@@ -88,8 +134,9 @@ entry references it).
 
 Verify after pasting:
 
-    grep -nE '^(HEDGE_BETA_ASSUMED|PROXY_PUT_PREFER_MONTHLY|OPTION_STRIKE_SNAP|OPTION_STRIKE_MAX_MONEYNESS_PCT|REGIME_LOOSEN_MIN_CYCLES|TOPUP_MIN_CONVICTION_DELTA|HEDGE_UNWIND_MIN_CYCLES|LEDGER_RESTATE_AT_FILL)=' .env
-    # exactly the eight lines above, once each; and no legacy EXPECTANCY_GATE=on
+    grep -nE '^(HEDGE_BETA_ASSUMED|PROXY_PUT_PREFER_MONTHLY|OPTION_STRIKE_SNAP|OPTION_STRIKE_MAX_MONEYNESS_PCT|REGIME_LOOSEN_MIN_CYCLES|TOPUP_MIN_CONVICTION_DELTA|HEDGE_UNWIND_MIN_CYCLES|CORE_FILL_BETA_CLAMP|HEDGE_STARVED_CORE_TRIM|HEDGE_STARVED_TRIM_MAX_PCT|REGIME_FALLING_TAPE_CAP|LEDGER_RESTATE_AT_FILL)=' .env
+    # exactly the twelve lines above, once each; and no legacy EXPECTANCY_GATE=on
+    # (scripts/run7_switch.sh runs this check for you and refuses to proceed otherwise)
 
 ## 2. STRATEGY KEY block for the run-7 fingerprint
 
@@ -145,6 +192,14 @@ S-1/S-3/S-4 now read them.
     REGIME_LOOSEN_MIN_CYCLES=2
     TOPUP_MIN_CONVICTION_DELTA=0.05
     HEDGE_UNWIND_MIN_CYCLES=1
+    # --- A+ change-set (2026-09-21) ---
+    CORE_FILL_BETA_CLAMP=on
+    HEDGE_STARVED_CORE_TRIM=on
+    HEDGE_STARVED_TRIM_MAX_PCT=50
+    REGIME_FALLING_TAPE_CAP=on
+    # keyless A+ strategy items (enter the fingerprint through the code hash):
+    # A-6 option rows on the 'Today so far' prompt block; A-8 top-up bar
+    # persistence past the 7-day buy clock. Keyless ops/measurement: A-1, A-2, A-5.
 
 Measurement keys carried from run-6 that are NOT in the fingerprint (keep them
 on): `POSTMORTEM_OPTION_MARKS=on`, `EQUITY_CLOSE_FIXED_STAMP=on`,

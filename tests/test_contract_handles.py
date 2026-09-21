@@ -74,6 +74,13 @@ PINNED_HANDLES: tuple[str, ...] = (
     "Watchdog BLIND",
     "not delivered",
     "ROTATION:",
+    # A+ change-set (Sep 21 2026)
+    "CORE STOPLESS:",
+    "CORE FILL: BUY",
+    "CORE FILL BETA CLAMP:",
+    "AUTO-HEDGE STARVED:",
+    "REGIME FALLING-TAPE CAP:",
+    "Options opened",
 )
 # Verbatim from v3 rule 1 ("exit_reason not in the system set **{...}**").
 PINNED_SYSTEM_EXIT_REASONS = frozenset(
