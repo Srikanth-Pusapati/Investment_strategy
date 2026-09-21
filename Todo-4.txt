@@ -1246,3 +1246,49 @@ https://claude.ai/code/artifact/9099ad65-64b1-495c-82b9-db7226a1bbbf
             TUE SEP 22 MORNING (docs/RUN7_SWITCH.md section 4 + section 0 step 5):
             grep -nE 'CORE STOPLESS|CORE FILL|AUTO-HEDGE STARVED|REGIME FALLING-TAPE CAP|Options opened' logs/bot.log
             and confirm the first decision cycle, FEEDS n/n healthy, one bot pid.
+
+2026-09-21  ~18:10 CT — POST-MERGE RECHECK + BOT RESTART (resident session; the user
+            merged PR #62 -> main, switched the live tree to main, asked for a
+            recheck, a bot rerun, proof the new Alpaca account is connected, and
+            readiness for Tue Sep 22)
+            TREE: live tree on main 5516f35 (= origin/main), clean.
+            investment_strategy/ tree id 2a6ec147... = the frozen fingerprint, so
+            the branch switch changed no code. Freeze intact.
+            RESTARTS (in-window, logged per the contract's freeze clause):
+              control panel 18:02:14 CT (launchctl kickstart; pid 6087 -> 30087) —
+              it had been up since Sat Sep 19 and holds `from ops.deadman import`
+              in memory; ops/deadman.py gained 58 lines in the run-7 change-set.
+              bot 18:02:24 CT via the panel's POST /api/restart (pid 57069 ->
+              30234), ONE instance. state/equity_history.jsonl byte-identical
+              after it: _refresh_closing_snapshot returns early when today has a
+              close/late row, so the day-0 anchor (ts 21:14:42Z, as quoted in the
+              contract) was NOT re-stamped and the post-mortem did not re-run.
+            ALPACA (keys in .env, read-only calls): PA3BGBBR2NB5 ACTIVE, equity =
+            cash = $1,000,000, buying power 4x, options level 3, nothing blocked,
+            0 positions / 0 open orders / 0 orders EVER, created 2026-09-21
+            20:52Z. Market data on the same keys OK (QQQ/SPY/PSQ/IWM/SGOV).
+            Next open Tue 09:30 ET, full sessions Sep 22-25. The RUNNING process
+            is bound to it: pid 30234 inherited 0 ALPACA_* vars (dotenv
+            override=False would let an inherited key beat .env), and .env
+            (mtime 16:10) predates its 18:02 start.
+            PREFLIGHT 7/8. The one fail is ROBINHOOD and it is NOT the token:
+            the 'TaskGroup (1 sub-exception)' wrapper hides httpx 502 Bad Gateway
+            from agent.robinhood.com/mcp/trading; the UNAUTHENTICATED
+            /.well-known/oauth-authorization-server also returns 502 and
+            api.robinhood.com / robinhood.com time out, while Alpaca / GitHub /
+            Anthropic are fine from this host => Robinhood-side outage. Token file
+            Sep 18 10:22, expires_in 519333 s (~Sep 24); auth-dead latch correctly
+            NOT tripped. DO NOT re-login on the preflight's 'token may be expired'
+            hint. In-cycle cost: a failing read returns [] in ~5.6 s (MCP SDK 1.28
+            timeouts: 30 s HTTP / 300 s SSE) — bounded, no wedge. 'rh=dead' is a
+            pre-declared non-confounding degraded mode in contract v3.
+            SAFETY NET: deadman every 300 s on the new code, exit 0 ('skip (market
+            closed)'); session_calendar.json has Sep 22 09:30-16:00;
+            claude-daily 17:37 CT saw the resident session alive and skipped (no
+            false-fire); HEARTBEAT_URL set; AC power, caffeinate holding sleep
+            off; 138 GB free; kill switch off.
+            NOTE: the live tree now sits on main; ops/away_mode.md steps 77/86
+            tell the headless fallback to push feature/preview. Identical trees, no
+            script hard-codes a branch — a convention point for the operator.
+            This entry was committed from an isolated worktree on feature/preview
+            so the live tree stayed on main.
