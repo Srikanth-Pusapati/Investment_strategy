@@ -1099,3 +1099,92 @@ https://claude.ai/code/artifact/9099ad65-64b1-495c-82b9-db7226a1bbbf
             taken), brings PR #57 + PR #59, restart after the close, verify the
             'late' row; (5) create the run-7 paper account keys; (6) weigh the top-3
             concentration before locking run-7's strategy tree.
+
+2026-09-21  ~10:30 CT — A+ ROADMAP WRITTEN; RUN-7 HAS NOT STARTED (resident session
+            bd391b29, resumed after the Sep 16 11:41 CT cap-kill; the Sep 17/18
+            fallbacks ran the run-6 close — see PR #59 / run6 final verdict).
+            STATE ON DISK TODAY: live tree still run-6 code (.git HEAD
+            feature/preview @ 1a82724, no docs/RUN7_SWITCH.md or
+            session_calendar.py on disk, investment_strategy/ mtimes Aug 31);
+            account PA3B09IK4MGS; bot RESTARTED 09:17 CT today (pid 97525, not by
+            this session); panel pid 6087 since Sep 19. The Sep 18 day-0 switch did
+            not happen -> contract v3 dates (day 1 = Sep 21) are stale.
+            GIT IS DEAD ON THIS HOST: every git/gh call returns 'You have not
+            agreed to the Xcode license agreements' (Darwin 27 upgrade). Needs the
+            operator: `sudo xcodebuild -license`. Not worked around. Until then
+            nothing here can be committed, pulled or switched; this entry and the
+            roadmap file are UNCOMMITTED on disk.
+            LIVE RISK FLAGGED, NOT TOUCHED: 09:17 + 09:56 'On BATTERY' CRITICALs,
+            DARK GAP 18 min (09:35) and 21 min (09:56); yfinance SPY outage ->
+            regime blind x0.50 at 09:33; BOOK BETA spy=1.20 invested 98.0%,
+            'Auto-hedge: want $213703 more PSQ but only $0 spendable'. Host back on
+            AC by ~10:25 CT (pmset: charging 73%).
+            DELIVERABLE: runs/pre-final-test-run-7/A_PLUS_ROADMAP.md — verdict B
+            (from B+ provisional); 15-scenario coverage table with [V]/[A]
+            evidence labels (the Sep 16 audit's verify phase died on the cap
+            twice: only STR-1 (2/3) and STR-2 (1 vote) carry refuter votes);
+            Steps 0-5; sample-size finding: 155-275 closed trips needed at run-6's
+            effect size, $730/trip needed at pooled N=60 vs $446 observed.
+            RECOMMENDATION: fix contract v3 text (rule 8 sanction-aware, stopless
+            + cadence definitions, pinned command, FIFO fill-restated, bearish
+            denominator metric), start run-7 AS BUILT on a fresh account (no new
+            strategy items), build the A+ change-set (P1 hedge integrity, P2
+            gap/cluster, P3 core execution, P4 bearish sleeve, P5 regime, P6
+            measurement) in an isolated worktree for run-8, and run the entry-edge
+            work offline with kill criteria. Earliest honest live pilot ~mid-Dec.
+            USER ACTIONS: (1) `sudo xcodebuild -license`; (2) host on AC / move to
+            the always-on host; (3) decide the run-7 start date + create the fresh
+            paper account keys; (4) merge PR #59 (Amendment 4 + run-6 close
+            records) if not merged — unverifiable from here while gh is down.
+
+2026-09-21  ~11:45 CT — A+ CHANGE-SET BUILT ON TOP OF RUN-7 (resident session; the user
+            fixed the Xcode license so git works again, and asked for the code
+            fixes + a from-today start). Branch feature/run7-aplus (isolated
+            worktree, based on the PR #59 branch so it carries the run-6 close
+            records); live tree untouched — the bot keeps running run-6 code until
+            the switch.
+            ITEMS (tests/test_aplus_changeset.py, 31 tests; suite 1547 passed):
+            A-1 core fill waits <= 5 s for its stop cancel to settle, logs 'CORE
+            FILL: BUY ... NOT submitted' on a skip/refusal and arms the stop retry
+            (Sep 15 14:40 CT silent wash reject -> QQQ stopless to the next open);
+            A-2 'CORE STOPLESS: <etf> <secs>s ... (cause ...)' — the ops bar gets a
+            handle (WARNING above 60 s); A-4a CORE_FILL_BETA_CLAMP — the core sweep
+            never passed the beta cap; now sized to the room under target+band at
+            the core's measured beta; A-4b HEDGE_STARVED_CORE_TRIM (+
+            HEDGE_STARVED_TRIM_MAX_PCT=50) — an unfunded hedge sells core shares
+            toward target through the S-7 trim mechanics, exit_reason=beta_trim
+            (added to the v3 system exit set); A-5 decision-sell rows carry
+            sell_events (full close, watchdog partial, retry queue) and v3 rule 8
+            counts only UNSANCTIONED losses below 0.5x stop (v2 reading unchanged);
+            A-6 option buys are journaled with their strategy and 'Today so far'
+            prints 'Options opened (... NOT shares ...): HBAN long_put (BEARISH)'
+            instead of 'Bought: HBAN 1x' (Sep 16: six put declines for
+            'contradicting the open long'); A-8 last_buy_convictions bounded by
+            count (400) not the 7-day clock, so the top-up bar outlives a week-long
+            hold ($65,573 of SMCI/SPCX top-ups passed the old hole); A-9
+            REGIME_FALLING_TAPE_CAP — a live falling read applies risk-on as
+            neutral x0.70 for the cycle (Sep 14 11:59-14:36 CT). All four knobs
+            default OFF in code (run-7-as-reviewed is byte-identical without them)
+            and ON in the RUN7_SWITCH 1c block. STRATEGY-affecting: A-4a, A-4b,
+            A-6, A-8, A-9; ops/measurement: A-1, A-2, A-5.
+            DROPPED WITH A REASON: hedge 'trim instead of close' — the Sep 14
+            arithmetic keeps ~$31k of PSQ instead of $0, worth ~$150 that day; the
+            loss was the overnight gap cluster, not the unwind. DEFERRED (evidence
+            is one unverified analyst read each, or noise-only): correlated-cluster
+            / gap-risk sizing (concentration harm was voided once already — needs
+            the offline study first), unknown-contract -> proxy-put fallback,
+            watchdog hard-exit backstop for the core, RIG-style first-close page,
+            unmarkable-option warning spam, second regime data source.
+            CONTRACT v3 (still DRAFT until the merge SHA): re-based dates (day 1 =
+            Tue Sep 22 if switched tonight, session 21 = Tue Oct 20), rule 8
+            sanction-aware, stopless/cadence/bearish-denominator definitions, the
+            literal pinned command, A-item classification, six new watch handles
+            (pinned in tests/test_contract_handles.py).
+            SWITCH: docs/RUN7_SWITCH.md section 0 + scripts/run7_switch.sh (DRY_RUN=1
+            first): refuses before 16:00 ET, on the old account, on a non-empty
+            account, without the twelve key lines, or without the merged code.
+            USER ACTIONS TODAY: (1) merge PR #59 then the A+ PR into
+            feature/preview; (2) new Alpaca paper account -> keys + the 1c block
+            into .env; (3) after 16:00 ET: DRY_RUN=1 sh scripts/run7_switch.sh,
+            then sh scripts/run7_switch.sh; (4) pre-register the contract with the
+            printed SHA. Host must stay on AC (two DARK GAPs this morning).

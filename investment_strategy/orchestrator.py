@@ -1077,6 +1077,7 @@ class Orchestrator:
             self._regime_mult = regime.multiplier
             self._regime_trend = regime.trend
             self._regime_label = regime.label
+            self._regime_cap_note = ""     # A-9: set when the falling-tape cap fires
             try:
                 self._regime_flipped_off = (
                     regime.label == "risk-off"
@@ -1094,6 +1095,7 @@ class Orchestrator:
             self._regime_mult = 1.0
             self._regime_trend = ""
             self._regime_label = ""
+            self._regime_cap_note = ""
             self._regime_flipped_off = False
         self._stamp_liveness()  # regime read done (a few benchmark fetches)
         self._record_equity_snapshot()
@@ -1116,6 +1118,9 @@ class Orchestrator:
         # (risk-off label, long-run downtrend, or an intraday benchmark drop),
         # trim the core once per day and pause the core fill for the cycle.
         self._apply_core_defense(account)
+        # A-9: a live falling-tape read caps a risk-on regime at neutral for
+        # this cycle's sizing, ladder and prompt (Sep 14 2026 disagreement).
+        self._apply_falling_tape_regime_cap()
         # Deterministic inverse-ETF hedge + defensive-core rotation (Jul 30
         # review): the Jul-29 index-put sanction is model-discretionary and
         # has fired zero times — this pair is the system acting on its own
@@ -1347,8 +1352,16 @@ class Orchestrator:
             today=today_block, buy_excluded=buy_excluded,
             signal_notes=signal_notes, held_notes=self._held_notes(account),
             data_health=data_health, composites=composites,
-            regime_label=(_reg.label if _reg else ""),
-            regime_reason=(_reg.reason if _reg else ""),
+            regime_label=(
+                self._regime_label if getattr(self, "_regime_cap_note", "")
+                else (_reg.label if _reg else "")
+            ),
+            regime_reason=(
+                f"{(_reg.reason if _reg else '').rstrip('.')} — "
+                f"{self._regime_cap_note}."
+                if getattr(self, "_regime_cap_note", "")
+                else (_reg.reason if _reg else "")
+            ),
             regime_trend=(_reg.trend if _reg else ""),
             curated=curated,
             hedge_symbol=hedge_symbol, hedge_price=hedge_price,
@@ -3606,6 +3619,9 @@ class Orchestrator:
             len(names), names_min,
         )
         self._apply_core_defense(account)
+        # Review #5: the re-arm is exactly the mid-cycle case where the
+        # falling read turns true AFTER the top-of-cycle cap ran.
+        self._apply_falling_tape_regime_cap()
         self._apply_auto_hedge(account)
 
     def _apply_core_defense(self, account) -> None:
@@ -4289,6 +4305,10 @@ class Orchestrator:
                 "Auto-hedge: want $%.0f more %s but only $%.0f spendable "
                 "after the cash buffer.", gap, etf, spendable,
             )
+            # A-4b: a hedge that cannot be funded is not a hedge. Take the
+            # beta off the core ETF instead (Sep 21 2026: book 1.20, invested
+            # 98%, 'want $213703 more PSQ but only $0 spendable').
+            self._starved_hedge_core_trim(account, beta, target, band)
             return
         reason = (
             f"beta: book spy-beta {beta:.2f} > target {target:.2f} + {band:.2f} band"
@@ -4308,6 +4328,176 @@ class Orchestrator:
             min(held_val + gap, ceiling), max_pct, hedge_beta, hb_source,
             notional_at_unit,
         )
+        # Review #7: cash covered only PART of the gap (run-6 Sep 3 12:51:
+        # $62k of a $142k want; Sep 18 10:14: $35k of $157k). If the book
+        # would still read above the arm line after this partial arm, the
+        # hedge is starved for the remainder — trim the core for it now.
+        residual = self._residual_beta_after_arm(
+            beta, notional, hedge_beta, account.equity)
+        if residual > target + band:
+            self._starved_hedge_core_trim(account, residual, target, band)
+
+    @staticmethod
+    def _residual_beta_after_arm(
+        beta: float, notional: float, hedge_beta: float, equity: float,
+    ) -> float:
+        """Book SPY-beta once a hedge buy of `notional` at `hedge_beta`
+        (negative) has filled: beta - notional x |hedge_beta| / equity."""
+        if equity <= 0:
+            return beta
+        return beta - max(0.0, notional) * abs(float(hedge_beta or 0.0)) / equity
+
+    def _sell_sanction_tags(
+        self, symbol: str, account, sell_events, stop_width_pct,
+    ) -> list[str]:
+        """The BASIS the risk gate approved a decision sell on, for the
+        ledger row's `sell_events` (A-5; review #4). Event tags when code
+        named an event; else the two event-less approvals RiskManager
+        ._evaluate_sell allows under events_only, read off the SAME cycle
+        snapshot the gate used: a winner ('gate_winner:+0.1%') or a
+        stop-reached loser ('stop_reached:-9.2% vs stop -8.9%'). Without
+        this a sell approved at +0.1% and restated to -0.06% at the fill
+        carried [] and rule 8 counted it as a gate bypass — the same
+        defective-rule NO-GO run-6 ended on. [] only when none applies
+        (authority 'full', or a genuine bypass — what rule 8 exists for)."""
+        if sell_events:
+            return [str(e) for e in sell_events]
+        try:
+            pos = account.position_for(symbol)
+            pl = float(pos.unrealized_pl_pct or 0.0) if pos is not None else None
+        except Exception:  # noqa: BLE001 — a tag, never a blocker
+            pl = None
+        if pl is None:
+            return []
+        if pl >= 0:
+            return [f"gate_winner:{pl:+.1f}%"]
+        stop_w = float(stop_width_pct or 0.0)
+        if stop_w > 0 and pl <= -stop_w:
+            return [f"stop_reached:{pl:+.1f}% vs stop -{stop_w:.1f}%"]
+        return []
+
+    # -- A-9: falling-tape cap on a risk-on regime (A+ change-set) ---------- #
+    _FALLING_TAPE_CAP_MULT = 0.70      # the neutral tier (regime._HOLD_MULT)
+
+    def _apply_falling_tape_regime_cap(self) -> None:
+        """While the book's own falling read is live, a risk-on regime is
+        applied as neutral for this cycle: multiplier capped at the neutral
+        tier, label 'neutral' (so the exposure ladder and the prompt agree).
+        Only ever tightens; nothing is persisted, so it clears with the read.
+        Off unless REGIME_FALLING_TAPE_CAP=on. Never raises."""
+        if not getattr(self.cfg, "regime_falling_tape_cap", False):
+            return
+        if getattr(self, "_regime_label", "") != "risk-on":
+            return
+        try:
+            falling, why = self._market_falling()
+        except Exception as e:  # noqa: BLE001 — a read, never a blocker
+            log.debug("Falling-tape regime cap: read failed: %s", e)
+            return
+        if not falling:
+            return
+        before = float(getattr(self, "_regime_mult", 1.0) or 1.0)
+        self._regime_mult = round(min(before, self._FALLING_TAPE_CAP_MULT), 2)
+        self._regime_label = "neutral"
+        # The decision prompt must show what is APPLIED (review #5: it was
+        # handed regime.assess()'s raw risk-on while buys were sized and
+        # laddered as neutral).
+        self._regime_cap_note = (
+            f"falling-tape cap: applied neutral x{self._regime_mult:.2f} "
+            f"while the book's falling read is live ({why})"
+        )
+        log.info(
+            "REGIME FALLING-TAPE CAP: risk-on x%.2f -> neutral x%.2f while the "
+            "falling read is live (%s).", before, self._regime_mult, why,
+        )
+
+    # -- A-4b: starved hedge -> beta trim of the core (A+ change-set) ------- #
+    def _starved_hedge_core_trim(
+        self, account, beta: float, target: float, band: float,
+    ) -> None:
+        """The beta hedge wants to arm (book spy-beta > target + band) but
+        the cash buffer leaves less than the min order spendable. The core
+        ETF is where the book's beta lives, so sell
+            (beta - target) x equity / core_beta
+        dollars of it — capped at HEDGE_STARVED_TRIM_MAX_PCT of the core per
+        decision cycle — which lands the book on target with no inverse-ETF
+        carry and frees the cash the next arm would need. Whole shares only,
+        through the S-7 trim mechanics (replace the GTC stop qty-down, then
+        sell; cancel -> poll -> sell fallback), so the remainder is never
+        stopless. Not a thesis exit: no cooldown / loss-streak stamp. Off
+        unless HEDGE_STARVED_CORE_TRIM=on. Never raises into the cycle."""
+        if not getattr(self.cfg, "hedge_starved_core_trim", False):
+            return
+        core = getattr(self.cfg, "core_etf", "")
+        if not core:
+            return
+        cyc = getattr(self, "_cycle_seq", 0)
+        if getattr(self, "_starved_trim_cycle", None) == cyc:
+            return                     # the breadth re-arm re-runs the hedge in-cycle
+        pos = account.position_for(core)
+        price = float(getattr(pos, "current_price", 0.0) or 0.0) if pos else 0.0
+        if pos is None or pos.qty < 1 or price <= 0 or account.equity <= 0:
+            log.info(
+                "AUTO-HEDGE STARVED: book spy-beta %.2f > %.2f + %.2f but no "
+                "%s core to trim — exposure stays until cash frees.",
+                beta, target, band, core or "core",
+            )
+            return
+        try:
+            cb = self.book_beta.beta_of(core, "SPY")
+            core_beta = float(cb) if cb is not None else 1.0
+        except Exception:  # noqa: BLE001 — a measurement, never a blocker
+            core_beta = 1.0
+        if not (0.5 <= core_beta <= 3.0):
+            core_beta = 1.0
+        want_usd = max(0.0, beta - target) * account.equity / core_beta
+        cap_pct = max(0.0, min(100.0, float(
+            getattr(self.cfg, "hedge_starved_trim_max_pct", 50.0))))
+        cap_usd = max(0.0, pos.market_value) * cap_pct / 100.0
+        # Cents first: 0.17 x 1.05e6 / 1.5 is 118,999.9999 in floats and
+        # would floor a share short of the 170 the arithmetic says.
+        whole = float(int(round(min(want_usd, cap_usd), 2) / price + 1e-9))
+        whole = min(whole, float(int(pos.qty)))
+        if whole < 1:
+            return
+        self._starved_trim_cycle = cyc
+        try:
+            oid, detail = self._core_trim_sell(core, pos, whole, whole)
+        except Exception as e:  # noqa: BLE001
+            log.warning("AUTO-HEDGE STARVED: %s trim raised %s: %s", core,
+                        type(e).__name__, e)
+            self._core_stop_gap = True
+            return
+        self._core_stop_gap = True     # verify the remainder's stop either way
+        if not oid:
+            log.warning(
+                "AUTO-HEDGE STARVED: trim of %g %s NOT submitted (%s) — "
+                "retried next cycle while the book reads above the arm line.",
+                whole, core, detail,
+            )
+            return
+        usd = whole * price
+        log.warning(
+            "AUTO-HEDGE STARVED: book spy-beta %.2f > target %.2f + %.2f band "
+            "and the hedge is unfunded — sold %g %s ($%.0f, %s beta %.2f) to "
+            "land near %.2f (wanted $%.0f; cap %.0f%% of the core).",
+            beta, target, band, whole, core, usd, core, core_beta,
+            beta - usd / account.equity * core_beta, want_usd, cap_pct,
+        )
+        self._pending_oids.append((oid, core))
+        self.state.add_pending_order(oid, core)
+        self.ledger.record(TradeRecord.for_sell(
+            core, f"starved-hedge beta trim: book spy-beta {beta:.2f} > "
+            f"{target:.2f} + {band:.2f}, hedge unfunded", oid,
+            qty=whole, realized_pl_pct=pos.unrealized_pl_pct,
+            realized_pl=None, exit_reason="beta_trim",
+            exit_price=price,
+        ))
+        pos.qty = round(pos.qty - whole, 6)
+        pos.market_value = pos.qty * price
+        account.cash += usd
+        account.buying_power += usd
+        self._ensure_core_stop(account)
 
     # -- run-7 S-8 / 4a-17: hedge observability (log lines only) ----------- #
     def _stamp_hedge_etf(self, reading) -> None:
@@ -4668,15 +4858,64 @@ class Orchestrator:
         min_fill = max(r.min_order_usd, equity * (r.min_order_pct / 100.0), 1.0)
         if notional < min_fill:
             return
+        # A-4a (Sep 21 2026): the sweep never went through the buy-path beta
+        # cap, so it bought a ~1.5-beta ETF toward the invested target
+        # whatever the book read. Size it to the room under the hedge ARM
+        # line instead, so a core fill can never be the buy that pushes the
+        # book into a hedge it then has no cash to fund. The defensive
+        # (T-bill) fill is a cash proxy and is exempt; no reading = unchanged.
+        if not defensive_fill:
+            # Review #1: a cycle that just SOLD core shares because the hedge
+            # was unfunded must not re-buy them minutes later with the
+            # proceeds (simulated: $82,880 of a $149,800 trim re-bought
+            # within two cycles).
+            if getattr(self, "_starved_trim_cycle", None) == getattr(self, "_cycle_seq", 0):
+                log.info(
+                    "Core fill skipped: this cycle trimmed %s to fund the beta "
+                    "target (AUTO-HEDGE STARVED) — no same-cycle re-buy.", etf,
+                )
+                return
+            notional = self._core_fill_beta_clamp(account, etf, notional, min_fill)
+            if notional < min_fill:
+                return
         price = self.broker.latest_price(etf)
         with self._trade_lock:
             # Cancel the resting GTC stop-sell before buying: Alpaca treats a
             # buy against an open stop-sell as a potential wash trade and rejects
             # it. _ensure_core_stop (called right after this) will re-place the
             # stop at the updated size/level.
+            #
+            # A-1 (Sep 15 2026 14:40:07 CT): the cancel is asynchronous — the
+            # BUY went out in the same instant, Alpaca still saw the stop
+            # (pending_cancel) and rejected it 40310000 "opposite side
+            # market/stop order exists"; this method returned WITHOUT a log
+            # line and the $137.6k core rode stopless until the next open.
+            # Wait (<= 5 s, the S-7 budget) for the venue to settle the
+            # cancel before buying; held under the trade lock so the
+            # watchdog's core-stop retry cannot re-rest a stop in the gap.
+            had_stop = False
+            try:
+                had_stop = bool(self.broker.open_stop_sells(etf, resting_only=False))
+            except Exception:  # noqa: BLE001 — a fake/legacy broker: no view
+                had_stop = False
             self.broker.cancel_open_orders_for(etf)
-            oid = self.broker.submit_notional_buy(etf, notional)
+            settled = self._core_fill_wait_cancel(etf) if had_stop else True
+            if had_stop:
+                self._note_core_stop_absent(etf, "core_fill")
+            oid = self.broker.submit_notional_buy(etf, notional) if settled else None
         if not oid:
+            if had_stop:
+                # The stop is gone and nothing replaced it: say so, arm the
+                # 30 s watchdog retry, and let the _ensure_core_stop call
+                # that follows this method re-rest it at once.
+                self._core_stop_gap = True
+                log.warning(
+                    "CORE FILL: BUY of $%.0f %s NOT submitted (%s) after its "
+                    "GTC stop was cancelled — re-placing the stop now; fill "
+                    "retried next cycle.", notional, etf,
+                    "stop cancel still settling after 5s" if not settled
+                    else "broker refused the order",
+                )
             return
         log.info(
             "%s fill: bought $%.0f of %s (invested %.0f%% -> ~%.0f%%, target %.0f%%).",
@@ -4744,6 +4983,87 @@ class Orchestrator:
                         p for p in account.positions if p.symbol != etf
                     ]
 
+    # -- A-1 / A-2 / A-4a helpers (A+ change-set, Sep 21 2026) -------------- #
+    def _core_fill_wait_cancel(self, etf: str) -> bool:
+        """Poll until no stop-type SELL for `etf` is listed at the venue in
+        ANY state (the S-7 cancel-fallback view and budget: 10 x 0.5 s).
+        True = settled, the BUY cannot be wash-rejected against it; False =
+        still settling, skip this cycle's fill. A broker without the view
+        (fakes, legacy) reads as settled — behaviour unchanged."""
+        for _ in range(self._CORE_TRIM_CANCEL_POLLS):
+            try:
+                pending = self.broker.open_stop_sells(etf, resting_only=False)
+            except Exception:  # noqa: BLE001
+                return True
+            if not pending:
+                return True
+            time.sleep(self._CORE_TRIM_CANCEL_POLL_S)
+        return False
+
+    def _note_core_stop_absent(self, etf: str, cause: str) -> None:
+        """Start the stopless clock for the core ETF (once — an earlier
+        cause wins). Closed by _log_core_stopless_closed."""
+        if getattr(self, "_core_stop_absent_since", None) is None:
+            self._core_stop_absent_since = (time.time(), cause)
+
+    def _log_core_stopless_closed(self, etf: str) -> None:
+        """ONE greppable line per stopless window, written when a GTC stop
+        rests again: 'CORE STOPLESS: QQQ 6.2s without a resting GTC stop
+        (cause core_fill)'. The contract's ops bar ("0 stopless windows on
+        the core ETF") had no definition and no tool in run-6: the Sep 15
+        14:40 CT -> Sep 16 08:35 CT window left no line at all. The bar is
+        graded as the count of these lines over 60 s."""
+        since = getattr(self, "_core_stop_absent_since", None)
+        self._core_stop_absent_since = None
+        if not since:
+            return
+        t0, cause = since
+        secs = max(0.0, time.time() - t0)
+        (log.warning if secs > 60.0 else log.info)(
+            "CORE STOPLESS: %s %.1fs without a resting GTC stop (cause %s).",
+            etf, secs, cause,
+        )
+
+    def _core_fill_beta_clamp(
+        self, account, etf: str, notional: float, min_fill: float,
+    ) -> float:
+        """A-4a: `notional` clamped to the room under the beta hedge's
+        TARGET (hedge_beta_target) at the core ETF's own SPY-beta — the core
+        sweep never adds beta beyond the level the hedge steers to. (Review
+        #1: the first draft clamped at the ARM line, target + band; the
+        next cycle's fill then re-bought a starved trim right back up to
+        1.15 and any drift starved the hedge again.) Unchanged when the knob
+        is off, the hedge is not in beta mode, or there is no reading this
+        cycle (an outage must not freeze the sweep). Returns 0.0 when the
+        room is under the min order."""
+        if not getattr(self.cfg, "core_fill_beta_clamp", False):
+            return notional
+        if getattr(self.cfg, "auto_hedge_mode", "") != "beta":
+            return notional
+        book, core_beta = self._beta_context(etf, account)
+        if book is None or account.equity <= 0:
+            return notional
+        cb = float(core_beta) if core_beta is not None else 1.0
+        if not cb > 0.0:
+            return notional                       # a non-positive beta adds none
+        line = float(getattr(self.cfg, "hedge_beta_target", 1.0))
+        room = max(0.0, (line - book) * account.equity / cb)
+        if room >= notional:
+            return notional
+        if room < min_fill:
+            log.info(
+                "CORE FILL BETA CLAMP: %s fill of $%.0f skipped — book "
+                "spy-beta %.2f leaves $%.0f of room under the %.2f hedge beta "
+                "target (%s beta %.2f).", etf, notional, book, room, line, etf, cb,
+            )
+            return 0.0
+        log.info(
+            "CORE FILL BETA CLAMP: %s fill $%.0f -> $%.0f (book spy-beta %.2f, "
+            "beta target %.2f, %s beta %.2f).", etf, notional, room, book, line,
+            etf, cb,
+        )
+        return round(room, 2)
+
     # -- core exchange-side stop (GA-2.3) ----------------------------------- #
     def _ensure_core_stop(self, account) -> None:
         """Rest a standalone GTC STOP at the exchange for the core position,
@@ -4773,6 +5093,9 @@ class Orchestrator:
             if self._core_stop_gap and self.broker.open_buy_notional(etf) > 0:
                 return
             self._core_stop_gap = False
+            # Review #8: nothing left to protect — an open stopless clock
+            # would otherwise print a huge false window much later.
+            self._core_stop_absent_since = None
             return
         desired_qty = float(int(pos.qty))
         desired_stop = round(pos.avg_entry_price * (1 - pct / 100.0), 2)
@@ -4809,6 +5132,7 @@ class Orchestrator:
                     and abs(o["stop_price"] - desired_stop) / desired_stop < 0.005
                 ):
                     self._core_stop_gap = False
+                    self._core_stop_absent_since = None   # A-2: never absent
                     return  # resting stop is already right — leave it alone
             for o in existing:
                 # Run-7 S-7: a stop SMALLER than the position whose missing
@@ -4848,6 +5172,15 @@ class Orchestrator:
                     # fills and the stop matches the remainder).
                     self._core_stop_gap = True
                     return
+            if not existing:
+                # A-2: first sighting of a core position with NO resting
+                # stop starts the stopless clock (a core-fill cancel starts
+                # it earlier, with its own cause).
+                self._note_core_stop_absent(etf, "missing")
+            if existing:
+                # Review #8: the clock starts at the CANCEL of a stale stop,
+                # not at the next retry (a failed re-submit read ~30 s low).
+                self._note_core_stop_absent(etf, "stale_replace")
             for o in existing:  # stale size/level — replace
                 self.broker.cancel_order(o["id"])
             oid = self.broker.submit(OrderRequest(
@@ -4861,6 +5194,7 @@ class Orchestrator:
                 "basis %.2f).", desired_qty, etf, desired_stop, pct,
                 pos.avg_entry_price,
             )
+            self._log_core_stopless_closed(etf)
         else:
             log.warning(
                 "Core stop for %s could not be placed (entry buy likely still "
@@ -5020,6 +5354,16 @@ class Orchestrator:
                     )
                     executed_notional = 0.0
                 else:
+                    # A-5: every ledger row this close writes — the "full"
+                    # row below, a "partial" row inside close_now, or a
+                    # later watchdog retry — carries the event sanction the
+                    # risk gate approved it on, so the contract's rule 8 can
+                    # tell a sanctioned loss-cut from a gate bypass.
+                    sell_sanction = self._sell_sanction_tags(
+                        proposal.symbol, account, sell_events, stop_width)
+                    _note = getattr(self.watchdog, "note_sell_events", None)
+                    if callable(_note):
+                        _note(proposal.symbol, sell_sanction)
                     outcome, oid = self.watchdog.close_now(held, "decision")
                     if outcome == "full":
                         self.watchdog.forget(proposal.symbol)
@@ -5034,6 +5378,7 @@ class Orchestrator:
                             exit_reason="decision",
                             exit_price=held.current_price or None,
                             composite_score=composite,
+                            sell_events=sell_sanction,
                         ))
                         self._pending_oids.append((oid, proposal.symbol))
                         # Persist at submit (mirror the watchdog) — crash-safe fill-check.
@@ -5087,6 +5432,7 @@ class Orchestrator:
                         self.state.queue_decision_sell(
                             proposal.symbol, proposal.rationale,
                             proposal.key_signals, composite,
+                            sell_events=sell_sanction,
                         )
                         log.error(
                             "SELL %s approved but the close FAILED — queued "
@@ -5426,12 +5772,21 @@ class Orchestrator:
         )
         # Journal every option verdict too — without this, rejects are invisible
         # to the 'Today so far' block and the nightly post-mortem.
+        # A-6 (Sep 16 2026): name the STRATEGY on the journal row. The
+        # 'Today so far' block printed an approved HBAN long_put as
+        # "Bought: HBAN 1x ($1,650, last conv 0.60)"; the model read that as
+        # an open LONG ("Account holds HBAN long (starter bought today)")
+        # and declined every later HBAN put as contradicting it.
+        _strat = getattr(proposal.option_strategy, "value", proposal.option_strategy)
+        _jreason = decision.reason or ""
+        if _strat and not _jreason.startswith("option fallback"):
+            _jreason = f"{_strat}: {_jreason}"
         self._journal_decision(
             proposal.symbol, proposal.action.value, "option",
             proposal.conviction, proposal.target_weight_pct,
             decision.verdict.value,
             decision.approved_notional if decision.verdict != RiskVerdict.REJECTED else 0.0,
-            decision.reason, proposal.rationale[:120] if proposal.rationale else "",
+            _jreason, proposal.rationale[:120] if proposal.rationale else "",
         )
         if proxy_for:
             self._proxy_put_state = (

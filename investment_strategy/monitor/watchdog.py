@@ -360,6 +360,18 @@ class Watchdog:
     def _log_waiting_throttled(self, symbol: str, msg: str, *args) -> None:
         self._log_throttled(f"wait:{symbol}", msg, *args, level=logging.WARNING)
 
+    def note_sell_events(self, symbol: str, events: list[str] | None) -> None:
+        """A-5: remember the event sanction behind the decision sell about to
+        be closed for `symbol`, so every row _record_exit writes for it (a
+        partial close inside close_now included) carries it. An empty list
+        clears the note — a stop-reached decision sell has no event sanction
+        and must not inherit a stale one."""
+        notes = self.__dict__.setdefault("_decision_sell_events", {})
+        if events:
+            notes[symbol] = [str(e) for e in events]
+        else:
+            notes.pop(symbol, None)
+
     def close_now(self, pos: Position, reason: str) -> tuple[str, str | None]:
         """Public entry for decision-loop closes (orchestrator SELL / thesis
         decay): the same escalation ladder as watchdog exits — exit-via-replace
@@ -386,6 +398,10 @@ class Watchdog:
                 # exchange-exit backfill (if any) covers ledgering it.
                 self.state.pop_decision_sell(symbol)
                 continue
+            # Review #6: a PARTIAL close is ledgered inside close_now and
+            # reads the in-memory note — gone after a restart. Re-seed it
+            # from the persisted queue entry before every retry.
+            self.note_sell_events(symbol, info.get("sell_events") or [])
             outcome, oid = self.close_now(pos, "decision")
             if outcome == "full":
                 self.state.pop_decision_sell(symbol)
@@ -395,6 +411,7 @@ class Watchdog:
                     rationale=info.get("rationale") or "",
                     key_signals=info.get("key_signals") or [],
                     composite_score=info.get("composite_score"),
+                    sell_events=info.get("sell_events") or [],
                 )
             elif outcome == "partial":
                 pass  # ledgered inside close_now; keep queued, retry next tick
@@ -1146,6 +1163,7 @@ class Watchdog:
         self, pos: Position, oid: str | None, reason: str, *,
         rationale: str | None = None, key_signals: list[str] | None = None,
         composite_score: float | None = None,
+        sell_events: list[str] | None = None,
     ) -> None:
         """Log a watchdog-driven close to the ledger so attribution sees the exit.
         The position's unrealized P&L at this instant IS the realized outcome.
@@ -1175,6 +1193,13 @@ class Watchdog:
         # the closes (job queued below, off the safety loop). Every other
         # reason leaves the field None for good.
         job = self._floor_shadow_job(pos, oid) if reason == "stop" and oid else None
+        # A-5: a DECISION exit carries its event sanction (explicit arg from
+        # the retry queue, else the note the orchestrator left before
+        # close_now). Every mechanical reason stays [].
+        if reason == "decision" and sell_events is None:
+            sell_events = self.__dict__.get("_decision_sell_events", {}).get(pos.symbol)
+        if reason != "decision":
+            sell_events = None
         try:
             self.ledger.record(TradeRecord.for_sell(
                 pos.symbol, rationale or f"watchdog {reason}", oid,
@@ -1183,6 +1208,7 @@ class Watchdog:
                 exit_reason=reason, exit_price=pos.current_price or None,
                 composite_score=composite_score,
                 floor6_would_survive=None, floor6_worst_close_pct=None,
+                sell_events=sell_events,
             ))
             self._queue_floor_shadow(job)
         except Exception as e:  # never let logging break the watchdog
