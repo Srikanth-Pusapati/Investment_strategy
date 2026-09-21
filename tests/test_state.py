@@ -254,6 +254,7 @@ def test_pending_decision_sell_queue_round_trip():
         "rationale": "thesis broken",
         "key_signals": ["technical -0.3"],
         "composite_score": 0.42,
+        "sell_events": [],          # A-5: the event sanction, [] when none
     }
     popped = s2.pop_decision_sell("ZTS")
     assert popped["rationale"] == "thesis broken"
