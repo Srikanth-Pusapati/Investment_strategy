@@ -4668,15 +4668,54 @@ class Orchestrator:
         min_fill = max(r.min_order_usd, equity * (r.min_order_pct / 100.0), 1.0)
         if notional < min_fill:
             return
+        # A-4a (Sep 21 2026): the sweep never went through the buy-path beta
+        # cap, so it bought a ~1.5-beta ETF toward the invested target
+        # whatever the book read. Size it to the room under the hedge ARM
+        # line instead, so a core fill can never be the buy that pushes the
+        # book into a hedge it then has no cash to fund. The defensive
+        # (T-bill) fill is a cash proxy and is exempt; no reading = unchanged.
+        if not defensive_fill:
+            notional = self._core_fill_beta_clamp(account, etf, notional, min_fill)
+            if notional < min_fill:
+                return
         price = self.broker.latest_price(etf)
         with self._trade_lock:
             # Cancel the resting GTC stop-sell before buying: Alpaca treats a
             # buy against an open stop-sell as a potential wash trade and rejects
             # it. _ensure_core_stop (called right after this) will re-place the
             # stop at the updated size/level.
+            #
+            # A-1 (Sep 15 2026 14:40:07 CT): the cancel is asynchronous — the
+            # BUY went out in the same instant, Alpaca still saw the stop
+            # (pending_cancel) and rejected it 40310000 "opposite side
+            # market/stop order exists"; this method returned WITHOUT a log
+            # line and the $137.6k core rode stopless until the next open.
+            # Wait (<= 5 s, the S-7 budget) for the venue to settle the
+            # cancel before buying; held under the trade lock so the
+            # watchdog's core-stop retry cannot re-rest a stop in the gap.
+            had_stop = False
+            try:
+                had_stop = bool(self.broker.open_stop_sells(etf, resting_only=False))
+            except Exception:  # noqa: BLE001 — a fake/legacy broker: no view
+                had_stop = False
             self.broker.cancel_open_orders_for(etf)
-            oid = self.broker.submit_notional_buy(etf, notional)
+            settled = self._core_fill_wait_cancel(etf) if had_stop else True
+            if had_stop:
+                self._note_core_stop_absent(etf, "core_fill")
+            oid = self.broker.submit_notional_buy(etf, notional) if settled else None
         if not oid:
+            if had_stop:
+                # The stop is gone and nothing replaced it: say so, arm the
+                # 30 s watchdog retry, and let the _ensure_core_stop call
+                # that follows this method re-rest it at once.
+                self._core_stop_gap = True
+                log.warning(
+                    "CORE FILL: BUY of $%.0f %s NOT submitted (%s) after its "
+                    "GTC stop was cancelled — re-placing the stop now; fill "
+                    "retried next cycle.", notional, etf,
+                    "stop cancel still settling after 5s" if not settled
+                    else "broker refused the order",
+                )
             return
         log.info(
             "%s fill: bought $%.0f of %s (invested %.0f%% -> ~%.0f%%, target %.0f%%).",
@@ -4744,6 +4783,86 @@ class Orchestrator:
                         p for p in account.positions if p.symbol != etf
                     ]
 
+    # -- A-1 / A-2 / A-4a helpers (A+ change-set, Sep 21 2026) -------------- #
+    def _core_fill_wait_cancel(self, etf: str) -> bool:
+        """Poll until no stop-type SELL for `etf` is listed at the venue in
+        ANY state (the S-7 cancel-fallback view and budget: 10 x 0.5 s).
+        True = settled, the BUY cannot be wash-rejected against it; False =
+        still settling, skip this cycle's fill. A broker without the view
+        (fakes, legacy) reads as settled — behaviour unchanged."""
+        for _ in range(self._CORE_TRIM_CANCEL_POLLS):
+            try:
+                pending = self.broker.open_stop_sells(etf, resting_only=False)
+            except Exception:  # noqa: BLE001
+                return True
+            if not pending:
+                return True
+            time.sleep(self._CORE_TRIM_CANCEL_POLL_S)
+        return False
+
+    def _note_core_stop_absent(self, etf: str, cause: str) -> None:
+        """Start the stopless clock for the core ETF (once — an earlier
+        cause wins). Closed by _log_core_stopless_closed."""
+        if getattr(self, "_core_stop_absent_since", None) is None:
+            self._core_stop_absent_since = (time.time(), cause)
+
+    def _log_core_stopless_closed(self, etf: str) -> None:
+        """ONE greppable line per stopless window, written when a GTC stop
+        rests again: 'CORE STOPLESS: QQQ 6.2s without a resting GTC stop
+        (cause core_fill)'. The contract's ops bar ("0 stopless windows on
+        the core ETF") had no definition and no tool in run-6: the Sep 15
+        14:40 CT -> Sep 16 08:35 CT window left no line at all. The bar is
+        graded as the count of these lines over 60 s."""
+        since = getattr(self, "_core_stop_absent_since", None)
+        self._core_stop_absent_since = None
+        if not since:
+            return
+        t0, cause = since
+        secs = max(0.0, time.time() - t0)
+        (log.warning if secs > 60.0 else log.info)(
+            "CORE STOPLESS: %s %.1fs without a resting GTC stop (cause %s).",
+            etf, secs, cause,
+        )
+
+    def _core_fill_beta_clamp(
+        self, account, etf: str, notional: float, min_fill: float,
+    ) -> float:
+        """A-4a: `notional` clamped to the room under the beta hedge's ARM
+        line (hedge_beta_target + hedge_beta_band) at the core ETF's own
+        SPY-beta. Unchanged when the knob is off, the hedge is not in beta
+        mode, or there is no reading this cycle (an outage must not freeze
+        the sweep). Returns 0.0 when the room is under the min order."""
+        if not getattr(self.cfg, "core_fill_beta_clamp", False):
+            return notional
+        if getattr(self.cfg, "auto_hedge_mode", "") != "beta":
+            return notional
+        book, core_beta = self._beta_context(etf, account)
+        if book is None or account.equity <= 0:
+            return notional
+        cb = float(core_beta) if core_beta is not None else 1.0
+        if not cb > 0.0:
+            return notional                       # a non-positive beta adds none
+        line = (
+            float(getattr(self.cfg, "hedge_beta_target", 1.0))
+            + max(0.0, float(getattr(self.cfg, "hedge_beta_band", 0.15)))
+        )
+        room = max(0.0, (line - book) * account.equity / cb)
+        if room >= notional:
+            return notional
+        if room < min_fill:
+            log.info(
+                "CORE FILL BETA CLAMP: %s fill of $%.0f skipped — book "
+                "spy-beta %.2f leaves $%.0f of room under the %.2f hedge arm "
+                "line (%s beta %.2f).", etf, notional, book, room, line, etf, cb,
+            )
+            return 0.0
+        log.info(
+            "CORE FILL BETA CLAMP: %s fill $%.0f -> $%.0f (book spy-beta %.2f, "
+            "arm line %.2f, %s beta %.2f).", etf, notional, room, book, line,
+            etf, cb,
+        )
+        return round(room, 2)
+
     # -- core exchange-side stop (GA-2.3) ----------------------------------- #
     def _ensure_core_stop(self, account) -> None:
         """Rest a standalone GTC STOP at the exchange for the core position,
@@ -4809,6 +4928,7 @@ class Orchestrator:
                     and abs(o["stop_price"] - desired_stop) / desired_stop < 0.005
                 ):
                     self._core_stop_gap = False
+                    self._core_stop_absent_since = None   # A-2: never absent
                     return  # resting stop is already right — leave it alone
             for o in existing:
                 # Run-7 S-7: a stop SMALLER than the position whose missing
@@ -4848,6 +4968,11 @@ class Orchestrator:
                     # fills and the stop matches the remainder).
                     self._core_stop_gap = True
                     return
+            if not existing:
+                # A-2: first sighting of a core position with NO resting
+                # stop starts the stopless clock (a core-fill cancel starts
+                # it earlier, with its own cause).
+                self._note_core_stop_absent(etf, "missing")
             for o in existing:  # stale size/level — replace
                 self.broker.cancel_order(o["id"])
             oid = self.broker.submit(OrderRequest(
@@ -4861,6 +4986,7 @@ class Orchestrator:
                 "basis %.2f).", desired_qty, etf, desired_stop, pct,
                 pos.avg_entry_price,
             )
+            self._log_core_stopless_closed(etf)
         else:
             log.warning(
                 "Core stop for %s could not be placed (entry buy likely still "

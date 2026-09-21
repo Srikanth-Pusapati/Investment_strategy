@@ -880,6 +880,26 @@ class Config:
     # unwind (n=0 in run-6), NOT the Sep 9 whipsaw. Log:
     # 'Auto-hedge: beta: unwind read 1/2 — holding $X PSQ'. ---
     hedge_unwind_min_cycles: int = 1       # HEDGE_UNWIND_MIN_CYCLES
+    # --- A+ change-set (Sep 21 2026) -------------------------------------
+    # A-4a CORE_FILL_BETA_CLAMP: the core-ETF sweep never went through the
+    # buy-path beta cap, so it kept buying a ~1.5-beta ETF toward
+    # TARGET_INVESTED_PCT whatever the book read (Sep 16-18 2026: cash
+    # $339k -> $20k, book spy-beta 1.09 -> 1.14, then a weekend drift to
+    # 1.20 with "$0 spendable" for the hedge). On: a core fill is sized to
+    # the room under the hedge ARM line (hedge_beta_target + hedge_beta_band)
+    # at the core's measured SPY-beta; no reading = unchanged (fail open).
+    # Off (code default) = run-7 behaviour. Log: 'CORE FILL BETA CLAMP:'.
+    core_fill_beta_clamp: bool = False     # CORE_FILL_BETA_CLAMP
+    # A-4b HEDGE_STARVED_CORE_TRIM: when the beta hedge wants to arm but the
+    # cash buffer leaves < the min order spendable, sell core-ETF shares
+    # instead — the core carries the book's beta, so a trim of
+    # (beta - target) x equity / core_beta lands the book on target with no
+    # inverse-ETF carry. At most hedge_starved_trim_max_pct of the core per
+    # decision cycle, through the S-7 stop-replace trim mechanics. Off (code
+    # default) = run-7 behaviour (the starved arm is only logged).
+    # Log: 'AUTO-HEDGE STARVED:'.
+    hedge_starved_core_trim: bool = False  # HEDGE_STARVED_CORE_TRIM
+    hedge_starved_trim_max_pct: float = 50.0   # HEDGE_STARVED_TRIM_MAX_PCT
 
     @property
     def is_live(self) -> bool:
@@ -1249,6 +1269,10 @@ def load_config() -> Config:
         option_strike_max_moneyness_pct=_f("OPTION_STRIKE_MAX_MONEYNESS_PCT", 10.0),
         # Run-7 S-8
         hedge_unwind_min_cycles=_hedge_unwind_min_cycles(),
+        core_fill_beta_clamp=_flag("CORE_FILL_BETA_CLAMP", "off"),
+        hedge_starved_core_trim=_flag("HEDGE_STARVED_CORE_TRIM", "off"),
+        hedge_starved_trim_max_pct=max(
+            0.0, min(100.0, _f("HEDGE_STARVED_TRIM_MAX_PCT", 50.0))),
     )
 
     missing = [
