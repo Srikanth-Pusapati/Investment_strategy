@@ -1116,6 +1116,9 @@ class Orchestrator:
         # (risk-off label, long-run downtrend, or an intraday benchmark drop),
         # trim the core once per day and pause the core fill for the cycle.
         self._apply_core_defense(account)
+        # A-9: a live falling-tape read caps a risk-on regime at neutral for
+        # this cycle's sizing, ladder and prompt (Sep 14 2026 disagreement).
+        self._apply_falling_tape_regime_cap()
         # Deterministic inverse-ETF hedge + defensive-core rotation (Jul 30
         # review): the Jul-29 index-put sanction is model-discretionary and
         # has fired zero times — this pair is the system acting on its own
@@ -4311,6 +4314,34 @@ class Orchestrator:
             reason, notional, etf, held_val + notional,
             min(held_val + gap, ceiling), max_pct, hedge_beta, hb_source,
             notional_at_unit,
+        )
+
+    # -- A-9: falling-tape cap on a risk-on regime (A+ change-set) ---------- #
+    _FALLING_TAPE_CAP_MULT = 0.70      # the neutral tier (regime._HOLD_MULT)
+
+    def _apply_falling_tape_regime_cap(self) -> None:
+        """While the book's own falling read is live, a risk-on regime is
+        applied as neutral for this cycle: multiplier capped at the neutral
+        tier, label 'neutral' (so the exposure ladder and the prompt agree).
+        Only ever tightens; nothing is persisted, so it clears with the read.
+        Off unless REGIME_FALLING_TAPE_CAP=on. Never raises."""
+        if not getattr(self.cfg, "regime_falling_tape_cap", False):
+            return
+        if getattr(self, "_regime_label", "") != "risk-on":
+            return
+        try:
+            falling, why = self._market_falling()
+        except Exception as e:  # noqa: BLE001 — a read, never a blocker
+            log.debug("Falling-tape regime cap: read failed: %s", e)
+            return
+        if not falling:
+            return
+        before = float(getattr(self, "_regime_mult", 1.0) or 1.0)
+        self._regime_mult = round(min(before, self._FALLING_TAPE_CAP_MULT), 2)
+        self._regime_label = "neutral"
+        log.info(
+            "REGIME FALLING-TAPE CAP: risk-on x%.2f -> neutral x%.2f while the "
+            "falling read is live (%s).", before, self._regime_mult, why,
         )
 
     # -- A-4b: starved hedge -> beta trim of the core (A+ change-set) ------- #

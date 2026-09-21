@@ -900,6 +900,15 @@ class Config:
     # Log: 'AUTO-HEDGE STARVED:'.
     hedge_starved_core_trim: bool = False  # HEDGE_STARVED_CORE_TRIM
     hedge_starved_trim_max_pct: float = 50.0   # HEDGE_STARVED_TRIM_MAX_PCT
+    # A-9 REGIME_FALLING_TAPE_CAP: the index regime and the book's own
+    # falling-tape read can disagree — Sep 14 2026 11:59-14:36 CT the label
+    # read risk-on x1.00 for four cycles (QQQ/IWM back over their 50dma on a
+    # partial bar) while the FALLING-TAPE trigger was live with the book
+    # -1.9% intraday. On: while _market_falling() is true a risk-on label is
+    # applied as neutral at the neutral tier's multiplier for that cycle
+    # (only ever tightens; clears with the falling read). Off (code default)
+    # = run-7 behaviour. Log: 'REGIME FALLING-TAPE CAP:'.
+    regime_falling_tape_cap: bool = False  # REGIME_FALLING_TAPE_CAP
 
     @property
     def is_live(self) -> bool:
@@ -1271,6 +1280,7 @@ def load_config() -> Config:
         hedge_unwind_min_cycles=_hedge_unwind_min_cycles(),
         core_fill_beta_clamp=_flag("CORE_FILL_BETA_CLAMP", "off"),
         hedge_starved_core_trim=_flag("HEDGE_STARVED_CORE_TRIM", "off"),
+        regime_falling_tape_cap=_flag("REGIME_FALLING_TAPE_CAP", "off"),
         hedge_starved_trim_max_pct=max(
             0.0, min(100.0, _f("HEDGE_STARVED_TRIM_MAX_PCT", 50.0))),
     )

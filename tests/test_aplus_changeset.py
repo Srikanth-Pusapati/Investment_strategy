@@ -412,3 +412,36 @@ def test_a8_conviction_map_is_bounded_by_count_oldest_first():
     st.register_buy("B", conviction=0.9)             # a re-buy moves B to newest
     st.register_buy("E", conviction=0.7)
     assert list(st.last_buy_convictions) == ["D", "B", "E"]
+
+
+# --------------------------------------------------------------------------- #
+# A-9 — a live falling-tape read caps a risk-on regime at neutral.
+# Sep 14 2026 11:59-14:36 CT: risk-on x1.00 for four cycles, book -1.9% intraday.
+# --------------------------------------------------------------------------- #
+def _regime_orch(label, mult, falling, on=True):
+    o = _to._orch()
+    o.cfg.regime_falling_tape_cap = on
+    o._regime_label, o._regime_mult = label, mult
+    o._market_falling = lambda: (falling, "book:-1.9%")
+    return o
+
+
+def test_a9_risk_on_is_applied_as_neutral_while_the_tape_is_falling(caplog):
+    o = _regime_orch("risk-on", 1.0, falling=True)
+    with caplog.at_level(logging.INFO):
+        o._apply_falling_tape_regime_cap()
+    assert (o._regime_label, o._regime_mult) == ("neutral", 0.70)
+    assert "REGIME FALLING-TAPE CAP: risk-on x1.00 -> neutral x0.70" in caplog.text
+
+
+def test_a9_never_loosens_and_is_inert_when_off_or_not_falling():
+    for label, mult, falling, on, want in [
+        ("risk-on", 1.0, False, True, ("risk-on", 1.0)),     # tape fine
+        ("risk-on", 1.0, True, False, ("risk-on", 1.0)),     # knob off
+        ("neutral", 0.70, True, True, ("neutral", 0.70)),    # already tighter
+        ("risk-off", 0.40, True, True, ("risk-off", 0.40)),  # never loosens
+        ("unknown", 0.50, True, True, ("unknown", 0.50)),    # degraded feed untouched
+    ]:
+        o = _regime_orch(label, mult, falling, on)
+        o._apply_falling_tape_regime_cap()
+        assert (o._regime_label, o._regime_mult) == want
