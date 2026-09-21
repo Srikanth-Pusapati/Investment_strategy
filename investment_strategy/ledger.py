@@ -248,6 +248,15 @@ class TradeRecord(BaseModel):
     verdict: str = ""                 # risk verdict: approved | resized
     risk_note: str = ""               # risk layer's sizing note
     exit_reason: str = ""             # what closed it: decision | stop | take | trail | flatten
+    # A-5 (Sep 21 2026, measurement-only): the deterministic event tags that
+    # SANCTIONED a decision sell under LLM_SELL_AUTHORITY=events_only (e.g.
+    # "name_falling:-5.6% today vs SPY -0.7%"), copied from the risk gate's
+    # `SELL AUTHORITY: ... allowed on event(s)` line. Run-6's contract rule 7
+    # failed the window on a sell the frozen code itself approved (INTC Sep 14,
+    # 0.49x its stop) because the ledger row could not say so; the v3 checker
+    # now counts only decision-sell losses with NO sanction. [] on every other
+    # row (mechanical exits, buys, rows predating the field).
+    sell_events: list[str] = Field(default_factory=list)
                                       # | time | thesis_decay | regime_trim | scale
                                       # | bracket_stop | bracket_take | external (F.1 backfill)
     option_strategy: Optional[str] = None
@@ -460,6 +469,7 @@ class TradeRecord(BaseModel):
         fill_ts: Optional[datetime] = None,
         floor6_would_survive: Optional[bool] = None,
         floor6_worst_close_pct: Optional[float] = None,
+        sell_events: Optional[list[str]] = None,
     ) -> "TradeRecord":
         """`ts` overrides the record time — the exchange-exit backfill (F.1)
         stamps the order's actual FILL time so attribution's chronological
@@ -514,6 +524,9 @@ class TradeRecord(BaseModel):
         if floor6_would_survive is not None:
             kwargs["floor6_would_survive"] = bool(floor6_would_survive)
             kwargs["floor6_worst_close_pct"] = floor6_worst_close_pct
+        # A-5: the event sanction behind a decision sell (see the field).
+        if sell_events:
+            kwargs["sell_events"] = [str(e) for e in sell_events]
         return cls(**kwargs)
 
     @classmethod

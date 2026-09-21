@@ -565,14 +565,18 @@ class PortfolioState:
     def queue_decision_sell(
         self, symbol: str, rationale: str, key_signals: list[str] | None = None,
         composite_score: float | None = None,
+        sell_events: list[str] | None = None,
     ) -> None:
         """Remember a decision-driven SELL whose close attempt failed, so the
-        watchdog retries it every tick — see the field's docstring above."""
+        watchdog retries it every tick — see the field's docstring above.
+        `sell_events` (A-5) is the risk gate's event sanction; persisted so a
+        retry that lands after a restart still ledgers it."""
         with self._lock:
             self.pending_decision_sells[symbol] = {
                 "rationale": rationale,
                 "key_signals": list(key_signals or []),
                 "composite_score": composite_score,
+                "sell_events": [str(e) for e in (sell_events or [])],
             }
             self._save()
 

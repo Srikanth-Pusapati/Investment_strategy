@@ -5020,6 +5020,14 @@ class Orchestrator:
                     )
                     executed_notional = 0.0
                 else:
+                    # A-5: every ledger row this close writes — the "full"
+                    # row below, a "partial" row inside close_now, or a
+                    # later watchdog retry — carries the event sanction the
+                    # risk gate approved it on, so the contract's rule 8 can
+                    # tell a sanctioned loss-cut from a gate bypass.
+                    _note = getattr(self.watchdog, "note_sell_events", None)
+                    if callable(_note):
+                        _note(proposal.symbol, list(sell_events or []))
                     outcome, oid = self.watchdog.close_now(held, "decision")
                     if outcome == "full":
                         self.watchdog.forget(proposal.symbol)
@@ -5034,6 +5042,7 @@ class Orchestrator:
                             exit_reason="decision",
                             exit_price=held.current_price or None,
                             composite_score=composite,
+                            sell_events=list(sell_events or []),
                         ))
                         self._pending_oids.append((oid, proposal.symbol))
                         # Persist at submit (mirror the watchdog) — crash-safe fill-check.
@@ -5087,6 +5096,7 @@ class Orchestrator:
                         self.state.queue_decision_sell(
                             proposal.symbol, proposal.rationale,
                             proposal.key_signals, composite,
+                            sell_events=list(sell_events or []),
                         )
                         log.error(
                             "SELL %s approved but the close FAILED — queued "
