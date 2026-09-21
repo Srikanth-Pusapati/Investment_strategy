@@ -886,8 +886,10 @@ class Config:
     # TARGET_INVESTED_PCT whatever the book read (Sep 16-18 2026: cash
     # $339k -> $20k, book spy-beta 1.09 -> 1.14, then a weekend drift to
     # 1.20 with "$0 spendable" for the hedge). On: a core fill is sized to
-    # the room under the hedge ARM line (hedge_beta_target + hedge_beta_band)
-    # at the core's measured SPY-beta; no reading = unchanged (fail open).
+    # the room under the hedge beta TARGET (hedge_beta_target) at the core's
+    # measured SPY-beta — the sweep never adds beta beyond the level the
+    # hedge steers to (an arm-line clamp re-bought a starved trim right back
+    # to 1.15; review #1). No reading = unchanged (fail open).
     # Off (code default) = run-7 behaviour. Log: 'CORE FILL BETA CLAMP:'.
     core_fill_beta_clamp: bool = False     # CORE_FILL_BETA_CLAMP
     # A-4b HEDGE_STARVED_CORE_TRIM: when the beta hedge wants to arm but the

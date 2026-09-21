@@ -398,6 +398,10 @@ class Watchdog:
                 # exchange-exit backfill (if any) covers ledgering it.
                 self.state.pop_decision_sell(symbol)
                 continue
+            # Review #6: a PARTIAL close is ledgered inside close_now and
+            # reads the in-memory note — gone after a restart. Re-seed it
+            # from the persisted queue entry before every retry.
+            self.note_sell_events(symbol, info.get("sell_events") or [])
             outcome, oid = self.close_now(pos, "decision")
             if outcome == "full":
                 self.state.pop_decision_sell(symbol)

@@ -37,8 +37,11 @@ change-set — four new STRATEGY KEYS in sections 1c / 2 below.
    the old state under `runs/pre-final-test-run-6/state-post-window/`, stops the
    bot, stashes the live tree's local docs (they are already on origin), moves
    `feature/preview` to `origin/feature/preview`, runs the test suite, runs
-   `scripts/fresh_cycle.py --yes`, and verifies the `basis='late'` day-0 row and
-   the new-code config line. It prints the merge SHA for the contract.
+   `scripts/fresh_cycle.py --yes`, and verifies the day-0 row (`basis` `late`,
+   or `close` when the restart lands inside the 16:00 ET hour — the v3 checker
+   accepts either as day 1's predecessor) and the new-code config line. It
+   keeps the old head on a `backup/pre-run7-switch-*` branch and prints the
+   merge SHA for the contract.
 4. Pre-register: put that SHA and the section-2 block into the Config row of
    `runs/pre-final-test-run-7/EVAL_CONTRACT.md`, flip the header to
    "Pre-registered <date>, BEFORE day 1", fix the two dates in the pinned verdict
@@ -118,7 +121,7 @@ entry references it).
     # S-8 beta-hedge unwind noise guard — ship at 1 (= run-6 behaviour)
     HEDGE_UNWIND_MIN_CYCLES=1
     # ---- A+ change-set (2026-09-21) — all four are STRATEGY KEYS ----
-    # A-4a core-ETF sweep sized to the room under the hedge arm line
+    # A-4a core-ETF sweep sized to the room under the hedge beta TARGET
     CORE_FILL_BETA_CLAMP=on
     # A-4b hedge has no cash -> sell core-ETF shares toward the beta target
     HEDGE_STARVED_CORE_TRIM=on

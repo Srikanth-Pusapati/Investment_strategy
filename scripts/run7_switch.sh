@@ -8,12 +8,13 @@
 #   checks   market closed · merged change-set is on origin/feature/preview ·
 #            .env has the twelve run-7 key lines once each · the keys in .env
 #            belong to a NEW paper account with no positions and no orders
+#   stop     the running bot (SIGTERM the lock-holding pid IF it is the bot, wait <= 30 s)
+#   code     back up HEAD on a branch, stash the live tree's local docs, move
+#            feature/preview to origin's
 #   archive  old state -> runs/pre-final-test-run-6/state-post-window/
-#   stop     the running bot (SIGTERM the lock-holding pid, wait <= 30 s)
-#   code     stash the live tree's local docs, move feature/preview to origin's
 #   tests    full suite must pass
 #   start    scripts/fresh_cycle.py --yes (archives + clears state, relaunches)
-#   verify   a basis='late' day-0 row for today + the new-code config line
+#   verify   a day-0 row for today (basis late or close) + the new-code config line
 # It never edits .env, never touches the kill switch, never force-pushes.
 # FORCE_TIME=1 skips the after-the-bell check (weekends / holidays).
 set -eu
@@ -88,50 +89,80 @@ if [ "$DRY" = 1 ]; then
     exit 0
 fi
 
-# -- 5. archive the old account's state -------------------------------------- #
+ROLLBACK="git checkout -B feature/preview $OLD_SHA   # then restore the old keys in .env and restart from the control panel"
+
+# -- 5. stop the bot --------------------------------------------------------- #
+# Only ever signal a pid that IS the bot: a stale lock with a recycled pid must
+# not SIGTERM an unrelated process (ops.deadman.bot_alive makes the same check).
+PID=$(cat state/bot.lock 2>/dev/null || true)
+if [ -n "$PID" ] && kill -0 "$PID" 2>/dev/null; then
+    if ps -o command= -p "$PID" 2>/dev/null | grep -q 'investment_strategy'; then
+        say "..  stopping bot pid $PID"
+        kill -TERM "$PID"
+        i=0
+        while kill -0 "$PID" 2>/dev/null; do
+            i=$((i + 1)); [ "$i" -le 60 ] || die "bot pid $PID did not exit in 30 s — nothing else was changed."
+            sleep 0.5
+        done
+    else
+        say "..  state/bot.lock names pid $PID but that is not the bot — stale lock, nothing to stop"
+    fi
+fi
+say "ok  bot stopped"
+
+# -- 6. move the live tree to the merged code -------------------------------- #
+# Local-only commits stay reachable on a backup branch, not just in the reflog.
+BACKUP="backup/pre-run7-switch-$(date +%Y%m%d-%H%M)"
+git branch -f "$BACKUP" HEAD || die "could not create $BACKUP — bot is STOPPED. Restart it from the control panel; nothing else changed."
+if [ -n "$(git status --porcelain)" ]; then
+    git stash push -q -u -m "pre-run7-switch local docs $(date +%F_%H%M) (already on origin)" \
+        || die "git stash failed — bot is STOPPED, code unchanged. Restart from the control panel."
+    say "ok  stashed local changes (git stash list)"
+fi
+git checkout -q -B feature/preview origin/feature/preview \
+    || die "git checkout failed — bot is STOPPED. Rollback: $ROLLBACK"
+say "ok  feature/preview -> $(git rev-parse --short HEAD)   (old head kept on $BACKUP)"
+say "    rollback: $ROLLBACK"
+
+# -- 7. archive the old account's state -------------------------------------- #
+# AFTER the stop (the shutdown save is in it) and AFTER the stash (an untracked
+# runs/ directory created earlier would be swept into the stash); state/ is
+# git-ignored, so it survived the checkout untouched.
 ARCH=runs/pre-final-test-run-6/state-post-window
 mkdir -p "$ARCH"
 cp state/trades.jsonl state/equity_history.jsonl state/risk_state.json "$ARCH"/ 2>/dev/null || true
 say "ok  archived state -> $ARCH (uncommitted; commit it with the pre-registration)"
 
-# -- 6. stop the bot --------------------------------------------------------- #
-PID=$(cat state/bot.lock 2>/dev/null || true)
-if [ -n "$PID" ] && kill -0 "$PID" 2>/dev/null; then
-    say "..  stopping bot pid $PID"
-    kill -TERM "$PID"
-    i=0
-    while kill -0 "$PID" 2>/dev/null; do
-        i=$((i + 1)); [ "$i" -le 60 ] || die "bot pid $PID did not exit in 30 s — nothing else was changed."
-        sleep 0.5
-    done
-fi
-say "ok  bot stopped"
-
-# -- 7. move the live tree to the merged code -------------------------------- #
-if [ -n "$(git status --porcelain)" ]; then
-    git stash push -q -u -m "pre-run7-switch local docs $(date +%F_%H%M) (already on origin)"
-    say "ok  stashed local changes (git stash list)"
-fi
-git checkout -q -B feature/preview origin/feature/preview
-say "ok  feature/preview -> $(git rev-parse --short HEAD)   (rollback: git checkout -B feature/preview $OLD_SHA)"
-
 # -- 8. tests ----------------------------------------------------------------- #
 "$PY" -m pytest -q --no-header -p no:cacheprovider tests >/tmp/run7_switch_tests.txt 2>&1 \
-    || { tail -15 /tmp/run7_switch_tests.txt; die "test suite failed on the merged code — bot is STOPPED; roll back with the command above and restart from the control panel."; }
+    || { tail -15 /tmp/run7_switch_tests.txt; die "test suite failed on the merged code — bot is STOPPED. Rollback: $ROLLBACK"; }
 say "ok  tests: $(tail -1 /tmp/run7_switch_tests.txt)"
 
 # -- 9. fresh cycle (archives + clears state, preflight, relaunch) ----------- #
 "$PY" scripts/fresh_cycle.py --yes || die "fresh_cycle failed — see its output above; the bot may be stopped."
 
 # -- 10. verify --------------------------------------------------------------- #
+# The day-0 anchor is a row dated today with basis 'late' OR 'close': the
+# writer stamps 'close' for a tick inside the 16:00 ET hour and 'late' after
+# it, and the v3 checker accepts either as the predecessor of day 1. It writes
+# NO row on a weekend / exchange holiday — then the anchor is the first
+# session's own predecessor and this check is skipped.
 TODAY=$(TZ=America/New_York date +%F)
-i=0
-until grep -q "\"date\": \"$TODAY\".*\"basis\": \"late\"" state/equity_history.jsonl 2>/dev/null \
-   || grep -q "\"basis\": \"late\".*\"date\": \"$TODAY\"" state/equity_history.jsonl 2>/dev/null; do
-    i=$((i + 1)); [ "$i" -le 36 ] || die "no basis='late' row for $TODAY after 3 min — the day-0 anchor is missing; check logs/bot.log."
-    sleep 5
-done
-say "ok  day-0 row: $(grep "$TODAY" state/equity_history.jsonl | tail -1)"
+if [ "$ET_DOW" -gt 5 ]; then
+    say "..  weekend: no day-0 row is written today — verify the anchor after the next session's close"
+else
+    i=0
+    until grep -E "\"date\": \"$TODAY\".*\"basis\": \"(late|close)\"" state/equity_history.jsonl >/dev/null 2>&1; do
+        i=$((i + 1))
+        if [ "$i" -gt 36 ]; then
+            [ "${FORCE_TIME:-0}" = 1 ] \
+                && { say "WARN no day-0 row for $TODAY after 3 min (FORCE_TIME: market holiday?) — check logs/bot.log"; break; } \
+                || die "no basis late/close row for $TODAY after 3 min — the day-0 anchor is missing; check logs/bot.log (the bot IS running on the new code)."
+        fi
+        sleep 5
+    done
+    say "ok  day-0 row: $(grep "\"date\": \"$TODAY\"" state/equity_history.jsonl | tail -1 | cut -c1-160)"
+fi
 grep -q 'BOOK BETA CAP vs hedge arm line' logs/bot.log \
     && say "ok  new code is running (config-load line present)" \
     || say "WARN new-code config line not seen yet in logs/bot.log — check 'Starting orchestrator'."

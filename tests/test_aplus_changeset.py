@@ -243,17 +243,19 @@ def _clamp_orch(book, core_beta, on=True):
     return o
 
 
-def test_a4a_core_fill_is_clamped_to_the_room_under_the_arm_line():
-    o = _clamp_orch(book=1.10, core_beta=1.5)
+def test_a4a_core_fill_is_clamped_to_the_room_under_the_beta_target():
+    o = _clamp_orch(book=0.95, core_beta=1.5)
     acct = SimpleNamespace(equity=1_000_000.0)
-    # room = (1.15 - 1.10) * 1e6 / 1.5 = 33,333.33
+    # room = (1.00 - 0.95) * 1e6 / 1.5 = 33,333.33  (TARGET, not target + band:
+    # review #1 — an arm-line clamp re-bought a starved trim back up to 1.15)
     assert o._core_fill_beta_clamp(acct, "QQQ", 50_000.0, 500.0) == 33_333.33
     assert o._core_fill_beta_clamp(acct, "QQQ", 20_000.0, 500.0) == 20_000.0
 
 
-def test_a4a_core_fill_is_skipped_above_the_arm_line_and_fails_open():
+def test_a4a_core_fill_is_skipped_at_or_above_the_target_and_fails_open():
     acct = SimpleNamespace(equity=1_000_000.0)
     assert _clamp_orch(1.20, 1.5)._core_fill_beta_clamp(acct, "QQQ", 50_000.0, 500.0) == 0.0
+    assert _clamp_orch(1.10, 1.5)._core_fill_beta_clamp(acct, "QQQ", 50_000.0, 500.0) == 0.0
     # no reading -> unchanged; knob off -> unchanged
     assert _clamp_orch(None, None)._core_fill_beta_clamp(acct, "QQQ", 50_000.0, 500.0) == 50_000.0
     assert _clamp_orch(1.20, 1.5, on=False)._core_fill_beta_clamp(acct, "QQQ", 50_000.0, 500.0) == 50_000.0
@@ -445,3 +447,108 @@ def test_a9_never_loosens_and_is_inert_when_off_or_not_falling():
         o = _regime_orch(label, mult, falling, on)
         o._apply_falling_tape_regime_cap()
         assert (o._regime_label, o._regime_mult) == want
+
+
+# --------------------------------------------------------------------------- #
+# Review fix pass (independent adversarial review, Sep 21 2026).
+# --------------------------------------------------------------------------- #
+def test_review1_core_fill_never_rebuys_in_the_cycle_that_trimmed_the_core(caplog):
+    b = _CoreBroker(stop_listed=False)
+    o = _core_orch(b)
+    o._cycle_seq = 9
+    o._starved_trim_cycle = 9                      # this cycle sold core shares
+    with caplog.at_level(logging.INFO):
+        o._apply_core_fill(_to._acct(cash=1000.0, positions=[]))
+    assert b.core_buys == [] and b.events == []    # no cancel, no buy
+    assert "no same-cycle re-buy" in caplog.text
+    o._cycle_seq = 10                              # next cycle: the sweep is back
+    o._apply_core_fill(_to._acct(cash=1000.0, positions=[]))
+    assert len(b.core_buys) == 1
+
+
+def test_review4_sanction_tags_cover_every_basis_the_gate_approves_on():
+    o = _to._orch()
+
+    def acct(pl):
+        p = Position(symbol="AAA", qty=10.0, avg_entry_price=100.0,
+                     current_price=100.0 + pl, market_value=1000.0,
+                     unrealized_pl=pl * 10, unrealized_pl_pct=pl)
+        return SimpleNamespace(position_for=lambda s: p if s == "AAA" else None)
+
+    ev = ("name_falling:-5.6% today vs SPY -0.7%",)
+    assert o._sell_sanction_tags("AAA", acct(-4.3), ev, 8.9) == list(ev)
+    assert o._sell_sanction_tags("AAA", acct(0.1), None, 8.9) == ["gate_winner:+0.1%"]
+    assert o._sell_sanction_tags("AAA", acct(-9.2), None, 8.9) == [
+        "stop_reached:-9.2% vs stop -8.9%"]
+    # a sub-stop loser with no event is what rule 8 exists to catch: no tag
+    assert o._sell_sanction_tags("AAA", acct(-4.3), None, 8.9) == []
+    assert o._sell_sanction_tags("ZZZ", acct(1.0), None, 8.9) == []
+
+
+def test_review4_a_winner_restated_to_a_small_loss_is_not_counted():
+    rows = [
+        {"ts": "2026-09-22T14:00:00Z", "symbol": "AAA", "action": "buy",
+         "stop_loss_pct": 8.0},
+        {"ts": "2026-09-24T15:00:00Z", "symbol": "AAA", "action": "sell",
+         "exit_reason": "decision", "realized_pl_pct": -0.06, "realized_pl": -12.0,
+         "sell_events": ["gate_winner:+0.1%"]},
+    ]
+    out = ecc.decision_sell_losses_below_stop(
+        rows, "2026-09-21", "2026-10-02", 0.5, sanction_aware=True)
+    assert out["count"] == 0 and len(out["sanctioned_rows"]) == 1
+
+
+def test_review5_the_cap_leaves_a_note_for_the_prompt():
+    o = _regime_orch("risk-on", 1.0, falling=True)
+    o._apply_falling_tape_regime_cap()
+    assert "falling-tape cap: applied neutral x0.70" in o._regime_cap_note
+    assert "book:-1.9%" in o._regime_cap_note
+
+
+class _PartialBroker:
+    """Shares reserved by a live sell leg: close_now takes the partial path."""
+
+    def latest_price(self, s):
+        return 97.0
+
+    def clear_orders_for_exit(self, s, ref):
+        return [("new-leg", 500.0, "old-leg", 0.0)]
+
+    def reduce_position(self, s, q):
+        return "oid-free"
+
+    def has_working_exit(self, s, ref):
+        return True
+
+
+def test_review6_a_retry_after_a_restart_still_stamps_partial_rows():
+    st = _state()
+    ev = ["name_falling:-5.6% today vs SPY -0.7%"]
+    st.queue_decision_sell("INTC", "loss-cut", ["technical"], 1.0, sell_events=ev)
+    led = _Ledger()
+    wd = Watchdog(_wd_cfg(), _PartialBroker(), state=st, ledger=led)   # fresh process
+    pos = Position(symbol="INTC", qty=503.0, qty_available=3.0,
+                   avg_entry_price=101.7, current_price=97.28,
+                   market_value=48931.84, unrealized_pl=-2223.26,
+                   unrealized_pl_pct=-4.35)
+    wd._retry_pending_decision_sells({"INTC": pos})
+    decision_rows = [r for r in led.rows if r.exit_reason == "decision"]
+    assert decision_rows and all(r.sell_events == ev for r in decision_rows)
+
+
+def test_review7_residual_beta_after_a_partial_arm():
+    o = _to._orch()
+    # book 1.30, $62k of PSQ at -1.51 on a $1.02M book: 1.30 - 0.0918 = 1.208
+    r = o._residual_beta_after_arm(1.30, 62_000.0, -1.51, 1_020_000.0)
+    assert abs(r - 1.2082) < 1e-3
+    assert r > 1.00 + 0.15                        # still in the arm zone -> trim
+    assert o._residual_beta_after_arm(1.20, 140_000.0, -1.51, 1_050_000.0) < 1.15
+    assert o._residual_beta_after_arm(1.2, 1.0, -1.5, 0.0) == 1.2   # no equity: inert
+
+
+def test_review8_stopless_clock_is_cleared_when_the_core_position_is_gone():
+    o = _to._orch(core_etf="QQQ", core_stop_pct=15.0)
+    o.broker.open_buy_notional = lambda etf: 0.0
+    o._note_core_stop_absent("QQQ", "core_fill")
+    o._ensure_core_stop(_to._acct(cash=1000.0, positions=[]))     # no QQQ held
+    assert o._core_stop_absent_since is None

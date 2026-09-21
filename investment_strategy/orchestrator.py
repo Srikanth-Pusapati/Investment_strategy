@@ -1077,6 +1077,7 @@ class Orchestrator:
             self._regime_mult = regime.multiplier
             self._regime_trend = regime.trend
             self._regime_label = regime.label
+            self._regime_cap_note = ""     # A-9: set when the falling-tape cap fires
             try:
                 self._regime_flipped_off = (
                     regime.label == "risk-off"
@@ -1094,6 +1095,7 @@ class Orchestrator:
             self._regime_mult = 1.0
             self._regime_trend = ""
             self._regime_label = ""
+            self._regime_cap_note = ""
             self._regime_flipped_off = False
         self._stamp_liveness()  # regime read done (a few benchmark fetches)
         self._record_equity_snapshot()
@@ -1350,8 +1352,16 @@ class Orchestrator:
             today=today_block, buy_excluded=buy_excluded,
             signal_notes=signal_notes, held_notes=self._held_notes(account),
             data_health=data_health, composites=composites,
-            regime_label=(_reg.label if _reg else ""),
-            regime_reason=(_reg.reason if _reg else ""),
+            regime_label=(
+                self._regime_label if getattr(self, "_regime_cap_note", "")
+                else (_reg.label if _reg else "")
+            ),
+            regime_reason=(
+                f"{(_reg.reason if _reg else '').rstrip('.')} — "
+                f"{self._regime_cap_note}."
+                if getattr(self, "_regime_cap_note", "")
+                else (_reg.reason if _reg else "")
+            ),
             regime_trend=(_reg.trend if _reg else ""),
             curated=curated,
             hedge_symbol=hedge_symbol, hedge_price=hedge_price,
@@ -3609,6 +3619,9 @@ class Orchestrator:
             len(names), names_min,
         )
         self._apply_core_defense(account)
+        # Review #5: the re-arm is exactly the mid-cycle case where the
+        # falling read turns true AFTER the top-of-cycle cap ran.
+        self._apply_falling_tape_regime_cap()
         self._apply_auto_hedge(account)
 
     def _apply_core_defense(self, account) -> None:
@@ -4315,6 +4328,53 @@ class Orchestrator:
             min(held_val + gap, ceiling), max_pct, hedge_beta, hb_source,
             notional_at_unit,
         )
+        # Review #7: cash covered only PART of the gap (run-6 Sep 3 12:51:
+        # $62k of a $142k want; Sep 18 10:14: $35k of $157k). If the book
+        # would still read above the arm line after this partial arm, the
+        # hedge is starved for the remainder — trim the core for it now.
+        residual = self._residual_beta_after_arm(
+            beta, notional, hedge_beta, account.equity)
+        if residual > target + band:
+            self._starved_hedge_core_trim(account, residual, target, band)
+
+    @staticmethod
+    def _residual_beta_after_arm(
+        beta: float, notional: float, hedge_beta: float, equity: float,
+    ) -> float:
+        """Book SPY-beta once a hedge buy of `notional` at `hedge_beta`
+        (negative) has filled: beta - notional x |hedge_beta| / equity."""
+        if equity <= 0:
+            return beta
+        return beta - max(0.0, notional) * abs(float(hedge_beta or 0.0)) / equity
+
+    def _sell_sanction_tags(
+        self, symbol: str, account, sell_events, stop_width_pct,
+    ) -> list[str]:
+        """The BASIS the risk gate approved a decision sell on, for the
+        ledger row's `sell_events` (A-5; review #4). Event tags when code
+        named an event; else the two event-less approvals RiskManager
+        ._evaluate_sell allows under events_only, read off the SAME cycle
+        snapshot the gate used: a winner ('gate_winner:+0.1%') or a
+        stop-reached loser ('stop_reached:-9.2% vs stop -8.9%'). Without
+        this a sell approved at +0.1% and restated to -0.06% at the fill
+        carried [] and rule 8 counted it as a gate bypass — the same
+        defective-rule NO-GO run-6 ended on. [] only when none applies
+        (authority 'full', or a genuine bypass — what rule 8 exists for)."""
+        if sell_events:
+            return [str(e) for e in sell_events]
+        try:
+            pos = account.position_for(symbol)
+            pl = float(pos.unrealized_pl_pct or 0.0) if pos is not None else None
+        except Exception:  # noqa: BLE001 — a tag, never a blocker
+            pl = None
+        if pl is None:
+            return []
+        if pl >= 0:
+            return [f"gate_winner:{pl:+.1f}%"]
+        stop_w = float(stop_width_pct or 0.0)
+        if stop_w > 0 and pl <= -stop_w:
+            return [f"stop_reached:{pl:+.1f}% vs stop -{stop_w:.1f}%"]
+        return []
 
     # -- A-9: falling-tape cap on a risk-on regime (A+ change-set) ---------- #
     _FALLING_TAPE_CAP_MULT = 0.70      # the neutral tier (regime._HOLD_MULT)
@@ -4339,6 +4399,13 @@ class Orchestrator:
         before = float(getattr(self, "_regime_mult", 1.0) or 1.0)
         self._regime_mult = round(min(before, self._FALLING_TAPE_CAP_MULT), 2)
         self._regime_label = "neutral"
+        # The decision prompt must show what is APPLIED (review #5: it was
+        # handed regime.assess()'s raw risk-on while buys were sized and
+        # laddered as neutral).
+        self._regime_cap_note = (
+            f"falling-tape cap: applied neutral x{self._regime_mult:.2f} "
+            f"while the book's falling read is live ({why})"
+        )
         log.info(
             "REGIME FALLING-TAPE CAP: risk-on x%.2f -> neutral x%.2f while the "
             "falling read is live (%s).", before, self._regime_mult, why,
@@ -4798,6 +4865,16 @@ class Orchestrator:
         # book into a hedge it then has no cash to fund. The defensive
         # (T-bill) fill is a cash proxy and is exempt; no reading = unchanged.
         if not defensive_fill:
+            # Review #1: a cycle that just SOLD core shares because the hedge
+            # was unfunded must not re-buy them minutes later with the
+            # proceeds (simulated: $82,880 of a $149,800 trim re-bought
+            # within two cycles).
+            if getattr(self, "_starved_trim_cycle", None) == getattr(self, "_cycle_seq", 0):
+                log.info(
+                    "Core fill skipped: this cycle trimmed %s to fund the beta "
+                    "target (AUTO-HEDGE STARVED) — no same-cycle re-buy.", etf,
+                )
+                return
             notional = self._core_fill_beta_clamp(account, etf, notional, min_fill)
             if notional < min_fill:
                 return
@@ -4950,11 +5027,15 @@ class Orchestrator:
     def _core_fill_beta_clamp(
         self, account, etf: str, notional: float, min_fill: float,
     ) -> float:
-        """A-4a: `notional` clamped to the room under the beta hedge's ARM
-        line (hedge_beta_target + hedge_beta_band) at the core ETF's own
-        SPY-beta. Unchanged when the knob is off, the hedge is not in beta
-        mode, or there is no reading this cycle (an outage must not freeze
-        the sweep). Returns 0.0 when the room is under the min order."""
+        """A-4a: `notional` clamped to the room under the beta hedge's
+        TARGET (hedge_beta_target) at the core ETF's own SPY-beta — the core
+        sweep never adds beta beyond the level the hedge steers to. (Review
+        #1: the first draft clamped at the ARM line, target + band; the
+        next cycle's fill then re-bought a starved trim right back up to
+        1.15 and any drift starved the hedge again.) Unchanged when the knob
+        is off, the hedge is not in beta mode, or there is no reading this
+        cycle (an outage must not freeze the sweep). Returns 0.0 when the
+        room is under the min order."""
         if not getattr(self.cfg, "core_fill_beta_clamp", False):
             return notional
         if getattr(self.cfg, "auto_hedge_mode", "") != "beta":
@@ -4965,23 +5046,20 @@ class Orchestrator:
         cb = float(core_beta) if core_beta is not None else 1.0
         if not cb > 0.0:
             return notional                       # a non-positive beta adds none
-        line = (
-            float(getattr(self.cfg, "hedge_beta_target", 1.0))
-            + max(0.0, float(getattr(self.cfg, "hedge_beta_band", 0.15)))
-        )
+        line = float(getattr(self.cfg, "hedge_beta_target", 1.0))
         room = max(0.0, (line - book) * account.equity / cb)
         if room >= notional:
             return notional
         if room < min_fill:
             log.info(
                 "CORE FILL BETA CLAMP: %s fill of $%.0f skipped — book "
-                "spy-beta %.2f leaves $%.0f of room under the %.2f hedge arm "
-                "line (%s beta %.2f).", etf, notional, book, room, line, etf, cb,
+                "spy-beta %.2f leaves $%.0f of room under the %.2f hedge beta "
+                "target (%s beta %.2f).", etf, notional, book, room, line, etf, cb,
             )
             return 0.0
         log.info(
             "CORE FILL BETA CLAMP: %s fill $%.0f -> $%.0f (book spy-beta %.2f, "
-            "arm line %.2f, %s beta %.2f).", etf, notional, room, book, line,
+            "beta target %.2f, %s beta %.2f).", etf, notional, room, book, line,
             etf, cb,
         )
         return round(room, 2)
@@ -5015,6 +5093,9 @@ class Orchestrator:
             if self._core_stop_gap and self.broker.open_buy_notional(etf) > 0:
                 return
             self._core_stop_gap = False
+            # Review #8: nothing left to protect — an open stopless clock
+            # would otherwise print a huge false window much later.
+            self._core_stop_absent_since = None
             return
         desired_qty = float(int(pos.qty))
         desired_stop = round(pos.avg_entry_price * (1 - pct / 100.0), 2)
@@ -5096,6 +5177,10 @@ class Orchestrator:
                 # stop starts the stopless clock (a core-fill cancel starts
                 # it earlier, with its own cause).
                 self._note_core_stop_absent(etf, "missing")
+            if existing:
+                # Review #8: the clock starts at the CANCEL of a stale stop,
+                # not at the next retry (a failed re-submit read ~30 s low).
+                self._note_core_stop_absent(etf, "stale_replace")
             for o in existing:  # stale size/level — replace
                 self.broker.cancel_order(o["id"])
             oid = self.broker.submit(OrderRequest(
@@ -5274,9 +5359,11 @@ class Orchestrator:
                     # later watchdog retry — carries the event sanction the
                     # risk gate approved it on, so the contract's rule 8 can
                     # tell a sanctioned loss-cut from a gate bypass.
+                    sell_sanction = self._sell_sanction_tags(
+                        proposal.symbol, account, sell_events, stop_width)
                     _note = getattr(self.watchdog, "note_sell_events", None)
                     if callable(_note):
-                        _note(proposal.symbol, list(sell_events or []))
+                        _note(proposal.symbol, sell_sanction)
                     outcome, oid = self.watchdog.close_now(held, "decision")
                     if outcome == "full":
                         self.watchdog.forget(proposal.symbol)
@@ -5291,7 +5378,7 @@ class Orchestrator:
                             exit_reason="decision",
                             exit_price=held.current_price or None,
                             composite_score=composite,
-                            sell_events=list(sell_events or []),
+                            sell_events=sell_sanction,
                         ))
                         self._pending_oids.append((oid, proposal.symbol))
                         # Persist at submit (mirror the watchdog) — crash-safe fill-check.
@@ -5345,7 +5432,7 @@ class Orchestrator:
                         self.state.queue_decision_sell(
                             proposal.symbol, proposal.rationale,
                             proposal.key_signals, composite,
-                            sell_events=list(sell_events or []),
+                            sell_events=sell_sanction,
                         )
                         log.error(
                             "SELL %s approved but the close FAILED — queued "
