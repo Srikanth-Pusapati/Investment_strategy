@@ -1188,3 +1188,61 @@ https://claude.ai/code/artifact/9099ad65-64b1-495c-82b9-db7226a1bbbf
             into .env; (3) after 16:00 ET: DRY_RUN=1 sh scripts/run7_switch.sh,
             then sh scripts/run7_switch.sh; (4) pre-register the contract with the
             printed SHA. Host must stay on AC (two DARK GAPs this morning).
+
+2026-09-21  ~16:15 CT — RUN-7 SWITCHED + PRE-REGISTERED (resident session; the user
+            merged PR #59/#60 -> feature/preview and PR #61 -> main, swapped the
+            Alpaca keys, and asked for the diverged local branch fixed, main
+            brought up to date, and the new run started)
+            GIT: local feature/preview was ahead 1 (1a82724, the Sep 16 Todo-4
+            liveness commit) / behind 21. Verified BEFORE moving anything that the
+            local side held nothing unique: 1a82724's Todo-4 lines, the 37
+            uncommitted Todo-4 lines, Sep 12-19 logs and A_PLUS_ROADMAP.md were all
+            byte-identical to origin/main. run7_switch.sh step 6 then moved
+            feature/preview to origin's eec9727 (old head kept on
+            backup/pre-run7-switch-20260921-1614; local docs in stash@{0}, redundant).
+            Local main fast-forwarded e9c55f8 -> a0507a0 (= origin/main, same tree
+            as eec9727). Git works again (the Xcode licence block is gone).
+            PRE-CHECK OFF THE LIVE TREE: full suite on eec9727 in an isolated
+            worktree BEFORE the bot was touched — 1554 passed (the script only
+            tests AFTER stopping the bot).
+            .env: the keys were swapped but the 1c block was NOT pasted (0 of the 15
+            lines; the dry run refused at step 3). Backed up to
+            .env.bak-pre-run7-20260921 (git-ignored, mode 600) and appended the 1c
+            block extracted verbatim from the merged doc; 12 strategy keys once each,
+            the first 425 lines untouched. All 11 knobs read back ON via load_config().
+            SWITCH, three attempts, 17:11-17:14 ET:
+              1) ABORT 'bot pid 97525 did not exit in 30 s' — FALSE: the run-6 bot
+                 HAD exited; it was a ZOMBIE (stat Z, unreaped by the control
+                 panel) and the wait loop's `kill -0` succeeds on a zombie.
+              2) ABORT at the account read — one TLS handshake to paper-api timed
+                 out (SDK call has no timeout); curl was fine seconds later.
+              3) OK: stash, feature/preview -> eec9727, state archived to
+                 runs/pre-final-test-run-6/state-post-window/, 1554 passed in the
+                 live tree, fresh_cycle (archive state/archive/20260921T211430Z,
+                 preflight 8/8), bot pid 57069, ONE instance, account.json =
+                 paper:PA3BGBBR2NB5, day-0 row basis=late equity 1,000,000.00.
+            SCRIPT FIXES (scripts/ only, outside the fingerprint): the stop loop
+            judges 'running' by the command line (zombie-proof; reproduced with a
+            forked unreaped child: kill -0 'alive', bot_running false); the account
+            read retries 3x / 5 s and prints the last error line only.
+            CONTRACT v3 PRE-REGISTERED (before day 1): header flipped; Account row =
+            PA3BGBBR2NB5 / $1,000,000 / day-0 late row; Config row = merge SHA
+            eec972753ff71a3998a0df6911abf6c834cde0cf, investment_strategy/ tree id
+            2a6ec147..., ls-tree sha256 7b4c8092...; all 36 fixed STRATEGY KEYS
+            diffed against the live .env = match; <live> values CORE_ETF=QQQ,
+            DEFENSIVE_CORE_ETF=SGOV, MAX_OPEN_POSITIONS=15 (.env lines) and
+            PUT_PROXY_ETF=IWM, MIN_OPTION_OPEN_INTEREST=100,
+            MAX_OPTION_SPREAD_PCT=10 (NO .env line — code defaults, pinned by the
+            code hash). Pinned verdict dates were already right (Sep 22 -> Oct 20).
+            NOTED, NOT FIXED: the new bot's first closed tick re-ran the nightly
+            post-mortem and OVERWROTE state/lessons/2026-09-21.md (the run-6 bot's
+            15:23 CT file: 'Losers held 1.3x longer than winners...') with a
+            'no notable patterns' file for the empty account. CURATED_LESSONS_INJECT
+            is off, so nothing reads it in-window; the headline survives in
+            logs/bot.log. The old account PA3B09IK4MGS keeps its positions at the
+            broker (paper, abandoned; resting bracket stops remain).
+            FREEZE IS ON from this commit: no commits to investment_strategy/ or
+            .env through the Oct 20 close (Oct 27 if extended).
+            TUE SEP 22 MORNING (docs/RUN7_SWITCH.md section 4 + section 0 step 5):
+            grep -nE 'CORE STOPLESS|CORE FILL|AUTO-HEDGE STARVED|REGIME FALLING-TAPE CAP|Options opened' logs/bot.log
+            and confirm the first decision cycle, FEEDS n/n healthy, one bot pid.
