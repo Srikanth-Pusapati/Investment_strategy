@@ -276,7 +276,9 @@ def test_handle_option_stamps_original_legs_in_risk_note():
     assert [l.strike for l in o.evaluated[-1].option_legs] == [320.0]
     stamp = "[STRIKE SNAP: model legs 2026-10-16 400P -> 320P (spot 321.05 broker)]"
     reason = o.journal_rows[-1][7]
-    assert reason.startswith("1 contract(s), $1,200 debit (cap $5,100).") and reason.endswith(stamp)
+    # A-6: the JOURNAL reason leads with the strategy so 'Today so far' can
+    # never print a put as a share buy; the ledger risk_note is unchanged.
+    assert reason.startswith("long_put: 1 contract(s), $1,200 debit (cap $5,100).") and reason.endswith(stamp)
     assert o.built == [[(MONTHLY, 320.0)]]
     rec = o.ledger_rows[-1]
     assert rec.risk_note.endswith(stamp)

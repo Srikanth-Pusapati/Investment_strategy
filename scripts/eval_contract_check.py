@@ -185,7 +185,7 @@ V3_STOP_FRACTION = 0.5            # rule 8 (same as v2)
 # reasons (core_fill is an entry signal) and were dropped at the fix pass.
 V3_SYSTEM_EXIT_REASONS = frozenset(
     {"hedge_unwind", "core_defense", "regime_trim", "defensive_rotate",
-     "correction"})
+     "correction", "beta_trim"})   # beta_trim: A-4b starved-hedge core trim
 # Symbols the system manages regardless of exit_reason (run-7 CORE_ETF /
 # HEDGE_ETF): QQQ carries a core stop and PSQ can be trailed/stopped, so those
 # rows arrive as bracket_stop / trail and would count as model trips.
@@ -2032,7 +2032,8 @@ def selftest() -> int:
         '{"ts":"2026-08-20T14:00:00Z","symbol":"EEE","action":"sell","exit_reason":"trail","realized_pl":7.0}',
     ])
     assert V3_SYSTEM_EXIT_REASONS == {"hedge_unwind", "core_defense", "regime_trim",
-                                      "defensive_rotate", "correction"}
+                                      "defensive_rotate", "correction",
+                                      "beta_trim"}
     assert V3_SYSTEM_SYMBOLS == {"QQQ", "PSQ"}
     sat, excl = satellite_closed_in_window(sat_trades, "2026-08-10", "2026-08-14")
     assert [r["symbol"] for r in sat] == ["AAA", "QQQ", "BBB", "DDD"]  # no symbol filter: the QQQ core stop counts; no-action row counts
@@ -2057,7 +2058,7 @@ def selftest() -> int:
         '{"ts":"2026-09-02T14:00:00Z","symbol":"ZZZ","action":"sell","exit_reason":"trail","realized_pl":3.0}',
     ]), v3_eq, spy_closes=spy, contract="v3")
     assert "N=1" in out and "excluded system-managed rows" in out
-    assert ("excluded system-managed rows (exit_reason core_defense/correction/"
+    assert ("excluded system-managed rows (exit_reason beta_trim/core_defense/correction/"
             "defensive_rotate/hedge_unwind/regime_trim; symbols PSQ/QQQ): "
             "n=1 sum=$41.76  [2026-09-01 PSQ hedge_unwind +41.76]") in out
     assert "day-0 predecessor: 2026-08-30 $990,000.00 (basis=close)" in out

@@ -4289,6 +4289,10 @@ class Orchestrator:
                 "Auto-hedge: want $%.0f more %s but only $%.0f spendable "
                 "after the cash buffer.", gap, etf, spendable,
             )
+            # A-4b: a hedge that cannot be funded is not a hedge. Take the
+            # beta off the core ETF instead (Sep 21 2026: book 1.20, invested
+            # 98%, 'want $213703 more PSQ but only $0 spendable').
+            self._starved_hedge_core_trim(account, beta, target, band)
             return
         reason = (
             f"beta: book spy-beta {beta:.2f} > target {target:.2f} + {band:.2f} band"
@@ -4308,6 +4312,94 @@ class Orchestrator:
             min(held_val + gap, ceiling), max_pct, hedge_beta, hb_source,
             notional_at_unit,
         )
+
+    # -- A-4b: starved hedge -> beta trim of the core (A+ change-set) ------- #
+    def _starved_hedge_core_trim(
+        self, account, beta: float, target: float, band: float,
+    ) -> None:
+        """The beta hedge wants to arm (book spy-beta > target + band) but
+        the cash buffer leaves less than the min order spendable. The core
+        ETF is where the book's beta lives, so sell
+            (beta - target) x equity / core_beta
+        dollars of it — capped at HEDGE_STARVED_TRIM_MAX_PCT of the core per
+        decision cycle — which lands the book on target with no inverse-ETF
+        carry and frees the cash the next arm would need. Whole shares only,
+        through the S-7 trim mechanics (replace the GTC stop qty-down, then
+        sell; cancel -> poll -> sell fallback), so the remainder is never
+        stopless. Not a thesis exit: no cooldown / loss-streak stamp. Off
+        unless HEDGE_STARVED_CORE_TRIM=on. Never raises into the cycle."""
+        if not getattr(self.cfg, "hedge_starved_core_trim", False):
+            return
+        core = getattr(self.cfg, "core_etf", "")
+        if not core:
+            return
+        cyc = getattr(self, "_cycle_seq", 0)
+        if getattr(self, "_starved_trim_cycle", None) == cyc:
+            return                     # the breadth re-arm re-runs the hedge in-cycle
+        pos = account.position_for(core)
+        price = float(getattr(pos, "current_price", 0.0) or 0.0) if pos else 0.0
+        if pos is None or pos.qty < 1 or price <= 0 or account.equity <= 0:
+            log.info(
+                "AUTO-HEDGE STARVED: book spy-beta %.2f > %.2f + %.2f but no "
+                "%s core to trim — exposure stays until cash frees.",
+                beta, target, band, core or "core",
+            )
+            return
+        try:
+            cb = self.book_beta.beta_of(core, "SPY")
+            core_beta = float(cb) if cb is not None else 1.0
+        except Exception:  # noqa: BLE001 — a measurement, never a blocker
+            core_beta = 1.0
+        if not (0.5 <= core_beta <= 3.0):
+            core_beta = 1.0
+        want_usd = max(0.0, beta - target) * account.equity / core_beta
+        cap_pct = max(0.0, min(100.0, float(
+            getattr(self.cfg, "hedge_starved_trim_max_pct", 50.0))))
+        cap_usd = max(0.0, pos.market_value) * cap_pct / 100.0
+        # Cents first: 0.17 x 1.05e6 / 1.5 is 118,999.9999 in floats and
+        # would floor a share short of the 170 the arithmetic says.
+        whole = float(int(round(min(want_usd, cap_usd), 2) / price + 1e-9))
+        whole = min(whole, float(int(pos.qty)))
+        if whole < 1:
+            return
+        self._starved_trim_cycle = cyc
+        try:
+            oid, detail = self._core_trim_sell(core, pos, whole, whole)
+        except Exception as e:  # noqa: BLE001
+            log.warning("AUTO-HEDGE STARVED: %s trim raised %s: %s", core,
+                        type(e).__name__, e)
+            self._core_stop_gap = True
+            return
+        self._core_stop_gap = True     # verify the remainder's stop either way
+        if not oid:
+            log.warning(
+                "AUTO-HEDGE STARVED: trim of %g %s NOT submitted (%s) — "
+                "retried next cycle while the book reads above the arm line.",
+                whole, core, detail,
+            )
+            return
+        usd = whole * price
+        log.warning(
+            "AUTO-HEDGE STARVED: book spy-beta %.2f > target %.2f + %.2f band "
+            "and the hedge is unfunded — sold %g %s ($%.0f, %s beta %.2f) to "
+            "land near %.2f (wanted $%.0f; cap %.0f%% of the core).",
+            beta, target, band, whole, core, usd, core, core_beta,
+            beta - usd / account.equity * core_beta, want_usd, cap_pct,
+        )
+        self._pending_oids.append((oid, core))
+        self.state.add_pending_order(oid, core)
+        self.ledger.record(TradeRecord.for_sell(
+            core, f"starved-hedge beta trim: book spy-beta {beta:.2f} > "
+            f"{target:.2f} + {band:.2f}, hedge unfunded", oid,
+            qty=whole, realized_pl_pct=pos.unrealized_pl_pct,
+            realized_pl=None, exit_reason="beta_trim",
+            exit_price=price,
+        ))
+        pos.qty = round(pos.qty - whole, 6)
+        pos.market_value = pos.qty * price
+        account.cash += usd
+        account.buying_power += usd
+        self._ensure_core_stop(account)
 
     # -- run-7 S-8 / 4a-17: hedge observability (log lines only) ----------- #
     def _stamp_hedge_etf(self, reading) -> None:
@@ -5562,12 +5654,21 @@ class Orchestrator:
         )
         # Journal every option verdict too — without this, rejects are invisible
         # to the 'Today so far' block and the nightly post-mortem.
+        # A-6 (Sep 16 2026): name the STRATEGY on the journal row. The
+        # 'Today so far' block printed an approved HBAN long_put as
+        # "Bought: HBAN 1x ($1,650, last conv 0.60)"; the model read that as
+        # an open LONG ("Account holds HBAN long (starter bought today)")
+        # and declined every later HBAN put as contradicting it.
+        _strat = getattr(proposal.option_strategy, "value", proposal.option_strategy)
+        _jreason = decision.reason or ""
+        if _strat and not _jreason.startswith("option fallback"):
+            _jreason = f"{_strat}: {_jreason}"
         self._journal_decision(
             proposal.symbol, proposal.action.value, "option",
             proposal.conviction, proposal.target_weight_pct,
             decision.verdict.value,
             decision.approved_notional if decision.verdict != RiskVerdict.REJECTED else 0.0,
-            decision.reason, proposal.rationale[:120] if proposal.rationale else "",
+            _jreason, proposal.rationale[:120] if proposal.rationale else "",
         )
         if proxy_for:
             self._proxy_put_state = (

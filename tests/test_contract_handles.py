@@ -78,7 +78,7 @@ PINNED_HANDLES: tuple[str, ...] = (
 # Verbatim from v3 rule 1 ("exit_reason not in the system set **{...}**").
 PINNED_SYSTEM_EXIT_REASONS = frozenset(
     {"hedge_unwind", "core_defense", "regime_trim", "defensive_rotate",
-     "correction"})
+     "correction", "beta_trim"})
 
 
 # ---------------------------------------------------------------- parsers ---

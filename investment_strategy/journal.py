@@ -31,6 +31,15 @@ Verdict = Literal[
 ]
 
 
+# A-6: option strategies the journal can name on the 'Today so far' block,
+# with the direction each expresses (the model must never read a put as a long).
+_OPTION_LEAN = {
+    "long_put": "BEARISH", "bear_put_spread": "BEARISH",
+    "long_call": "bullish", "bull_call_spread": "bullish",
+}
+_OPTION_STRATEGIES = frozenset(_OPTION_LEAN)
+
+
 def _trading_day(when: datetime | None = None) -> str:
     when = when or datetime.now(timezone.utc)
     if when.tzinfo is None:
@@ -151,6 +160,11 @@ class DecisionJournal:
         buy_spent: dict[str, float] = defaultdict(float)
         buy_count: dict[str, int] = defaultdict(int)
         buy_last_conv: dict[str, float] = {}
+        # A-6: approved OPTION buys are tallied apart from share buys — a
+        # long put printed under "Bought:" read as an open long (Sep 16 HBAN).
+        opt_spent: dict[str, float] = defaultdict(float)
+        opt_count: dict[str, int] = defaultdict(int)
+        opt_last: dict[str, tuple[float, str]] = {}   # conv, strategy
         excluded: dict[str, str] = {}  # symbol -> reason (last seen)
         rejected_count: dict[str, int] = defaultdict(int)
         rejected_reason: dict[str, str] = {}
@@ -181,7 +195,14 @@ class DecisionJournal:
                 continue
             if r.action != "buy":
                 continue
-            if r.verdict in ("approved", "resized"):
+            if r.verdict in ("approved", "resized") and r.instrument == "option":
+                opt_spent[r.symbol] += r.approved_notional
+                opt_count[r.symbol] += 1
+                head = (r.reason or "").split(":", 1)[0].strip().lower()
+                opt_last[r.symbol] = (
+                    r.conviction, head if head in _OPTION_STRATEGIES else "option",
+                )
+            elif r.verdict in ("approved", "resized"):
                 buy_spent[r.symbol] += r.approved_notional
                 buy_count[r.symbol] += 1
                 buy_last_conv[r.symbol] = r.conviction
@@ -210,6 +231,21 @@ class DecisionJournal:
             lines.append("Bought: " + ", ".join(parts))
         else:
             lines.append("Bought: nothing yet today.")
+
+        if opt_spent:
+            parts = []
+            for sym, spent in sorted(opt_spent.items(), key=lambda x: -x[1])[:6]:
+                conv, strat = opt_last[sym]
+                lean = _OPTION_LEAN.get(strat, "")
+                parts.append(
+                    f"{sym} {strat}{f' ({lean})' if lean else ''} "
+                    f"{opt_count[sym]}x (${spent:,.0f} debit, conv {conv:.2f})"
+                )
+            lines.append(
+                "Options opened (defined-risk OPTION positions, NOT shares — "
+                "a put is a BEARISH position on the underlying and does not "
+                "make the account long the stock): " + ", ".join(parts)
+            )
 
         if sold:
             lines.append(

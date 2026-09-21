@@ -257,3 +257,128 @@ def test_a4a_core_fill_is_skipped_above_the_arm_line_and_fails_open():
     # no reading -> unchanged; knob off -> unchanged
     assert _clamp_orch(None, None)._core_fill_beta_clamp(acct, "QQQ", 50_000.0, 500.0) == 50_000.0
     assert _clamp_orch(1.20, 1.5, on=False)._core_fill_beta_clamp(acct, "QQQ", 50_000.0, 500.0) == 50_000.0
+
+
+# --------------------------------------------------------------------------- #
+# A-4b — a hedge that cannot be funded trims the core ETF toward target.
+# Incident: Sep 21 2026 09:33 CT — book spy-beta 1.20, invested 98%,
+# "Auto-hedge: want $213703 more PSQ but only $0 spendable".
+# --------------------------------------------------------------------------- #
+def _starved_orch(on=True, core_beta=1.5, trim_ok=True, max_pct=50.0):
+    o = _to._orch(core_etf="QQQ", core_stop_pct=0.0)
+    o.cfg.hedge_starved_core_trim = on
+    o.cfg.hedge_starved_trim_max_pct = max_pct
+    o.book_beta = SimpleNamespace(beta_of=lambda sym, bench: core_beta)
+    o._cycle_seq = 7
+    o.trims = []
+
+    def _sell(etf, pos, sell_qty, whole):
+        o.trims.append((etf, sell_qty, whole))
+        return ("oid-trim", "stop replaced") if trim_ok else (None, "replace refused")
+    o._core_trim_sell = _sell
+    return o
+
+
+def _core_acct(qty=214.0, price=700.0, equity=1_050_000.0, cash=20_000.0):
+    from investment_strategy.models import AccountSnapshot
+    pos = Position(symbol="QQQ", qty=qty, avg_entry_price=708.28,
+                   current_price=price, market_value=qty * price,
+                   unrealized_pl=0.0, unrealized_pl_pct=-1.2)
+    return AccountSnapshot(equity=equity, last_equity=equity, cash=cash,
+                           buying_power=cash, positions=[pos])
+
+
+def test_a4b_starved_hedge_sells_core_shares_toward_target():
+    o = _starved_orch()
+    acct = _core_acct()
+    o._starved_hedge_core_trim(acct, beta=1.20, target=1.00, band=0.15)
+    # want = 0.20 * 1.05e6 / 1.5 = $140,000; cap = 50% of $149,800 = $74,900
+    # -> int(74,900 / 700) = 107 whole shares
+    assert o.trims == [("QQQ", 107.0, 107.0)]
+    rec = o.ledger.records[-1]
+    assert rec.exit_reason == "beta_trim" and rec.qty == 107.0 and rec.symbol == "QQQ"
+    assert acct.position_for("QQQ").qty == 107.0
+    assert acct.cash == 20_000.0 + 107 * 700.0
+    assert o._core_stop_gap is True and ("oid-trim", "QQQ") in o._pending_oids
+
+
+def test_a4b_is_sized_by_the_beta_gap_when_that_is_smaller_than_the_cap():
+    o = _starved_orch(max_pct=100.0)
+    acct = _core_acct()
+    o._starved_hedge_core_trim(acct, beta=1.17, target=1.00, band=0.15)
+    # want = 0.17 * 1.05e6 / 1.5 = $119,000 -> 170 shares
+    assert o.trims == [("QQQ", 170.0, 170.0)]
+
+
+def test_a4b_once_per_cycle_off_by_default_and_quiet_on_failure():
+    o = _starved_orch()
+    acct = _core_acct()
+    o._starved_hedge_core_trim(acct, 1.20, 1.00, 0.15)
+    o._starved_hedge_core_trim(acct, 1.20, 1.00, 0.15)     # breadth re-arm pass
+    assert len(o.trims) == 1
+    off = _starved_orch(on=False)
+    off._starved_hedge_core_trim(_core_acct(), 1.20, 1.00, 0.15)
+    assert off.trims == [] and off.ledger.records == []
+    bad = _starved_orch(trim_ok=False)
+    a = _core_acct()
+    bad._starved_hedge_core_trim(a, 1.20, 1.00, 0.15)
+    assert bad.ledger.records == []                        # no phantom sell
+    assert a.position_for("QQQ").qty == 214.0 and bad._core_stop_gap is True
+
+
+def test_a4b_beta_trim_is_a_system_exit_for_the_v3_checker():
+    assert "beta_trim" in ecc.V3_SYSTEM_EXIT_REASONS
+
+
+# --------------------------------------------------------------------------- #
+# A-6 — an approved put is never rendered to the model as a share purchase.
+# Incident: Sep 16 2026 — HBAN long_put filled 09:25 CT; the next six cycles
+# declined HBAN puts because "Account holds HBAN long (starter bought today)".
+# --------------------------------------------------------------------------- #
+from datetime import datetime, timezone
+
+from investment_strategy.journal import DecisionJournal, DecisionRecord
+
+
+def _journal_with(*recs):
+    j = DecisionJournal(base_dir=tempfile.mkdtemp(prefix="_aplus_journal_"))
+    for r in recs:
+        j.record(r)
+    return j
+
+
+def _rec(symbol, instrument, verdict, notional, reason, conv=0.6, action="buy"):
+    return DecisionRecord(
+        ts=datetime.now(timezone.utc).isoformat(), symbol=symbol, action=action,
+        instrument=instrument, conviction=conv, target_weight_pct=0.5,
+        verdict=verdict, approved_notional=notional, reason=reason,
+        rationale_head="corroborated breakdown",
+    )
+
+
+def test_a6_option_buy_is_listed_as_an_option_with_its_direction():
+    j = _journal_with(
+        _rec("HBAN", "option", "approved", 1650.0,
+             "long_put: 50 contract(s), $1,650 debit (cap $5,096)."),
+        _rec("BWIN", "equity", "approved", 17781.0, "sized to 1.7%"),
+    )
+    block = j.render_today(equity=1_000_000.0)
+    bought = next(l for l in block.splitlines() if l.startswith("Bought:"))
+    opts = next(l for l in block.splitlines() if l.startswith("Options opened"))
+    assert "BWIN" in bought and "HBAN" not in bought
+    assert "HBAN long_put (BEARISH) 1x ($1,650 debit, conv 0.60)" in opts
+    assert "NOT shares" in opts
+
+
+def test_a6_only_option_buys_still_says_no_shares_bought():
+    j = _journal_with(_rec("HBAN", "option", "approved", 1650.0,
+                           "bear_put_spread: 14 contract(s), $5,096 debit"))
+    block = j.render_today(equity=1_000_000.0)
+    assert "Bought: nothing yet today." in block
+    assert "HBAN bear_put_spread (BEARISH)" in block
+
+
+def test_a6_legacy_rows_without_a_strategy_prefix_render_as_option():
+    j = _journal_with(_rec("HD", "option", "approved", 3430.0,
+                           "1 contract(s), $3,430 debit (cap $5,000)."))
+    assert "HD option 1x ($3,430 debit" in j.render_today(equity=1_000_000.0)
