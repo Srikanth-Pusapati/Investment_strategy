@@ -185,7 +185,7 @@ V3_STOP_FRACTION = 0.5            # rule 8 (same as v2)
 # reasons (core_fill is an entry signal) and were dropped at the fix pass.
 V3_SYSTEM_EXIT_REASONS = frozenset(
     {"hedge_unwind", "core_defense", "regime_trim", "defensive_rotate",
-     "correction"})
+     "correction", "beta_trim"})   # beta_trim: A-4b starved-hedge core trim
 # Symbols the system manages regardless of exit_reason (run-7 CORE_ETF /
 # HEDGE_ETF): QQQ carries a core stop and PSQ can be trailed/stopped, so those
 # rows arrive as bracket_stop / trail and would count as model trips.
@@ -577,16 +577,26 @@ def capture_beta_adjusted(days, idx_closes: dict[str, float],
 
 
 def decision_sell_losses_below_stop(trade_rows: list[dict], start: str, end: str,
-                                    fraction: float = V2_STOP_FRACTION) -> dict:
+                                    fraction: float = V2_STOP_FRACTION,
+                                    sanction_aware: bool = False) -> dict:
     """Validity check (v2): decision-sells that closed a LOSS shallower than
     `fraction` x the planned stop. Sell rows carry realized_pl_pct but no
     stop width, so each is joined to the latest prior BUY row of the same
     symbol with stop_loss_pct > 0. Returns count, n_decision_losses,
-    unknown_stop (no joinable stop) and the offending rows."""
+    unknown_stop (no joinable stop) and the offending rows.
+
+    `sanction_aware` (v3 rule 8, Sep 21 2026): a row whose `sell_events` list
+    is non-empty was APPROVED by the frozen risk gate on a deterministic event
+    (`SELL AUTHORITY: ... allowed on event(s) name_falling:...`) — designed
+    behaviour under LLM_SELL_AUTHORITY=events_only, not a gate bypass. Such
+    rows go to `sanctioned_rows` and are NOT counted. Run-6's v2 verdict read
+    NO-GO on exactly one such row (INTC Sep 14 2026, -4.33% vs an 8.91% stop
+    = 0.49x); v2 stays as written (sanction_aware=False, byte-identical)."""
     rows = sorted(
         (r for r in trade_rows if r.get("ts")), key=lambda r: str(r["ts"]))
     last_stop: dict[str, float] = {}
     hits, n_losses, unknown = [], 0, 0
+    sanctioned: list[tuple] = []
     for r in rows:
         sym = str(r.get("symbol") or "")
         action = str(r.get("action") or "").lower()
@@ -612,9 +622,15 @@ def decision_sell_losses_below_stop(trade_rows: list[dict], start: str, end: str
             unknown += 1
             continue
         if abs(float(pct)) < fraction * stop:
-            hits.append((date, sym, float(pct), stop))
+            events = r.get("sell_events") or []
+            if sanction_aware and events:
+                sanctioned.append((date, sym, float(pct), stop,
+                                   ", ".join(str(e) for e in events)))
+            else:
+                hits.append((date, sym, float(pct), stop))
     return {"count": len(hits), "n_decision_losses": n_losses,
-            "unknown_stop": unknown, "rows": hits}
+            "unknown_stop": unknown, "rows": hits,
+            "sanctioned_rows": sanctioned}
 
 
 def _fmt_t(t) -> str:
@@ -1552,15 +1568,21 @@ def render_report_v3(start: str, end: str, trade_rows, equity_rows,
                   + ("" if c["qualified"] else "   (INSUFFICIENT SAMPLE)"))
 
     # (7) decision-sell validity
-    dsl = decision_sell_losses_below_stop(trade_rows, start, end, V3_STOP_FRACTION)
-    print(f"--- (7) decision-sell losses below {V3_STOP_FRACTION:.1f}x planned stop "
-          "(rule 8) ---")
+    dsl = decision_sell_losses_below_stop(
+        trade_rows, start, end, V3_STOP_FRACTION, sanction_aware=True)
+    print(f"--- (7) UNSANCTIONED decision-sell losses below "
+          f"{V3_STOP_FRACTION:.1f}x planned stop (rule 8) ---")
     print(f"decision-sell losses in window: {dsl['n_decision_losses']}  "
-          f"below {V3_STOP_FRACTION:.1f}x stop: {dsl['count']}  "
+          f"unsanctioned below {V3_STOP_FRACTION:.1f}x stop: {dsl['count']}  "
+          f"event-sanctioned below {V3_STOP_FRACTION:.1f}x stop (not counted): "
+          f"{len(dsl['sanctioned_rows'])}  "
           f"no joinable stop: {dsl['unknown_stop']}")
     for date, sym, pct, stop in dsl["rows"]:
         print(f"  {date} {sym} realized {pct:+.2f}% vs stop {stop:.2f}% "
-              f"({abs(pct) / stop:.2f}x)")
+              f"({abs(pct) / stop:.2f}x)  UNSANCTIONED")
+    for date, sym, pct, stop, events in dsl["sanctioned_rows"]:
+        print(f"  {date} {sym} realized {pct:+.2f}% vs stop {stop:.2f}% "
+              f"({abs(pct) / stop:.2f}x)  sanctioned: {events}")
 
     # (8) verdict
     print("--- (8) verdict: pre-final-test-run-7 contract v3 ---")
@@ -1638,8 +1660,9 @@ def render_report_v3(start: str, end: str, trade_rows, equity_rows,
         print("[N/A ] rule 7 capture: no --spy-csv — not counted")
     ds_ok = dsl["count"] == 0
     checks.append(("decision-sell validity", ds_ok))
-    print(f"[{'PASS' if ds_ok else 'FAIL'}] rule 8 zero decision-sell losses below "
-          f"{V3_STOP_FRACTION:.1f}x stop  (count={dsl['count']}, "
+    print(f"[{'PASS' if ds_ok else 'FAIL'}] rule 8 zero UNSANCTIONED decision-sell "
+          f"losses below {V3_STOP_FRACTION:.1f}x stop  (count={dsl['count']}, "
+          f"sanctioned={len(dsl['sanctioned_rows'])}, "
           f"unknown stop={dsl['unknown_stop']})")
     if tel["pairs"] and not tel["passed"]:
         print(f"[WARN] validity: telescoping FAIL (max gap {_money(tel['max_gap'])} "
@@ -2009,7 +2032,8 @@ def selftest() -> int:
         '{"ts":"2026-08-20T14:00:00Z","symbol":"EEE","action":"sell","exit_reason":"trail","realized_pl":7.0}',
     ])
     assert V3_SYSTEM_EXIT_REASONS == {"hedge_unwind", "core_defense", "regime_trim",
-                                      "defensive_rotate", "correction"}
+                                      "defensive_rotate", "correction",
+                                      "beta_trim"}
     assert V3_SYSTEM_SYMBOLS == {"QQQ", "PSQ"}
     sat, excl = satellite_closed_in_window(sat_trades, "2026-08-10", "2026-08-14")
     assert [r["symbol"] for r in sat] == ["AAA", "QQQ", "BBB", "DDD"]  # no symbol filter: the QQQ core stop counts; no-action row counts
@@ -2034,7 +2058,7 @@ def selftest() -> int:
         '{"ts":"2026-09-02T14:00:00Z","symbol":"ZZZ","action":"sell","exit_reason":"trail","realized_pl":3.0}',
     ]), v3_eq, spy_closes=spy, contract="v3")
     assert "N=1" in out and "excluded system-managed rows" in out
-    assert ("excluded system-managed rows (exit_reason core_defense/correction/"
+    assert ("excluded system-managed rows (exit_reason beta_trim/core_defense/correction/"
             "defensive_rotate/hedge_unwind/regime_trim; symbols PSQ/QQQ): "
             "n=1 sum=$41.76  [2026-09-01 PSQ hedge_unwind +41.76]") in out
     assert "day-0 predecessor: 2026-08-30 $990,000.00 (basis=close)" in out

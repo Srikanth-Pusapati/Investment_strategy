@@ -1,0 +1,33 @@
+keys: ['action', 'composite_score', 'conviction', 'cost_usd', 'entry_price', 'entry_signals', 'exit_price', 'exit_reason', 'fill_price', 'fill_qty', 'fill_ts', 'instrument', 'key_signals', 'occ_sides', 'occ_symbols', 'option_strategy', 'order_id', 'qty', 'rationale', 'realized_pl', 'realized_pl_pct', 'repair_note', 'risk_note', 'stop_loss_pct', 'stop_loss_price', 'symbol', 'take_profit_pct', 'take_profit_price', 'ts', 'underlying', 'verdict']
+open equity cost at Sep 11 close: total $858388
+  PSQ    $   204,391  19.7% eq  first buy 2026-09-03T15:14 
+  QQQ    $   115,892  11.2% eq  first buy 2026-09-01T13:34 
+  SPCX   $    94,888   9.1% eq  first buy 2026-09-01T13:34 
+  SMCI   $    84,603   8.1% eq  first buy 2026-09-02T14:25 <-- Sep14 gap cluster
+  AVGO   $    63,528   6.1% eq  first buy 2026-09-08T16:10 <-- Sep14 gap cluster
+  NOK    $    53,061   5.1% eq  first buy 2026-09-01T13:34 <-- Sep14 gap cluster
+  INTC   $    51,127   4.9% eq  first buy 2026-09-01T13:34 <-- Sep14 gap cluster
+  SEI    $    31,067   3.0% eq  first buy 2026-09-09T19:40 <-- Sep14 gap cluster
+  NU     $    30,915   3.0% eq  first buy 2026-09-01T13:34 
+  GRNT   $    26,136   2.5% eq  first buy 2026-09-08T17:54 
+  PFE    $    22,498   2.2% eq  first buy 2026-09-01T13:34 
+  ONON   $    20,778   2.0% eq  first buy 2026-09-09T14:26 
+  VALE   $    20,740   2.0% eq  first buy 2026-09-09T15:18 <-- Sep14 gap cluster
+  RIG    $    20,617   2.0% eq  first buy 2026-09-02T19:39 <-- Sep14 gap cluster
+  DRAM   $    18,147   1.7% eq  first buy 2026-09-09T14:26 <-- Sep14 gap cluster
+cluster cost: 342890 = 33.0 % of equity
+--- Sep 14/15 sells ---
+2026-09-14T13:33 NOK equity qty 2080.0 exit 10.002236 pl -109.75 bracket_stop None
+2026-09-14T13:34 DRAM equity qty 293.0 exit 54.639386 pl -2137.61 bracket_stop None
+2026-09-14T13:34 AVGO equity qty 172.0 exit 347.674941 pl -3728.11 bracket_stop None
+2026-09-14T13:34 SEI equity qty 454.0 exit 61.68 pl -3064.5 bracket_stop None
+2026-09-14T13:35 VALE equity qty 1352.0 exit 14.695776 pl -870.99 bracket_stop None
+2026-09-14T14:22 QQQ equity qty 40.0 exit 705.89 pl -128.77 core_defense 705.9525
+2026-09-14T14:22 PSQ equity qty 7834.069758528 exit 26.26 pl 1331.79 hedge_unwind 26.26
+2026-09-14T14:25 NOK equity qty 2983.0 exit 10.04 pl -1287.87 decision 10.0392
+2026-09-14T14:25 INTC equity qty 503.0 exit 97.29 pl -2216.87 decision 97.28
+2026-09-14T15:08 RIG equity qty 3570.0 exit 5.46 pl -1124.55 bracket_stop None
+2026-09-15T13:33 PFE equity qty 775.0 exit 27.37 pl -1286.5 bracket_stop None
+2026-09-15T14:22 SGOV equity qty 1518.59385258 exit 100.535 pl 7.59 defensive_rotate 100.53
+2026-09-15T14:29 NU equity qty 2061.0 exit 14.14 pl -1782.77 bracket_stop None
+2026-09-15T18:45 IBIT equity qty 283.0 exit 42.635724 pl -640.79 bracket_stop None

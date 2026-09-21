@@ -1,0 +1,19 @@
+VERIFY STR-4: residual = book% - beta * SPY%  (same-row beta = finding's convention; prior-row beta = checker (4d) ex-ante convention)
+date          book%    SPY%  b_same  r_same  b_prior  r_prior
+2026-09-01    0.094  -0.687   0.770   0.623      nan      nan
+2026-09-02    0.468   0.444   1.041   0.006    0.770    0.127
+2026-09-03    1.076   1.047   1.108  -0.084    1.041   -0.014
+2026-09-04    0.931  -0.385   1.077   1.346    1.108    1.358
+2026-09-08    1.663  -0.549   0.923   2.170    1.077    2.255
+2026-09-09   -0.714  -0.465   0.992  -0.253    0.923   -0.285
+2026-09-10   -0.702  -0.599   0.893  -0.167    0.992   -0.107
+2026-09-11    1.043   0.852   0.886   0.288    0.893    0.282
+2026-09-14   -2.232  -0.446   0.794  -1.878    0.886   -1.837
+2026-09-15   -0.707  -0.459   0.895  -0.297    0.794   -0.343
+cum same-row: thru Sep11=3.930  thru Sep15=1.755  erased=55.3%
+cum prior-row (Sep1 has no prior beta, 9 days): thru Sep11=3.615  thru Sep15=1.435  erased=60.3%
+Sep4+Sep8 same-row resid sum: 3.516  vs cum thru Sep15 1.755
+OLS --start0831 thru Sep15: n=10 alpha=0.194%/day t=0.54 beta=0.82 r2=0.20
+OLS --start0901 thru Sep15: n=9 alpha=0.148%/day t=0.37 beta=0.90 r2=0.22
+OLS --start0831 thru Sep11: n=8 alpha=0.505%/day t=1.68 beta=0.52 r2=0.18
+OLS --start0901 thru Sep11: n=7 alpha=0.513%/day t=1.46 beta=0.50 r2=0.15

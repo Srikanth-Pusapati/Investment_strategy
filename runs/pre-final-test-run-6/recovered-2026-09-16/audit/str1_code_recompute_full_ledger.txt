@@ -1,0 +1,61 @@
+in-window rows 83 sells 29
+exit_reason counts: {'bracket_stop': 14, 'bracket_take': 2, 'hedge_unwind': 2, 'trail': 3, 'core_defense': 2, 'defensive_rotate': 1, 'decision': 5}
+null realized_pl sells: []
+v3 phantom/dup dropped: []
+N=24 sum=8580.60 mean=357.53 WR=0.292 (7W/17L) PF=1.382 top3=[12525.11, 8930.46, 5182.11] mean_ex_top3=-859.86 t=0.473 boot95=[-905.91,1946.96]
+SGOV sells in sat: []
+instrument counts in sat: {'equity': 24}
+excluded system rows: [('2026-09-09T14:22', 'PSQ', 'hedge_unwind', 41.76), ('2026-09-10T19:38', 'QQQ', 'core_defense', 27.56), ('2026-09-14T14:22', 'QQQ', 'core_defense', -128.77), ('2026-09-14T14:22', 'PSQ', 'hedge_unwind', 1331.79), ('2026-09-15T14:22', 'SGOV', 'defensive_rotate', 7.59)]
+NVDA sat rows: [('2026-09-09T14:03:15.323545Z', 'trail', 2893.44)]
+after 09-09T14:03Z: n=17 wins=1 sum=-18755.58
+   2026-09-09T14:03:15 NVDA trail 2893.44
+   2026-09-09T17:10:52 RIG bracket_stop -688.22
+   2026-09-09T18:14:57 AAPL bracket_stop -923.92
+   2026-09-10T13:33:28 ABT bracket_stop -951.47
+   2026-09-10T13:53:39 SNXX bracket_stop -772.68
+   2026-09-14T13:33:52 NOK bracket_stop -109.75
+   2026-09-14T13:34:40 DRAM bracket_stop -2137.61
+   2026-09-14T13:34:50 AVGO bracket_stop -3728.11
+   2026-09-14T13:34:52 SEI bracket_stop -3064.5
+   2026-09-14T13:35:02 VALE bracket_stop -870.99
+   2026-09-14T14:25:43 NOK decision -1287.87
+   2026-09-14T14:25:43 INTC decision -2216.87
+   2026-09-14T15:08:24 RIG bracket_stop -1124.55
+   2026-09-15T13:33:21 PFE bracket_stop -1286.5
+   2026-09-15T14:29:18 NU bracket_stop -1782.77
+   2026-09-15T18:45:51 IBIT bracket_stop -640.79
+   2026-09-16T15:18:50 RIG decision -62.42
+unmatched sells (no prior in-window buy): []
+entries Sep1-3 closed: n=12 sum=26379.52 wins=7
+entries Sep8+ closed: n=12 sum=-17798.91 wins=0
+   SNXX 2026-09-09 -> 2026-09-10 bracket_stop -772.68 comp 1.58 conv 0.6
+   NOK 2026-09-09 -> 2026-09-14 bracket_stop -109.75 comp 2.15 conv 0.66
+   DRAM 2026-09-09 -> 2026-09-14 bracket_stop -2137.61 comp 1.15 conv 0.62
+   AVGO 2026-09-08 -> 2026-09-14 bracket_stop -3728.11 comp 1.09 conv 0.66
+   SEI 2026-09-09 -> 2026-09-14 bracket_stop -3064.5 comp 2.39 conv 0.66
+   VALE 2026-09-09 -> 2026-09-14 bracket_stop -870.99 comp 1.08 conv 0.6
+   NOK 2026-09-09 -> 2026-09-14 decision -1287.87 comp 2.15 conv 0.66
+   INTC 2026-09-10 -> 2026-09-14 decision -2216.87 comp 1.74 conv 0.66
+   RIG 2026-09-11 -> 2026-09-14 bracket_stop -1124.55 comp 1.27 conv 0.6
+   NU 2026-09-11 -> 2026-09-15 bracket_stop -1782.77 comp 1.16 conv 0.62
+   IBIT 2026-09-14 -> 2026-09-15 bracket_stop -640.79 comp 0.93 conv 0.6
+   RIG 2026-09-15 -> 2026-09-16 decision -62.42 comp 1.9 conv 0.63
+entries Sep 4-7 closed: []
+spearman comp vs pl (n=24): -0.221
+spearman conv vs pl (n=24): -0.098
+winners mean comp 1.16 (n=7) losers mean comp 1.47 (n=17)
+--- per-symbol buy/sell sequence for INTC NU RIG ---
+   INTC 2026-09-01T13:34 buy  0 qty 462.0 cost 39990.72
+   INTC 2026-09-08T16:50 sell bracket_take 8930.46 qty 462.0 cost 0.0
+   INTC 2026-09-10T13:35 buy  0 qty 503.0 cost 51127.43
+   INTC 2026-09-14T14:25 sell decision -2216.87 qty 503.0 cost 0.0
+   NU 2026-09-01T13:34 buy  0 qty 2061.0 cost 29987.55
+   NU 2026-09-09T13:37 sell trail 1076.92 qty 2061.0 cost 0.0
+   NU 2026-09-11T13:35 buy  0 qty 2061.0 cost 30915.0
+   NU 2026-09-15T14:29 sell bracket_stop -1782.77 qty 2061.0 cost 0.0
+   RIG 2026-09-02T19:39 buy  0 qty 1419.0 cost 8804.9
+   RIG 2026-09-09T17:10 sell bracket_stop -688.22 qty 1419.0 cost 0.0
+   RIG 2026-09-11T13:35 buy  0 qty 3570.0 cost 20616.75
+   RIG 2026-09-14T15:08 sell bracket_stop -1124.55 qty 3570.0 cost 0.0
+   RIG 2026-09-15T17:02 buy  0 qty 227.0 cost 1340.43
+   RIG 2026-09-16T15:18 sell decision -62.42 qty 227.0 cost 0.0

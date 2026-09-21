@@ -337,7 +337,7 @@ def test_v3_run6_regression_pairs_satellite_and_worst_day(capsys, tmp_path):
     # (3) satellite-only N excludes the PSQ hedge_unwind + QQQ core_defense rows
     assert "N=12" in out and "expectancy/trade: $2,241.11" in out
     assert "t-stat: 1.750  df=11  crit(95%, one-sided)=1.796" in out
-    assert ("excluded system-managed rows (exit_reason core_defense/correction/"
+    assert ("excluded system-managed rows (exit_reason beta_trim/core_defense/correction/"
             "defensive_rotate/hedge_unwind/regime_trim; symbols PSQ/QQQ): n=2 "
             "sum=$69.32  [2026-09-09 PSQ hedge_unwind +41.76; "
             "2026-09-10 QQQ core_defense +27.56]") in out
@@ -437,7 +437,7 @@ def test_v3_system_symbols_flag_excludes_core_and_hedge_bracket_exits(capsys, tm
     ecc.main(base)
     out = capsys.readouterr().out
     assert "ts in window): N=12" in out                        # run-6 satellite N unchanged
-    assert ("excluded system-managed rows (exit_reason core_defense/correction/"
+    assert ("excluded system-managed rows (exit_reason beta_trim/core_defense/correction/"
             "defensive_rotate/hedge_unwind/regime_trim; symbols PSQ/QQQ): n=4 "
             "sum=$19.32  [2026-09-05 QQQ bracket_stop -100.00; 2026-09-08 PSQ trail +50.00; "
             "2026-09-09 PSQ hedge_unwind +41.76; 2026-09-10 QQQ core_defense +27.56]") in out
@@ -541,6 +541,7 @@ def test_v3_satellite_filter_and_pooled_ledgers():
         '{"ts":"2026-09-02T15:00:00Z","symbol":"XLU","action":"sell","exit_reason":"defensive_rotate","realized_pl":1.0}',
         '{"ts":"2026-09-02T16:00:00Z","symbol":"FIX","action":"sell","exit_reason":"correction","realized_pl":1.0}',
         '{"ts":"2026-09-02T17:00:00Z","symbol":"QQQ","action":"sell","exit_reason":"regime_trim","realized_pl":1.0}',
+        '{"ts":"2026-09-02T17:30:00Z","symbol":"QQQ","action":"sell","exit_reason":"beta_trim","realized_pl":2.0}',
         '{"ts":"2026-09-02T18:00:00Z","symbol":"QQQ","action":"sell","exit_reason":"bracket_stop","realized_pl":-30.0}',
         '{"ts":"2026-09-02T19:00:00Z","symbol":"PSQ","action":"sell","exit_reason":"trail","realized_pl":5.0}',
         '{"ts":"2026-09-03T14:00:00Z","symbol":"OPT","action":"sell","exit_reason":"trail","realized_pl":-4.0,"instrument":"option"}',
@@ -562,7 +563,7 @@ def test_v3_satellite_filter_and_pooled_ledgers():
     assert ecc.all_satellite_pls(rows, ["qqq"]) == [10.0, 5.0, -4.0]   # case-insensitive
     assert ecc.instrument_split(sat_s) == {"equity": [10.0], "option": [-4.0]}
     # v1/v2 selector unchanged: every non-null realized_pl counts
-    assert len(ecc.closed_pls_in_window(rows, "2026-09-01", "2026-09-03")) == 10
+    assert len(ecc.closed_pls_in_window(rows, "2026-09-01", "2026-09-03")) == 11  # +1 beta_trim fixture row
 
 
 def test_v3_rule2_counts_at_24_and_prints_concentration(capsys, tmp_path):
@@ -746,7 +747,8 @@ def test_v3_helper_units():
     assert ecc.beta_ci90({"beta": None, "se_beta": None}) is None
     assert ecc._interval_overlaps((0.7, 0.9), 0.8, 1.2) and not ecc._interval_overlaps((0.3, 0.7), 0.8, 1.2)
     assert ecc.V3_SYSTEM_EXIT_REASONS == {"hedge_unwind", "core_defense", "regime_trim",
-                                          "defensive_rotate", "correction"}
+                                          "defensive_rotate", "correction",
+                                          "beta_trim"}   # A-4b starved-hedge core trim
     assert ecc.V3_SYSTEM_SYMBOLS == {"QQQ", "PSQ"}
     assert (ecc.EXIT_GO, ecc.EXIT_NO_GO, ecc.EXIT_PENDING, ecc.EXIT_VOID) == (0, 2, 3, 4)
     assert (ecc.V3_MIN_TRADES_FLOOR, ecc.V3_POOLED_MIN_TRADES, ecc.V3_MIN_ALPHA_PAIRS,

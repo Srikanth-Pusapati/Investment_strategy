@@ -1,0 +1,149 @@
+# eval_contract_check v2 — FINAL run-6 readout on the Sep 18 basis=close row
+# This is THE verdict run: Amendment 3 extended contract rule 1 to the Sep 18
+# close. Run by the HEADLESS away-mode fallback (the primary session was dead —
+# cap-killed Sep 16 11:41 CT, 54h with no real turn).
+# Benchmark bars exported from the Alpaca read-only bars endpoint per SPY_CSV_HELP
+# (SPY/QQQ/IWM daily closes from 2026-08-20, last bar 2026-09-18).
+# Both pinned --start commands were run, per the contract's v3 fix pass; they agree.
+
+################ PRIMARY: --start 2026-08-31 (pinned) ################
+# python3 scripts/eval_contract_check.py --contract v2 --start 2026-08-31 --end 2026-09-18 \
+#     --spy-csv spy.csv --bench-csv IWM=iwm.csv --bench-csv QQQ=qqq.csv --beta-target 1.0
+=== EVAL-CONTRACT pre-final-test-run-6 (v2) | window 2026-08-31..2026-09-18 | contract v2 ===
+--- (1) closed trades ---
+closed trades (realized_pl non-null, ts in window): N=31
+sum realized P&L: $13,836.79
+win rate: 38.7% (12W / 19L / 0 flat)
+avg win: $3,134.10   avg loss: $-1,251.18
+expectancy/trade: $446.35
+--- (2) one-sided 95% t-test (H1: mean realized_pl > 0) ---
+t-stat: 0.736  df=30  crit(95%, one-sided)=1.697
+result: FAIL (t <= crit)
+--- (2b) expectancy pooled across same-config windows ---
+this window 2026-08-31..2026-09-18: N=31 mean=$446.35 t=0.736 (df=30) bootstrap95=[$-612.70, $1,768.22]
+POOLED: N=31 (1 window(s)) mean=$446.35 t=0.736 crit=1.697 bootstrap95=[$-612.70, $1,768.22]  -> PENDING (needs N >= 60)
+--- (3) drawdown (daily equity closes in window) ---
+max drawdown: -3.29% (peak 2026-09-08 -> trough 2026-09-15, 14 days)
+worst day: 2026-09-14 day_pl $-23,587.13
+equity basis: close=13 row(s), late=1 row(s)  (close rows win per date)
+--- (3b) telescoping: sum(day_pl) vs equity difference (validity, not a verdict check) ---
+sum day_pl: $29,527.85   equity diff (first->last row): $32,231.08   pairs=13 skipped=0
+max per-day gap |Δequity - day_pl|: $1,421.49 on 2026-09-03  -> FAIL (limit $1.00)
+--- (4) up/down capture vs SPY ---
+SPY days in window: 4 up / 9 down
+up-capture: 129.8%   down-capture: 30.1%
+--- (4b) capture vs IWM (informational, not judged) ---
+IWM days in window: 5 up / 8 down
+up-capture: 193.8%   down-capture: 35.4%   (INSUFFICIENT SAMPLE)
+--- (4b) capture vs QQQ (informational, not judged) ---
+QQQ days in window: 7 up / 6 down
+up-capture: 120.6%   down-capture: 62.5%
+--- (4c) daily alpha (OLS book return ~ SPY return, per session) ---
+sessions=13  alpha/day=+0.298%  t(alpha)=1.01  beta=0.92  r2=0.27  (< 20 sessions: t NOT interpretable)
+realized beta vs target 1.00 +/- 0.2: WITHIN
+--- (4d) beta-adjusted capture: book / (beta_exante x index) (informational) ---
+ex-ante beta source: 13 stamped close row(s) (book_beta_spy); fallback beta=1.00 for the rest
+IWM: up-capture 210.5%   down-capture 37.2%   (5 up / 8 down, 12 stamped-beta days)
+QQQ: up-capture 117.0%   down-capture 66.5%   (7 up / 6 down, 12 stamped-beta days)
+SPY: up-capture 131.6%   down-capture 31.2%   (4 up / 9 down, 12 stamped-beta days)
+--- (4e) decision-sell losses below 0.5x planned stop (validity) ---
+decision-sell losses in window: 3  below 0.5x stop: 1  no joinable stop: 0
+  2026-09-14 INTC realized -4.33% vs stop 8.91% (0.49x)
+--- (5) verdict: pre-final-test-run-6 contract v2 ---
+[INFO] sample floor N >= 24: N=31 (met)
+[PEND] pooled expectancy: pooled N=31 < 60 — undecided; pool the next same-config window
+[PASS] max drawdown > -5%  (-3.29%)
+[PASS] beta rule (Amendment 2, 13 sessions < 20): mean ex-ante book_beta_spy=0.98 over 13 stamped close row(s) (range 0.77..1.14) within +/-0.2 of 1.00
+[INFO] realized OLS beta=0.92 (r2=0.27) recorded, NOT counted below 20 sessions (Amendment 2)
+[INFO] daily alpha +0.298%/day, t=1.01 over 13 sessions — < 20 sessions, not interpretable
+[PASS] up-capture > down-capture  (up 129.8% vs down 30.1%)
+[FAIL] zero decision-sell losses below 0.5x stop  (count=1, unknown stop=0)
+VERDICT: NO-GO
+exit=2
+
+################ SECONDARY: --start 2026-09-01 ################
+# same command with --start 2026-09-01
+=== EVAL-CONTRACT pre-final-test-run-6 (v2) | window 2026-09-01..2026-09-18 | contract v2 ===
+--- (1) closed trades ---
+closed trades (realized_pl non-null, ts in window): N=31
+sum realized P&L: $13,836.79
+win rate: 38.7% (12W / 19L / 0 flat)
+avg win: $3,134.10   avg loss: $-1,251.18
+expectancy/trade: $446.35
+--- (2) one-sided 95% t-test (H1: mean realized_pl > 0) ---
+t-stat: 0.736  df=30  crit(95%, one-sided)=1.697
+result: FAIL (t <= crit)
+--- (2b) expectancy pooled across same-config windows ---
+this window 2026-09-01..2026-09-18: N=31 mean=$446.35 t=0.736 (df=30) bootstrap95=[$-612.70, $1,768.22]
+POOLED: N=31 (1 window(s)) mean=$446.35 t=0.736 crit=1.697 bootstrap95=[$-612.70, $1,768.22]  -> PENDING (needs N >= 60)
+--- (3) drawdown (daily equity closes in window) ---
+max drawdown: -3.29% (peak 2026-09-08 -> trough 2026-09-15, 13 days)
+worst day: 2026-09-14 day_pl $-23,587.13
+equity basis: close=13 row(s)  (close rows win per date)
+--- (3b) telescoping: sum(day_pl) vs equity difference (validity, not a verdict check) ---
+sum day_pl: $28,584.21   equity diff (first->last row): $31,287.44   pairs=12 skipped=0
+max per-day gap |Δequity - day_pl|: $1,421.49 on 2026-09-03  -> FAIL (limit $1.00)
+--- (4) up/down capture vs SPY ---
+SPY days in window: 4 up / 8 down
+up-capture: 129.8%   down-capture: 38.8%
+--- (4b) capture vs IWM (informational, not judged) ---
+IWM days in window: 5 up / 7 down
+up-capture: 193.8%   down-capture: 45.3%   (INSUFFICIENT SAMPLE)
+--- (4b) capture vs QQQ (informational, not judged) ---
+QQQ days in window: 7 up / 5 down
+up-capture: 120.6%   down-capture: 93.3%   (INSUFFICIENT SAMPLE)
+--- (4c) daily alpha (OLS book return ~ SPY return, per session) ---
+sessions=12  alpha/day=+0.263%  t(alpha)=0.83  beta=0.98  r2=0.28  (< 20 sessions: t NOT interpretable)
+realized beta vs target 1.00 +/- 0.2: WITHIN
+--- (4d) beta-adjusted capture: book / (beta_exante x index) (informational) ---
+ex-ante beta source: 13 stamped close row(s) (book_beta_spy); fallback beta=1.00 for the rest
+IWM: up-capture 210.5%   down-capture 48.2%   (5 up / 7 down, 12 stamped-beta days)
+QQQ: up-capture 117.0%   down-capture 102.2%   (7 up / 5 down, 12 stamped-beta days)
+SPY: up-capture 131.6%   down-capture 40.4%   (4 up / 8 down, 12 stamped-beta days)
+--- (4e) decision-sell losses below 0.5x planned stop (validity) ---
+decision-sell losses in window: 3  below 0.5x stop: 1  no joinable stop: 0
+  2026-09-14 INTC realized -4.33% vs stop 8.91% (0.49x)
+--- (5) verdict: pre-final-test-run-6 contract v2 ---
+[INFO] sample floor N >= 24: N=31 (met)
+[PEND] pooled expectancy: pooled N=31 < 60 — undecided; pool the next same-config window
+[PASS] max drawdown > -5%  (-3.29%)
+[PASS] beta rule (Amendment 2, 12 sessions < 20): mean ex-ante book_beta_spy=0.98 over 13 stamped close row(s) (range 0.77..1.14) within +/-0.2 of 1.00
+[INFO] realized OLS beta=0.98 (r2=0.28) recorded, NOT counted below 20 sessions (Amendment 2)
+[INFO] daily alpha +0.263%/day, t=0.83 over 12 sessions — < 20 sessions, not interpretable
+[PASS] up-capture > down-capture  (up 129.8% vs down 38.8%)
+[FAIL] zero decision-sell losses below 0.5x stop  (count=1, unknown stop=0)
+VERDICT: NO-GO
+exit=2
+
+################ READING THE VERDICT ################
+Both commands: VERDICT NO-GO, exit=2, on RULE 7 ALONE.
+The single breach is the same row the Sep 15 and Sep 17 interim runs found:
+  2026-09-14 INTC decision sell, realized -4.33% vs planned stop 8.91% = 0.49x
+
+Rule 7's premise is defective, and this was registered BEFORE the verdict day
+(Todo-4, Sep 16 entry; carried into Amendment 4). Rule 7 reads a decision-sell
+loss below 0.5x the planned stop as proof "the gate that ran is not the frozen
+one" — because events_only supposedly makes such sells impossible. That premise
+has been false since NAME_DROP_DEFENSE shipped (Aug 1). The frozen code
+SANCTIONED this sell and said so in the log:
+  "SELL AUTHORITY: INTC decision-sell allowed on event(s) name_falling:-5.6%
+   today vs SPY -0.7%"
+So the breach detects a WORDING defect, not a frozen-code violation.
+
+Both readings go into Amendment 4 as disclosure; NO counted rule is changed
+after the fact:
+  * as written      -> NO-GO (this file, both commands)
+  * sanction-aware  -> 0 breaches; every counted rule passes
+Contract v3 rule 8 inherits the identical wording and MUST be fixed at
+pre-registration, before run-7 day 1 (Mon Sep 21) — either exempt
+event-sanctioned sells or define the metric as decision sells WITHOUT a
+SELL AUTHORITY sanction line.
+
+Everything else counted PASSES in both runs:
+  drawdown -3.29% (limit -5%), ex-ante beta 0.98 (target 1.00 +/-0.2),
+  up-capture 129.8% > down-capture 30.1% (counted for the first time this run —
+  the window finally holds >=4 up and >=4 down SPY days).
+Expectancy stays [PEND]: pooled N=31 < 60. N=31 met the sample floor of 24.
+
+Known validity breach, unchanged and already disclosed: the telescoping check
+FAILs on a single $1,421.49 gap on 2026-09-03 (limit $1.00).

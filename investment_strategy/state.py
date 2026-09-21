@@ -386,6 +386,9 @@ class PortfolioState:
 
     # -- churn-guard clocks (top-up spacing + re-entry cooldown) ------------- #
     _CLOCK_RETENTION_DAYS = 7.0  # cooldowns are hours-scale; week-old stamps are noise
+    #: A-8: last-buy convictions are kept by COUNT, not by the 7-day clock
+    #: (the top-up bar must outlive a week-long hold). ~25 names/week -> years.
+    _CONVICTION_MAX_ENTRIES = 400
     # Same-trip window for loss-streak stamps: must exceed the longest gap a
     # single trip's exit records can span (a DAY-expired close resubmitted at
     # the next open is ~17.5h later) while staying under the 24h+hold minimum
@@ -405,13 +408,22 @@ class PortfolioState:
                 when or datetime.now(timezone.utc)
             ).isoformat()
             if conviction is not None:
+                # Re-insert so dict order == recency (the size cap below
+                # drops the OLDEST buys first).
+                self.last_buy_convictions.pop(symbol, None)
                 self.last_buy_convictions[symbol] = float(conviction)
             self._prune_clock(self.last_buy_times)
-            # Convictions ride the same retention as the buy clock: no stamp,
-            # no comparison (the gate fails open on a missing prior).
-            for sym in list(self.last_buy_convictions):
-                if sym not in self.last_buy_times:
-                    del self.last_buy_convictions[sym]
+            # A-8 (Sep 21 2026): convictions NO LONGER ride the 7-day buy
+            # clock. They used to be deleted with the stamp, and the top-up
+            # gate "fails open on a missing prior" — so any name held longer
+            # than a week could be added to at ANY conviction, below its own
+            # entry included (run-6: SMCI Sep 10 + SPCX Sep 15 top-ups,
+            # $65,573, passed only through that hole). The gate consults a
+            # conviction only while the symbol is HELD, and every buy
+            # re-stamps it, so a stale entry for a closed name is inert; the
+            # map is bounded by count instead of age.
+            while len(self.last_buy_convictions) > self._CONVICTION_MAX_ENTRIES:
+                del self.last_buy_convictions[next(iter(self.last_buy_convictions))]
             self._save()
 
     def last_buy_conviction(self, symbol: str) -> float | None:
@@ -565,14 +577,18 @@ class PortfolioState:
     def queue_decision_sell(
         self, symbol: str, rationale: str, key_signals: list[str] | None = None,
         composite_score: float | None = None,
+        sell_events: list[str] | None = None,
     ) -> None:
         """Remember a decision-driven SELL whose close attempt failed, so the
-        watchdog retries it every tick — see the field's docstring above."""
+        watchdog retries it every tick — see the field's docstring above.
+        `sell_events` (A-5) is the risk gate's event sanction; persisted so a
+        retry that lands after a restart still ledgers it."""
         with self._lock:
             self.pending_decision_sells[symbol] = {
                 "rationale": rationale,
                 "key_signals": list(key_signals or []),
                 "composite_score": composite_score,
+                "sell_events": [str(e) for e in (sell_events or [])],
             }
             self._save()
 

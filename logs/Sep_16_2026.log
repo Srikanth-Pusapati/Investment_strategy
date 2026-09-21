@@ -1,0 +1,657 @@
+2026-09-16 00:10:46,419 INFO orchestrator | Market closed; skipping decision cycle.
+2026-09-16 01:02:58,485 INFO orchestrator | Market closed; skipping decision cycle.
+2026-09-16 01:55:10,970 INFO orchestrator | Market closed; skipping decision cycle.
+2026-09-16 02:47:23,231 INFO orchestrator | Market closed; skipping decision cycle.
+2026-09-16 03:39:34,978 INFO orchestrator | Market closed; skipping decision cycle.
+2026-09-16 04:31:47,109 INFO orchestrator | Market closed; skipping decision cycle.
+2026-09-16 05:23:59,690 INFO orchestrator | Market closed; skipping decision cycle.
+2026-09-16 06:16:12,214 INFO orchestrator | Market closed; skipping decision cycle.
+2026-09-16 07:08:24,045 INFO orchestrator | Market closed; skipping decision cycle.
+2026-09-16 08:00:36,750 INFO orchestrator | Market closed; skipping decision cycle.
+2026-09-16 08:30:15,832 INFO orchestrator | Market regime: SPY above 200dma (760 vs 713, today +0.3%), VIX 16.7, VIX3M 19.4 (contango), QQQ+IWM below 50dma (narrow breadth) -> neutral, size x0.70.
+2026-09-16 08:30:18,055 INFO orchestrator | BOOK BETA: spy=0.90 qqq=0.56 iwm=0.83 invested=58.8% [options at debit notional x underlying beta: HD,IWM]
+2026-09-16 08:30:18,293 INFO quiver | Quiver live/congresstrading -> 1000 row(s).
+2026-09-16 08:30:22,697 INFO screener | EDGAR Form-4 feed -> 59 filing(s) (scanning up to 100).
+2026-09-16 08:30:46,782 INFO screener | Options-flow most-actives pool -> 40 name(s).
+2026-09-16 08:31:16,452 INFO screener | Screener liquidity floor dropped 5/24 pre-cap: ROC $4.25<$5, AIM $0.21<$5, PDSB $0.67<$5, NVD $4.16<$5, TSLG $4.61<$5
+2026-09-16 08:31:16,457 INFO screener | Discovered 18 candidate(s) from 3 source(s) (207 merged, 19 above min_score, capped to 18).
+2026-09-16 08:31:16,458 INFO screener |   candidate MARA [options_flow] score=+0.51 — Options flow: 101,036 call / 32,775 put vol (bullish call imbalance +0.51) on a most-active name.
+2026-09-16 08:31:16,461 INFO screener |   candidate NU [options_flow] score=+0.48 — Options flow: 24,403 call / 8,463 put vol (bullish call imbalance +0.48) on a most-active name.
+2026-09-16 08:31:16,463 INFO screener |   candidate BMNR [options_flow] score=+0.43 — Options flow: 93,328 call / 37,379 put vol (bullish call imbalance +0.43) on a most-active name.
+2026-09-16 08:31:16,465 INFO screener |   candidate HL [options_flow] score=+0.43 — Options flow: 10,048 call / 4,024 put vol (bullish call imbalance +0.43) on a most-active name.
+2026-09-16 08:31:16,467 INFO screener |   candidate ONDS [options_flow] score=+0.41 — Options flow: 30,218 call / 12,730 put vol (bullish call imbalance +0.41) on a most-active name.
+2026-09-16 08:31:16,469 INFO screener |   candidate SOFI [options_flow] score=+0.32 — Options flow: 102,102 call / 52,778 put vol (bullish call imbalance +0.32) on a most-active name.
+2026-09-16 08:31:16,470 INFO screener |   candidate AVBC [insider] score=+0.30 — Insider: 1 open-market buy filing(s), 5,000 sh (SEC Form 4, last filings feed).
+2026-09-16 08:31:16,472 INFO screener |   candidate CELH [insider] score=+0.30 — Insider: 1 open-market buy filing(s), 12,000 sh (SEC Form 4, last filings feed).
+2026-09-16 08:31:16,474 INFO screener |   candidate CLH [congress] score=-0.23 — Congress: 0 buy / 4 sell filings in last 60d (disclosures lag up to ~45d).
+2026-09-16 08:31:16,475 INFO screener |   candidate MKL [congress] score=-0.23 — Congress: 0 buy / 5 sell filings in last 60d (disclosures lag up to ~45d).
+2026-09-16 08:31:16,477 INFO screener |   candidate VIK [congress] score=-0.23 — Congress: 0 buy / 7 sell filings in last 60d (disclosures lag up to ~45d).
+2026-09-16 08:31:16,478 INFO screener |   candidate LYV [congress] score=-0.23 — Congress: 0 buy / 5 sell filings in last 60d (disclosures lag up to ~45d).
+2026-09-16 08:31:16,479 INFO screener |   candidate STE [congress] score=-0.23 — Congress: 0 buy / 5 sell filings in last 60d (disclosures lag up to ~45d).
+2026-09-16 08:31:16,482 INFO screener |   candidate LH [congress] score=-0.23 — Congress: 0 buy / 4 sell filings in last 60d (disclosures lag up to ~45d).
+2026-09-16 08:31:16,484 INFO screener |   candidate WAB [congress] score=-0.23 — Congress: 0 buy / 4 sell filings in last 60d (disclosures lag up to ~45d).
+2026-09-16 08:31:16,485 INFO screener |   candidate CPAY [congress] score=-0.23 — Congress: 0 buy / 6 sell filings in last 60d (disclosures lag up to ~45d).
+2026-09-16 08:31:16,487 INFO screener |   candidate TDY [congress] score=-0.23 — Congress: 0 buy / 5 sell filings in last 60d (disclosures lag up to ~45d).
+2026-09-16 08:31:16,488 INFO screener |   candidate MIDD [congress] score=-0.23 — Congress: 0 buy / 6 sell filings in last 60d (disclosures lag up to ~45d).
+2026-09-16 08:31:54,044 INFO quiver | Quiver live/offexchange -> 5543 row(s).
+2026-09-16 08:31:54,468 INFO quiver | Quiver live/govcontractsall -> 20000 row(s).
+2026-09-16 08:31:55,447 INFO quiver | Quiver live/lobbying -> 20000 row(s).
+2026-09-16 08:34:14,580 INFO signals | options_chain: reading 25 of 30 symbols this cycle (cap).
+2026-09-16 08:34:20,895 INFO signals | Gathered signals for 30/30 symbols (+3 market signals).
+2026-09-16 08:34:20,967 INFO orchestrator | Composite index (30 scored, top: GRNT +2.35, RIG +2.05, AVBC +2.02, BWIN +1.83, BRK.B +1.52, BE +1.34, SPCX +1.32, ONON +1.31; bear tail: LYV -1.93, STE -1.70, VIK -1.17, HD -1.10, LH -0.70, CPAY -0.68).
+2026-09-16 08:34:20,972 INFO orchestrator | Expectancy gate (off, report-only): would have armed against: insider -1.7%/trip x12, options_chain -1.3%/trip x10, technical -1.5%/trip x19
+2026-09-16 08:34:23,694 INFO robinhood | Imported 1 Robinhood holding(s) for context (read-only).
+2026-09-16 08:34:23,696 INFO orchestrator | FEEDS: 3/3 healthy news=vader-fallback
+2026-09-16 08:34:23,702 INFO orchestrator | Buy-excluded from slate this cycle: NU (exited 23.1h ago (cooldown 24h))
+2026-09-16 08:35:16,063 INFO usage | decision call: 22941 in / 3656 out (cache r=0 w=6485) ~$0.2710 [claude-opus-4-8]
+2026-09-16 08:35:16,071 INFO decision | Claude returned 4 proposal(s), 2 bearish verdict(s).
+2026-09-16 08:35:16,077 INFO orchestrator | Bearish verdict: HD DECLINED — Downtrend and insider selling present, but options flow is neutral (-0.01, 8,020c/8,231p) and chain positioning neutral (+0.09) — no bearish flow/chain confirma
+2026-09-16 08:35:16,081 INFO orchestrator | Bearish verdict: STE DECLINED — Bearish flow (-0.70) and downtrend corroborate, but technical RSI is 29 (oversold, decaying) — a mean-reversion bounce is the higher-probability near-term move,
+2026-09-16 08:35:16,131 INFO orchestrator | Cycle budget $396,105 split across 4 buy(s): AVBC $94,271, RIG $101,843, GRNT $113,209, BWIN $86,781.
+2026-09-16 08:35:17,854 INFO earnings | Robinhood earnings calendar: 326 name(s) reporting within 31d.
+2026-09-16 08:35:20,850 INFO orchestrator | BUY AVBC -> resized: Sized to 538.411 sh ($11,834) within caps. Reduced from request. Starter haircut x0.5 (conviction 0.62 < 0.65; stop at the 4.0% vol floor). | Scanner-surfaced with the strongest composite on the slate (+2.02). Hard insider corroboration: open
+2026-09-16 08:35:20,905 WARNING alpaca | AVBC: floored 538.411 sh -> 538 for the exchange bracket; $9.04 of the $11834.28 allocation NOT deployed (stays cash; core sweep / next cycle can redeploy).
+2026-09-16 08:35:20,976 INFO alpaca | BUY market AVBC qty=538.0 notional=None lim=None (order 7bac15d7-f6a9-4b2c-8e2b-4ccd2f17d643)
+2026-09-16 08:35:20,984 INFO ledger | Ledger: BUY AVBC qty=538 $11825
+2026-09-16 08:35:21,302 INFO risk | REJECT buy RIG: Top-up conviction 0.66 shows no new edge over prior entry 0.63 (needs +0.05) — 'adding to a winner' is not a signal.
+2026-09-16 08:35:21,305 INFO orchestrator | BUY RIG -> rejected: Top-up conviction 0.66 shows no new edge over prior entry 0.63 (needs +0.05) — 'adding to a winner' is not a signal. | Top-up on intact fresh position (+0.5%, 0.9d). Composite +2.05 with hard insider buying 35,000 sh op
+2026-09-16 08:35:21,543 INFO risk | REJECT buy GRNT: Budget $9.04 below min order $505.62 after buffers/caps.
+2026-09-16 08:35:21,546 INFO orchestrator | BUY GRNT -> rejected: Budget $9.04 below min order $505.62 after buffers/caps. | Top-up on intact winner (+3.3%, 7.5pp stop room). Strongest composite on book (+2.35): fundamentals 
+2026-09-16 08:35:21,882 INFO risk | REJECT buy BWIN: Top-up conviction 0.63 shows no new edge over prior entry 0.66 (needs +0.05) — 'adding to a winner' is not a signal.
+2026-09-16 08:35:21,886 INFO orchestrator | BUY BWIN -> rejected: Top-up conviction 0.63 shows no new edge over prior entry 0.66 (needs +0.05) — 'adding to a winner' is not a signal. | Top-up on intact position. Composite +1.83 with insider net +0.93 (10,863 bought/416 sold), bullish 
+2026-09-16 08:35:21,892 INFO orchestrator | BEARISH FUNNEL: slate_bearish=7 [LYV -1.93 gate-blocked; STE -1.70 ELIGIBLE (below its 200dma) -> declined: Bearish flow (-0.70) and downtrend corroborate, but technica; VIK -1.17 gate-blocked; HD -1.10 ELIGIBLE (below its 200dma) -> declined: Downtrend and insider selling present, but options flow is n; LH -0.70 gate-blocked; CPAY -0.68 gate-blocked] put_proposals=0 put_approved=0 auto_hedge=flat proxy_put=none
+2026-09-16 08:35:21,896 INFO orchestrator | Cycle budget not fully deployed: $9.04 dropped by whole-share flooring across this cycle's buys (stays cash; core sweep / next cycle can redeploy).
+2026-09-16 08:35:22,010 INFO alpaca | SELL stop QQQ qty=195.0 notional=None lim=None (order 23015d3a-12c7-4c17-933e-9dd4dbd7b16c)
+2026-09-16 08:35:22,015 INFO orchestrator | Core stop: GTC stop resting for 195 QQQ @ 602.04 (15% under basis 708.28).
+2026-09-16 08:35:22,027 INFO alpaca | Alpaca client ready (mode=paper).
+2026-09-16 08:35:24,462 INFO dashboard | Wrote dashboard with 80 trades -> dashboard.html
+2026-09-16 09:22:36,153 INFO orchestrator | Order 7bac15d7-f6a9-4b2c-8e2b-4ccd2f17d643 (AVBC) FILLED (538/538) @ 22.3500 x 538 [ledger stamped].
+2026-09-16 09:22:37,501 INFO orchestrator | Market regime: SPY above 200dma (759 vs 713, today +0.2%), VIX 16.8, VIX3M 19.2 (contango), QQQ+IWM below 50dma (narrow breadth) -> neutral, size x0.70.
+2026-09-16 09:22:39,390 INFO orchestrator | BOOK BETA: spy=0.93 qqq=0.57 iwm=0.87 invested=60.3% [options at debit notional x underlying beta: HD,IWM]
+2026-09-16 09:22:39,771 INFO quiver | Quiver live/congresstrading -> 1000 row(s).
+2026-09-16 09:22:43,288 INFO screener | EDGAR Form-4 feed -> 59 filing(s) (scanning up to 100).
+2026-09-16 09:23:07,711 INFO screener | Options-flow most-actives pool -> 40 name(s).
+2026-09-16 09:23:33,631 INFO screener | Screener liquidity floor dropped 3/20 pre-cap: GAIA $1.32<$5, FNGR $0.14<$5, PDSB $0.63<$5
+2026-09-16 09:23:33,638 INFO screener | Discovered 17 candidate(s) from 3 source(s) (202 merged, 17 above min_score, capped to 18).
+2026-09-16 09:23:33,641 INFO screener |   candidate HBAN [options_flow] score=-0.85 — Options flow: 252 call / 3,227 put vol (bearish put imbalance -0.85) on a most-active name.
+2026-09-16 09:23:33,646 INFO screener |   candidate NOK [options_flow] score=+0.73 — Options flow: 33,053 call / 5,232 put vol (bullish call imbalance +0.73) on a most-active name.
+2026-09-16 09:23:33,649 INFO screener |   candidate CIFR [options_flow] score=+0.53 — Options flow: 96,767 call / 29,896 put vol (bullish call imbalance +0.53) on a most-active name.
+2026-09-16 09:23:33,652 INFO screener |   candidate INTC [congress+options_flow] score=+0.48 — Congress: 2 buy / 1 sell filings in last 60d (disclosures lag up to ~45d). | Options flow: 227,731 call / 91,849 put vol (bullish call imbalance +0.42) on a most-active name.
+2026-09-16 09:23:33,656 INFO screener |   candidate XLE [options_flow] score=-0.48 — Options flow: 13,737 call / 39,122 put vol (bearish put imbalance -0.48) on a most-active name.
+2026-09-16 09:23:33,658 INFO screener |   candidate SOXS [options_flow] score=+0.36 — Options flow: 8,909 call / 4,171 put vol (bullish call imbalance +0.36) on a most-active name.
+2026-09-16 09:23:33,660 INFO screener |   candidate CLH [congress] score=-0.23 — Congress: 0 buy / 4 sell filings in last 60d (disclosures lag up to ~45d).
+2026-09-16 09:23:33,662 INFO screener |   candidate MKL [congress] score=-0.23 — Congress: 0 buy / 5 sell filings in last 60d (disclosures lag up to ~45d).
+2026-09-16 09:23:33,663 INFO screener |   candidate VIK [congress] score=-0.23 — Congress: 0 buy / 7 sell filings in last 60d (disclosures lag up to ~45d).
+2026-09-16 09:23:33,665 INFO screener |   candidate LYV [congress] score=-0.23 — Congress: 0 buy / 5 sell filings in last 60d (disclosures lag up to ~45d).
+2026-09-16 09:23:33,667 INFO screener |   candidate STE [congress] score=-0.23 — Congress: 0 buy / 5 sell filings in last 60d (disclosures lag up to ~45d).
+2026-09-16 09:23:33,668 INFO screener |   candidate LH [congress] score=-0.23 — Congress: 0 buy / 4 sell filings in last 60d (disclosures lag up to ~45d).
+2026-09-16 09:23:33,670 INFO screener |   candidate WAB [congress] score=-0.23 — Congress: 0 buy / 4 sell filings in last 60d (disclosures lag up to ~45d).
+2026-09-16 09:23:33,671 INFO screener |   candidate CPAY [congress] score=-0.23 — Congress: 0 buy / 6 sell filings in last 60d (disclosures lag up to ~45d).
+2026-09-16 09:23:33,673 INFO screener |   candidate TDY [congress] score=-0.23 — Congress: 0 buy / 5 sell filings in last 60d (disclosures lag up to ~45d).
+2026-09-16 09:23:33,674 INFO screener |   candidate MIDD [congress] score=-0.23 — Congress: 0 buy / 6 sell filings in last 60d (disclosures lag up to ~45d).
+2026-09-16 09:23:33,676 INFO screener |   candidate SCI [congress] score=-0.23 — Congress: 0 buy / 5 sell filings in last 60d (disclosures lag up to ~45d).
+2026-09-16 09:23:50,393 INFO quiver | Quiver live/offexchange -> 5543 row(s).
+2026-09-16 09:23:51,127 INFO quiver | Quiver live/govcontractsall -> 20000 row(s).
+2026-09-16 09:23:52,558 INFO quiver | Quiver live/lobbying -> 20000 row(s).
+2026-09-16 09:24:38,510 INFO signals | options_chain: reading 25 of 30 symbols this cycle (cap).
+2026-09-16 09:24:45,419 INFO signals | Gathered signals for 30/30 symbols (+3 market signals).
+2026-09-16 09:24:45,472 INFO orchestrator | Composite index (30 scored, top: GRNT +2.60, INTC +1.90, RIG +1.81, BE +1.53, SPCX +1.28, NOK +1.20, AVBC +1.17, BRK.B +1.15; bear tail: HBAN -2.07, LYV -1.99, STE -1.59, LH -1.39, HD -1.27, VIK -1.10).
+2026-09-16 09:24:45,473 INFO orchestrator | NAME FALLING: GRNT -4.7% today vs SPY +0.2% — defense read armed (loss-cut release + HELD-line note).
+2026-09-16 09:24:45,477 INFO orchestrator | Expectancy gate (off, report-only): would have armed against: insider -1.7%/trip x12, options_chain -1.3%/trip x10, technical -1.5%/trip x19
+2026-09-16 09:24:48,265 INFO robinhood | Imported 1 Robinhood holding(s) for context (read-only).
+2026-09-16 09:24:48,268 INFO orchestrator | FEEDS: 3/3 healthy news=vader-fallback
+2026-09-16 09:24:48,273 INFO orchestrator | Buy-excluded from slate this cycle: AVBC (topped up 0.8h ago (next ok in 4h))
+2026-09-16 09:25:36,511 INFO usage | decision call: 23742 in / 3261 out (cache r=6485 w=0) ~$0.2035 [claude-opus-4-8]
+2026-09-16 09:25:36,519 INFO decision | Claude returned 2 proposal(s), 3 bearish verdict(s).
+2026-09-16 09:25:36,526 INFO orchestrator | Bearish verdict: HD DECLINED — Options flow only -0.14 and chain neutral (+0.06), off-exchange actually buy-side +0.20; RSI 36 oversold. Composite -1.27 is driven by lagged congress/insider s
+2026-09-16 09:25:36,529 INFO orchestrator | Bearish verdict: STE DECLINED — Bearish technical -0.60 and flow -0.59 are real, but RSI 33 is oversold and fundamentals are positive (+0.42); the -1.59 composite leans heavily on lagged congr
+2026-09-16 09:25:38,223 INFO earnings | Robinhood earnings calendar: 326 name(s) reporting within 31d.
+2026-09-16 09:25:41,229 INFO risk | REJECT buy INTC: At/over the 60% exposure-ladder cap (neutral regime; risk deployed $614,988 of $611,576).
+2026-09-16 09:25:41,233 INFO orchestrator | BUY INTC -> rejected: At/over the 60% exposure-ladder cap (neutral regime; risk deployed $614,988 of $611,576). | Strongest corroborated new name (composite +1.90): technical +0.62 uptrend px>50>200 with MACD bull,
+2026-09-16 09:25:41,871 INFO risk | PER-UNDERLYING PREMIUM CAP: HBAN debit budget clamped $7,135 -> $5,096 (open premium $0 of $5,096 cap).
+2026-09-16 09:25:41,876 INFO risk | Option HBAN: clamping 154 contracts to 50 (thin-book count cap).
+2026-09-16 09:25:41,879 INFO orchestrator | OPTION OptionStrategy.LONG_PUT HBAN -> approved: 50 contract(s), $1,650 debit (cap $5,096). | Corroborated breakdown: below its 200dma, RSI 37 with MACD bear, and the freshest signals all bearis
+2026-09-16 09:25:41,955 INFO alpaca | OPTION 1-leg order qty=50 limit=0.4 (order b9c7ddce-3da9-4483-8ebd-b1a3767f73c3)
+2026-09-16 09:25:41,963 INFO ledger | Ledger: BUY HBAN261016P00016000 qty=50 $1650
+2026-09-16 09:25:41,971 INFO orchestrator | BEARISH FUNNEL: slate_bearish=8 [HBAN -2.07 ELIGIBLE (below its 200dma) -> put proposed; LYV -1.99 gate-blocked; STE -1.59 ELIGIBLE (below its 200dma) -> declined: Bearish technical -0.60 and flow -0.59 are real, but RSI 33 ; LH -1.39 gate-blocked; HD -1.27 ELIGIBLE (below its 200dma) -> declined: Options flow only -0.14 and chain neutral (+0.06), off-excha; VIK -1.10 gate-blocked] put_proposals=1 put_approved=1 auto_hedge=flat proxy_put=none
+2026-09-16 09:25:42,037 INFO alpaca | Alpaca client ready (mode=paper).
+2026-09-16 09:25:44,609 INFO dashboard | Wrote dashboard with 81 trades -> dashboard.html
+2026-09-16 10:06:28,821 WARNING watchdog | Option HBAN 2026-10-16 premium mark unreliable (absurd 102% spread on HBAN261016P00016000 (> 10% cap): bid=0.12 ask=0.37), skipping tick — breach streak held at 0/2, not reset.
+2026-09-16 10:06:59,689 WARNING watchdog | Option HBAN 2026-10-16 premium mark unreliable (absurd 93% spread on HBAN261016P00016000 (> 10% cap): bid=0.12 ask=0.33), skipping tick — breach streak held at 0/2, not reset.
+2026-09-16 10:07:30,583 WARNING watchdog | Option HBAN 2026-10-16 premium mark unreliable (absurd 93% spread on HBAN261016P00016000 (> 10% cap): bid=0.12 ask=0.33), skipping tick — breach streak held at 0/2, not reset.
+2026-09-16 10:08:01,553 WARNING watchdog | Option HBAN 2026-10-16 premium mark unreliable (absurd 93% spread on HBAN261016P00016000 (> 10% cap): bid=0.12 ask=0.33), skipping tick — breach streak held at 0/2, not reset.
+2026-09-16 10:08:32,574 WARNING watchdog | Option HBAN 2026-10-16 premium mark unreliable (absurd 51% spread on HBAN261016P00016000 (> 10% cap): bid=0.22 ask=0.37), skipping tick — breach streak held at 0, not reset.
+2026-09-16 10:09:03,448 WARNING watchdog | Option HBAN 2026-10-16 premium mark unreliable (absurd 51% spread on HBAN261016P00016000 (> 10% cap): bid=0.22 ask=0.37), skipping tick — breach streak held at 0, not reset.
+2026-09-16 10:09:34,283 WARNING watchdog | Option HBAN 2026-10-16 premium mark unreliable (absurd 51% spread on HBAN261016P00016000 (> 10% cap): bid=0.22 ask=0.37), skipping tick — breach streak held at 0, not reset.
+2026-09-16 10:10:05,265 WARNING watchdog | Option HBAN 2026-10-16 premium mark unreliable (absurd 59% spread on HBAN261016P00016000 (> 10% cap): bid=0.18 ask=0.33), skipping tick — breach streak held at 0, not reset.
+2026-09-16 10:10:36,227 WARNING watchdog | Option HBAN 2026-10-16 premium mark unreliable (absurd 43% spread on HBAN261016P00016000 (> 10% cap): bid=0.27 ask=0.42), skipping tick — breach streak held at 0, not reset.
+2026-09-16 10:11:07,220 WARNING watchdog | Option HBAN 2026-10-16 premium mark unreliable (absurd 58% spread on HBAN261016P00016000 (> 10% cap): bid=0.23 ask=0.42), skipping tick — breach streak held at 0, not reset.
+2026-09-16 10:11:38,080 WARNING watchdog | Option HBAN 2026-10-16 premium mark unreliable (absurd 58% spread on HBAN261016P00016000 (> 10% cap): bid=0.23 ask=0.42), skipping tick — breach streak held at 0, not reset.
+2026-09-16 10:12:09,094 WARNING watchdog | Option HBAN 2026-10-16 premium mark unreliable (absurd 34% spread on HBAN261016P00016000 (> 10% cap): bid=0.27 ask=0.38), skipping tick — breach streak held at 0, not reset.
+2026-09-16 10:12:39,891 WARNING watchdog | Option HBAN 2026-10-16 premium mark unreliable (absurd 34% spread on HBAN261016P00016000 (> 10% cap): bid=0.27 ask=0.38), skipping tick — breach streak held at 0, not reset.
+2026-09-16 10:13:10,804 WARNING watchdog | Option HBAN 2026-10-16 premium mark unreliable (absurd 34% spread on HBAN261016P00016000 (> 10% cap): bid=0.27 ask=0.38), skipping tick — breach streak held at 0, not reset.
+2026-09-16 10:13:41,707 WARNING watchdog | Option HBAN 2026-10-16 premium mark unreliable (absurd 49% spread on HBAN261016P00016000 (> 10% cap): bid=0.23 ask=0.38), skipping tick — breach streak held at 0, not reset.
+2026-09-16 10:14:12,713 WARNING watchdog | Option HBAN 2026-10-16 premium mark unreliable (absurd 34% spread on HBAN261016P00016000 (> 10% cap): bid=0.27 ask=0.38), skipping tick — breach streak held at 0, not reset.
+2026-09-16 10:14:43,635 WARNING watchdog | Option HBAN 2026-10-16 premium mark unreliable (absurd 40% spread on HBAN261016P00016000 (> 10% cap): bid=0.28 ask=0.42), skipping tick — breach streak held at 0, not reset.
+2026-09-16 10:14:56,189 INFO orchestrator | Order b9c7ddce-3da9-4483-8ebd-b1a3767f73c3 (HBAN) FILLED (50/50) @ 0.3500 x 50 [ledger stamped].
+2026-09-16 10:14:57,575 INFO orchestrator | Market regime: SPY above 200dma (761 vs 713, today +0.5%), VIX 16.8, VIX3M 19.2 (contango) -> risk-on, size x1.00.
+2026-09-16 10:14:59,451 INFO orchestrator | BOOK BETA: spy=0.94 qqq=0.57 iwm=0.88 invested=60.5% [options at debit notional x underlying beta: HBAN,HD,IWM]
+2026-09-16 10:15:00,050 INFO quiver | Quiver live/congresstrading -> 1000 row(s).
+2026-09-16 10:15:00,319 INFO screener | EDGAR Form-4 feed -> 63 filing(s) (scanning up to 100).
+2026-09-16 10:15:14,594 WARNING watchdog | Option HBAN 2026-10-16 premium mark unreliable (absurd 27% spread on HBAN261016P00016000 (> 10% cap): bid=0.32 ask=0.42), skipping tick — breach streak held at 0, not reset.
+2026-09-16 10:15:27,827 INFO screener | Options-flow most-actives pool -> 40 name(s).
+2026-09-16 10:15:45,493 WARNING watchdog | Option HBAN 2026-10-16 premium mark unreliable (absurd 17% spread on HBAN261016P00016000 (> 10% cap): bid=0.32 ask=0.38), skipping tick — breach streak held at 0, not reset.
+2026-09-16 10:15:54,978 INFO screener | Screener liquidity floor dropped 5/25 pre-cap: BDN $2.96<$5, PDSB $0.84<$5, FNGR $0.14<$5, TSLG $4.78<$5, PLUG $2.04<$5
+2026-09-16 10:15:54,983 INFO screener | Discovered 18 candidate(s) from 3 source(s) (207 merged, 20 above min_score, capped to 18).
+2026-09-16 10:15:54,987 INFO screener |   candidate NOK [options_flow] score=+0.71 — Options flow: 48,186 call / 8,191 put vol (bullish call imbalance +0.71) on a most-active name.
+2026-09-16 10:15:54,990 INFO screener |   candidate TSLL [options_flow] score=+0.57 — Options flow: 36,329 call / 9,880 put vol (bullish call imbalance +0.57) on a most-active name.
+2026-09-16 10:15:54,993 INFO screener |   candidate XLE [options_flow] score=-0.54 — Options flow: 20,663 call / 68,460 put vol (bearish put imbalance -0.54) on a most-active name.
+2026-09-16 10:15:54,995 INFO screener |   candidate INTC [congress+options_flow] score=+0.50 — Congress: 2 buy / 1 sell filings in last 60d (disclosures lag up to ~45d). | Options flow: 299,795 call / 117,030 put vol (bullish call imbalance +0.44) on a most-active name.
+2026-09-16 10:15:54,998 INFO screener |   candidate CIFR [options_flow] score=+0.43 — Options flow: 118,546 call / 46,829 put vol (bullish call imbalance +0.43) on a most-active name.
+2026-09-16 10:15:55,001 INFO screener |   candidate SOXS [options_flow] score=+0.32 — Options flow: 10,212 call / 5,289 put vol (bullish call imbalance +0.32) on a most-active name.
+2026-09-16 10:15:55,004 INFO screener |   candidate AUR [options_flow] score=+0.32 — Options flow: 4,821 call / 2,507 put vol (bullish call imbalance +0.32) on a most-active name.
+2026-09-16 10:15:55,006 INFO screener |   candidate RICK [insider] score=+0.30 — Insider: 1 open-market buy filing(s), 601 sh (SEC Form 4, last filings feed).
+2026-09-16 10:15:55,007 INFO screener |   candidate SBLK [insider] score=+0.30 — Insider: 1 open-market buy filing(s), 6,000 sh (SEC Form 4, last filings feed).
+2026-09-16 10:15:55,009 INFO screener |   candidate CLH [congress] score=-0.23 — Congress: 0 buy / 4 sell filings in last 60d (disclosures lag up to ~45d).
+2026-09-16 10:15:55,011 INFO screener |   candidate MKL [congress] score=-0.23 — Congress: 0 buy / 5 sell filings in last 60d (disclosures lag up to ~45d).
+2026-09-16 10:15:55,012 INFO screener |   candidate VIK [congress] score=-0.23 — Congress: 0 buy / 7 sell filings in last 60d (disclosures lag up to ~45d).
+2026-09-16 10:15:55,013 INFO screener |   candidate LYV [congress] score=-0.23 — Congress: 0 buy / 5 sell filings in last 60d (disclosures lag up to ~45d).
+2026-09-16 10:15:55,015 INFO screener |   candidate STE [congress] score=-0.23 — Congress: 0 buy / 5 sell filings in last 60d (disclosures lag up to ~45d).
+2026-09-16 10:15:55,016 INFO screener |   candidate LH [congress] score=-0.23 — Congress: 0 buy / 4 sell filings in last 60d (disclosures lag up to ~45d).
+2026-09-16 10:15:55,017 INFO screener |   candidate WAB [congress] score=-0.23 — Congress: 0 buy / 4 sell filings in last 60d (disclosures lag up to ~45d).
+2026-09-16 10:15:55,018 INFO screener |   candidate CPAY [congress] score=-0.23 — Congress: 0 buy / 6 sell filings in last 60d (disclosures lag up to ~45d).
+2026-09-16 10:15:55,019 INFO screener |   candidate TDY [congress] score=-0.23 — Congress: 0 buy / 5 sell filings in last 60d (disclosures lag up to ~45d).
+2026-09-16 10:16:16,347 WARNING watchdog | Option HBAN 2026-10-16 premium mark unreliable (absurd 40% spread on HBAN261016P00016000 (> 10% cap): bid=0.28 ask=0.42), skipping tick — breach streak held at 0, not reset.
+2026-09-16 10:16:18,409 INFO quiver | Quiver live/offexchange -> 5543 row(s).
+2026-09-16 10:16:18,971 INFO quiver | Quiver live/govcontractsall -> 20000 row(s).
+2026-09-16 10:16:23,745 INFO quiver | Quiver live/lobbying -> 20000 row(s).
+2026-09-16 10:16:47,381 WARNING watchdog | Option HBAN 2026-10-16 premium mark unreliable (absurd 40% spread on HBAN261016P00016000 (> 10% cap): bid=0.28 ask=0.42), skipping tick — breach streak held at 0, not reset.
+2026-09-16 10:17:02,413 INFO signals | options_chain: reading 25 of 32 symbols this cycle (cap).
+2026-09-16 10:17:09,687 INFO signals | Gathered signals for 32/32 symbols (+3 market signals).
+2026-09-16 10:17:09,742 INFO orchestrator | Composite index (32 scored, top: GRNT +2.58, INTC +1.92, BE +1.59, SPCX +1.44, SNAP +1.33, SBLK +1.31, BRK.B +1.28, ONON +1.26; bear tail: HBAN -2.20, LYV -1.98, STE -1.58, LH -1.41, HD -1.25, VIK -1.09).
+2026-09-16 10:17:09,743 INFO orchestrator | NAME FALLING: GRNT -5.8% today vs SPY +0.5% — defense read armed (loss-cut release + HELD-line note).
+2026-09-16 10:17:09,744 INFO orchestrator | NAME FALLING: RIG -5.2% today vs SPY +0.5% — defense read armed (loss-cut release + HELD-line note).
+2026-09-16 10:17:09,747 INFO orchestrator | Expectancy gate (off, report-only): would have armed against: insider -1.7%/trip x12, options_chain -1.3%/trip x10, technical -1.5%/trip x19
+2026-09-16 10:17:12,179 INFO robinhood | Imported 1 Robinhood holding(s) for context (read-only).
+2026-09-16 10:17:12,181 INFO orchestrator | FEEDS: 3/3 healthy news=vader-fallback
+2026-09-16 10:17:12,185 INFO orchestrator | Buy-excluded from slate this cycle: AVBC (topped up 1.7h ago (next ok in 4h)), HBAN (topped up 0.9h ago (next ok in 4h))
+2026-09-16 10:17:18,275 WARNING watchdog | Option HBAN 2026-10-16 premium mark unreliable (absurd 17% spread on HBAN261016P00016000 (> 10% cap): bid=0.32 ask=0.38), skipping tick — breach streak held at 0, not reset.
+2026-09-16 10:17:49,236 WARNING watchdog | Option HBAN 2026-10-16 premium mark unreliable (absurd 27% spread on HBAN261016P00016000 (> 10% cap): bid=0.32 ask=0.42), skipping tick — breach streak held at 0, not reset.
+2026-09-16 10:18:20,174 WARNING watchdog | Option HBAN 2026-10-16 premium mark unreliable (absurd 40% spread on HBAN261016P00016000 (> 10% cap): bid=0.28 ask=0.42), skipping tick — breach streak held at 0, not reset.
+2026-09-16 10:18:35,272 INFO usage | decision call: 24507 in / 5839 out (cache r=6485 w=0) ~$0.2718 [claude-opus-4-8]
+2026-09-16 10:18:35,276 INFO decision | Claude returned 5 proposal(s), 3 bearish verdict(s).
+2026-09-16 10:18:35,281 INFO orchestrator | Bearish verdict: HBAN DECLINED — Account holds HBAN long (starter bought today, conv 0.60); a put would contradict the open long rather than express a clean directional bearish thesis. RSI 37 i
+2026-09-16 10:18:35,284 INFO orchestrator | Bearish verdict: HD DECLINED — Technical breakdown is real (downtrend px<50<200, RSI 35, MACD bear, insider selling -1.00) but the chain does NOT confirm downside: options_chain +0.13 neutral
+2026-09-16 10:18:35,287 INFO orchestrator | Bearish verdict: STE DECLINED — Thesis is corroborated (technical -0.59 downtrend, RSI 35, MACD bear, flow -0.59, insider open-market selling -1.00) but the option legs are illiquid: total opt
+2026-09-16 10:18:36,650 INFO earnings | Robinhood earnings calendar: 326 name(s) reporting within 31d.
+2026-09-16 10:18:36,651 INFO risk | SELL AUTHORITY: RIG decision-sell allowed on event(s) name_falling:-5.2% today vs SPY +0.5% (unrealized -4.7%).
+2026-09-16 10:18:36,652 INFO orchestrator | SELL RIG -> approved: Closing existing position. | Loss-cut on a losing HELD position with a concrete NAME FALLING read armed (-5.2% today vs SPY +0.5%
+2026-09-16 10:18:36,939 WARNING alpaca | replace sell 8bcf43df-64f6-4546-9e74-d53441cc7a62 failed ({"code":42210000,"message":"take_profit.limit_price must be \u003e stop_loss.stop_price"}); falling back to cancel.
+2026-09-16 10:18:37,074 ERROR orchestrator | SELL RIG approved but the close FAILED — queued for the watchdog to retry every tick.
+2026-09-16 10:18:37,082 INFO orchestrator | Cycle budget $382,174 split across 3 buy(s): SNAP $119,192, SPCX $127,065, BE $135,917.
+2026-09-16 10:18:38,420 INFO notify | CRITICAL alert emailed to srikanthpusapati1@gmail.com: RIG SELL approved but close FAILED
+2026-09-16 10:18:41,170 INFO risk | REJECT buy SNAP: Top-up conviction 0.65 shows no new edge over prior entry 0.63 (needs +0.05) — 'adding to a winner' is not a signal.
+2026-09-16 10:18:41,173 INFO orchestrator | BUY SNAP -> rejected: Top-up conviction 0.65 shows no new edge over prior entry 0.63 (needs +0.05) — 'adding to a winner' is not a signal. | Top-up on intact fresh holding (held 1d, -1.1%). Strongest corroborated bullish positioning on the s
+2026-09-16 10:18:41,455 INFO risk | REJECT buy SPCX: Top-up conviction 0.64 shows no new edge over prior entry 0.62 (needs +0.05) — 'adding to a winner' is not a signal.
+2026-09-16 10:18:41,458 INFO orchestrator | BUY SPCX -> rejected: Top-up conviction 0.64 shows no new edge over prior entry 0.62 (needs +0.05) — 'adding to a winner' is not a signal. | Top-up on strongest-fundamentals holding (+4.3%, 14.3pp stop room). Fundamentals +0.71 (EBITDA $5.9B
+2026-09-16 10:18:41,646 INFO risk | REJECT buy BE: Top-up conviction 0.62 shows no new edge over prior entry 0.62 (needs +0.05) — 'adding to a winner' is not a signal.
+2026-09-16 10:18:41,648 INFO orchestrator | BUY BE -> rejected: Top-up conviction 0.62 shows no new edge over prior entry 0.62 (needs +0.05) — 'adding to a winner' is not a signal. | Top-up on intact winner (+4.8%, 14.8pp room). Technical +0.70 improving (MACD bull, uptrend px>50>20
+2026-09-16 10:18:41,765 INFO orchestrator | HOLD GRNT (no action) | HELD loser down today (NAME FALLING -5.8%) but thesis intact: fundamentals +0.77 (59.8% margin, +37.
+2026-09-16 10:18:41,769 INFO orchestrator | BEARISH FUNNEL: slate_bearish=8 [HBAN -2.20 ELIGIBLE (below its 200dma) -> declined: Account holds HBAN long (starter bought today, conv 0.60); a; LYV -1.98 gate-blocked; STE -1.58 ELIGIBLE (below its 200dma) -> declined: Thesis is corroborated (technical -0.59 downtrend, RSI 35, M; LH -1.41 gate-blocked; HD -1.25 ELIGIBLE (below its 200dma) -> declined: Technical breakdown is real (downtrend px<50<200, RSI 35, MA; VIK -1.09 gate-blocked] put_proposals=0 put_approved=0 auto_hedge=flat proxy_put=none
+2026-09-16 10:18:42,028 INFO alpaca | BUY market QQQ qty=None notional=13938.4 lim=None (order c1126018-0871-4b70-b11a-e82cadc741da)
+2026-09-16 10:18:42,031 INFO orchestrator | Core fill: bought $13938 of QQQ (invested 61% -> ~62%, target 75%).
+2026-09-16 10:18:42,035 INFO ledger | Ledger: BUY QQQ qty=19.6122 $13938
+2026-09-16 10:18:48,157 INFO alpaca | SELL stop QQQ qty=214.0 notional=None lim=None (order 3f5580d8-ae5c-4297-9e7e-040673e68dda)
+2026-09-16 10:18:48,160 INFO orchestrator | Core stop: GTC stop resting for 214 QQQ @ 602.04 (15% under basis 708.28).
+2026-09-16 10:18:48,165 INFO alpaca | Alpaca client ready (mode=paper).
+2026-09-16 10:18:50,424 INFO dashboard | Wrote dashboard with 82 trades -> dashboard.html
+2026-09-16 10:18:50,980 INFO alpaca | CLOSE RIG (order 98c30d70-740f-428f-ac39-60ef208bd52e)
+2026-09-16 10:18:50,989 INFO ledger | Ledger: SELL RIG qty=227 $1279
+2026-09-16 10:18:51,043 WARNING watchdog | Option HBAN 2026-10-16 premium mark unreliable (absurd 40% spread on HBAN261016P00016000 (> 10% cap): bid=0.28 ask=0.42), skipping tick — breach streak held at 0, not reset.
+2026-09-16 10:19:22,064 WARNING watchdog | Option HBAN 2026-10-16 premium mark unreliable (absurd 30% spread on HBAN261016P00016000 (> 10% cap): bid=0.28 ask=0.38), skipping tick — breach streak held at 0, not reset.
+2026-09-16 10:19:53,026 WARNING watchdog | Option HBAN 2026-10-16 premium mark unreliable (absurd 30% spread on HBAN261016P00016000 (> 10% cap): bid=0.28 ask=0.38), skipping tick — breach streak held at 0, not reset.
+2026-09-16 10:20:23,910 WARNING watchdog | Option HBAN 2026-10-16 premium mark unreliable (absurd 40% spread on HBAN261016P00016000 (> 10% cap): bid=0.28 ask=0.42), skipping tick — breach streak held at 0, not reset.
+2026-09-16 10:20:54,796 WARNING watchdog | Option HBAN 2026-10-16 premium mark unreliable (absurd 17% spread on HBAN261016P00016000 (> 10% cap): bid=0.32 ask=0.38), skipping tick — breach streak held at 0, not reset.
+2026-09-16 10:21:25,754 WARNING watchdog | Option HBAN 2026-10-16 premium mark unreliable (absurd 30% spread on HBAN261016P00016000 (> 10% cap): bid=0.28 ask=0.38), skipping tick — breach streak held at 0, not reset.
+2026-09-16 10:21:56,735 WARNING watchdog | Option HBAN 2026-10-16 premium mark unreliable (absurd 30% spread on HBAN261016P00016000 (> 10% cap): bid=0.28 ask=0.38), skipping tick — breach streak held at 0, not reset.
+2026-09-16 10:22:27,718 WARNING watchdog | Option HBAN 2026-10-16 premium mark unreliable (absurd 27% spread on HBAN261016P00016000 (> 10% cap): bid=0.32 ask=0.42), skipping tick — breach streak held at 0, not reset.
+2026-09-16 10:22:58,640 WARNING watchdog | Option HBAN 2026-10-16 premium mark unreliable (absurd 40% spread on HBAN261016P00016000 (> 10% cap): bid=0.28 ask=0.42), skipping tick — breach streak held at 0, not reset.
+2026-09-16 10:23:29,551 WARNING watchdog | Option HBAN 2026-10-16 premium mark unreliable (absurd 40% spread on HBAN261016P00016000 (> 10% cap): bid=0.28 ask=0.42), skipping tick — breach streak held at 0, not reset.
+2026-09-16 10:24:00,633 WARNING watchdog | Option HBAN 2026-10-16 premium mark unreliable (absurd 40% spread on HBAN261016P00016000 (> 10% cap): bid=0.28 ask=0.42), skipping tick — breach streak held at 0, not reset.
+2026-09-16 10:24:31,672 WARNING watchdog | Option HBAN 2026-10-16 premium mark unreliable (absurd 30% spread on HBAN261016P00016000 (> 10% cap): bid=0.28 ask=0.38), skipping tick — breach streak held at 0, not reset.
+2026-09-16 10:25:02,733 WARNING watchdog | Option HBAN 2026-10-16 premium mark unreliable (absurd 27% spread on HBAN261016P00016000 (> 10% cap): bid=0.32 ask=0.42), skipping tick — breach streak held at 0, not reset.
+2026-09-16 10:25:33,670 WARNING watchdog | Option HBAN 2026-10-16 premium mark unreliable (absurd 40% spread on HBAN261016P00016000 (> 10% cap): bid=0.28 ask=0.42), skipping tick — breach streak held at 0, not reset.
+2026-09-16 10:26:04,753 WARNING watchdog | Option HBAN 2026-10-16 premium mark unreliable (absurd 40% spread on HBAN261016P00016000 (> 10% cap): bid=0.28 ask=0.42), skipping tick — breach streak held at 0, not reset.
+2026-09-16 10:26:35,725 WARNING watchdog | Option HBAN 2026-10-16 premium mark unreliable (absurd 40% spread on HBAN261016P00016000 (> 10% cap): bid=0.28 ask=0.42), skipping tick — breach streak held at 0, not reset.
+2026-09-16 10:27:06,606 WARNING watchdog | Option HBAN 2026-10-16 premium mark unreliable (absurd 30% spread on HBAN261016P00016000 (> 10% cap): bid=0.28 ask=0.38), skipping tick — breach streak held at 0, not reset.
+2026-09-16 10:27:37,558 WARNING watchdog | Option HBAN 2026-10-16 premium mark unreliable (absurd 17% spread on HBAN261016P00016000 (> 10% cap): bid=0.32 ask=0.38), skipping tick — breach streak held at 0, not reset.
+2026-09-16 10:28:08,501 WARNING watchdog | Option HBAN 2026-10-16 premium mark unreliable (absurd 40% spread on HBAN261016P00016000 (> 10% cap): bid=0.28 ask=0.42), skipping tick — breach streak held at 0, not reset.
+2026-09-16 10:28:39,406 WARNING watchdog | Option HBAN 2026-10-16 premium mark unreliable (absurd 40% spread on HBAN261016P00016000 (> 10% cap): bid=0.28 ask=0.42), skipping tick — breach streak held at 0, not reset.
+2026-09-16 10:29:10,346 WARNING watchdog | Option HBAN 2026-10-16 premium mark unreliable (absurd 27% spread on HBAN261016P00016000 (> 10% cap): bid=0.32 ask=0.42), skipping tick — breach streak held at 0, not reset.
+2026-09-16 10:29:41,275 WARNING watchdog | Option HBAN 2026-10-16 premium mark unreliable (absurd 40% spread on HBAN261016P00016000 (> 10% cap): bid=0.28 ask=0.42), skipping tick — breach streak held at 0, not reset.
+2026-09-16 10:30:12,175 WARNING watchdog | Option HBAN 2026-10-16 premium mark unreliable (absurd 27% spread on HBAN261016P00016000 (> 10% cap): bid=0.32 ask=0.42), skipping tick — breach streak held at 0, not reset.
+2026-09-16 10:30:43,155 WARNING watchdog | Option HBAN 2026-10-16 premium mark unreliable (absurd 27% spread on HBAN261016P00016000 (> 10% cap): bid=0.32 ask=0.42), skipping tick — breach streak held at 0, not reset.
+2026-09-16 10:31:14,066 WARNING watchdog | Option HBAN 2026-10-16 premium mark unreliable (absurd 40% spread on HBAN261016P00016000 (> 10% cap): bid=0.28 ask=0.42), skipping tick — breach streak held at 0, not reset.
+2026-09-16 10:31:45,087 WARNING watchdog | Option HBAN 2026-10-16 premium mark unreliable (absurd 40% spread on HBAN261016P00016000 (> 10% cap): bid=0.28 ask=0.42), skipping tick — breach streak held at 0, not reset.
+2026-09-16 10:32:15,868 WARNING watchdog | Option HBAN 2026-10-16 premium mark unreliable (absurd 30% spread on HBAN261016P00016000 (> 10% cap): bid=0.28 ask=0.38), skipping tick — breach streak held at 0, not reset.
+2026-09-16 10:32:46,856 WARNING watchdog | Option HBAN 2026-10-16 premium mark unreliable (absurd 40% spread on HBAN261016P00016000 (> 10% cap): bid=0.28 ask=0.42), skipping tick — breach streak held at 0, not reset.
+2026-09-16 10:33:17,888 WARNING watchdog | Option HBAN 2026-10-16 premium mark unreliable (absurd 17% spread on HBAN261016P00016000 (> 10% cap): bid=0.32 ask=0.38), skipping tick — breach streak held at 0, not reset.
+2026-09-16 10:33:48,850 WARNING watchdog | Option HBAN 2026-10-16 premium mark unreliable (absurd 40% spread on HBAN261016P00016000 (> 10% cap): bid=0.28 ask=0.42), skipping tick — breach streak held at 0, not reset.
+2026-09-16 10:34:19,727 WARNING watchdog | Option HBAN 2026-10-16 premium mark unreliable (absurd 17% spread on HBAN261016P00016000 (> 10% cap): bid=0.32 ask=0.38), skipping tick — breach streak held at 0, not reset.
+2026-09-16 10:34:50,589 WARNING watchdog | Option HBAN 2026-10-16 premium mark unreliable (absurd 17% spread on HBAN261016P00016000 (> 10% cap): bid=0.32 ask=0.38), skipping tick — breach streak held at 0, not reset.
+2026-09-16 10:35:21,497 WARNING watchdog | Option HBAN 2026-10-16 premium mark unreliable (absurd 17% spread on HBAN261016P00016000 (> 10% cap): bid=0.32 ask=0.38), skipping tick — breach streak held at 0, not reset.
+2026-09-16 10:35:52,417 WARNING watchdog | Option HBAN 2026-10-16 premium mark unreliable (absurd 27% spread on HBAN261016P00016000 (> 10% cap): bid=0.32 ask=0.42), skipping tick — breach streak held at 0, not reset.
+2026-09-16 10:36:23,394 WARNING watchdog | Option HBAN 2026-10-16 premium mark unreliable (absurd 27% spread on HBAN261016P00016000 (> 10% cap): bid=0.32 ask=0.42), skipping tick — breach streak held at 0, not reset.
+2026-09-16 10:36:54,254 WARNING watchdog | Option HBAN 2026-10-16 premium mark unreliable (absurd 30% spread on HBAN261016P00016000 (> 10% cap): bid=0.28 ask=0.38), skipping tick — breach streak held at 0, not reset.
+2026-09-16 10:37:25,131 WARNING watchdog | Option HBAN 2026-10-16 premium mark unreliable (absurd 17% spread on HBAN261016P00016000 (> 10% cap): bid=0.32 ask=0.38), skipping tick — breach streak held at 0, not reset.
+2026-09-16 10:37:56,121 WARNING watchdog | Option HBAN 2026-10-16 premium mark unreliable (absurd 13% spread on HBAN261016P00016000 (> 10% cap): bid=0.37 ask=0.42), skipping tick — breach streak held at 0, not reset.
+2026-09-16 10:38:27,050 WARNING watchdog | Option HBAN 2026-10-16 premium mark unreliable (absurd 24% spread on HBAN261016P00016000 (> 10% cap): bid=0.33 ask=0.42), skipping tick — breach streak held at 0, not reset.
+2026-09-16 10:38:58,024 WARNING watchdog | Option HBAN 2026-10-16 premium mark unreliable (absurd 24% spread on HBAN261016P00016000 (> 10% cap): bid=0.33 ask=0.42), skipping tick — breach streak held at 0, not reset.
+2026-09-16 10:39:28,939 WARNING watchdog | Option HBAN 2026-10-16 premium mark unreliable (absurd 24% spread on HBAN261016P00016000 (> 10% cap): bid=0.33 ask=0.42), skipping tick — breach streak held at 0, not reset.
+2026-09-16 10:39:59,893 WARNING watchdog | Option HBAN 2026-10-16 premium mark unreliable (absurd 24% spread on HBAN261016P00016000 (> 10% cap): bid=0.33 ask=0.42), skipping tick — breach streak held at 0, not reset.
+2026-09-16 10:40:30,837 WARNING watchdog | Option HBAN 2026-10-16 premium mark unreliable (absurd 24% spread on HBAN261016P00016000 (> 10% cap): bid=0.33 ask=0.42), skipping tick — breach streak held at 0, not reset.
+2026-09-16 10:41:01,740 WARNING watchdog | Option HBAN 2026-10-16 premium mark unreliable (absurd 14% spread on HBAN261016P00016000 (> 10% cap): bid=0.33 ask=0.38), skipping tick — breach streak held at 0, not reset.
+2026-09-16 10:41:32,873 WARNING watchdog | Option HBAN 2026-10-16 premium mark unreliable (absurd 14% spread on HBAN261016P00016000 (> 10% cap): bid=0.33 ask=0.38), skipping tick — breach streak held at 0, not reset.
+2026-09-16 10:42:03,648 WARNING watchdog | Option HBAN 2026-10-16 premium mark unreliable (absurd 13% spread on HBAN261016P00016000 (> 10% cap): bid=0.37 ask=0.42), skipping tick — breach streak held at 0, not reset.
+2026-09-16 10:42:34,591 WARNING watchdog | Option HBAN 2026-10-16 premium mark unreliable (absurd 13% spread on HBAN261016P00016000 (> 10% cap): bid=0.37 ask=0.42), skipping tick — breach streak held at 0, not reset.
+2026-09-16 10:43:05,510 WARNING watchdog | Option HBAN 2026-10-16 premium mark unreliable (absurd 24% spread on HBAN261016P00016000 (> 10% cap): bid=0.33 ask=0.42), skipping tick — breach streak held at 0, not reset.
+2026-09-16 10:43:36,485 INFO watchdog | Option HBAN 2026-10-16 premium back inside stop/take thresholds (now +0.0%) — breach streak reset.
+2026-09-16 11:07:02,433 INFO orchestrator | Order c1126018-0871-4b70-b11a-e82cadc741da (QQQ) FILLED (19.6138/0) @ 710.6411 x 19.6138 [ledger stamped].
+2026-09-16 11:07:02,503 INFO orchestrator | Order 98c30d70-740f-428f-ac39-60ef208bd52e (RIG) FILLED (227/227) @ 5.6300 x 227 [ledger stamped].
+2026-09-16 11:07:03,667 INFO orchestrator | Market regime: SPY above 200dma (760 vs 713, today +0.4%), VIX 16.7, VIX3M 19.1 (contango) -> risk-on, size x1.00.
+2026-09-16 11:07:06,075 INFO orchestrator | BOOK BETA: spy=0.96 qqq=0.59 iwm=0.89 invested=61.7% [options at debit notional x underlying beta: HBAN,HD,IWM]
+2026-09-16 11:07:06,551 INFO quiver | Quiver live/congresstrading -> 1000 row(s).
+2026-09-16 11:07:06,788 INFO screener | EDGAR Form-4 feed -> 68 filing(s) (scanning up to 100).
+2026-09-16 11:07:36,729 INFO screener | Options-flow most-actives pool -> 40 name(s).
+2026-09-16 11:08:02,838 INFO screener | Screener liquidity floor dropped 5/30 pre-cap: PDSB $0.86<$5, FNGR $0.14<$5, NVD $4.08<$5, TSLG $4.73<$5, PLUG $2.04<$5
+2026-09-16 11:08:02,846 INFO screener | Discovered 18 candidate(s) from 3 source(s) (212 merged, 25 above min_score, capped to 18).
+2026-09-16 11:08:02,849 INFO screener |   candidate SPSB [options_flow] score=-0.97 — Options flow: 7 call / 473 put vol (bearish put imbalance -0.97) on a most-active name.
+2026-09-16 11:08:02,855 INFO screener |   candidate SBLK [insider] score=+0.61 — Insider: 2 open-market buy filing(s), 17,000 sh (SEC Form 4, last filings feed).
+2026-09-16 11:08:02,859 INFO screener |   candidate TSLL [options_flow] score=+0.58 — Options flow: 43,008 call / 11,439 put vol (bullish call imbalance +0.58) on a most-active name.
+2026-09-16 11:08:02,862 INFO screener |   candidate AUR [options_flow] score=+0.53 — Options flow: 8,107 call / 2,513 put vol (bullish call imbalance +0.53) on a most-active name.
+2026-09-16 11:08:02,865 INFO screener |   candidate INTC [congress+options_flow] score=+0.47 — Congress: 2 buy / 1 sell filings in last 60d (disclosures lag up to ~45d). | Options flow: 350,648 call / 145,053 put vol (bullish call imbalance +0.41) on a most-active name.
+2026-09-16 11:08:02,868 INFO screener |   candidate XLE [options_flow] score=-0.47 — Options flow: 32,099 call / 89,093 put vol (bearish put imbalance -0.47) on a most-active name.
+2026-09-16 11:08:02,870 INFO screener |   candidate CIFR [options_flow] score=+0.42 — Options flow: 133,351 call / 53,875 put vol (bullish call imbalance +0.42) on a most-active name.
+2026-09-16 11:08:02,872 INFO screener |   candidate AAL [options_flow] score=+0.41 — Options flow: 41,639 call / 17,447 put vol (bullish call imbalance +0.41) on a most-active name.
+2026-09-16 11:08:02,874 INFO screener |   candidate ETHA [options_flow] score=+0.34 — Options flow: 53,004 call / 25,960 put vol (bullish call imbalance +0.34) on a most-active name.
+2026-09-16 11:08:02,876 INFO screener |   candidate SOXS [options_flow] score=+0.33 — Options flow: 11,934 call / 6,017 put vol (bullish call imbalance +0.33) on a most-active name.
+2026-09-16 11:08:02,878 INFO screener |   candidate NOK [options_flow] score=+0.33 — Options flow: 53,180 call / 27,003 put vol (bullish call imbalance +0.33) on a most-active name.
+2026-09-16 11:08:02,881 INFO screener |   candidate ARDC [insider] score=+0.30 — Insider: 1 open-market buy filing(s), 240,000 sh (SEC Form 4, last filings feed).
+2026-09-16 11:08:02,883 INFO screener |   candidate RDGL [insider] score=+0.30 — Insider: 1 open-market buy filing(s), 25,550 sh (SEC Form 4, last filings feed).
+2026-09-16 11:08:02,884 INFO screener |   candidate TLAC [insider] score=+0.30 — Insider: 1 open-market buy filing(s), 200,000 sh vs 1 sell filing(s) (SEC Form 4, last filings feed).
+2026-09-16 11:08:02,886 INFO screener |   candidate CLH [congress] score=-0.23 — Congress: 0 buy / 4 sell filings in last 60d (disclosures lag up to ~45d).
+2026-09-16 11:08:02,888 INFO screener |   candidate MKL [congress] score=-0.23 — Congress: 0 buy / 5 sell filings in last 60d (disclosures lag up to ~45d).
+2026-09-16 11:08:02,889 INFO screener |   candidate VIK [congress] score=-0.23 — Congress: 0 buy / 7 sell filings in last 60d (disclosures lag up to ~45d).
+2026-09-16 11:08:02,890 INFO screener |   candidate LYV [congress] score=-0.23 — Congress: 0 buy / 5 sell filings in last 60d (disclosures lag up to ~45d).
+2026-09-16 11:08:11,537 ERROR yfinance | HTTP Error 404: {"quoteSummary":{"result":null,"error":{"code":"Not Found","description":"Quote not found for symbol: TLAC"}}}
+2026-09-16 11:08:17,029 ERROR yfinance | $TLAC: possibly delisted; no price data found  (period=1y) (Yahoo error = "No data found, symbol may be delisted")
+2026-09-16 11:08:19,965 INFO quiver | Quiver live/offexchange -> 5543 row(s).
+2026-09-16 11:08:20,554 INFO quiver | Quiver live/govcontractsall -> 20000 row(s).
+2026-09-16 11:08:21,587 INFO quiver | Quiver live/lobbying -> 20000 row(s).
+2026-09-16 11:08:58,447 INFO signals | options_chain: reading 25 of 31 symbols this cycle (cap).
+2026-09-16 11:09:06,174 INFO signals | Gathered signals for 31/31 symbols (+3 market signals).
+2026-09-16 11:09:06,234 INFO orchestrator | Composite index (31 scored, top: GRNT +2.59, INTC +1.98, BE +1.56, SPCX +1.41, SBLK +1.38, BRK.B +1.31, AVBC +1.17, SNAP +1.11; bear tail: HBAN -2.10, LYV -1.96, HD -1.19, SPSB -1.11, VIK -0.87, CLH -0.71).
+2026-09-16 11:09:06,235 INFO orchestrator | NAME FALLING: GRNT -5.5% today vs SPY +0.4% — defense read armed (loss-cut release + HELD-line note).
+2026-09-16 11:09:06,239 INFO orchestrator | Expectancy gate (off, report-only): would have armed against: insider -1.9%/trip x13, options_chain -1.3%/trip x10, technical -1.5%/trip x19
+2026-09-16 11:09:08,811 INFO robinhood | Imported 1 Robinhood holding(s) for context (read-only).
+2026-09-16 11:09:08,812 INFO orchestrator | FEEDS: 3/3 healthy news=vader-fallback
+2026-09-16 11:09:08,816 INFO orchestrator | Buy-excluded from slate this cycle: AVBC (topped up 2.6h ago (next ok in 4h)), HBAN (topped up 1.7h ago (next ok in 4h)), RDGL (price $0.05 < $5 liquidity floor)
+2026-09-16 11:10:22,733 INFO usage | decision call: 22238 in / 5066 out (cache r=6485 w=0) ~$0.2411 [claude-opus-4-8]
+2026-09-16 11:10:22,741 INFO decision | Claude returned 2 proposal(s), 3 bearish verdict(s).
+2026-09-16 11:10:22,746 INFO orchestrator | Bearish verdict: AAL DECLINED — Not a corroborated breakdown: options flow is bullish (+0.41 discovery, +0.22 imbalance, improving) and MACD is bullish, directly contradicting the bearish insi
+2026-09-16 11:10:22,749 INFO orchestrator | Bearish verdict: HBAN DECLINED — Composite is deeply bearish (-2.10, put flow -0.80, chain -0.48) but this account just opened a long HBAN position today at conv 0.60 (topped up 1.7h ago). Buyi
+2026-09-16 11:10:22,752 INFO orchestrator | Bearish verdict: HD DECLINED — Technical downtrend (px<50<200, RSI 36, MACD bear) and insider/congress selling are bearish, but options positioning does NOT confirm: flow -0.09 (essentially n
+2026-09-16 11:10:24,556 INFO earnings | Robinhood earnings calendar: 326 name(s) reporting within 31d.
+2026-09-16 11:10:27,438 INFO risk | REJECT buy NOK: Re-buying NOK at $10.11 >= recent exit $10.04 — chasing above the exit; composite +1.02 doesn't clear the +1.25 override (churn guard).
+2026-09-16 11:10:27,442 INFO orchestrator | BUY NOK -> rejected: Re-buying NOK at $10.11 >= recent exit $10.04 — chasing above the exit; composite +1.02 doesn't clear the +1.25 override (churn guard). | NEW scanner name with corroborated bullish positioning: options chain +0.67 (bullish, put/call OI 0.
+2026-09-16 11:10:27,561 INFO orchestrator | HOLD GRNT (no action) | Held loser down today (NAME FALLING -5.5%) but thesis intact: composite +2.59, fundamentals +0.77 (5
+2026-09-16 11:10:27,567 INFO orchestrator | BEARISH FUNNEL: slate_bearish=8 [HBAN -2.10 ELIGIBLE (below its 200dma) -> declined: Composite is deeply bearish (-2.10, put flow -0.80, chain -0; LYV -1.96 gate-blocked; HD -1.19 ELIGIBLE (below its 200dma) -> declined: Technical downtrend (px<50<200, RSI 36, MACD bear) and insid; SPSB -1.11 gate-blocked; VIK -0.87 gate-blocked; CLH -0.71 gate-blocked] put_proposals=0 put_approved=0 auto_hedge=flat proxy_put=none
+2026-09-16 11:10:27,639 INFO alpaca | Alpaca client ready (mode=paper).
+2026-09-16 11:10:29,821 INFO dashboard | Wrote dashboard with 83 trades -> dashboard.html
+2026-09-16 11:59:12,181 INFO orchestrator | Market regime: SPY above 200dma (760 vs 713, today +0.3%), VIX 16.8, VIX3M 19.2 (contango) -> risk-on, size x1.00.
+2026-09-16 11:59:13,896 INFO orchestrator | BOOK BETA: spy=0.96 qqq=0.59 iwm=0.89 invested=61.7% [options at debit notional x underlying beta: HBAN,HD,IWM]
+2026-09-16 11:59:14,198 INFO quiver | Quiver live/congresstrading -> 1000 row(s).
+2026-09-16 11:59:14,444 INFO screener | EDGAR Form-4 feed -> 57 filing(s) (scanning up to 100).
+2026-09-16 11:59:40,346 INFO screener | Options-flow most-actives pool -> 40 name(s).
+2026-09-16 12:00:04,750 INFO screener | Screener liquidity floor dropped 4/25 pre-cap: PDSB $0.90<$5, FNGR $0.15<$5, NVD $4.06<$5, TSLG $4.73<$5
+2026-09-16 12:00:04,756 INFO screener | Discovered 18 candidate(s) from 3 source(s) (207 merged, 21 above min_score, capped to 18).
+2026-09-16 12:00:04,760 INFO screener |   candidate AUR [options_flow] score=+0.70 — Options flow: 14,125 call / 2,534 put vol (bullish call imbalance +0.70) on a most-active name.
+2026-09-16 12:00:04,763 INFO screener |   candidate TSLL [options_flow] score=+0.61 — Options flow: 46,728 call / 11,150 put vol (bullish call imbalance +0.61) on a most-active name.
+2026-09-16 12:00:04,766 INFO screener |   candidate XLE [options_flow] score=-0.53 — Options flow: 33,774 call / 109,689 put vol (bearish put imbalance -0.53) on a most-active name.
+2026-09-16 12:00:04,768 INFO screener |   candidate INTC [congress+options_flow] score=+0.46 — Congress: 2 buy / 1 sell filings in last 60d (disclosures lag up to ~45d). | Options flow: 420,640 call / 177,292 put vol (bullish call imbalance +0.41) on a most-active name.
+2026-09-16 12:00:04,771 INFO screener |   candidate CIFR [options_flow] score=+0.40 — Options flow: 138,486 call / 59,774 put vol (bullish call imbalance +0.40) on a most-active name.
+2026-09-16 12:00:04,774 INFO screener |   candidate TER [insider] score=-0.36 — Insider: 2 open-market SELL filing(s), 4,800 sh — bearish cluster (SEC Form 4, last filings feed).
+2026-09-16 12:00:04,776 INFO screener |   candidate NOK [options_flow] score=+0.34 — Options flow: 56,028 call / 27,800 put vol (bullish call imbalance +0.34) on a most-active name.
+2026-09-16 12:00:04,778 INFO screener |   candidate ETHA [options_flow] score=+0.34 — Options flow: 57,302 call / 28,428 put vol (bullish call imbalance +0.34) on a most-active name.
+2026-09-16 12:00:04,779 INFO screener |   candidate SOXS [options_flow] score=+0.33 — Options flow: 12,843 call / 6,546 put vol (bullish call imbalance +0.33) on a most-active name.
+2026-09-16 12:00:04,781 INFO screener |   candidate ASYS [insider] score=+0.30 — Insider: 1 open-market buy filing(s), 2,000 sh (SEC Form 4, last filings feed).
+2026-09-16 12:00:04,783 INFO screener |   candidate CLH [congress] score=-0.23 — Congress: 0 buy / 4 sell filings in last 60d (disclosures lag up to ~45d).
+2026-09-16 12:00:04,784 INFO screener |   candidate MKL [congress] score=-0.23 — Congress: 0 buy / 5 sell filings in last 60d (disclosures lag up to ~45d).
+2026-09-16 12:00:04,786 INFO screener |   candidate VIK [congress] score=-0.23 — Congress: 0 buy / 7 sell filings in last 60d (disclosures lag up to ~45d).
+2026-09-16 12:00:04,787 INFO screener |   candidate LYV [congress] score=-0.23 — Congress: 0 buy / 5 sell filings in last 60d (disclosures lag up to ~45d).
+2026-09-16 12:00:04,788 INFO screener |   candidate STE [congress] score=-0.23 — Congress: 0 buy / 5 sell filings in last 60d (disclosures lag up to ~45d).
+2026-09-16 12:00:04,790 INFO screener |   candidate LH [congress] score=-0.23 — Congress: 0 buy / 4 sell filings in last 60d (disclosures lag up to ~45d).
+2026-09-16 12:00:04,791 INFO screener |   candidate WAB [congress] score=-0.23 — Congress: 0 buy / 4 sell filings in last 60d (disclosures lag up to ~45d).
+2026-09-16 12:00:04,792 INFO screener |   candidate CPAY [congress] score=-0.23 — Congress: 0 buy / 6 sell filings in last 60d (disclosures lag up to ~45d).
+2026-09-16 12:00:43,593 INFO quiver | Quiver live/offexchange -> 5543 row(s).
+2026-09-16 12:00:44,167 INFO quiver | Quiver live/govcontractsall -> 20000 row(s).
+2026-09-16 12:00:45,204 INFO quiver | Quiver live/lobbying -> 20000 row(s).
+2026-09-16 12:01:38,248 INFO signals | options_chain: reading 25 of 31 symbols this cycle (cap).
+2026-09-16 12:01:44,904 INFO signals | Gathered signals for 31/31 symbols (+3 market signals).
+2026-09-16 12:01:44,962 INFO orchestrator | Composite index (31 scored, top: GRNT +2.59, INTC +2.02, BE +1.51, BRK.B +1.37, SPCX +1.26, ONON +1.18, AVBC +1.17, AUR +1.09; bear tail: LYV -1.98, HBAN -1.94, STE -1.58, LH -1.42, HD -1.10, VIK -0.87).
+2026-09-16 12:01:44,963 INFO orchestrator | NAME FALLING: GRNT -4.9% today vs SPY +0.3% — defense read armed (loss-cut release + HELD-line note).
+2026-09-16 12:01:44,967 INFO orchestrator | Expectancy gate (off, report-only): would have armed against: insider -1.9%/trip x13, options_chain -1.3%/trip x10, technical -1.5%/trip x19
+2026-09-16 12:01:47,286 INFO robinhood | Imported 1 Robinhood holding(s) for context (read-only).
+2026-09-16 12:01:47,288 INFO orchestrator | FEEDS: 3/3 healthy news=vader-fallback
+2026-09-16 12:01:47,292 INFO orchestrator | Buy-excluded from slate this cycle: AVBC (topped up 3.4h ago (next ok in 4h)), HBAN (topped up 2.6h ago (next ok in 4h))
+2026-09-16 12:03:16,193 INFO usage | decision call: 24258 in / 6203 out (cache r=6485 w=0) ~$0.2796 [claude-opus-4-8]
+2026-09-16 12:03:16,203 INFO decision | Claude returned 7 proposal(s), 3 bearish verdict(s).
+2026-09-16 12:03:16,287 INFO orchestrator | Bearish verdict: HBAN DECLINED — Bearish flow -0.80 (307 call/9213 put) and chain -0.33 are genuinely bearish, but the account is net LONG HBAN (bought today); a put against our own fresh long 
+2026-09-16 12:03:16,293 INFO orchestrator | Bearish verdict: HD DECLINED — No bearish flow or chain confirmation: options_flow is -0.01 (5295 call/5478 put, essentially balanced) and options_chain is neutral +0.11. Downtrend is real bu
+2026-09-16 12:03:16,297 INFO orchestrator | Bearish verdict: STE DECLINED — Breakdown is corroborated (technical -0.59 downtrend below 200dma RSI 35 MACD bear, options_flow -0.59, insider open-market sells -1.00), but the bundle contain
+2026-09-16 12:03:16,364 INFO orchestrator | Cycle budget $369,518 split across 3 buy(s): INTC $163,104, BE $110,841, SPCX $95,572.
+2026-09-16 12:03:18,080 INFO earnings | Robinhood earnings calendar: 326 name(s) reporting within 31d.
+2026-09-16 12:03:20,968 INFO orchestrator | BUY INTC -> approved: Sized to 601.964 sh ($61,129) within caps. | Strongest corroborated new name: composite +2.02, technical +0.62 (uptrend px>50>200, MACD bull, RSI
+2026-09-16 12:03:21,021 WARNING alpaca | INTC: floored 601.964 sh -> 601 for the exchange bracket; $97.86 of the $61129.41 allocation NOT deployed (stays cash; core sweep / next cycle can redeploy).
+2026-09-16 12:03:21,087 INFO alpaca | BUY market INTC qty=601.0 notional=None lim=None (order d731303e-32bf-4422-b6ec-b79f6906de99)
+2026-09-16 12:03:21,093 INFO ledger | Ledger: BUY INTC qty=601 $61032
+2026-09-16 12:03:21,411 INFO risk | REJECT buy BE: Top-up conviction 0.60 shows no new edge over prior entry 0.62 (needs +0.05) — 'adding to a winner' is not a signal.
+2026-09-16 12:03:21,415 INFO orchestrator | BUY BE -> rejected: Top-up conviction 0.60 shows no new edge over prior entry 0.62 (needs +0.05) — 'adding to a winner' is not a signal. | Top-up on intact winner (+4.8%, 14.8pp stop room). Technical +0.70 improving (uptrend, MACD bull), f
+2026-09-16 12:03:21,626 INFO risk | REJECT buy SPCX: Top-up conviction 0.62 shows no new edge over prior entry 0.62 (needs +0.05) — 'adding to a winner' is not a signal.
+2026-09-16 12:03:21,630 INFO orchestrator | BUY SPCX -> rejected: Top-up conviction 0.62 shows no new edge over prior entry 0.62 (needs +0.05) — 'adding to a winner' is not a signal. | Top-up on strongest-fundamentals holding (+4.2%, 14.2pp room): EBITDA $5.9B, margin 25.6%, rev growt
+2026-09-16 12:03:21,755 INFO orchestrator | HOLD GRNT (no action) | NAME FALLING -4.9% today arms loss-cut, but thesis intact: composite +2.59, fundamentals +0.77 (59.8
+2026-09-16 12:03:21,931 INFO orchestrator | HOLD ORCL (no action) | Fundamentals anchor intact (EBITDA $34.4B, 48% margin, rev +29.6%) but technical -0.19 decaying (MAC
+2026-09-16 12:03:22,046 INFO orchestrator | HOLD SMCI (no action) | Fundamentals +0.34 (rev +93%) and bullish flow/chain, but technical MACD bear and insider open-marke
+2026-09-16 12:03:22,283 INFO orchestrator | HOLD ONON (no action) | Hard insider corroboration (open-market +0.97, 130k sh; net +1.00) and improving flow, but technical
+2026-09-16 12:03:22,347 INFO orchestrator | BEARISH FUNNEL: slate_bearish=8 [LYV -1.98 gate-blocked; HBAN -1.94 ELIGIBLE (below its 200dma) -> declined: Bearish flow -0.80 (307 call/9213 put) and chain -0.33 are g; STE -1.58 ELIGIBLE (below its 200dma) -> declined: Breakdown is corroborated (technical -0.59 downtrend below 2; LH -1.42 gate-blocked; HD -1.10 ELIGIBLE (below its 200dma) -> declined: No bearish flow or chain confirmation: options_flow is -0.01; VIK -0.87 gate-blocked] put_proposals=0 put_approved=0 auto_hedge=flat proxy_put=none
+2026-09-16 12:03:22,351 INFO orchestrator | Cycle budget not fully deployed: $97.86 dropped by whole-share flooring across this cycle's buys (stays cash; core sweep / next cycle can redeploy).
+2026-09-16 12:03:22,467 INFO alpaca | Alpaca client ready (mode=paper).
+2026-09-16 12:03:24,852 INFO dashboard | Wrote dashboard with 84 trades -> dashboard.html
+2026-09-16 12:51:36,241 INFO orchestrator | Order d731303e-32bf-4422-b6ec-b79f6906de99 (INTC) FILLED (601/601) @ 101.5400 x 601 [ledger stamped].
+2026-09-16 12:51:37,322 INFO orchestrator | Market regime: SPY above 200dma (760 vs 713, today +0.3%), VIX 16.8, VIX3M 19.2 (contango), QQQ+IWM below 50dma (narrow breadth) -> neutral, size x0.70.
+2026-09-16 12:51:39,140 INFO orchestrator | BOOK BETA: spy=1.14 qqq=0.73 iwm=1.04 invested=67.6% [options at debit notional x underlying beta: HBAN,HD,IWM]
+2026-09-16 12:51:39,481 INFO quiver | Quiver live/congresstrading -> 1000 row(s).
+2026-09-16 12:51:39,825 INFO screener | EDGAR Form-4 feed -> 55 filing(s) (scanning up to 100).
+2026-09-16 12:52:02,595 INFO screener | Options-flow most-actives pool -> 40 name(s).
+2026-09-16 12:52:25,782 INFO screener | Screener liquidity floor dropped 4/25 pre-cap: PDSB $0.97<$5, FNGR $0.15<$5, NVD $4.11<$5, TSLG $4.68<$5
+2026-09-16 12:52:25,786 INFO screener | Discovered 18 candidate(s) from 3 source(s) (207 merged, 21 above min_score, capped to 18).
+2026-09-16 12:52:25,788 INFO screener |   candidate AUR [options_flow] score=+0.73 — Options flow: 16,270 call / 2,583 put vol (bullish call imbalance +0.73) on a most-active name.
+2026-09-16 12:52:25,791 INFO screener |   candidate TSLL [options_flow] score=+0.62 — Options flow: 50,367 call / 11,733 put vol (bullish call imbalance +0.62) on a most-active name.
+2026-09-16 12:52:25,793 INFO screener |   candidate XLE [options_flow] score=-0.52 — Options flow: 36,511 call / 116,598 put vol (bearish put imbalance -0.52) on a most-active name.
+2026-09-16 12:52:25,795 INFO screener |   candidate ETHA [options_flow] score=+0.41 — Options flow: 68,257 call / 28,504 put vol (bullish call imbalance +0.41) on a most-active name.
+2026-09-16 12:52:25,796 INFO screener |   candidate CIFR [options_flow] score=+0.41 — Options flow: 144,690 call / 61,209 put vol (bullish call imbalance +0.41) on a most-active name.
+2026-09-16 12:52:25,798 INFO screener |   candidate NOK [options_flow] score=+0.34 — Options flow: 57,428 call / 28,150 put vol (bullish call imbalance +0.34) on a most-active name.
+2026-09-16 12:52:25,800 INFO screener |   candidate SOXS [options_flow] score=+0.32 — Options flow: 13,710 call / 7,012 put vol (bullish call imbalance +0.32) on a most-active name.
+2026-09-16 12:52:25,802 INFO screener |   candidate BITO [options_flow] score=+0.31 — Options flow: 2,893 call / 1,517 put vol (bullish call imbalance +0.31) on a most-active name.
+2026-09-16 12:52:25,804 INFO screener |   candidate CTTH [insider] score=+0.30 — Insider: 1 open-market buy filing(s), 10,900 sh (SEC Form 4, last filings feed).
+2026-09-16 12:52:25,806 INFO screener |   candidate BFH [insider] score=+0.30 — Insider: 1 open-market buy filing(s), 15 sh (SEC Form 4, last filings feed).
+2026-09-16 12:52:25,808 INFO screener |   candidate CLH [congress] score=-0.23 — Congress: 0 buy / 4 sell filings in last 60d (disclosures lag up to ~45d).
+2026-09-16 12:52:25,811 INFO screener |   candidate MKL [congress] score=-0.23 — Congress: 0 buy / 5 sell filings in last 60d (disclosures lag up to ~45d).
+2026-09-16 12:52:25,812 INFO screener |   candidate VIK [congress] score=-0.23 — Congress: 0 buy / 7 sell filings in last 60d (disclosures lag up to ~45d).
+2026-09-16 12:52:25,814 INFO screener |   candidate LYV [congress] score=-0.23 — Congress: 0 buy / 5 sell filings in last 60d (disclosures lag up to ~45d).
+2026-09-16 12:52:25,815 INFO screener |   candidate STE [congress] score=-0.23 — Congress: 0 buy / 5 sell filings in last 60d (disclosures lag up to ~45d).
+2026-09-16 12:52:25,816 INFO screener |   candidate LH [congress] score=-0.23 — Congress: 0 buy / 4 sell filings in last 60d (disclosures lag up to ~45d).
+2026-09-16 12:52:25,816 INFO screener |   candidate WAB [congress] score=-0.23 — Congress: 0 buy / 4 sell filings in last 60d (disclosures lag up to ~45d).
+2026-09-16 12:52:25,817 INFO screener |   candidate CPAY [congress] score=-0.23 — Congress: 0 buy / 6 sell filings in last 60d (disclosures lag up to ~45d).
+2026-09-16 12:52:41,710 INFO quiver | Quiver live/offexchange -> 5543 row(s).
+2026-09-16 12:52:42,291 INFO quiver | Quiver live/govcontractsall -> 20000 row(s).
+2026-09-16 12:52:43,544 INFO quiver | Quiver live/lobbying -> 20000 row(s).
+2026-09-16 12:53:19,631 INFO signals | options_chain: reading 25 of 32 symbols this cycle (cap).
+2026-09-16 12:53:25,989 INFO signals | Gathered signals for 32/32 symbols (+3 market signals).
+2026-09-16 12:53:26,057 INFO orchestrator | Composite index (32 scored, top: GRNT +2.59, INTC +1.97, BE +1.53, SPCX +1.41, BRK.B +1.40, ONON +1.24, AVBC +1.17, SMCI +1.04; bear tail: LYV -1.88, BFH -1.85, HBAN -1.85, STE -1.58, LH -1.40, HD -1.09).
+2026-09-16 12:53:26,058 INFO orchestrator | NAME FALLING: GRNT -5.7% today vs SPY +0.3% — defense read armed (loss-cut release + HELD-line note).
+2026-09-16 12:53:26,061 INFO orchestrator | Expectancy gate (off, report-only): would have armed against: insider -1.9%/trip x13, options_chain -1.3%/trip x10, technical -1.5%/trip x19
+2026-09-16 12:53:28,415 INFO robinhood | Imported 1 Robinhood holding(s) for context (read-only).
+2026-09-16 12:53:28,416 INFO orchestrator | FEEDS: 3/3 healthy news=vader-fallback
+2026-09-16 12:53:28,420 INFO orchestrator | Buy-excluded from slate this cycle: CTTH (price $0.04 < $5 liquidity floor), HBAN (topped up 3.5h ago (next ok in 4h)), INTC (topped up 0.8h ago (next ok in 4h))
+2026-09-16 12:54:13,443 INFO usage | decision call: 24657 in / 3056 out (cache r=6485 w=0) ~$0.2029 [claude-opus-4-8]
+2026-09-16 12:54:13,452 INFO decision | Claude returned 1 proposal(s), 3 bearish verdict(s).
+2026-09-16 12:54:13,457 INFO orchestrator | Bearish verdict: HBAN DECLINED — Bearish flow is real (options flow -0.76, chain -0.27) but RSI 37 is near-oversold and we opened a long HBAN position today on a +0.60 thesis; a put would fight
+2026-09-16 12:54:13,462 INFO orchestrator | Bearish verdict: HD DECLINED — Technical downtrend (RSI 36, MACD bear, px<50<200) and insider/congress selling, but NO bearish options confirmation — options flow neutral +0.01 and chain neut
+2026-09-16 12:54:13,465 INFO orchestrator | Bearish verdict: STE DECLINED — Downtrend and bearish flow present (technical -0.59, options flow -0.59, insider open-market -1.00) but RSI 35 is oversold and option volume is thin (148 call/5
+2026-09-16 12:54:13,645 INFO orchestrator | HOLD GRNT (no action) | NAME FALLING -5.7% arms loss-cut and stop room is thin (2.9pp), but the fundamental thesis is intact
+2026-09-16 12:54:13,651 INFO orchestrator | BEARISH FUNNEL: slate_bearish=8 [LYV -1.88 gate-blocked; BFH -1.85 gate-blocked; HBAN -1.85 ELIGIBLE (below its 200dma) -> declined: Bearish flow is real (options flow -0.76, chain -0.27) but R; STE -1.58 ELIGIBLE (below its 200dma) -> declined: Downtrend and bearish flow present (technical -0.59, options; LH -1.40 gate-blocked; HD -1.09 ELIGIBLE (below its 200dma) -> declined: Technical downtrend (RSI 36, MACD bear, px<50<200) and insid] put_proposals=0 put_approved=0 auto_hedge=flat proxy_put=none
+2026-09-16 12:54:13,717 INFO alpaca | Alpaca client ready (mode=paper).
+2026-09-16 12:54:15,964 INFO dashboard | Wrote dashboard with 84 trades -> dashboard.html
+2026-09-16 12:59:55,618 WARNING watchdog | Option HBAN 2026-10-16 premium mark unreliable (absurd 111% spread on HBAN261016P00016000 (> 10% cap): bid=0.12 ask=0.42), skipping tick — breach streak held at 0/2, not reset.
+2026-09-16 13:00:26,511 WARNING watchdog | Option HBAN 2026-10-16 premium mark unreliable (absurd 130% spread on HBAN261016P00016000 (> 10% cap): bid=0.08 ask=0.38), skipping tick — breach streak held at 0/2, not reset.
+2026-09-16 13:00:57,383 WARNING watchdog | Option HBAN 2026-10-16 premium mark unreliable (absurd 104% spread on HBAN261016P00016000 (> 10% cap): bid=0.12 ask=0.38), skipping tick — breach streak held at 0/2, not reset.
+2026-09-16 13:01:28,286 WARNING watchdog | Option HBAN 2026-10-16 premium mark unreliable (absurd 136% spread on HBAN261016P00016000 (> 10% cap): bid=0.08 ask=0.42), skipping tick — breach streak held at 0/2, not reset.
+2026-09-16 13:01:59,201 WARNING watchdog | Option HBAN 2026-10-16 premium mark unreliable (absurd 111% spread on HBAN261016P00016000 (> 10% cap): bid=0.12 ask=0.42), skipping tick — breach streak held at 0/2, not reset.
+2026-09-16 13:02:30,165 WARNING watchdog | Option HBAN 2026-10-16 premium mark unreliable (absurd 111% spread on HBAN261016P00016000 (> 10% cap): bid=0.12 ask=0.42), skipping tick — breach streak held at 0/2, not reset.
+2026-09-16 13:03:01,128 WARNING watchdog | Option HBAN 2026-10-16 premium mark unreliable (absurd 136% spread on HBAN261016P00016000 (> 10% cap): bid=0.08 ask=0.42), skipping tick — breach streak held at 0/2, not reset.
+2026-09-16 13:03:32,088 WARNING watchdog | Option HBAN 2026-10-16 premium mark unreliable (absurd 111% spread on HBAN261016P00016000 (> 10% cap): bid=0.12 ask=0.42), skipping tick — breach streak held at 0/2, not reset.
+2026-09-16 13:04:03,036 WARNING watchdog | Option HBAN 2026-10-16 premium mark unreliable (absurd 111% spread on HBAN261016P00016000 (> 10% cap): bid=0.12 ask=0.42), skipping tick — breach streak held at 0/2, not reset.
+2026-09-16 13:04:33,908 WARNING watchdog | Option HBAN 2026-10-16 premium mark unreliable (absurd 111% spread on HBAN261016P00016000 (> 10% cap): bid=0.12 ask=0.42), skipping tick — breach streak held at 0/2, not reset.
+2026-09-16 13:05:04,954 WARNING watchdog | Option HBAN 2026-10-16 premium mark unreliable (absurd 104% spread on HBAN261016P00016000 (> 10% cap): bid=0.12 ask=0.38), skipping tick — breach streak held at 0/2, not reset.
+2026-09-16 13:05:35,795 WARNING watchdog | Option HBAN 2026-10-16 premium mark unreliable (absurd 130% spread on HBAN261016P00016000 (> 10% cap): bid=0.08 ask=0.38), skipping tick — breach streak held at 0/2, not reset.
+2026-09-16 13:06:06,753 WARNING watchdog | Option HBAN 2026-10-16 premium mark unreliable (absurd 104% spread on HBAN261016P00016000 (> 10% cap): bid=0.12 ask=0.38), skipping tick — breach streak held at 0/2, not reset.
+2026-09-16 13:06:37,621 WARNING watchdog | Option HBAN 2026-10-16 premium mark unreliable (absurd 76% spread on HBAN261016P00016000 (> 10% cap): bid=0.17 ask=0.38), skipping tick — breach streak held at 0/2, not reset.
+2026-09-16 13:07:08,558 WARNING watchdog | Option HBAN 2026-10-16 premium mark unreliable (absurd 98% spread on HBAN261016P00016000 (> 10% cap): bid=0.13 ask=0.38), skipping tick — breach streak held at 0/2, not reset.
+2026-09-16 13:07:39,446 WARNING watchdog | Option HBAN 2026-10-16 premium mark unreliable (absurd 98% spread on HBAN261016P00016000 (> 10% cap): bid=0.13 ask=0.38), skipping tick — breach streak held at 0/2, not reset.
+2026-09-16 13:08:10,381 WARNING watchdog | Option HBAN 2026-10-16 premium mark unreliable (absurd 98% spread on HBAN261016P00016000 (> 10% cap): bid=0.13 ask=0.38), skipping tick — breach streak held at 0/2, not reset.
+2026-09-16 13:08:41,331 WARNING watchdog | Option HBAN 2026-10-16 premium mark unreliable (absurd 76% spread on HBAN261016P00016000 (> 10% cap): bid=0.17 ask=0.38), skipping tick — breach streak held at 0/2, not reset.
+2026-09-16 13:09:12,108 WARNING watchdog | Option HBAN 2026-10-16 premium mark unreliable (absurd 76% spread on HBAN261016P00016000 (> 10% cap): bid=0.17 ask=0.38), skipping tick — breach streak held at 0/2, not reset.
+2026-09-16 13:09:43,061 WARNING watchdog | Option HBAN 2026-10-16 premium mark unreliable (absurd 76% spread on HBAN261016P00016000 (> 10% cap): bid=0.17 ask=0.38), skipping tick — breach streak held at 0/2, not reset.
+2026-09-16 13:10:14,066 WARNING watchdog | Option HBAN 2026-10-16 premium mark unreliable (absurd 76% spread on HBAN261016P00016000 (> 10% cap): bid=0.17 ask=0.38), skipping tick — breach streak held at 0/2, not reset.
+2026-09-16 13:10:45,097 WARNING watchdog | Option HBAN 2026-10-16 premium mark unreliable (absurd 98% spread on HBAN261016P00016000 (> 10% cap): bid=0.13 ask=0.38), skipping tick — breach streak held at 0/2, not reset.
+2026-09-16 13:11:16,093 WARNING watchdog | Option HBAN 2026-10-16 premium mark unreliable (absurd 91% spread on HBAN261016P00016000 (> 10% cap): bid=0.18 ask=0.48), skipping tick — breach streak held at 0, not reset.
+2026-09-16 13:11:47,050 WARNING watchdog | Option HBAN 2026-10-16 premium mark unreliable (absurd 81% spread on HBAN261016P00016000 (> 10% cap): bid=0.22 ask=0.52), skipping tick — breach streak held at 0, not reset.
+2026-09-16 13:12:17,979 WARNING watchdog | Option HBAN 2026-10-16 premium mark unreliable (absurd 91% spread on HBAN261016P00016000 (> 10% cap): bid=0.18 ask=0.48), skipping tick — breach streak held at 0, not reset.
+2026-09-16 13:12:48,867 WARNING watchdog | Option HBAN 2026-10-16 premium mark unreliable (absurd 81% spread on HBAN261016P00016000 (> 10% cap): bid=0.22 ask=0.52), skipping tick — breach streak held at 0, not reset.
+2026-09-16 13:13:19,745 WARNING watchdog | Option HBAN 2026-10-16 premium mark unreliable (absurd 91% spread on HBAN261016P00016000 (> 10% cap): bid=0.18 ask=0.48), skipping tick — breach streak held at 0, not reset.
+2026-09-16 13:13:50,694 WARNING watchdog | Option HBAN 2026-10-16 premium mark unreliable (absurd 81% spread on HBAN261016P00016000 (> 10% cap): bid=0.22 ask=0.52), skipping tick — breach streak held at 0, not reset.
+2026-09-16 13:14:21,653 WARNING watchdog | Option HBAN 2026-10-16 premium mark unreliable (absurd 74% spread on HBAN261016P00016000 (> 10% cap): bid=0.22 ask=0.48), skipping tick — breach streak held at 0, not reset.
+2026-09-16 13:14:52,482 WARNING watchdog | Option HBAN 2026-10-16 premium mark unreliable (absurd 74% spread on HBAN261016P00016000 (> 10% cap): bid=0.22 ask=0.48), skipping tick — breach streak held at 0, not reset.
+2026-09-16 13:15:23,575 WARNING watchdog | Option HBAN 2026-10-16 premium mark unreliable (absurd 97% spread on HBAN261016P00016000 (> 10% cap): bid=0.18 ask=0.52), skipping tick — breach streak held at 0, not reset.
+2026-09-16 13:15:54,456 WARNING watchdog | Option HBAN 2026-10-16 premium mark unreliable (absurd 81% spread on HBAN261016P00016000 (> 10% cap): bid=0.22 ask=0.52), skipping tick — breach streak held at 0, not reset.
+2026-09-16 13:16:25,382 WARNING watchdog | Option HBAN 2026-10-16 premium mark unreliable (absurd 81% spread on HBAN261016P00016000 (> 10% cap): bid=0.22 ask=0.52), skipping tick — breach streak held at 0, not reset.
+2026-09-16 13:16:56,324 WARNING watchdog | Option HBAN 2026-10-16 premium mark unreliable (absurd 91% spread on HBAN261016P00016000 (> 10% cap): bid=0.18 ask=0.48), skipping tick — breach streak held at 0, not reset.
+2026-09-16 13:17:27,324 WARNING watchdog | Option HBAN 2026-10-16 premium mark unreliable (absurd 97% spread on HBAN261016P00016000 (> 10% cap): bid=0.18 ask=0.52), skipping tick — breach streak held at 0, not reset.
+2026-09-16 13:17:58,238 WARNING watchdog | Option HBAN 2026-10-16 premium mark unreliable (absurd 91% spread on HBAN261016P00016000 (> 10% cap): bid=0.18 ask=0.48), skipping tick — breach streak held at 0, not reset.
+2026-09-16 13:18:29,080 WARNING watchdog | Option HBAN 2026-10-16 premium mark unreliable (absurd 74% spread on HBAN261016P00016000 (> 10% cap): bid=0.22 ask=0.48), skipping tick — breach streak held at 0, not reset.
+2026-09-16 13:19:00,008 WARNING watchdog | Option HBAN 2026-10-16 premium mark unreliable (absurd 91% spread on HBAN261016P00016000 (> 10% cap): bid=0.18 ask=0.48), skipping tick — breach streak held at 0, not reset.
+2026-09-16 13:19:30,955 WARNING watchdog | Option HBAN 2026-10-16 premium mark unreliable (absurd 91% spread on HBAN261016P00016000 (> 10% cap): bid=0.18 ask=0.48), skipping tick — breach streak held at 0, not reset.
+2026-09-16 13:20:02,020 WARNING watchdog | Option HBAN 2026-10-16 premium mark unreliable (absurd 81% spread on HBAN261016P00016000 (> 10% cap): bid=0.22 ask=0.52), skipping tick — breach streak held at 0, not reset.
+2026-09-16 13:20:32,857 WARNING watchdog | Option HBAN 2026-10-16 premium mark unreliable (absurd 97% spread on HBAN261016P00016000 (> 10% cap): bid=0.18 ask=0.52), skipping tick — breach streak held at 0, not reset.
+2026-09-16 13:21:03,791 WARNING watchdog | Option HBAN 2026-10-16 premium mark unreliable (absurd 97% spread on HBAN261016P00016000 (> 10% cap): bid=0.18 ask=0.52), skipping tick — breach streak held at 0, not reset.
+2026-09-16 13:21:34,675 WARNING watchdog | Option HBAN 2026-10-16 premium mark unreliable (absurd 97% spread on HBAN261016P00016000 (> 10% cap): bid=0.18 ask=0.52), skipping tick — breach streak held at 0, not reset.
+2026-09-16 13:22:05,633 WARNING watchdog | Option HBAN 2026-10-16 premium mark unreliable (absurd 74% spread on HBAN261016P00016000 (> 10% cap): bid=0.22 ask=0.48), skipping tick — breach streak held at 0, not reset.
+2026-09-16 13:22:36,603 WARNING watchdog | Option HBAN 2026-10-16 premium mark unreliable (absurd 81% spread on HBAN261016P00016000 (> 10% cap): bid=0.22 ask=0.52), skipping tick — breach streak held at 0, not reset.
+2026-09-16 13:23:07,567 WARNING watchdog | Option HBAN 2026-10-16 premium mark unreliable (absurd 81% spread on HBAN261016P00016000 (> 10% cap): bid=0.22 ask=0.52), skipping tick — breach streak held at 0, not reset.
+2026-09-16 13:23:38,484 WARNING watchdog | Option HBAN 2026-10-16 premium mark unreliable (absurd 81% spread on HBAN261016P00016000 (> 10% cap): bid=0.22 ask=0.52), skipping tick — breach streak held at 0, not reset.
+2026-09-16 13:24:09,448 WARNING watchdog | Option HBAN 2026-10-16 premium mark unreliable (absurd 91% spread on HBAN261016P00016000 (> 10% cap): bid=0.18 ask=0.48), skipping tick — breach streak held at 0, not reset.
+2026-09-16 13:24:40,323 WARNING watchdog | Option HBAN 2026-10-16 premium mark unreliable (absurd 81% spread on HBAN261016P00016000 (> 10% cap): bid=0.22 ask=0.52), skipping tick — breach streak held at 0, not reset.
+2026-09-16 13:25:11,147 WARNING watchdog | Option HBAN 2026-10-16 premium mark unreliable (absurd 74% spread on HBAN261016P00016000 (> 10% cap): bid=0.22 ask=0.48), skipping tick — breach streak held at 0, not reset.
+2026-09-16 13:25:42,139 WARNING watchdog | Option HBAN 2026-10-16 premium mark unreliable (absurd 74% spread on HBAN261016P00016000 (> 10% cap): bid=0.22 ask=0.48), skipping tick — breach streak held at 0, not reset.
+2026-09-16 13:26:13,073 WARNING watchdog | Option HBAN 2026-10-16 premium mark unreliable (absurd 81% spread on HBAN261016P00016000 (> 10% cap): bid=0.22 ask=0.52), skipping tick — breach streak held at 0, not reset.
+2026-09-16 13:26:44,006 WARNING watchdog | Option HBAN 2026-10-16 premium mark unreliable (absurd 81% spread on HBAN261016P00016000 (> 10% cap): bid=0.22 ask=0.52), skipping tick — breach streak held at 0, not reset.
+2026-09-16 13:27:14,983 WARNING watchdog | Option HBAN 2026-10-16 premium mark unreliable (absurd 91% spread on HBAN261016P00016000 (> 10% cap): bid=0.18 ask=0.48), skipping tick — breach streak held at 0, not reset.
+2026-09-16 13:27:45,891 WARNING watchdog | Option HBAN 2026-10-16 premium mark unreliable (absurd 91% spread on HBAN261016P00016000 (> 10% cap): bid=0.18 ask=0.48), skipping tick — breach streak held at 0, not reset.
+2026-09-16 13:28:16,840 WARNING watchdog | Option HBAN 2026-10-16 premium mark unreliable (absurd 97% spread on HBAN261016P00016000 (> 10% cap): bid=0.18 ask=0.52), skipping tick — breach streak held at 0, not reset.
+2026-09-16 13:28:47,718 WARNING watchdog | Option HBAN 2026-10-16 premium mark unreliable (absurd 81% spread on HBAN261016P00016000 (> 10% cap): bid=0.22 ask=0.52), skipping tick — breach streak held at 0, not reset.
+2026-09-16 13:29:18,776 WARNING watchdog | Option HBAN 2026-10-16 premium mark unreliable (absurd 74% spread on HBAN261016P00016000 (> 10% cap): bid=0.22 ask=0.48), skipping tick — breach streak held at 0, not reset.
+2026-09-16 13:29:49,658 WARNING watchdog | Option HBAN 2026-10-16 premium mark unreliable (absurd 81% spread on HBAN261016P00016000 (> 10% cap): bid=0.22 ask=0.52), skipping tick — breach streak held at 0, not reset.
+2026-09-16 13:30:20,541 WARNING watchdog | Option HBAN 2026-10-16 premium mark unreliable (absurd 81% spread on HBAN261016P00016000 (> 10% cap): bid=0.22 ask=0.52), skipping tick — breach streak held at 0, not reset.
+2026-09-16 13:30:51,532 WARNING watchdog | Option HBAN 2026-10-16 premium mark unreliable (absurd 81% spread on HBAN261016P00016000 (> 10% cap): bid=0.22 ask=0.52), skipping tick — breach streak held at 0, not reset.
+2026-09-16 13:31:22,391 WARNING watchdog | Option HBAN 2026-10-16 premium mark unreliable (absurd 97% spread on HBAN261016P00016000 (> 10% cap): bid=0.18 ask=0.52), skipping tick — breach streak held at 0, not reset.
+2026-09-16 13:31:53,309 WARNING watchdog | Option HBAN 2026-10-16 premium mark unreliable (absurd 74% spread on HBAN261016P00016000 (> 10% cap): bid=0.22 ask=0.48), skipping tick — breach streak held at 0, not reset.
+2026-09-16 13:32:24,333 WARNING watchdog | Option HBAN 2026-10-16 premium mark unreliable (absurd 74% spread on HBAN261016P00016000 (> 10% cap): bid=0.22 ask=0.48), skipping tick — breach streak held at 0, not reset.
+2026-09-16 13:32:55,267 WARNING watchdog | Option HBAN 2026-10-16 premium mark unreliable (absurd 97% spread on HBAN261016P00016000 (> 10% cap): bid=0.18 ask=0.52), skipping tick — breach streak held at 0, not reset.
+2026-09-16 13:33:26,187 WARNING watchdog | Option HBAN 2026-10-16 premium mark unreliable (absurd 74% spread on HBAN261016P00016000 (> 10% cap): bid=0.22 ask=0.48), skipping tick — breach streak held at 0, not reset.
+2026-09-16 13:33:57,109 WARNING watchdog | Option HBAN 2026-10-16 premium mark unreliable (absurd 81% spread on HBAN261016P00016000 (> 10% cap): bid=0.22 ask=0.52), skipping tick — breach streak held at 0, not reset.
+2026-09-16 13:34:27,990 WARNING watchdog | Option HBAN 2026-10-16 premium mark unreliable (absurd 81% spread on HBAN261016P00016000 (> 10% cap): bid=0.22 ask=0.52), skipping tick — breach streak held at 0, not reset.
+2026-09-16 13:34:58,984 WARNING watchdog | Option HBAN 2026-10-16 premium mark unreliable (absurd 74% spread on HBAN261016P00016000 (> 10% cap): bid=0.22 ask=0.48), skipping tick — breach streak held at 0, not reset.
+2026-09-16 13:35:29,894 WARNING watchdog | Option HBAN 2026-10-16 premium mark unreliable (absurd 74% spread on HBAN261016P00016000 (> 10% cap): bid=0.22 ask=0.48), skipping tick — breach streak held at 0, not reset.
+2026-09-16 13:36:00,936 WARNING watchdog | Option HBAN 2026-10-16 premium mark unreliable (absurd 89% spread on HBAN261016P00016000 (> 10% cap): bid=0.22 ask=0.57), skipping tick — breach streak held at 0, not reset.
+2026-09-16 13:36:31,745 WARNING watchdog | Option HBAN 2026-10-16 premium mark unreliable (absurd 89% spread on HBAN261016P00016000 (> 10% cap): bid=0.22 ask=0.57), skipping tick — breach streak held at 0, not reset.
+2026-09-16 13:37:02,681 WARNING watchdog | Option HBAN 2026-10-16 premium mark unreliable (absurd 105% spread on HBAN261016P00016000 (> 10% cap): bid=0.18 ask=0.58), skipping tick — breach streak held at 0, not reset.
+2026-09-16 13:37:33,540 WARNING watchdog | Option HBAN 2026-10-16 premium mark unreliable (absurd 105% spread on HBAN261016P00016000 (> 10% cap): bid=0.18 ask=0.58), skipping tick — breach streak held at 0, not reset.
+2026-09-16 13:38:04,527 WARNING watchdog | Option HBAN 2026-10-16 premium mark unreliable (absurd 105% spread on HBAN261016P00016000 (> 10% cap): bid=0.18 ask=0.58), skipping tick — breach streak held at 0, not reset.
+2026-09-16 13:38:35,544 WARNING watchdog | Option HBAN 2026-10-16 premium mark unreliable (absurd 110% spread on HBAN261016P00016000 (> 10% cap): bid=0.18 ask=0.62), skipping tick — breach streak held at 0, not reset.
+2026-09-16 13:39:06,471 WARNING watchdog | Option HBAN 2026-10-16 premium mark unreliable (absurd 105% spread on HBAN261016P00016000 (> 10% cap): bid=0.18 ask=0.58), skipping tick — breach streak held at 0, not reset.
+2026-09-16 13:39:37,310 WARNING watchdog | Option HBAN 2026-10-16 premium mark unreliable (absurd 110% spread on HBAN261016P00016000 (> 10% cap): bid=0.18 ask=0.62), skipping tick — breach streak held at 0, not reset.
+2026-09-16 13:40:08,259 WARNING watchdog | Option HBAN 2026-10-16 premium mark unreliable (absurd 90% spread on HBAN261016P00016000 (> 10% cap): bid=0.22 ask=0.58), skipping tick — breach streak held at 0, not reset.
+2026-09-16 13:40:39,125 WARNING watchdog | Option HBAN 2026-10-16 premium mark unreliable (absurd 90% spread on HBAN261016P00016000 (> 10% cap): bid=0.22 ask=0.58), skipping tick — breach streak held at 0, not reset.
+2026-09-16 13:41:10,155 WARNING watchdog | Option HBAN 2026-10-16 premium mark unreliable (absurd 90% spread on HBAN261016P00016000 (> 10% cap): bid=0.22 ask=0.58), skipping tick — breach streak held at 0, not reset.
+2026-09-16 13:41:41,103 WARNING watchdog | Option HBAN 2026-10-16 premium mark unreliable (absurd 105% spread on HBAN261016P00016000 (> 10% cap): bid=0.18 ask=0.58), skipping tick — breach streak held at 0, not reset.
+2026-09-16 13:42:12,301 WARNING watchdog | Option HBAN 2026-10-16 premium mark unreliable (absurd 105% spread on HBAN261016P00016000 (> 10% cap): bid=0.18 ask=0.58), skipping tick — breach streak held at 0, not reset.
+2026-09-16 13:42:43,284 WARNING watchdog | Option HBAN 2026-10-16 premium mark unreliable (absurd 36% spread on HBAN261016P00016000 (> 10% cap): bid=0.43 ask=0.62), skipping tick — breach streak held at 0, not reset.
+2026-09-16 13:43:14,273 WARNING watchdog | Option HBAN 2026-10-16 premium mark unreliable (absurd 28% spread on HBAN261016P00016000 (> 10% cap): bid=0.43 ask=0.57), skipping tick — breach streak held at 0, not reset.
+2026-09-16 13:43:45,150 WARNING watchdog | Option HBAN 2026-10-16 premium mark unreliable (absurd 28% spread on HBAN261016P00016000 (> 10% cap): bid=0.43 ask=0.57), skipping tick — breach streak held at 0, not reset.
+2026-09-16 13:43:59,364 INFO orchestrator | Market regime: SPY above 200dma (760 vs 713, today +0.3%), VIX 16.9, VIX3M 19.3 (contango) -> risk-on, size x1.00.
+2026-09-16 13:44:01,275 INFO orchestrator | BOOK BETA: spy=1.14 qqq=0.73 iwm=1.05 invested=67.7% [options at debit notional x underlying beta: HBAN,HD,IWM]
+2026-09-16 13:44:01,647 INFO quiver | Quiver live/congresstrading -> 1000 row(s).
+2026-09-16 13:44:09,000 INFO screener | EDGAR Form-4 feed -> 55 filing(s) (scanning up to 100).
+2026-09-16 13:44:16,085 WARNING watchdog | Option HBAN 2026-10-16 premium mark unreliable (absurd 21% spread on HBAN261016P00016000 (> 10% cap): bid=0.43 ask=0.53), skipping tick — breach streak held at 0, not reset.
+2026-09-16 13:44:34,653 INFO screener | Options-flow most-actives pool -> 40 name(s).
+2026-09-16 13:44:47,015 WARNING watchdog | Option HBAN 2026-10-16 premium mark unreliable (absurd 12% spread on HBAN261016P00016000 (> 10% cap): bid=0.47 ask=0.53), skipping tick — breach streak held at 0, not reset.
+2026-09-16 13:45:02,949 INFO screener | Screener liquidity floor dropped 5/25 pre-cap: RWT $3.96<$5, PDSB $0.92<$5, NVD $4.08<$5, FNGR $0.14<$5, TSLG $4.66<$5
+2026-09-16 13:45:02,957 INFO screener | Discovered 18 candidate(s) from 3 source(s) (207 merged, 20 above min_score, capped to 18).
+2026-09-16 13:45:02,960 INFO screener |   candidate AUR [options_flow] score=+0.73 — Options flow: 16,430 call / 2,589 put vol (bullish call imbalance +0.73) on a most-active name.
+2026-09-16 13:45:02,963 INFO screener |   candidate TSLL [options_flow] score=+0.60 — Options flow: 57,779 call / 14,552 put vol (bullish call imbalance +0.60) on a most-active name.
+2026-09-16 13:45:02,966 INFO screener |   candidate XLE [options_flow] score=-0.51 — Options flow: 39,403 call / 120,316 put vol (bearish put imbalance -0.51) on a most-active name.
+2026-09-16 13:45:02,968 INFO screener |   candidate ETHA [options_flow] score=+0.47 — Options flow: 92,342 call / 33,022 put vol (bullish call imbalance +0.47) on a most-active name.
+2026-09-16 13:45:02,971 INFO screener |   candidate CIFR [options_flow] score=+0.42 — Options flow: 160,342 call / 64,886 put vol (bullish call imbalance +0.42) on a most-active name.
+2026-09-16 13:45:02,973 INFO screener |   candidate TLT [options_flow] score=+0.41 — Options flow: 497,597 call / 206,054 put vol (bullish call imbalance +0.41) on a most-active name.
+2026-09-16 13:45:02,975 INFO screener |   candidate SOXS [options_flow] score=+0.32 — Options flow: 17,079 call / 8,758 put vol (bullish call imbalance +0.32) on a most-active name.
+2026-09-16 13:45:02,977 INFO screener |   candidate UMH [insider] score=+0.30 — Insider: 1 open-market buy filing(s), 67 sh (SEC Form 4, last filings feed).
+2026-09-16 13:45:02,980 INFO screener |   candidate RGCO [insider] score=+0.30 — Insider: 1 open-market buy filing(s), 112 sh (SEC Form 4, last filings feed).
+2026-09-16 13:45:02,981 INFO screener |   candidate CLH [congress] score=-0.23 — Congress: 0 buy / 4 sell filings in last 60d (disclosures lag up to ~45d).
+2026-09-16 13:45:02,983 INFO screener |   candidate MKL [congress] score=-0.23 — Congress: 0 buy / 5 sell filings in last 60d (disclosures lag up to ~45d).
+2026-09-16 13:45:02,985 INFO screener |   candidate VIK [congress] score=-0.23 — Congress: 0 buy / 7 sell filings in last 60d (disclosures lag up to ~45d).
+2026-09-16 13:45:02,986 INFO screener |   candidate LYV [congress] score=-0.23 — Congress: 0 buy / 5 sell filings in last 60d (disclosures lag up to ~45d).
+2026-09-16 13:45:02,987 INFO screener |   candidate STE [congress] score=-0.23 — Congress: 0 buy / 5 sell filings in last 60d (disclosures lag up to ~45d).
+2026-09-16 13:45:02,989 INFO screener |   candidate LH [congress] score=-0.23 — Congress: 0 buy / 4 sell filings in last 60d (disclosures lag up to ~45d).
+2026-09-16 13:45:02,990 INFO screener |   candidate WAB [congress] score=-0.23 — Congress: 0 buy / 4 sell filings in last 60d (disclosures lag up to ~45d).
+2026-09-16 13:45:02,992 INFO screener |   candidate CPAY [congress] score=-0.23 — Congress: 0 buy / 6 sell filings in last 60d (disclosures lag up to ~45d).
+2026-09-16 13:45:02,993 INFO screener |   candidate TDY [congress] score=-0.23 — Congress: 0 buy / 5 sell filings in last 60d (disclosures lag up to ~45d).
+2026-09-16 13:45:17,991 WARNING watchdog | Option HBAN 2026-10-16 premium mark unreliable (absurd 12% spread on HBAN261016P00016000 (> 10% cap): bid=0.47 ask=0.53), skipping tick — breach streak held at 0, not reset.
+2026-09-16 13:45:24,428 INFO quiver | Quiver live/offexchange -> 5543 row(s).
+2026-09-16 13:45:24,890 INFO quiver | Quiver live/govcontractsall -> 20000 row(s).
+2026-09-16 13:45:26,001 INFO quiver | Quiver live/lobbying -> 20000 row(s).
+2026-09-16 13:45:48,866 WARNING watchdog | Option HBAN 2026-10-16 premium mark unreliable (absurd 12% spread on HBAN261016P00016000 (> 10% cap): bid=0.47 ask=0.53), skipping tick — breach streak held at 0, not reset.
+2026-09-16 13:46:19,766 INFO watchdog | Option HBAN 2026-10-16 premium back inside stop/take thresholds (now +42.9%) — breach streak reset.
+2026-09-16 13:46:25,013 INFO signals | options_chain: reading 25 of 32 symbols this cycle (cap).
+2026-09-16 13:46:31,871 INFO signals | Gathered signals for 32/32 symbols (+3 market signals).
+2026-09-16 13:46:31,941 INFO orchestrator | Composite index (32 scored, top: GRNT +2.60, INTC +1.99, BE +1.49, BRK.B +1.47, AUR +1.29, SPCX +1.27, ONON +1.26, AVBC +1.17; bear tail: HBAN -2.01, LYV -1.95, STE -1.45, LH -1.38, HD -0.89, VIK -0.87).
+2026-09-16 13:46:31,943 INFO orchestrator | NAME FALLING: GRNT -6.5% today vs SPY +0.3% — defense read armed (loss-cut release + HELD-line note).
+2026-09-16 13:46:31,947 INFO orchestrator | Expectancy gate (off, report-only): would have armed against: insider -1.9%/trip x13, options_chain -1.3%/trip x10, technical -1.5%/trip x19
+2026-09-16 13:46:34,559 INFO robinhood | Imported 1 Robinhood holding(s) for context (read-only).
+2026-09-16 13:46:34,560 INFO orchestrator | FEEDS: 3/3 healthy news=vader-fallback
+2026-09-16 13:46:34,564 INFO orchestrator | Buy-excluded from slate this cycle: GRNT (price $4.98 < $5 liquidity floor), INTC (topped up 1.7h ago (next ok in 4h))
+2026-09-16 13:47:50,667 INFO usage | decision call: 25530 in / 5435 out (cache r=6485 w=0) ~$0.2668 [claude-opus-4-8]
+2026-09-16 13:47:50,672 INFO decision | Claude returned 5 proposal(s), 3 bearish verdict(s).
+2026-09-16 13:47:50,676 INFO orchestrator | Bearish verdict: HBAN DECLINED — Account holds HBAN long; RSI 33 deeply oversold limits put follow-through despite bearish flow -0.72 and chain -0.45 — bounce risk outweighs adding a downside e
+2026-09-16 13:47:50,679 INFO orchestrator | Bearish verdict: HD DECLINED — No bearish flow confirm — options_flow +0.15 and options_chain +0.15 both bullish, off-exchange buy-side +0.20; only technical/congress bearish and RSI 34 overs
+2026-09-16 13:47:50,682 INFO orchestrator | Bearish verdict: STE DECLINED — RSI 34 oversold into positive fundamentals +0.42; bearish flow thin (573 put vol on 0.53x OI) and chain neutral +0.13 — corroboration too light and stretched to
+2026-09-16 13:47:50,726 INFO orchestrator | Cycle budget $308,480 split across 2 buy(s): BE $170,265, SPCX $138,215.
+2026-09-16 13:47:52,537 INFO earnings | Robinhood earnings calendar: 326 name(s) reporting within 31d.
+2026-09-16 13:47:55,536 INFO risk | REJECT buy BE: Top-up conviction 0.63 shows no new edge over prior entry 0.62 (needs +0.05) — 'adding to a winner' is not a signal.
+2026-09-16 13:47:55,542 INFO orchestrator | BUY BE -> rejected: Top-up conviction 0.63 shows no new edge over prior entry 0.62 (needs +0.05) — 'adding to a winner' is not a signal. | Top-up on intact winner (+3.8%, 13.8pp stop room). Technical +0.69 improving (+0.04/d), uptrend px>5
+2026-09-16 13:47:55,813 INFO risk | REJECT buy SPCX: Top-up conviction 0.60 shows no new edge over prior entry 0.62 (needs +0.05) — 'adding to a winner' is not a signal.
+2026-09-16 13:47:55,817 INFO orchestrator | BUY SPCX -> rejected: Top-up conviction 0.60 shows no new edge over prior entry 0.62 (needs +0.05) — 'adding to a winner' is not a signal. | Top-up on strongest-fundamentals holding (+3.4%, 13.4pp stop room): EBITDA $5.9B, margin 25.6%, rev 
+2026-09-16 13:47:55,924 INFO orchestrator | HOLD GRNT (no action) | NAME FALLING -6.5% arms loss-cut but thesis intact: fundamentals +0.77 (59.8% margin, rev +37%), ins
+2026-09-16 13:47:56,047 INFO orchestrator | HOLD ORCL (no action) | Fundamentals anchor intact (EBITDA $34.4B, 48% margin, rev +29.6%) but technical -0.19 decaying, MAC
+2026-09-16 13:47:56,231 INFO orchestrator | HOLD ONON (no action) | Hard insider corroboration (open-market +0.97 130k sh, net +1.00) and bullish flow +0.47 improving, 
+2026-09-16 13:47:56,238 INFO orchestrator | BEARISH FUNNEL: slate_bearish=8 [HBAN -2.01 ELIGIBLE (below its 200dma) -> declined: Account holds HBAN long; RSI 33 deeply oversold limits put f; LYV -1.95 gate-blocked; STE -1.45 ELIGIBLE (below its 200dma) -> declined: RSI 34 oversold into positive fundamentals +0.42; bearish fl; LH -1.38 gate-blocked; HD -0.89 ELIGIBLE (below its 200dma) -> declined: No bearish flow confirm — options_flow +0.15 and options_cha; VIK -0.87 gate-blocked] put_proposals=0 put_approved=0 auto_hedge=flat proxy_put=none
+2026-09-16 13:47:56,303 INFO alpaca | Alpaca client ready (mode=paper).
+2026-09-16 13:47:58,609 INFO dashboard | Wrote dashboard with 84 trades -> dashboard.html
+2026-09-16 13:53:01,664 INFO watchdog | Option IWM 2026-10-09 premium take breach tick 1/2 (now +100.0%) — awaiting confirmation on the next tick before closing.
+2026-09-16 13:53:32,650 INFO watchdog | Option exit on IWM 2026-10-09: premium take +100% (now +101.3%). Closing 2 leg(s).
+2026-09-16 13:53:32,739 INFO alpaca | OPTION close 2-leg qty=13 (order 0c02c681-df70-4eac-b1a1-70724da4a860)
+2026-09-16 13:53:32,751 INFO ledger | Ledger: SELL IWM qty=13 $0
+2026-09-16 14:20:18,613 WARNING watchdog | Option HBAN 2026-10-16 premium mark unreliable (absurd 20% spread on HBAN261016P00016000 (> 10% cap): bid=0.68 ask=0.83), skipping tick — breach streak held at 0/2, not reset.
+2026-09-16 14:20:49,570 WARNING watchdog | Option HBAN 2026-10-16 premium mark unreliable (absurd 19% spread on HBAN261016P00016000 (> 10% cap): bid=0.72 ask=0.87), skipping tick — breach streak held at 0/2, not reset.
+2026-09-16 14:21:20,499 WARNING watchdog | Option HBAN 2026-10-16 premium mark unreliable (absurd 20% spread on HBAN261016P00016000 (> 10% cap): bid=0.68 ask=0.83), skipping tick — breach streak held at 0/2, not reset.
+2026-09-16 14:21:51,408 WARNING watchdog | Option HBAN 2026-10-16 premium mark unreliable (absurd 20% spread on HBAN261016P00016000 (> 10% cap): bid=0.68 ask=0.83), skipping tick — breach streak held at 0/2, not reset.
+2026-09-16 14:22:22,431 WARNING watchdog | Option HBAN 2026-10-16 premium mark unreliable (absurd 19% spread on HBAN261016P00016000 (> 10% cap): bid=0.72 ask=0.87), skipping tick — breach streak held at 0/2, not reset.
+2026-09-16 14:22:53,263 WARNING watchdog | Option HBAN 2026-10-16 premium mark unreliable (absurd 14% spread on HBAN261016P00016000 (> 10% cap): bid=0.72 ask=0.83), skipping tick — breach streak held at 0/2, not reset.
+2026-09-16 14:23:24,214 WARNING watchdog | Option HBAN 2026-10-16 premium mark unreliable (absurd 19% spread on HBAN261016P00016000 (> 10% cap): bid=0.72 ask=0.87), skipping tick — breach streak held at 0/2, not reset.
+2026-09-16 14:23:55,144 WARNING watchdog | Option HBAN 2026-10-16 premium mark unreliable (absurd 19% spread on HBAN261016P00016000 (> 10% cap): bid=0.72 ask=0.87), skipping tick — breach streak held at 0/2, not reset.
+2026-09-16 14:24:26,078 WARNING watchdog | Option HBAN 2026-10-16 premium mark unreliable (absurd 14% spread on HBAN261016P00016000 (> 10% cap): bid=0.72 ask=0.83), skipping tick — breach streak held at 0/2, not reset.
+2026-09-16 14:24:57,021 WARNING watchdog | Option HBAN 2026-10-16 premium mark unreliable (absurd 20% spread on HBAN261016P00016000 (> 10% cap): bid=0.68 ask=0.83), skipping tick — breach streak held at 0/2, not reset.
+2026-09-16 14:25:27,967 WARNING watchdog | Option HBAN 2026-10-16 premium mark unreliable (absurd 20% spread on HBAN261016P00016000 (> 10% cap): bid=0.68 ask=0.83), skipping tick — breach streak held at 0/2, not reset.
+2026-09-16 14:25:58,888 WARNING watchdog | Option HBAN 2026-10-16 premium mark unreliable (absurd 25% spread on HBAN261016P00016000 (> 10% cap): bid=0.68 ask=0.87), skipping tick — breach streak held at 0/2, not reset.
+2026-09-16 14:26:29,829 WARNING watchdog | Option HBAN 2026-10-16 premium mark unreliable (absurd 14% spread on HBAN261016P00016000 (> 10% cap): bid=0.72 ask=0.83), skipping tick — breach streak held at 0/2, not reset.
+2026-09-16 14:27:00,780 WARNING watchdog | Option HBAN 2026-10-16 premium mark unreliable (absurd 20% spread on HBAN261016P00016000 (> 10% cap): bid=0.68 ask=0.83), skipping tick — breach streak held at 0/2, not reset.
+2026-09-16 14:27:31,716 WARNING watchdog | Option HBAN 2026-10-16 premium mark unreliable (absurd 43% spread on HBAN261016P00016000 (> 10% cap): bid=0.63 ask=0.98), skipping tick — breach streak held at 0, not reset.
+2026-09-16 14:28:02,519 WARNING watchdog | Option HBAN 2026-10-16 premium mark unreliable (absurd 26% spread on HBAN261016P00016000 (> 10% cap): bid=0.63 ask=0.82), skipping tick — breach streak held at 0, not reset.
+2026-09-16 14:28:33,410 WARNING watchdog | Option HBAN 2026-10-16 premium mark unreliable (absurd 21% spread on HBAN261016P00016000 (> 10% cap): bid=0.63 ask=0.78), skipping tick — breach streak held at 0, not reset.
+2026-09-16 14:29:04,285 WARNING watchdog | Option HBAN 2026-10-16 premium mark unreliable (absurd 21% spread on HBAN261016P00016000 (> 10% cap): bid=0.63 ask=0.78), skipping tick — breach streak held at 0, not reset.
+2026-09-16 14:29:35,217 WARNING watchdog | Option HBAN 2026-10-16 premium mark unreliable (absurd 26% spread on HBAN261016P00016000 (> 10% cap): bid=0.63 ask=0.82), skipping tick — breach streak held at 0, not reset.
+2026-09-16 14:30:06,298 WARNING watchdog | Option HBAN 2026-10-16 premium mark unreliable (absurd 26% spread on HBAN261016P00016000 (> 10% cap): bid=0.63 ask=0.82), skipping tick — breach streak held at 0, not reset.
+2026-09-16 14:30:37,330 WARNING watchdog | Option HBAN 2026-10-16 premium mark unreliable (absurd 21% spread on HBAN261016P00016000 (> 10% cap): bid=0.63 ask=0.78), skipping tick — breach streak held at 0, not reset.
+2026-09-16 14:31:08,438 WARNING watchdog | Option HBAN 2026-10-16 premium mark unreliable (absurd 20% spread on HBAN261016P00016000 (> 10% cap): bid=0.67 ask=0.82), skipping tick — breach streak held at 0, not reset.
+2026-09-16 14:31:39,578 WARNING watchdog | Option HBAN 2026-10-16 premium mark unreliable (absurd 21% spread on HBAN261016P00016000 (> 10% cap): bid=0.63 ask=0.78), skipping tick — breach streak held at 0, not reset.
+2026-09-16 14:32:10,521 WARNING watchdog | Option HBAN 2026-10-16 premium mark unreliable (absurd 20% spread on HBAN261016P00016000 (> 10% cap): bid=0.67 ask=0.82), skipping tick — breach streak held at 0, not reset.
+2026-09-16 14:32:41,337 WARNING watchdog | Option HBAN 2026-10-16 premium mark unreliable (absurd 15% spread on HBAN261016P00016000 (> 10% cap): bid=0.63 ask=0.73), skipping tick — breach streak held at 0, not reset.
+2026-09-16 14:33:12,348 WARNING watchdog | Option HBAN 2026-10-16 premium mark unreliable (absurd 15% spread on HBAN261016P00016000 (> 10% cap): bid=0.63 ask=0.73), skipping tick — breach streak held at 0, not reset.
+2026-09-16 14:33:43,254 INFO watchdog | Option HBAN 2026-10-16 premium back inside stop/take thresholds (now +85.7%) — breach streak reset.
+2026-09-16 14:36:10,043 INFO orchestrator | Order 0c02c681-df70-4eac-b1a1-70724da4a860 (IWM) FILLED (13/13).
+2026-09-16 14:36:11,079 INFO orchestrator | Market regime: SPY above 200dma (752 vs 713, today -0.7%), VIX 18.5, VIX3M 20.2 (contango), QQQ+IWM below 50dma (narrow breadth) -> neutral, size x0.70.
+2026-09-16 14:36:13,499 INFO orchestrator | BOOK BETA: spy=1.09 qqq=0.71 iwm=1.00 invested=66.6% [options at debit notional x underlying beta: HBAN,HD]
+2026-09-16 14:36:13,924 INFO quiver | Quiver live/congresstrading -> 1000 row(s).
+2026-09-16 14:36:14,215 INFO screener | EDGAR Form-4 feed -> 59 filing(s) (scanning up to 100).
+2026-09-16 14:36:39,555 INFO screener | Options-flow most-actives pool -> 40 name(s).
+2026-09-16 14:37:09,774 INFO screener | Screener liquidity floor dropped 5/25 pre-cap: RCG $2.86<$5, PDSB $0.99<$5, NVD $4.17<$5, FNGR $0.14<$5, TSLG $4.62<$5
+2026-09-16 14:37:09,784 INFO screener | Discovered 18 candidate(s) from 3 source(s) (207 merged, 20 above min_score, capped to 18).
+2026-09-16 14:37:09,789 INFO screener |   candidate AUR [options_flow] score=+0.73 — Options flow: 16,646 call / 2,596 put vol (bullish call imbalance +0.73) on a most-active name.
+2026-09-16 14:37:09,792 INFO screener |   candidate TSLL [options_flow] score=+0.57 — Options flow: 64,359 call / 17,409 put vol (bullish call imbalance +0.57) on a most-active name.
+2026-09-16 14:37:09,795 INFO screener |   candidate SQQQ [options_flow] score=+0.53 — Options flow: 59,433 call / 18,074 put vol (bullish call imbalance +0.53) on a most-active name.
+2026-09-16 14:37:09,797 INFO screener |   candidate ETHA [options_flow] score=+0.47 — Options flow: 106,054 call / 37,930 put vol (bullish call imbalance +0.47) on a most-active name.
+2026-09-16 14:37:09,799 INFO screener |   candidate CIFR [options_flow] score=+0.42 — Options flow: 168,193 call / 68,912 put vol (bullish call imbalance +0.42) on a most-active name.
+2026-09-16 14:37:09,801 INFO screener |   candidate TLT [options_flow] score=+0.41 — Options flow: 596,049 call / 247,954 put vol (bullish call imbalance +0.41) on a most-active name.
+2026-09-16 14:37:09,805 INFO screener |   candidate SOXS [options_flow] score=+0.40 — Options flow: 22,190 call / 9,491 put vol (bullish call imbalance +0.40) on a most-active name.
+2026-09-16 14:37:09,807 INFO screener |   candidate XLE [options_flow] score=-0.38 — Options flow: 55,456 call / 124,740 put vol (bearish put imbalance -0.38) on a most-active name.
+2026-09-16 14:37:09,809 INFO screener |   candidate AAL [options_flow] score=+0.30 — Options flow: 60,895 call / 32,568 put vol (bullish call imbalance +0.30) on a most-active name.
+2026-09-16 14:37:09,811 INFO screener |   candidate CLH [congress] score=-0.23 — Congress: 0 buy / 4 sell filings in last 60d (disclosures lag up to ~45d).
+2026-09-16 14:37:09,813 INFO screener |   candidate MKL [congress] score=-0.23 — Congress: 0 buy / 5 sell filings in last 60d (disclosures lag up to ~45d).
+2026-09-16 14:37:09,814 INFO screener |   candidate VIK [congress] score=-0.23 — Congress: 0 buy / 7 sell filings in last 60d (disclosures lag up to ~45d).
+2026-09-16 14:37:09,816 INFO screener |   candidate LYV [congress] score=-0.23 — Congress: 0 buy / 5 sell filings in last 60d (disclosures lag up to ~45d).
+2026-09-16 14:37:09,817 INFO screener |   candidate STE [congress] score=-0.23 — Congress: 0 buy / 5 sell filings in last 60d (disclosures lag up to ~45d).
+2026-09-16 14:37:09,818 INFO screener |   candidate LH [congress] score=-0.23 — Congress: 0 buy / 4 sell filings in last 60d (disclosures lag up to ~45d).
+2026-09-16 14:37:09,819 INFO screener |   candidate WAB [congress] score=-0.23 — Congress: 0 buy / 4 sell filings in last 60d (disclosures lag up to ~45d).
+2026-09-16 14:37:09,821 INFO screener |   candidate CPAY [congress] score=-0.23 — Congress: 0 buy / 6 sell filings in last 60d (disclosures lag up to ~45d).
+2026-09-16 14:37:09,822 INFO screener |   candidate TDY [congress] score=-0.23 — Congress: 0 buy / 5 sell filings in last 60d (disclosures lag up to ~45d).
+2026-09-16 14:37:24,764 INFO quiver | Quiver live/offexchange -> 5543 row(s).
+2026-09-16 14:37:25,276 INFO quiver | Quiver live/govcontractsall -> 20000 row(s).
+2026-09-16 14:37:26,341 INFO quiver | Quiver live/lobbying -> 20000 row(s).
+2026-09-16 14:39:03,804 INFO signals | options_chain: reading 25 of 31 symbols this cycle (cap).
+2026-09-16 14:39:10,411 INFO signals | Gathered signals for 31/31 symbols (+3 market signals).
+2026-09-16 14:39:10,478 INFO orchestrator | Composite index (31 scored, top: GRNT +2.56, INTC +1.89, BRK.B +1.51, BE +1.44, ONON +1.34, SPCX +1.20, AVBC +1.17, MKL +0.95; bear tail: HBAN -2.24, LYV -2.00, STE -1.47, LH -1.39, VIK -0.88, HD -0.85).
+2026-09-16 14:39:10,479 INFO orchestrator | NAME FALLING: GRNT -8.2% today vs SPY -0.7% — defense read armed (loss-cut release + HELD-line note).
+2026-09-16 14:39:13,069 INFO robinhood | Imported 1 Robinhood holding(s) for context (read-only).
+2026-09-16 14:39:13,071 INFO orchestrator | FEEDS: 3/3 healthy news=vader-fallback
+2026-09-16 14:39:13,075 INFO orchestrator | Buy-excluded from slate this cycle: GRNT (price $4.89 < $5 liquidity floor), INTC (topped up 2.6h ago (next ok in 4h))
+2026-09-16 14:39:57,616 INFO usage | decision call: 25267 in / 3195 out (cache r=6485 w=0) ~$0.2095 [claude-opus-4-8]
+2026-09-16 14:39:57,624 INFO decision | Claude returned 2 proposal(s), 4 bearish verdict(s).
+2026-09-16 14:39:57,630 INFO orchestrator | Bearish verdict: AAL DECLINED — Insider selling -1.00 is stale positioning; live options flow is bullish (+0.26, improving) and chain neutral (+0.04), MACD bull, RSI 33 oversold — no corrobora
+2026-09-16 14:39:57,634 INFO orchestrator | Bearish verdict: HBAN DECLINED — Bearish flow (-0.70) and chain (-0.68, put/call OI 1.45) are corroborated, but RSI 29 is oversold — high bounce risk buying puts at the low — and this account h
+2026-09-16 14:39:57,637 INFO orchestrator | Bearish verdict: HD DECLINED — Technical downtrend (px<50<200, RSI 32) is bearish, but options flow is BULLISH (+0.26, C/P 9619/5105) and chain neutral (+0.10) — the live positioning contradi
+2026-09-16 14:39:57,640 INFO orchestrator | Bearish verdict: STE DECLINED — Downtrend and options flow -0.59 lean bearish, but RSI 30 is oversold and the options_chain reads neutral (+0.13, put/call OI 0.77) — no fresh bearish chain con
+2026-09-16 14:39:57,791 INFO orchestrator | HOLD GRNT (no action) | NAME FALLING -8.2% today arms loss-cut and passes the rotation guard, but thesis is intact: fundamen
+2026-09-16 14:39:57,895 INFO orchestrator | HOLD ONON (no action) | Hard insider corroboration remains: 130k sh open-market buying (+0.97) and net +1.00, bullish option
+2026-09-16 14:39:57,900 INFO orchestrator | BEARISH FUNNEL: slate_bearish=9 [HBAN -2.24 ELIGIBLE (below its 200dma) -> declined: Bearish flow (-0.70) and chain (-0.68, put/call OI 1.45) are; LYV -2.00 gate-blocked; STE -1.47 ELIGIBLE (below its 200dma) -> declined: Downtrend and options flow -0.59 lean bearish, but RSI 30 is; LH -1.39 gate-blocked; VIK -0.88 gate-blocked; HD -0.85 ELIGIBLE (below its 200dma) -> declined: Technical downtrend (px<50<200, RSI 32) is bearish, but opti] put_proposals=0 put_approved=0 auto_hedge=flat proxy_put=none
+2026-09-16 14:39:57,967 INFO alpaca | Alpaca client ready (mode=paper).
+2026-09-16 14:40:00,304 INFO dashboard | Wrote dashboard with 85 trades -> dashboard.html
+2026-09-16 15:28:12,291 INFO orchestrator | Market closed; skipping decision cycle.
+2026-09-16 15:28:12,608 INFO orchestrator | Equity close row stamped for 2026-09-16 (basis=close).
+2026-09-16 15:28:12,613 INFO orchestrator | Running nightly post-mortem for 2026-09-16 …
+2026-09-16 15:28:12,631 INFO alpaca | Alpaca client ready (mode=paper).
+2026-09-16 15:28:14,069 INFO postmortem | Postmortem day attribution (close-to-close): 17 name(s); Day WINNER by close-to-close: SPCX +6,769 USD; Day LOSER by close-to-close: GRNT -1,906 USD
+2026-09-16 15:28:26,665 INFO usage | postmortem call: 4249 in / 627 out (cache r=0 w=0) ~$0.0369 [claude-opus-4-8]
+2026-09-16 15:28:26,673 INFO postmortem | Post-mortem written to state/lessons/2026-09-16.md
+2026-09-16 15:28:26,674 INFO postmortem | Post-mortem lessons: When one equity name exceeds ~50% of the day's fresh buy dollars (e.g. INTC $61k), flag and diversify remaining budget.
+2026-09-16 15:28:26,689 INFO orchestrator | API spend today: $1.98 across 9 calls (197,389 in / 36,338 out tokens).
+2026-09-16 15:28:26,747 INFO alpaca | Alpaca client ready (mode=paper).
+2026-09-16 15:28:29,075 INFO dashboard | Wrote dashboard with 85 trades -> dashboard.html
+2026-09-16 16:20:41,364 INFO orchestrator | Market closed; skipping decision cycle.
+2026-09-16 17:12:53,741 INFO orchestrator | Market closed; skipping decision cycle.
+2026-09-16 18:05:06,271 INFO orchestrator | Market closed; skipping decision cycle.
+2026-09-16 18:57:18,983 INFO orchestrator | Market closed; skipping decision cycle.
+2026-09-16 19:49:31,553 INFO orchestrator | Market closed; skipping decision cycle.
+2026-09-16 20:41:44,312 INFO orchestrator | Market closed; skipping decision cycle.
+2026-09-16 21:33:57,143 INFO orchestrator | Market closed; skipping decision cycle.
+2026-09-16 22:26:09,467 INFO orchestrator | Market closed; skipping decision cycle.
+2026-09-16 23:18:21,946 INFO orchestrator | Market closed; skipping decision cycle.
