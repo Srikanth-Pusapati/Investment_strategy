@@ -80,7 +80,11 @@ say "ok  .env: twelve run-7 key lines present once each; expectancy gate off"
 
 # -- 4. the keys belong to a NEW, empty paper account ------------------------ #
 OLD_ACCT=$(sed 's/^paper://' state/account.json 2>/dev/null || true)
-ACCT_LINE=$("$PY" - <<'PYEOF'
+# Retried: the SDK call has no timeout of its own, and on Sep 21 2026 one TLS
+# handshake to paper-api timed out and aborted a switch whose bot was already
+# stopped (the same read had passed two minutes earlier).
+read_account() {
+    "$PY" - <<'PYEOF'
 from dotenv import dotenv_values
 from alpaca.trading.client import TradingClient
 from alpaca.trading.requests import GetOrdersRequest
@@ -92,7 +96,16 @@ npos = len(c.get_all_positions())
 nord = len(c.get_orders(GetOrdersRequest(status=QueryOrderStatus.OPEN, limit=50)))
 print(f"{a.account_number} {a.equity} {npos} {nord}")
 PYEOF
-) || die "could not read the Alpaca account with the keys in .env"
+}
+ACCT_ERR=$(mktemp "${TMPDIR:-/tmp}/run7_switch_acct.XXXXXX"); try=0
+until ACCT_LINE=$(read_account 2>"$ACCT_ERR"); do
+    try=$((try + 1))
+    why=$(tail -1 "$ACCT_ERR" | cut -c1-160)
+    [ "$try" -lt 3 ] || { rm -f "$ACCT_ERR"; die "could not read the Alpaca account with the keys in .env (3 attempts): $why"; }
+    say "..  Alpaca account read failed ($why) — retry $try/2 in 5 s"
+    sleep 5
+done
+rm -f "$ACCT_ERR"
 set -- $ACCT_LINE
 NEW_ACCT=$1; NEW_EQ=$2; NPOS=$3; NORD=$4
 [ "$NEW_ACCT" != "$OLD_ACCT" ] || die ".env still holds the OLD account ($OLD_ACCT) — paste the fresh paper account's keys."
@@ -111,12 +124,17 @@ ROLLBACK="git checkout -B feature/preview $OLD_SHA   # then restore the old keys
 # Only ever signal a pid that IS the bot: a stale lock with a recycled pid must
 # not SIGTERM an unrelated process (ops.deadman.bot_alive makes the same check).
 PID=$(cat state/bot.lock 2>/dev/null || true)
+# "Running" is judged by the command line, never by `kill -0` alone: a bot that
+# has exited but is not yet reaped by its parent (the control panel) is a
+# ZOMBIE — `kill -0` still succeeds on it while ps shows `<defunct>`. On Sep 21
+# 2026 the wait loop below sat 30 s on exactly that and aborted a good stop.
+bot_running() { ps -o command= -p "$1" 2>/dev/null | grep -q 'investment_strategy'; }
 if [ -n "$PID" ] && kill -0 "$PID" 2>/dev/null; then
-    if ps -o command= -p "$PID" 2>/dev/null | grep -q 'investment_strategy'; then
+    if bot_running "$PID"; then
         say "..  stopping bot pid $PID"
         kill -TERM "$PID"
         i=0
-        while kill -0 "$PID" 2>/dev/null; do
+        while bot_running "$PID"; do
             i=$((i + 1)); [ "$i" -le 60 ] || die "bot pid $PID did not exit in 30 s — nothing else was changed."
             sleep 0.5
         done
