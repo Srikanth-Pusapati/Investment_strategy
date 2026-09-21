@@ -1,8 +1,13 @@
 #!/bin/sh
-# Run-7 day-0 switch — run from the LIVE tree, AFTER 16:00 ET on the switch day.
+# Run-7 day-0 switch — AFTER 16:00 ET on the switch day. The live tree is
+# still on the OLD code (this file is not in it yet) and the script moves the
+# tree to new code, so it must run from a copy OUTSIDE the tree:
 #
-#   DRY_RUN=1 sh scripts/run7_switch.sh    # every check, changes nothing
-#   sh scripts/run7_switch.sh              # the switch
+#   cd ~/Personal/Investment_stratergy            # the live tree
+#   git fetch origin
+#   git show origin/feature/preview:scripts/run7_switch.sh > /tmp/run7_switch.sh
+#   DRY_RUN=1 sh /tmp/run7_switch.sh              # every check, changes nothing
+#   sh /tmp/run7_switch.sh                        # the switch
 #
 # What it does, in order (docs/RUN7_SWITCH.md section 0):
 #   checks   market closed · merged change-set is on origin/feature/preview ·
@@ -19,12 +24,23 @@
 # FORCE_TIME=1 skips the after-the-bell check (weekends / holidays).
 set -eu
 
-ROOT=$(cd "$(dirname "$0")/.." && pwd)
-cd "$ROOT"
-PY="$ROOT/.venv/bin/python"
 DRY=${DRY_RUN:-0}
 say() { printf '%s\n' "$*"; }
 die() { printf 'ABORT: %s\n' "$*" >&2; exit 1; }
+
+# The live tree is the CURRENT directory (or LIVE_ROOT). The script itself must
+# live outside it: step 6 stashes untracked files and checks out new code, and
+# a shell script rewritten or removed while it runs misbehaves.
+ROOT=$(cd "${LIVE_ROOT:-$(pwd)}" && pwd)
+cd "$ROOT"
+[ -d .git ] && [ -d investment_strategy ] && [ -f .env ] \
+    || die "$ROOT is not the live tree (.git, investment_strategy/, .env) — cd into it first."
+SELF=$(cd "$(dirname "$0")" && pwd)
+case "$SELF/" in
+    "$ROOT"/*) [ "$DRY" = 1 ] || die "this script sits inside the live tree ($SELF) — copy it out first: git show origin/feature/preview:scripts/run7_switch.sh > /tmp/run7_switch.sh" ;;
+esac
+PY="$ROOT/.venv/bin/python"
+[ -x "$PY" ] || die "$PY not found"
 
 say "== run-7 switch ($( [ "$DRY" = 1 ] && echo DRY RUN || echo LIVE )) in $ROOT"
 

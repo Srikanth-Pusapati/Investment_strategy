@@ -26,10 +26,14 @@ change-set — four new STRATEGY KEYS in sections 1c / 2 below.
 2. Alpaca dashboard: create a NEW paper account, generate keys; in the live
    `.env` replace `ALPACA_API_KEY` / `ALPACA_SECRET_KEY` with them and paste the
    section-1c block (twelve lines + the ops lines). Never commit `.env`.
-3. Live tree, after 16:00 ET:
+3. Live tree, after 16:00 ET. The live tree is still on the OLD code and the
+   script moves it, so run a copy from OUTSIDE the tree:
 
-       DRY_RUN=1 sh scripts/run7_switch.sh     # every check, changes nothing
-       sh scripts/run7_switch.sh               # the switch
+       cd ~/Personal/Investment_stratergy
+       git fetch origin
+       git show origin/feature/preview:scripts/run7_switch.sh > /tmp/run7_switch.sh
+       DRY_RUN=1 sh /tmp/run7_switch.sh        # every check, changes nothing
+       sh /tmp/run7_switch.sh                  # the switch
 
    The script refuses to run before the bell, on the old account, with an
    account that has positions or orders, with a missing/duplicated key line, or
