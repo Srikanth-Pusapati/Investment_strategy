@@ -1292,3 +1292,42 @@ https://claude.ai/code/artifact/9099ad65-64b1-495c-82b9-db7226a1bbbf
             script hard-codes a branch — a convention point for the operator.
             This entry was committed from an isolated worktree on feature/preview
             so the live tree stayed on main.
+
+2026-09-21  ~18:40 CT — ROBINHOOD OUTAGE RESOLVED ITSELF; ONE-COMMAND MORNING CHECK
+            (resident session; the user merged PR #63, pulled main 8f71ed9, then
+            ran `robinhood_auth login` and hit the same 502; asked for Robinhood
+            fixed and the remaining by-hand commands taken care of)
+            ROBINHOOD — proven THEIR SIDE, nothing to fix here, and it recovered
+            on its own ~18:31 CT with the ORIGINAL token (state/robinhood_oauth.json
+            still Sep 18 10:22, 1784 bytes; the failed login did not touch it):
+              - the 502 carries `x-cache: Error from cloudfront`, `via: ...
+                cloudfront.net`, POP DFW56: this Mac reaches the edge in 12 ms
+                with a clean TLS handshake and the ORIGIN behind it does not
+                answer; robinhood.com and api.robinhood.com likewise.
+              - not local: no VPN service (default route en0 -> home router),
+                egress 99.27.x.x AT&T residential, IPv4 and IPv6 identical.
+              - second vantage point: the claude.ai Robinhood connector (runs
+                from Anthropic's cloud) got 502 origin_bad_gateway at 23:28Z.
+              - status.robinhood.com is RETIRED ('operational', points at
+                @AskRobinhood) — useless as evidence either way.
+              - the current grant is from Sep 18 (token died and was re-granted
+                that morning), access token to Thu Sep 24 ~10:37 CT. If Robinhood
+                is down AT that moment the refresh fails and the auth-dead latch
+                WILL set — that would be a real NEEDS LOGIN.
+            Preflight via the panel at 18:32 CT: 8/8.
+            NEW scripts/run7_morning_check.py (scripts/ only — outside the
+            fingerprint; read-only, no orders, no writes, keys compared by hash):
+            PASS/WARN/FAIL for the section-4 list in one command; classifies
+            Robinhood up / THEIR SIDE / NEEDS LOGIN. Its first live run LIED
+            (NOT READY on a healthy bot) and both causes are fixed and pinned in
+            tests/test_run7_morning_check.py: it read the whole day of bot.log,
+            which on a switch day holds the PREVIOUS account's session (run-6's
+            morning battery pages) -> now scoped to this run's first equity row;
+            and it matched the word CRITICAL inside `INFO notify | CRITICAL alert
+            emailed` -> now the level FIELD (Sep 18 replay: 3 real, not 8).
+            Replayed Sep 18 as an in-session day: 8 cycles found, 3 degraded FEEDS
+            cycles graded FAIL (> 2 = breach), hour-old CRITICALs WARN.
+            Suite 1564 passed (1554 + 10). Live verdict 18:35 CT: READY, 0 fail,
+            0 warn. docs/RUN7_SWITCH.md section 0 step 5 now names the command.
+            TUE SEP 22: .venv/bin/python scripts/run7_morning_check.py
+            (any time; again after 09:50 ET / 08:50 CT for the in-session verdict).

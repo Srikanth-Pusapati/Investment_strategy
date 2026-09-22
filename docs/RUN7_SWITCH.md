@@ -50,7 +50,23 @@ change-set — four new STRATEGY KEYS in sections 1c / 2 below.
    `runs/pre-final-test-run-7/EVAL_CONTRACT.md`, flip the header to
    "Pre-registered <date>, BEFORE day 1", fix the two dates in the pinned verdict
    command if day 1 is not Sep 22, commit, push.
-5. Next morning: section 4's checks, plus `grep -nE 'CORE STOPLESS|CORE FILL|AUTO-HEDGE STARVED|REGIME FALLING-TAPE CAP|Options opened' logs/bot.log`.
+5. Next morning — ONE command, read-only, any time (it detects pre-open vs in-session;
+   re-run after 09:50 ET for the in-session verdict):
+
+       .venv/bin/python scripts/run7_morning_check.py
+
+   It prints PASS / WARN / FAIL for: one bot instance + fresh tick, kill switch,
+   the freeze (`investment_strategy/` tree id = the contract's), the twelve `.env`
+   key lines, the Alpaca account the RUNNING process is bound to, Robinhood
+   (classified: up / THEIR SIDE / NEEDS LOGIN — a 502 from their CDN is not a dead
+   token; do not re-login on it), calendar, alert spool, deadman, panel, AC power,
+   the day-0 anchor row, and — in session — the first decision cycle, the `FEEDS:`
+   line (> 2 degraded cycles = breach), `BOOK BETA:` per cycle, the day's ERROR /
+   CRITICAL lines and the section-4 watch handles. On the switch day it reads
+   `bot.log` only from this run's first equity row (the same file also holds the
+   previous account's session). Exit 1 = at least one FAIL. The by-hand
+   equivalent is section 4's table plus
+   `grep -nE 'CORE STOPLESS|CORE FILL|AUTO-HEDGE STARVED|REGIME FALLING-TAPE CAP|Options opened' logs/bot.log`.
 
 Rollback (market closed, any step failed): `git checkout -B feature/preview <old sha printed by the script>`,
 restore the old keys in `.env`, restart from the control panel.
