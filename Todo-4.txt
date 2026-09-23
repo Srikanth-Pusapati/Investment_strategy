@@ -1331,3 +1331,124 @@ https://claude.ai/code/artifact/9099ad65-64b1-495c-82b9-db7226a1bbbf
             0 warn. docs/RUN7_SWITCH.md section 0 step 5 now names the command.
             TUE SEP 22: .venv/bin/python scripts/run7_morning_check.py
             (any time; again after 09:50 ET / 08:50 CT for the in-session verdict).
+
+2026-09-23  ~08:15 CT — "SYSTEM SHUTDOWN" WAS A 1% BATTERY HIBERNATE; BOT RESTARTED
+            08:10 CT; FULL BACKTRACK OF SEP 21-23 LOGS (resident session; the user
+            found the machine off, restarted the bot and asked for a complete
+            backtrack log analysis + anything that needs fixing)
+            WHAT ACTUALLY HAPPENED (pmset -g log, not a guess): the Mac did NOT
+            reboot — uptime 3d 19h, booted Sat Sep 19 12:33. It was UNPLUGGED
+            after the close on Sep 22 (~17:46 CT, 80% charge; lid-closed
+            maintenance sleeps = the three 3/4/13-min DARK GAPs at 17:44-18:03,
+            market closed, correctly not paged), drained overnight, and at
+            07:50:18 CT entered 'Low Power Sleep ... Using Batt (Charge:1%)' =
+            HIBERNATE. 08:07:40 'Wake from Hibernate due to acattach' = the
+            user plugged it in. The OLD bot survived the hibernate (no traceback,
+            no exit line; it logged 'DARK GAP (market closed): 18 min' at
+            08:07:41, settled the network, ticked at 08:07:48); the user's
+            08:10:41 restart replaced it. One instance only (flock held by pid
+            6804). Now on AC at 15% and charging — the market-hours battery
+            page will fire if it is unplugged again before ~10:30 CT.
+            OVERNIGHT 02:06-02:54 CT: 16 consecutive watchdog ticks skipped on
+            Alpaca ReadTimeout (retry 1/2, 2/2 each) while the laptop was on
+            battery. Not paged BY DESIGN (_maybe_page_on_skip_run only fires in
+            paging hours: 'an overnight outage strands nothing'); self-healed
+            at 03:38. The 02:15 backup_state ran normally in the middle of it
+            (652K tarball), so the host was up — it was the network path (Wi-Fi
+            on battery / ISP), not the process. Nothing to fix; would have paged
+            at the 5/10/20 rungs in-hours.
+            RESTART RECONCILE: 'Loaded 1 pending order(s) from state' = BRK.B
+            9207f22c (BUY 59 market at 14:38:47 CT Sep 22). Broker says filled
+            59 @ 504.51 at 14:38:49 CT with the bracket live (TP 554.86 new,
+            stop 484.24 held); the ledger row still has fill_price=None because
+            the next decision cycle (15:28 CT) was 'Market closed' — the stamp
+            lands at today's first cycle. Not a bug (same shape as run-6).
+            BROKER TRUTH 08:17 CT: PA3BGBBR2NB5 ACTIVE, equity $997,606, cash
+            $556,307, 10 positions (AUR BRK.B DBRG IBIT NOK NVDA ONON QQQ SNXX
+            SOFI), 10 open sells = 9 bracket TP legs (their stop legs 'held')
+            + the QQQ GTC core stop @ 632.68 for 201 sh. UNPROTECTED: none.
+            halted=false, no latch. Pre-market marks: SOFI -4.39% (stop 5.73%),
+            ONON -4.15% (stop 10%), NVDA -0.73%, NOK +1.70%, SNXX +3.41%.
+            SEP 22 (day 1 of run-7) READ END TO END, 535 lines: 9 decision
+            cycles, 0 CRITICAL, 1 ERROR (the known QQQ wash-trade reject on the
+            core stop while the entry buy was open — stop resting 4.1 s later,
+            'CORE STOPLESS: QQQ 4.1s'), 37 WARNING. Buys: NVDA NOK SOFI AUR CRML
+            IBIT (08:33), ONON DBRG (09:26), SNXX (10:18), BRK.B (14:38); QQQ
+            core filled 3x to the 15% ceiling ($150k). VKTX REJECTED at the
+            anti-chase gate (+27% gap-day, 4.0xATR) — the A+ gate works. CRML:
+            bought 8.73 with the overextension haircut, NAME FALLING -6.4% then
+            -8.3% vs SPY flat, decision sell via replace-on-resting-leg (never
+            cancel-then-resell), filled 8.62, realized -$156 — the name-level
+            defense doing its job. Day P/L -$1,633 (-0.16%), self-consistent
+            close row; postmortem wrote 2026-09-22.md; API $1.45 / 9 calls.
+            SEP 21 (switch day): the 4 CRITICALs were the run-6 account's
+            morning battery + 18/21-min dark gaps at 09:17-09:56 (already in the
+            Sep 21 entries); yfinance '$SPY possibly delisted' was the one-shot
+            regime read right after wake (sized x0.50 for that cycle, then
+            fine); '$LNBIX possibly delisted' x2 is the Robinhood mutual-fund
+            holding yfinance cannot price — harmless context import.
+            OBSERVATIONS FOR THE RUN-8 CHANGE-SET (freeze holds, NOT fixing now;
+            frozen tree 2a6ec147 verified byte-identical):
+              1. STE long_put re-proposed 5 cycles in a row (11:09, 12:02, 12:53,
+                 13:46, 14:38) and refused every time as 'Net credit / no debit'.
+                 Real cause: the Alpaca options feed has NO NBBO for
+                 STE261121P00205000 (STRIKE SNAP found no OI-qualified strike
+                 within 5%; _mid_price -> 0.0 -> the est_premium<=0 backstop).
+                 Safe by design, but (a) the reject wording is wrong — it is
+                 'no quote on feed', not a credit structure — and (b) nothing
+                 stops the model burning a proposal slot on the same dead
+                 contract every cycle (LH 305P same shape at 10:18). The
+                 nightly postmortem flagged the churn itself. Candidate: a
+                 per-name 'no-quote' cooldown on put proposals + honest reject
+                 text.
+              2. Bearish-verdict IGNORED persists despite schema forcing: MIDD
+                 x4, TDY x1, EXPO x1 on Sep 22 (TDY x2 on Sep 21) — the model
+                 omits the bearish_verdicts entry for an ELIGIBLE name. Every
+                 other eligible name got an explicit DECLINED with a reason.
+                 Already the Aug 1 / Sep 17 watch item; still 0 puts approved.
+              3. Finnhub news-sentiment 403 -> VADER fallback every cycle
+                 (known tier gap, Jul audit). FEEDS 3/3 healthy throughout.
+              4. Whole-share flooring left $97 + $9 + $6 + $241 undeployed on
+                 the day — cosmetic (the core sweep picks it up).
+            MORNING CHECK 09:15 ET (.venv/bin/python scripts/run7_morning_check.py):
+            READY — 0 fail, 0 warn (the first run said FAIL alpaca only because
+            it was launched with system python3, no 'alpaca' module — use the
+            venv interpreter). In-session verdict: see the next entry.
+
+2026-09-23  ~08:45 CT — IN-SESSION VERDICT: BOT CLEAN, HOST ON BATTERY AGAIN
+            (resident session, continuation of the 08:15 entry)
+            FIRST CYCLE AFTER THE RESTART 08:30:17-08:34:17 CT: BRK.B 9207f22c
+            reconciled 'FILLED (59/59) @ 504.5100 [ledger stamped]' — the
+            pending row is closed. Regime risk-on x1.00 (SPY 773 vs 713, VIX
+            14.3/18.1 contango). BOOK BETA 0.78 invested 44.3% -> 48.3% after
+            IEMG 180 sh ($14,939, starter x0.5, 4% vol-floor stop) and ADC 370
+            sh ($24,912, insider-buy anchored, same haircut/stop). Core fill
+            skipped (QQQ at the 15% ceiling). SLOT COUNT 10/15. FEEDS 3/3.
+            BEARISH FUNNEL slate_bearish=11: STE put re-proposed (6th time,
+            now the Oct-30 205P — 'empty put chain around 2026-10-30', same
+            no-quote reject); IGNORED x4 this cycle (AAL MIDD SOXS TDY) — worse
+            than any Sep 22 cycle (max 2). Observation items 1-2 of the 08:15
+            entry stand; still 0 puts approved in run-7.
+            POWER: the Mac was UNPLUGGED at ~08:24 CT (pmset: 'Using
+            Batt(Charge: 23)' at 08:24:04; at 08:17 it was AC, 15%, charging).
+            The bot paged correctly at 08:25:03 — CRITICAL 'On BATTERY during
+            market hours', emailed 08:25:06 (delivered, spool empty). At 08:42
+            CT: 21%, discharging, 3:29 remaining => a repeat of this morning's
+            1% hibernate lands ~12:00 CT, mid-session, if it stays unplugged.
+            caffeinate -s (the 'awake' launchd job) and caffeinate -dims -w 6804
+            are both running and both are powerless on battery. Pushed a phone
+            notification; nothing the bot can do about it.
+            run7_morning_check.py in-session 08:42 CT: NOT READY — 2 fail, 0
+            warn, BOTH the battery (power FAIL + the 1 CRITICAL it produced);
+            every other line PASS (12 positions / 12 open protective orders,
+            equity $996,181, robinhood up, deadman 0.6 min, panel up).
+            LOGS COMMITTED: logs/Sep_21_2026.log + logs/Sep_22_2026.log (the
+            switch day and day 1 of run-7), from an isolated worktree on
+            feature/preview; the live tree stays on main 09eeecc with the
+            frozen tree untouched.
+            NEXT: plug in AC (the only fix); re-run the morning check to see
+            'power PASS' and the CRITICAL age out of the last-hour window.
+            Lesson for the runbook: a LAPTOP host needs the charger checked
+            after every overnight, not just at the switch — the day-0 checklist
+            passed 'power on AC' at 09:15 ET and the host was on battery nine
+            minutes later.
