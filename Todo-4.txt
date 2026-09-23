@@ -1452,3 +1452,14 @@ https://claude.ai/code/artifact/9099ad65-64b1-495c-82b9-db7226a1bbbf
             after every overnight, not just at the switch — the day-0 checklist
             passed 'power on AC' at 09:15 ET and the host was on battery nine
             minutes later.
+            08:51:45 CT ADDENDUM: AC re-attached — but system_profiler says a
+            20 W adapter (AdapterPowerTier 1, 'Charging: No', NotChargingReason
+            128); battery flat at 20% since attach, so it is holding, not
+            recovering. The 08:17 CT adapter WAS charging (15% -> 'charging,
+            2:13 remaining'). Get that one back on the host; a 20 W brick under
+            this load (bot + 2 Claude sessions + VS Code, load avg 4-6) is
+            break-even at best. On 'AC' macOS honours caffeinate -s, so the
+            hibernate risk is parked as long as the drain stays at ~0.
+            08:47:34 CT: AUR bracket STOP filled on the exchange — 4651 sh @
+            5.95 (-7.7% from 6.46, ~-$2,370), backfilled 'stop -> bracket_stop'
+            with LOT STAMP; 11 positions / 11 protective legs after it.
