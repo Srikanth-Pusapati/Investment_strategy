@@ -1559,3 +1559,42 @@ https://claude.ai/code/artifact/9099ad65-64b1-495c-82b9-db7226a1bbbf
             MONDAY SEP 28: charger on; .venv/bin/python scripts/run7_morning_check.py at ~08:50
             CT and ~15:35 CT; RH login when convenient; if FEEDS insider UNHEALTHY > 2 cycles,
             append the day to Amendment 1's table the same evening.
+
+2026-09-26  ~14:30 CT — ROBINHOOD RESTORED, PR #67 MERGED + PULLED, REPO MOVE PREPARED
+            (resident session; the user fixed the Robinhood auth, merged PR #67, and asked for the
+            next steps, a move of the repo to their own GitHub account, and the Claude commit
+            attribution removed from the history)
+            PULL: live tree main 1fbeac3 -> 3642a61 (ff-only, merge of PR #67); frozen tree still
+            2a6ec147; clean. Amendment 1 is now ACCEPTED (merged).
+            ROBINHOOD: `robinhood_auth status` = authorized (token file rewritten 12:27 CT). The
+            bot's in-process latch clears by itself at its next read: RobinhoodReader compares the
+            token file's (mtime, size) with the signature it latched on (robinhood.py:112-115), so
+            the FAIL line in run7_morning_check.py stands until the first decision cycle Mon Sep 28
+            08:30 CT, then clears. No restart needed. state/robinhood_health.json still says
+            auth_dead=true until then — expected.
+            REPO MOVE (prepared in the scratchpad, NOTHING pushed yet — needs the target URL):
+              - history: 266 commits; 199 authored by the user, 67 GitHub web-merges authored by the
+                previous account; 181 Co-Authored-By trailers + 2 Claude-Session trailers.
+              - rewrite = ONE git-filter-repo pass on a fresh bare clone (mailmap the previous
+                account + GitHub noreply -> the user; strip the two trailer kinds; merge subjects
+                -> "Merge branch '<b>' into main"). Result: 266 commits, one author/committer, 0
+                trailers, 0 org references; investment_strategy/ tree on main = 2a6ec147 (frozen
+                fingerprint intact — tree objects are untouched by message/identity rewrites).
+                Product references to Claude (the decision model, claude_daily.sh, the away-mode
+                runbook) are file content and stay. Pinned-SHA map: runs/SHA_MAP_2026-09-26_repo-move.md.
+              - LICENSE: copyright holder -> Srikanth Babu Pusapati (this commit).
+              - gitleaks 8.30 over ALL history (values redacted): exactly 1 finding —
+                ANTHROPIC_API_KEY in runs/pre-final-test-run-4/analysis/config.json:84 (commit
+                e2a70264). Not inspected here (credential read blocked); the OWNER checks it: if
+                live -> rotate + drop the file from the moved history before going public.
+                .env / state/ never tracked in any commit. The tracked logs carry the owner's
+                e-mail in 'CRITICAL alert emailed to …' lines and the paper account IDs; docs/
+                has the attorney/tax notes — fine private, review before public.
+              - live tree keeps the current origin through the Oct 20 close; switch = fresh clone
+                after the window (shared-tree hazard + freeze), never a mid-window reset.
+              - going forward: no Co-Authored-By / Generated-with lines on commits or PRs (user
+                instruction). The harness setting for it (includeCoAuthoredBy=false in
+                ~/.claude/settings.json) is for the user to add — the session's edit was blocked.
+            NEXT (user): give the new repo URL with push access from this Mac (own SSH key / gh
+            login, or add the current account as a collaborator); private first, public after the
+            gitleaks + personal-data review; Mon Sep 28 run7_morning_check.py ~08:50 + ~15:35 CT.
