@@ -1463,3 +1463,99 @@ https://claude.ai/code/artifact/9099ad65-64b1-495c-82b9-db7226a1bbbf
             08:47:34 CT: AUR bracket STOP filled on the exchange — 4651 sh @
             5.95 (-7.7% from 6.46, ~-$2,370), backfilled 'stop -> bracket_stop'
             with LOT STAMP; 11 positions / 11 protective legs after it.
+
+2026-09-26  ~02:00 CT — SESSION-4 BACKTRACK OF RUN-7 + AMENDMENT 1 + RUN-8 CHANGE-SET DRAFT
+            (resident session, Sat; the user asked for the status, a backtrack analysis of
+            the model and the fixes for the next trial run written up)
+            STATUS: bot pid 6804 up since Sep 23 08:10 CT, ONE instance, tick 0.4 min; freeze
+            intact (investment_strategy/ = 2a6ec147, .env mtime Sep 21 16:10, zero commits to
+            frozen paths since the switch). run7_morning_check.py (venv, --no-network): NOT
+            READY — 1 FAIL = robinhood NEEDS LOGIN. That one is REAL this time: the refresh
+            failed Sep 24 11:09 CT ('OAuthFlowError: No redirect handler' = refresh token
+            rejected, browser grant needed), CRITICAL emailed, context reads latched off,
+            earnings on yfinance-fallback since (both pre-declared; rh=dead non-confounding).
+            User action, not urgent: .venv/bin/python -m investment_strategy.portfolio.robinhood_auth login
+            HOST: unplugged ~20:23 CT Sep 25 at 65%; maintenance-sleep cycles all night = the
+            50-89 min DARK GAPs (market closed, correctly not paged); 94 W USB-C attached
+            01:33 CT Sep 26, charging 68%. Third overnight on battery since the switch.
+            BROKER 01:47 CT (read-only): PA3BGBBR2NB5 equity $991,014, cash $185,610, 13
+            equity + 4 option positions (5 legs), 18 open orders = 17 bracket TP legs (stops
+            'held', invisible to status=open) + QQQ GTC stop 632.68. UNPROTECTED: none.
+            LQD 33x put (a9abf848, 14:39 CT Sep 25) fill stamp lands Monday — BRK.B shape.
+            API $5.93 / 4 sessions ($1.40-1.59/day, 9 calls, Opus 4.8).
+            SESSIONS 1-4 (close rows): 1,000,000 -> 998,367 -> 990,646 -> 990,141 -> 990,896
+            = -0.91% vs SPY -0.28% (QQQ +0.41%, IWM -1.26%). Telescoping $0.00. DD -0.99%.
+            INTERIM CHECKER (pinned command, --end 2026-09-25; CSVs via the checker's own
+            Alpaca-bars recipe; copy at runs/pre-final-test-run-7/CHECKER_2026-09-25_interim.txt):
+            VERDICT PENDING (UNDER-FLOOR). N=6, sum -$5,656.14, WR 16.7% (1W/5L), mean -$943,
+            t=-2.148, PF 0.01, ex-top-3 mean -$1,707; rule 6 PASS; rule 8 PASS (0 unsanctioned;
+            CRML 0.13x / SNXX 0.42x / BB 0.37x all sanctioned name_falling — A-5 works, the
+            run-6 NO-GO wording cannot recur); rules 4/5/7 under floor (alpha -0.181%/day,
+            OLS beta 0.68, ex-ante mean 0.84 WITHIN; capture 1 up/3 down: 14% / 121%).
+            *** VALIDITY BREACH Sep 25, undisclosed until now: 'FEEDS: 2/3 — insider
+            UNHEALTHY (edgar: timeout)' in 3 of 8 cycles (10:17, 12:53, 14:39 CT) > the
+            contract's 2/day. Sep 23 and Sep 24 had 1 each (within). Cause = sec.gov latency,
+            external, not pre-declared. Decisions in those cycles: SMCI top-up $59.5k (cites
+            insider -1.00 AGAINST the trade), BB sanctioned sell, LQD put + BITO corr reject —
+            none insider-anchored. Nobody ran the in-session check Sep 24/25; it grades exactly
+            this. => AMENDMENT 1 appended to runs/pre-final-test-run-7/EVAL_CONTRACT.md:
+            discloses + accepts Sep 25 with the counterfactual table, pre-registers a running
+            table for further EDGAR-timeout-only days (same class only), changes no counted
+            rule (window NOT marked AMENDED), and names the 15:35 CT in-session check as the
+            process fix. Acceptance = the user's merge of this PR. ***
+            BACKTRACK (runs/pre-final-test-run-7/BACKTRACK_2026-09-26.md, all [V]):
+              1. Closed trips: CRML -156 (decision), AUR -2,321 (bracket -7.7%), SOFI -2,295
+                 (bracket -5.7%), SNXX -419 (decision), VKTX +40 (decision), BB -504 (decision).
+                 ALL six were starters at conv 0.60-0.62; losers' mean composite 1.58 vs the
+                 +$40 winner's 0.70 — run-6's 'composite does not rank' reproduces. 4 name_falling
+                 fires -> 4 sanctioned sells at 0.13-0.42x the planned stop (defense works).
+              2. OPEN-PRINT COHORT: the first cycle's 6 buys hit at 08:33 CT = 09:33 ET.
+                 0 of 6 positive; CRML+AUR+SOFI = -$4,772 = 84% of realized loss; NVDA -1,422,
+                 NOK -980, IBIT -202 unrealized. Later entries 5/12 positive. n=6, one day -> [H].
+              3. TOP-UP CONVICTION RATCHET: TOPUP_MIN_CONVICTION_DELTA=0.05 rejected 4.6/session
+                 in run-6 and 0 in run-7's 32 cycles. DBRG 0.60 -> 0.66 -> 0.72 -> 0.77 on
+                 composite 2.50 -> 2.69 -> 2.75 -> 2.53 (third top-up on a LOWER composite);
+                 BRK.B 0.61 -> 0.67; SMCI 0.62 -> 0.68. Every step = the minimum that clears
+                 the bar. Top-ups: 5 buys, $296,479, 38% of satellite $, 3 names; one lot 4x
+                 its starter; no haircut, no MIN_NEW_NAME_CONVICTION. Book: DBRG 18.0% of
+                 equity ($178k) > QQQ core 15.1%; BRK.B 10.9%; SMCI 9.1%; top-3 = 38%.
+                 Top-up lot P&L flat so far (-$388). -4% DBRG gap = -0.72% of equity.
+                 NOT trimming (mid-window strategy intervention); protected by 4 bracket legs.
+              4. BEARISH SLEEVE — PUTS FILLED FOR THE FIRST TIME IN ANY RUN: HYG Oct-30 78.5P
+                 x50 ($4,450; filled 0.89 vs est 0.79 = +12.7% slip inside the 20% entry
+                 buffer), HYG Nov 79P x3, IWM Oct-30 281/266 bear put spread x12 (SYSTEM PROXY
+                 PUT for HYG after HYG Nov 78P failed the 10% spread cap at 10.1% — S-3 fired
+                 and worked), LQD Nov 103P x33. All credit/duration-ETF puts on one thesis.
+                 Options unrealized -$289 on $14.6k. Funnel 4 sessions: 18 proposed, 79 DECLINED
+                 (no-confirmation 30, oversold 27, liquidity 17, holds 2, other 3), 15 IGNORED
+                 (TDY 5, MIDD 5, SOXS 2, AAL/EXPO/NU 1; Sep 25 = 0), 4 approved. STE x9 / LH x3
+                 died 'Net credit / no debit' = no NBBO on feed (Oct expiry) then honestly on
+                 spread 27% / OI 5 (Nov). Sep 24: 16x 'premium mark unreliable' on the HYG
+                 50-lot = watchdog premium stop blind intraday (run-6 scenario 9 reproduced).
+                 HYG premium cap bound -> 2 cap rejects + 6 HYG DECLINED = churn.
+              5. Hedge/beta/regime: risk-on x1.00 all 32 cycles; book beta 0.52 -> 1.04, invested
+                 21.6% -> 80.7%; hedge never armed (arm 1.15); CLAMP/STARVED/WHIPSAW/FALLING-CAP
+                 all 0. SMCI top-up moved beta +0.20 in one cycle (by design). CORE STOPLESS
+                 4.1/1.6/2.6 s = 0 stopless windows. 8 cycles/day on the 52-min cadence.
+              6. Ops: CRITICAL 1 (Sep 23 battery); ERROR 6 (QQQ wash reject; RH dead; yfinance
+                 404 'no fundamentals' for ETFs x4 = noise at ERROR level); tracebacks 0.
+            RUN-8 CHANGE-SET DRAFT (runs/pre-final-test-run-8/CHANGESET_DRAFT.md; nothing ships
+            in run-7): B-1 TOPUP_AUTHORITY=events_only + TOPUP_MAX_MULTIPLE_OF_HELD (the
+            ratchet); B-2 MAX_SYMBOL_EXPOSURE_PCT 18 -> 12 + MAX_TOP3_SATELLITE_PCT=30; B-3
+            ENTRY_OPEN_DELAY_MIN=15 with a pre-registered kill; B-4 BEARISH_IGNORED_FALLBACK=
+            proxy_put (model veto only; the Aug 1 trigger, finally); B-5 option entry buffer
+            tiered 5%/20% by leg liquidity; B-6 put no-quote cooldown + honest reject text;
+            B-7 entry spread check = watchdog mark cap, OI >= 20x contracts, delta-mark fallback;
+            B-8 premium-cap-bound underlying leaves the bearish slate. Ops: C-1 in-session check
+            automated 09:55/15:35 ET with a page on FAIL (can ship now); C-2 EDGAR retry +
+            insider=cached mode; C-3 ETF 'no fundamentals' at DEBUG; C-4 top-up prior fields +
+            raw bearish_verdicts on IGNORED; C-5 entry_minute on buy rows; C-6 contract v4 text;
+            C-7 RH token-expiry WARN 24 h ahead (can ship now). Every B item = fingerprint
+            change -> pooling restarts at run-8 (roadmap already assumed this).
+            COMMITTED from an isolated worktree on feature/preview (live tree stays on main):
+            logs/Sep_23..25_2026.log, the backtrack, the interim checker copy, Amendment 1,
+            the run-8 draft, this entry. The 3 untracked log copies are removed from the live
+            tree after the push (hash-verified) so the user's post-merge pull is not refused.
+            MONDAY SEP 28: charger on; .venv/bin/python scripts/run7_morning_check.py at ~08:50
+            CT and ~15:35 CT; RH login when convenient; if FEEDS insider UNHEALTHY > 2 cycles,
+            append the day to Amendment 1's table the same evening.

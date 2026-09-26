@@ -1,0 +1,551 @@
+2026-09-23 00:09:49,134 INFO orchestrator | Market closed; skipping decision cycle.
+2026-09-23 01:02:01,352 INFO orchestrator | Market closed; skipping decision cycle.
+2026-09-23 01:54:14,035 INFO orchestrator | Market closed; skipping decision cycle.
+2026-09-23 02:06:34,536 WARNING alpaca | get_account: transient network error (ReadTimeout); retry 1/2.
+2026-09-23 02:06:40,145 WARNING alpaca | get_account: transient network error (ConnectTimeout); retry 2/2.
+2026-09-23 02:06:46,242 WARNING orchestrator | Watchdog tick skipped on a transient network error (ConnectTimeout); retrying next tick (1 in a row).
+2026-09-23 02:07:21,542 WARNING alpaca | get_account: transient network error (ReadTimeout); retry 1/2.
+2026-09-23 02:34:51,302 WARNING alpaca | get_account: transient network error (ReadTimeout); retry 1/2.
+2026-09-23 02:35:07,222 WARNING alpaca | get_account: transient network error (ReadTimeout); retry 2/2.
+2026-09-23 02:35:23,466 WARNING orchestrator | Watchdog tick skipped on a transient network error (ReadTimeout); retrying next tick (1 in a row).
+2026-09-23 02:36:08,845 WARNING alpaca | get_account: transient network error (ReadTimeout); retry 1/2.
+2026-09-23 02:36:24,646 WARNING alpaca | get_account: transient network error (ReadTimeout); retry 2/2.
+2026-09-23 02:36:40,777 WARNING orchestrator | Watchdog tick skipped on a transient network error (ReadTimeout); retrying next tick (2 in a row).
+2026-09-23 02:37:26,158 WARNING alpaca | get_account: transient network error (ReadTimeout); retry 1/2.
+2026-09-23 02:37:41,951 WARNING alpaca | get_account: transient network error (ReadTimeout); retry 2/2.
+2026-09-23 02:37:58,205 WARNING orchestrator | Watchdog tick skipped on a transient network error (ReadTimeout); retrying next tick (3 in a row).
+2026-09-23 02:38:43,514 WARNING alpaca | get_account: transient network error (ReadTimeout); retry 1/2.
+2026-09-23 02:38:59,303 WARNING alpaca | get_account: transient network error (ReadTimeout); retry 2/2.
+2026-09-23 02:39:15,502 WARNING orchestrator | Watchdog tick skipped on a transient network error (ReadTimeout); retrying next tick (4 in a row).
+2026-09-23 02:40:00,648 WARNING alpaca | get_account: transient network error (ReadTimeout); retry 1/2.
+2026-09-23 02:40:16,503 WARNING alpaca | get_account: transient network error (ReadTimeout); retry 2/2.
+2026-09-23 02:40:32,795 WARNING orchestrator | Watchdog tick skipped on a transient network error (ReadTimeout); retrying next tick (5 in a row).
+2026-09-23 02:41:18,083 WARNING alpaca | get_account: transient network error (ReadTimeout); retry 1/2.
+2026-09-23 02:41:33,854 WARNING alpaca | get_account: transient network error (ReadTimeout); retry 2/2.
+2026-09-23 02:41:50,151 WARNING orchestrator | Watchdog tick skipped on a transient network error (ReadTimeout); retrying next tick (6 in a row).
+2026-09-23 02:42:35,503 WARNING alpaca | get_account: transient network error (ReadTimeout); retry 1/2.
+2026-09-23 02:42:51,342 WARNING alpaca | get_account: transient network error (ReadTimeout); retry 2/2.
+2026-09-23 02:43:07,620 WARNING orchestrator | Watchdog tick skipped on a transient network error (ReadTimeout); retrying next tick (7 in a row).
+2026-09-23 02:43:53,033 WARNING alpaca | get_account: transient network error (ReadTimeout); retry 1/2.
+2026-09-23 02:44:08,872 WARNING alpaca | get_account: transient network error (ReadTimeout); retry 2/2.
+2026-09-23 02:44:25,157 WARNING orchestrator | Watchdog tick skipped on a transient network error (ReadTimeout); retrying next tick (8 in a row).
+2026-09-23 02:45:10,447 WARNING alpaca | get_account: transient network error (ReadTimeout); retry 1/2.
+2026-09-23 02:45:26,209 WARNING alpaca | get_account: transient network error (ReadTimeout); retry 2/2.
+2026-09-23 02:45:42,456 WARNING orchestrator | Watchdog tick skipped on a transient network error (ReadTimeout); retrying next tick (9 in a row).
+2026-09-23 02:46:27,241 INFO orchestrator | Market closed; skipping decision cycle.
+2026-09-23 02:46:27,812 WARNING alpaca | get_account: transient network error (ReadTimeout); retry 1/2.
+2026-09-23 02:46:43,586 WARNING alpaca | get_account: transient network error (ReadTimeout); retry 2/2.
+2026-09-23 02:46:59,801 WARNING orchestrator | Watchdog tick skipped on a transient network error (ReadTimeout); retrying next tick (10 in a row).
+2026-09-23 02:47:45,169 WARNING alpaca | get_account: transient network error (ReadTimeout); retry 1/2.
+2026-09-23 02:48:01,023 WARNING alpaca | get_account: transient network error (ReadTimeout); retry 2/2.
+2026-09-23 02:48:17,378 WARNING orchestrator | Watchdog tick skipped on a transient network error (ReadTimeout); retrying next tick (11 in a row).
+2026-09-23 02:49:02,623 WARNING alpaca | get_account: transient network error (ReadTimeout); retry 1/2.
+2026-09-23 02:49:18,411 WARNING alpaca | get_account: transient network error (ReadTimeout); retry 2/2.
+2026-09-23 02:49:34,688 WARNING orchestrator | Watchdog tick skipped on a transient network error (ReadTimeout); retrying next tick (12 in a row).
+2026-09-23 02:50:20,067 WARNING alpaca | get_account: transient network error (ReadTimeout); retry 1/2.
+2026-09-23 02:50:35,828 WARNING alpaca | get_account: transient network error (ReadTimeout); retry 2/2.
+2026-09-23 02:50:52,108 WARNING orchestrator | Watchdog tick skipped on a transient network error (ReadTimeout); retrying next tick (13 in a row).
+2026-09-23 02:51:37,547 WARNING alpaca | get_account: transient network error (ReadTimeout); retry 1/2.
+2026-09-23 02:51:53,342 WARNING alpaca | get_account: transient network error (ReadTimeout); retry 2/2.
+2026-09-23 02:52:09,650 WARNING orchestrator | Watchdog tick skipped on a transient network error (ReadTimeout); retrying next tick (14 in a row).
+2026-09-23 02:52:54,976 WARNING alpaca | get_account: transient network error (ReadTimeout); retry 1/2.
+2026-09-23 02:53:10,716 WARNING alpaca | get_account: transient network error (ReadTimeout); retry 2/2.
+2026-09-23 02:53:26,942 WARNING orchestrator | Watchdog tick skipped on a transient network error (ReadTimeout); retrying next tick (15 in a row).
+2026-09-23 02:54:12,334 WARNING alpaca | get_account: transient network error (ReadTimeout); retry 1/2.
+2026-09-23 02:54:28,056 WARNING alpaca | get_account: transient network error (ReadTimeout); retry 2/2.
+2026-09-23 02:54:44,283 WARNING orchestrator | Watchdog tick skipped on a transient network error (ReadTimeout); retrying next tick (16 in a row).
+2026-09-23 03:38:40,663 INFO orchestrator | Market closed; skipping decision cycle.
+2026-09-23 04:30:53,516 INFO orchestrator | Market closed; skipping decision cycle.
+2026-09-23 05:23:05,402 INFO orchestrator | Market closed; skipping decision cycle.
+2026-09-23 06:15:17,909 INFO orchestrator | Market closed; skipping decision cycle.
+2026-09-23 07:07:29,928 INFO orchestrator | Market closed; skipping decision cycle.
+2026-09-23 08:07:41,975 WARNING orchestrator | DARK GAP (market closed): no loop tick for 18 min (sleep/suspend?) — positions could not move; not paging.
+2026-09-23 08:07:42,305 INFO orchestrator | Resumed after a 18-min gap — settling the network (<= 20s) before the first cycle.
+2026-09-23 08:07:48,242 INFO orchestrator | Market closed; skipping decision cycle.
+2026-09-23 08:07:58,633 WARNING alpaca | get_account: transient network error (ReadTimeout); retry 1/2.
+2026-09-23 08:10:41,225 INFO config | BOOK BETA CAP vs hedge arm line: cap 1.20 - (target 1.00 + band 0.15) = +0.05 (cap-bound buys land inside the arm zone)
+2026-09-23 08:10:41,228 INFO alpaca | Alpaca client ready (mode=paper).
+2026-09-23 08:10:41,645 INFO orchestrator | Discovery-driven mode: trading scanner-found names + holdings.
+2026-09-23 08:10:41,646 INFO orchestrator | Loaded 1 pending order(s) from state to reconcile.
+2026-09-23 08:10:41,650 INFO orchestrator | Starting orchestrator (paper). Kill switch: off. Options: on. Benchmark: QQQ.
+2026-09-23 08:10:41,988 INFO orchestrator | Market closed; skipping decision cycle.
+2026-09-23 08:10:42,056 INFO config | BOOK BETA CAP vs hedge arm line: cap 1.20 - (target 1.00 + band 0.15) = +0.05 (cap-bound buys land inside the arm zone)
+2026-09-23 08:10:42,058 INFO alpaca | Alpaca client ready (mode=paper).
+2026-09-23 08:10:43,177 INFO dashboard | Wrote dashboard with 14 trades -> dashboard.html
+2026-09-23 08:25:03,591 CRITICAL orchestrator | On BATTERY during market hours — clamshell/battery sleep will blind the bot (caffeinate cannot prevent it). Plug in AC or move to the always-on host (ops/).
+2026-09-23 08:25:06,334 INFO notify | CRITICAL alert emailed to srikanthpusapati1@gmail.com: Bot on battery during market hours
+2026-09-23 08:30:17,129 INFO orchestrator | Order 9207f22c-1670-4093-a911-989317c1ce50 (BRK.B) FILLED (59/59) @ 504.5100 x 59 [ledger stamped].
+2026-09-23 08:30:18,937 INFO orchestrator | Market regime: SPY above 200dma (773 vs 713, today -0.1%), VIX 14.3, VIX3M 18.1 (contango) -> risk-on, size x1.00.
+2026-09-23 08:30:20,379 INFO orchestrator | BOOK BETA: spy=0.78 qqq=0.52 iwm=0.66 invested=44.3% hedge=PSQ w=0 unhedged=0.78
+2026-09-23 08:30:20,795 INFO quiver | Quiver live/congresstrading -> 1000 row(s).
+2026-09-23 08:30:21,147 INFO screener | EDGAR Form-4 feed -> 55 filing(s) (scanning up to 100).
+2026-09-23 08:30:42,203 INFO screener | Options-flow most-actives pool -> 40 name(s).
+2026-09-23 08:31:07,734 INFO screener | Screener liquidity floor dropped 4/22 pre-cap: RCT $0.19<$5, GRAB $3.19<$5, FLNA $1.00<$5, NVD $3.66<$5
+2026-09-23 08:31:07,743 INFO screener | Discovered 18 candidate(s) from 3 source(s) (199 merged, 18 above min_score, capped to 18).
+2026-09-23 08:31:07,745 INFO screener |   candidate WBD [options_flow] score=-0.78 — Options flow: 13,653 call / 110,969 put vol (bearish put imbalance -0.78) on a most-active name.
+2026-09-23 08:31:07,748 INFO screener |   candidate IEMG [options_flow] score=+0.63 — Options flow: 84 call / 19 put vol (bullish call imbalance +0.63) on a most-active name.
+2026-09-23 08:31:07,751 INFO screener |   candidate BITO [options_flow] score=+0.55 — Options flow: 3,955 call / 1,155 put vol (bullish call imbalance +0.55) on a most-active name.
+2026-09-23 08:31:07,753 INFO screener |   candidate AAL [options_flow] score=+0.52 — Options flow: 122,513 call / 38,978 put vol (bullish call imbalance +0.52) on a most-active name.
+2026-09-23 08:31:07,755 INFO screener |   candidate SOXS [options_flow] score=+0.40 — Options flow: 44,453 call / 19,173 put vol (bullish call imbalance +0.40) on a most-active name.
+2026-09-23 08:31:07,757 INFO screener |   candidate XLF [options_flow] score=-0.37 — Options flow: 82,098 call / 178,837 put vol (bearish put imbalance -0.37) on a most-active name.
+2026-09-23 08:31:07,758 INFO screener |   candidate SE [insider] score=-0.36 — Insider: 2 open-market SELL filing(s), 62,400 sh — bearish cluster (SEC Form 4, last filings feed).
+2026-09-23 08:31:07,760 INFO screener |   candidate ONDS [options_flow] score=+0.36 — Options flow: 51,118 call / 23,961 put vol (bullish call imbalance +0.36) on a most-active name.
+2026-09-23 08:31:07,763 INFO screener |   candidate MBB [options_flow] score=-0.33 — Options flow: 52 call / 104 put vol (bearish put imbalance -0.33) on a most-active name.
+2026-09-23 08:31:07,765 INFO screener |   candidate ADC [insider] score=+0.30 — Insider: 1 open-market buy filing(s), 1,000 sh (SEC Form 4, last filings feed).
+2026-09-23 08:31:07,767 INFO screener |   candidate SCI [congress] score=-0.23 — Congress: 0 buy / 4 sell filings in last 60d (disclosures lag up to ~45d).
+2026-09-23 08:31:07,769 INFO screener |   candidate CPAY [congress] score=-0.23 — Congress: 0 buy / 6 sell filings in last 60d (disclosures lag up to ~45d).
+2026-09-23 08:31:07,770 INFO screener |   candidate MIDD [congress] score=-0.23 — Congress: 0 buy / 6 sell filings in last 60d (disclosures lag up to ~45d).
+2026-09-23 08:31:07,772 INFO screener |   candidate TDY [congress] score=-0.23 — Congress: 0 buy / 5 sell filings in last 60d (disclosures lag up to ~45d).
+2026-09-23 08:31:07,773 INFO screener |   candidate LH [congress] score=-0.23 — Congress: 0 buy / 4 sell filings in last 60d (disclosures lag up to ~45d).
+2026-09-23 08:31:07,775 INFO screener |   candidate MKL [congress] score=-0.23 — Congress: 0 buy / 4 sell filings in last 60d (disclosures lag up to ~45d).
+2026-09-23 08:31:07,776 INFO screener |   candidate VIK [congress] score=-0.23 — Congress: 0 buy / 6 sell filings in last 60d (disclosures lag up to ~45d).
+2026-09-23 08:31:07,777 INFO screener |   candidate STE [congress] score=-0.23 — Congress: 0 buy / 4 sell filings in last 60d (disclosures lag up to ~45d).
+2026-09-23 08:31:45,014 WARNING signals | Finnhub news-sentiment is premium-gated on this key (HTTP 403) — using the VADER fallback for this run.
+2026-09-23 08:31:47,028 INFO quiver | Quiver live/offexchange -> 5533 row(s).
+2026-09-23 08:31:47,584 INFO quiver | Quiver live/govcontractsall -> 20000 row(s).
+2026-09-23 08:31:48,521 INFO quiver | Quiver live/lobbying -> 20000 row(s).
+2026-09-23 08:33:20,600 INFO signals | options_chain: reading 25 of 27 symbols this cycle (cap).
+2026-09-23 08:33:26,785 INFO signals | Gathered signals for 27/27 symbols (+2 market signals).
+2026-09-23 08:33:26,851 INFO orchestrator | Composite index (27 scored, top: DBRG +2.69, SNXX +2.13, ONON +1.80, IEMG +1.54, NOK +1.54, IBIT +1.39, ADC +1.29, BRK.B +1.12; bear tail: STE -1.86, LH -1.43, MBB -1.10, CPAY -1.06, SCI -0.77, VIK -0.77).
+2026-09-23 08:33:29,703 INFO robinhood | Imported 1 Robinhood holding(s) for context (read-only).
+2026-09-23 08:33:29,705 INFO orchestrator | FEEDS: 3/3 healthy news=vader-fallback earnings=rh
+2026-09-23 08:34:10,074 INFO usage | decision call: 19177 in / 2914 out (cache r=0 w=6603) ~$0.2348 [claude-opus-4-8]
+2026-09-23 08:34:10,076 INFO decision | Claude returned 3 proposal(s), 4 bearish verdict(s).
+2026-09-23 08:34:10,079 WARNING orchestrator | Bearish verdict: AAL ELIGIBLE but IGNORED — model returned no bearish_verdicts entry for an ELIGIBLE name (the schema requires one per listed name).
+2026-09-23 08:34:10,080 INFO orchestrator | Bearish verdict: MBB DECLINED — Bond ETF with ATM IV of only 7% — near-zero movement priced in makes a put payoff negligible; put/call OI reading is a distorted illiquid print, not a tradable 
+2026-09-23 08:34:10,081 WARNING orchestrator | Bearish verdict: MIDD ELIGIBLE but IGNORED — model returned no bearish_verdicts entry for an ELIGIBLE name (the schema requires one per listed name).
+2026-09-23 08:34:10,081 INFO orchestrator | Bearish verdict: SCI DECLINED — No bearish chain confirm — options_chain is actually +0.47 bullish (put/call OI 0.16); bearish read rests on lagged congress selling and RSI 36, not corroborate
+2026-09-23 08:34:10,082 WARNING orchestrator | Bearish verdict: SOXS ELIGIBLE but IGNORED — model returned no bearish_verdicts entry for an ELIGIBLE name (the schema requires one per listed name).
+2026-09-23 08:34:10,083 WARNING orchestrator | Bearish verdict: TDY ELIGIBLE but IGNORED — model returned no bearish_verdicts entry for an ELIGIBLE name (the schema requires one per listed name).
+2026-09-23 08:34:10,084 INFO orchestrator | Bearish verdict: VIK DECLINED — Not corroborated: options_flow +0.34 bullish (inflection-bullish), chain +0.13 neutral, MACD bull; bearish thesis leans on ~45d-lagged congress selling only.
+2026-09-23 08:34:10,178 INFO orchestrator | Cycle budget $536,332 split across 2 buy(s): IEMG $296,211, ADC $240,121.
+2026-09-23 08:34:11,606 INFO earnings | Robinhood earnings calendar: 712 name(s) reporting within 31d.
+2026-09-23 08:34:12,111 INFO risk | SLOT COUNT: 9/15 model rows (exempt: QQQ; raw 10)
+2026-09-23 08:34:12,114 INFO orchestrator | BUY IEMG -> resized: Sized to 180.503 sh ($14,981) within caps. Reduced from request. Starter haircut x0.5 (conviction 0.62 < 0.65; stop at the 4.0% vol floor). | Clean uptrend px>50>200 (technical +0.40), bullish options flow +0.54 and bullish chain lean +0.49 (
+2026-09-23 08:34:12,234 WARNING alpaca | IEMG: floored 180.503 sh -> 180 for the exchange bracket; $41.71 of the $14980.81 allocation NOT deployed (stays cash; core sweep / next cycle can redeploy).
+2026-09-23 08:34:12,311 INFO alpaca | BUY market IEMG qty=180.0 notional=None lim=None (order 6251bcc2-7b8a-4745-b1af-31570241c73a)
+2026-09-23 08:34:12,315 INFO orchestrator | ENTRY TAPE: IEMG spy_intraday=-0.09% regime=risk-on falling=0 would_haircut=$0 stop=4.00% stop_if_floor6=6.00%
+2026-09-23 08:34:12,324 INFO ledger | Ledger: BUY IEMG qty=180 $14939
+2026-09-23 08:34:15,531 INFO risk | SLOT COUNT: 10/15 model rows (exempt: QQQ; raw 11)
+2026-09-23 08:34:15,535 INFO orchestrator | BUY ADC -> resized: Sized to 370.831 sh ($24,968) within caps. Reduced from request. Starter haircut x0.5 (conviction 0.60 < 0.65; stop at the 4.0% vol floor). | Heavy open-market insider BUYING +1.00 (58k sh, 0 sold) with strong fundamentals (86.7% margin, +16.
+2026-09-23 08:34:15,589 WARNING alpaca | ADC: floored 370.831 sh -> 370 for the exchange bracket; $55.92 of the $24968.02 allocation NOT deployed (stays cash; core sweep / next cycle can redeploy).
+2026-09-23 08:34:15,650 INFO alpaca | BUY market ADC qty=370.0 notional=None lim=None (order bba1979f-173e-42f5-9b79-d3eaf6189385)
+2026-09-23 08:34:15,654 INFO orchestrator | ENTRY TAPE: ADC spy_intraday=-0.09% regime=risk-on falling=0 would_haircut=$0 stop=4.00% stop_if_floor6=6.00%
+2026-09-23 08:34:15,658 INFO ledger | Ledger: BUY ADC qty=370 $24912
+2026-09-23 08:34:15,956 INFO options | STRIKE SNAP: STE none — empty put chain around 2026-10-30; model legs stand
+2026-09-23 08:34:16,126 WARNING options | no quote available for STE261030P00205000 — contract unknown to feed
+2026-09-23 08:34:16,172 WARNING options | no quote available for STE261030P00205000 — contract unknown to feed
+2026-09-23 08:34:16,270 INFO risk | REJECT buy STE: Net credit / no debit — not a bounded-loss debit play.
+2026-09-23 08:34:16,273 INFO orchestrator | OPTION OptionStrategy.LONG_PUT STE -> rejected: Net credit / no debit — not a bounded-loss debit play. | Corroborated breakdown: price below its own 200dma (gate passes), technical -0.50 downtrend/MACD bea
+2026-09-23 08:34:16,277 INFO orchestrator | BOOK BETA (post-exec): spy=0.78 qqq=0.53 iwm=0.66 invested=48.3% hedge=PSQ w=0 unhedged=0.78 (pre-exec spy=0.78 delta=+0.01)
+2026-09-23 08:34:16,279 INFO orchestrator | BEARISH FUNNEL: slate_bearish=11 [STE -1.86 ELIGIBLE (below its 200dma) -> put proposed; LH -1.43 gate-blocked; MBB -1.10 ELIGIBLE (below its 200dma) -> declined: Bond ETF with ATM IV of only 7% — near-zero movement priced; CPAY -1.06 gate-blocked; SCI -0.77 ELIGIBLE (below its 200dma) -> declined: No bearish chain confirm — options_chain is actually +0.47 b; VIK -0.77 ELIGIBLE (below its 200dma) -> declined: Not corroborated: options_flow +0.34 bullish (inflection-bul; MIDD -0.71 ELIGIBLE (below its 200dma) -> IGNORED; AAL -0.54 ELIGIBLE (below its 200dma) -> IGNORED; XLF -0.53 gate-blocked; SOXS -0.50 ELIGIBLE (below its 200dma) -> IGNORED; TDY -0.44 ELIGIBLE (below its 200dma) -> IGNORED] put_proposals=1 put_approved=0 ignored=4 auto_hedge=flat proxy_put=none
+2026-09-23 08:34:16,284 INFO orchestrator | Cycle budget not fully deployed: $97.63 dropped by whole-share flooring across this cycle's buys (stays cash; core sweep / next cycle can redeploy).
+2026-09-23 08:34:16,286 INFO orchestrator | Core fill skipped: QQQ already at/above the 15% ceiling.
+2026-09-23 08:34:16,435 INFO config | BOOK BETA CAP vs hedge arm line: cap 1.20 - (target 1.00 + band 0.15) = +0.05 (cap-bound buys land inside the arm zone)
+2026-09-23 08:34:16,437 INFO alpaca | Alpaca client ready (mode=paper).
+2026-09-23 08:34:17,651 INFO dashboard | Wrote dashboard with 16 trades -> dashboard.html
+2026-09-23 08:47:40,419 INFO orchestrator | FLOOR6 SHADOW: AUR bracket_stop worst_close=-7.13% vs basis 6.45 (live stop 7.70%, floor under test 6%) -> would_survive=False (close-based proxy)
+2026-09-23 08:47:40,428 INFO ledger | LOT STAMP: AUR bracket_stop entry_ts=2026-09-22 13:33 entry_fill=6.4600 (fill) conviction=0.60 composite=+1.66 stop=7.70% lots_n=1 key_signals=['uptrend MACD bull', 'chain lean +0.92', 'options flow +0.35']
+2026-09-23 08:47:40,432 INFO ledger | Ledger: SELL AUR qty=4651 $27677
+2026-09-23 08:47:40,434 INFO orchestrator | Backfilled exchange exit: AUR 4651 sh @ 5.95 (stop -> bracket_stop, -7.7%) [fill stamped 2026-09-23T13:47:34.155718+00:00].
+2026-09-23 09:22:25,949 INFO orchestrator | Order 6251bcc2-7b8a-4745-b1af-31570241c73a (IEMG) FILLED (180/180) @ 82.9974 x 180 [ledger stamped].
+2026-09-23 09:22:26,040 INFO orchestrator | Order bba1979f-173e-42f5-9b79-d3eaf6189385 (ADC) FILLED (370/370) @ 66.9600 x 370 [ledger stamped].
+2026-09-23 09:22:27,429 INFO orchestrator | Market regime: SPY above 200dma (769 vs 713, today -0.6%), VIX 14.5, VIX3M 17.8 (contango) -> risk-on, size x1.00.
+2026-09-23 09:22:28,984 INFO orchestrator | BOOK BETA: spy=0.73 qqq=0.48 iwm=0.58 invested=45.1% hedge=PSQ w=0 unhedged=0.73
+2026-09-23 09:22:29,560 INFO quiver | Quiver live/congresstrading -> 1000 row(s).
+2026-09-23 09:22:29,794 INFO screener | EDGAR Form-4 feed -> 65 filing(s) (scanning up to 100).
+2026-09-23 09:22:50,264 INFO screener | Options-flow most-actives pool -> 40 name(s).
+2026-09-23 09:23:13,308 INFO screener | Screener liquidity floor dropped 7/24 pre-cap: GOAI $2.12<$5, RCT $0.18<$5, VTGN $0.43<$5, GRAB $3.13<$5, MSTZ $2.42<$5, NVD $3.73<$5, GLND $2.90<$5
+2026-09-23 09:23:13,311 INFO screener | Discovered 17 candidate(s) from 3 source(s) (201 merged, 17 above min_score, capped to 18).
+2026-09-23 09:23:13,312 INFO screener |   candidate WBD [options_flow] score=-0.63 — Options flow: 5,686 call / 25,419 put vol (bearish put imbalance -0.63) on a most-active name.
+2026-09-23 09:23:13,317 INFO screener |   candidate SNDQ [options_flow] score=+0.58 — Options flow: 1,793 call / 482 put vol (bullish call imbalance +0.58) on a most-active name.
+2026-09-23 09:23:13,321 INFO screener |   candidate IONQ [options_flow] score=+0.54 — Options flow: 41,400 call / 12,389 put vol (bullish call imbalance +0.54) on a most-active name.
+2026-09-23 09:23:13,324 INFO screener |   candidate SMCI [options_flow] score=+0.54 — Options flow: 65,865 call / 19,870 put vol (bullish call imbalance +0.54) on a most-active name.
+2026-09-23 09:23:13,326 INFO screener |   candidate SQQQ [options_flow] score=+0.47 — Options flow: 18,835 call / 6,796 put vol (bullish call imbalance +0.47) on a most-active name.
+2026-09-23 09:23:13,329 INFO screener |   candidate BITO [options_flow] score=+0.43 — Options flow: 2,487 call / 983 put vol (bullish call imbalance +0.43) on a most-active name.
+2026-09-23 09:23:13,331 INFO screener |   candidate TSLL [options_flow] score=+0.41 — Options flow: 22,396 call / 9,301 put vol (bullish call imbalance +0.41) on a most-active name.
+2026-09-23 09:23:13,333 INFO screener |   candidate SOXS [options_flow] score=+0.33 — Options flow: 14,788 call / 7,459 put vol (bullish call imbalance +0.33) on a most-active name.
+2026-09-23 09:23:13,335 INFO screener |   candidate GAM [insider] score=+0.30 — Insider: 1 open-market buy filing(s), 2,000 sh (SEC Form 4, last filings feed).
+2026-09-23 09:23:13,337 INFO screener |   candidate SCI [congress] score=-0.23 — Congress: 0 buy / 4 sell filings in last 60d (disclosures lag up to ~45d).
+2026-09-23 09:23:13,339 INFO screener |   candidate CPAY [congress] score=-0.23 — Congress: 0 buy / 6 sell filings in last 60d (disclosures lag up to ~45d).
+2026-09-23 09:23:13,340 INFO screener |   candidate MIDD [congress] score=-0.23 — Congress: 0 buy / 6 sell filings in last 60d (disclosures lag up to ~45d).
+2026-09-23 09:23:13,342 INFO screener |   candidate TDY [congress] score=-0.23 — Congress: 0 buy / 5 sell filings in last 60d (disclosures lag up to ~45d).
+2026-09-23 09:23:13,343 INFO screener |   candidate LH [congress] score=-0.23 — Congress: 0 buy / 4 sell filings in last 60d (disclosures lag up to ~45d).
+2026-09-23 09:23:13,345 INFO screener |   candidate MKL [congress] score=-0.23 — Congress: 0 buy / 4 sell filings in last 60d (disclosures lag up to ~45d).
+2026-09-23 09:23:13,346 INFO screener |   candidate VIK [congress] score=-0.23 — Congress: 0 buy / 6 sell filings in last 60d (disclosures lag up to ~45d).
+2026-09-23 09:23:13,348 INFO screener |   candidate STE [congress] score=-0.23 — Congress: 0 buy / 4 sell filings in last 60d (disclosures lag up to ~45d).
+2026-09-23 09:23:29,340 INFO quiver | Quiver live/offexchange -> 5533 row(s).
+2026-09-23 09:23:29,891 INFO quiver | Quiver live/govcontractsall -> 20000 row(s).
+2026-09-23 09:23:30,964 INFO quiver | Quiver live/lobbying -> 20000 row(s).
+2026-09-23 09:24:02,610 INFO signals | options_chain: reading 25 of 27 symbols this cycle (cap).
+2026-09-23 09:24:09,198 INFO signals | Gathered signals for 27/27 symbols (+3 market signals).
+2026-09-23 09:24:09,291 INFO orchestrator | Composite index (27 scored, top: DBRG +2.69, SNXX +1.92, ONON +1.83, IEMG +1.54, NOK +1.48, SMCI +1.47, ADC +1.39, BRK.B +1.26; bear tail: STE -1.85, LH -1.58, CPAY -1.05, SCI -0.76, MIDD -0.71, VIK -0.63).
+2026-09-23 09:24:11,735 INFO robinhood | Imported 1 Robinhood holding(s) for context (read-only).
+2026-09-23 09:24:11,737 INFO orchestrator | FEEDS: 3/3 healthy news=vader-fallback earnings=rh
+2026-09-23 09:24:11,739 INFO orchestrator | Buy-excluded from slate this cycle: ADC (topped up 0.8h ago (next ok in 4h)), IEMG (topped up 0.8h ago (next ok in 4h))
+2026-09-23 09:24:45,979 INFO usage | decision call: 19200 in / 2415 out (cache r=6603 w=0) ~$0.1597 [claude-opus-4-8]
+2026-09-23 09:24:45,985 INFO decision | Claude returned 2 proposal(s), 4 bearish verdict(s).
+2026-09-23 09:24:45,989 INFO orchestrator | Bearish verdict: MIDD DECLINED — Options_chain -0.53 bearish but insider net BUYING +1.00 (11,979 sh) and MACD bull directly contradict the breakdown; too conflicting to press a put.
+2026-09-23 09:24:45,992 INFO orchestrator | Bearish verdict: SCI DECLINED — Bearish technical (-0.48, MACD bear) but options_chain reads +0.47 BULLISH (put/call OI 0.16) — positioning contradicts the thesis; no bearish flow confirm.
+2026-09-23 09:24:45,995 WARNING orchestrator | Bearish verdict: SOXS ELIGIBLE but IGNORED — model returned no bearish_verdicts entry for an ELIGIBLE name (the schema requires one per listed name).
+2026-09-23 09:24:45,998 INFO orchestrator | Bearish verdict: VIK DECLINED — Bearish leans are congress-lag (-1.00 w=0.23) and insider sale, but options_flow is +0.61 bullish (inflection-bullish) and MACD bull — live flow contradicts dow
+2026-09-23 09:24:47,530 INFO earnings | Robinhood earnings calendar: 712 name(s) reporting within 31d.
+2026-09-23 09:24:50,410 INFO risk | SLOT COUNT: 10/15 model rows (exempt: QQQ; raw 11)
+2026-09-23 09:24:50,414 INFO orchestrator | BUY SMCI -> resized: Sized to 714.884 sh ($29,746) within caps. Reduced from request. Starter haircut x0.5 (conviction 0.62 < 0.65). | Risk-on tape, cash-heavy book. SMCI clean uptrend px>50>200, RSI 60 (not overbought, not extended), 
+2026-09-23 09:24:50,541 WARNING alpaca | SMCI: floored 714.884 sh -> 714 for the exchange bracket; $36.76 of the $29746.32 allocation NOT deployed (stays cash; core sweep / next cycle can redeploy).
+2026-09-23 09:24:50,600 INFO alpaca | BUY market SMCI qty=714.0 notional=None lim=None (order 69bdcb57-8b3e-426c-b5c9-5354d32753f4)
+2026-09-23 09:24:50,604 INFO orchestrator | ENTRY TAPE: SMCI spy_intraday=-0.64% regime=risk-on falling=0 would_haircut=$0 stop=10.00% stop_if_floor6=10.00%
+2026-09-23 09:24:50,611 INFO ledger | Ledger: BUY SMCI qty=714 $29699
+2026-09-23 09:24:50,845 INFO options | STRIKE SNAP: STE none — empty put chain around 2026-10-31; model legs stand
+2026-09-23 09:24:51,065 WARNING options | no quote available for STE261031P00210000 — contract unknown to feed
+2026-09-23 09:24:51,114 WARNING options | no quote available for STE261031P00210000 — contract unknown to feed
+2026-09-23 09:24:51,220 INFO risk | REJECT buy STE: Net credit / no debit — not a bounded-loss debit play.
+2026-09-23 09:24:51,223 INFO orchestrator | OPTION OptionStrategy.LONG_PUT STE -> rejected: Net credit / no debit — not a bounded-loss debit play. | Corroborated breakdown: below 200dma, downtrend px<50<200, technical -0.49 MACD bear RSI36, options_
+2026-09-23 09:24:51,229 INFO orchestrator | BOOK BETA (post-exec): spy=0.83 qqq=0.55 iwm=0.65 invested=48.1% hedge=PSQ w=0 unhedged=0.83 (pre-exec spy=0.73 delta=+0.10)
+2026-09-23 09:24:51,232 INFO orchestrator | BEARISH FUNNEL: slate_bearish=7 [STE -1.85 ELIGIBLE (below its 200dma) -> put proposed; LH -1.58 gate-blocked; CPAY -1.05 gate-blocked; SCI -0.76 ELIGIBLE (below its 200dma) -> declined: Bearish technical (-0.48, MACD bear) but options_chain reads; MIDD -0.71 ELIGIBLE (below its 200dma) -> declined: Options_chain -0.53 bearish but insider net BUYING +1.00 (11; VIK -0.63 ELIGIBLE (below its 200dma) -> declined: Bearish leans are congress-lag (-1.00 w=0.23) and insider sa; SOXS -0.54 ELIGIBLE (below its 200dma) -> IGNORED] put_proposals=1 put_approved=0 ignored=1 auto_hedge=flat proxy_put=none
+2026-09-23 09:24:51,238 INFO orchestrator | Cycle budget not fully deployed: $36.76 dropped by whole-share flooring across this cycle's buys (stays cash; core sweep / next cycle can redeploy).
+2026-09-23 09:24:51,295 INFO config | BOOK BETA CAP vs hedge arm line: cap 1.20 - (target 1.00 + band 0.15) = +0.05 (cap-bound buys land inside the arm zone)
+2026-09-23 09:24:51,299 INFO alpaca | Alpaca client ready (mode=paper).
+2026-09-23 09:24:52,744 INFO dashboard | Wrote dashboard with 18 trades -> dashboard.html
+2026-09-23 10:14:34,662 INFO orchestrator | Order 69bdcb57-8b3e-426c-b5c9-5354d32753f4 (SMCI) FILLED (714/714) @ 41.6200 x 714 [ledger stamped].
+2026-09-23 10:14:36,171 INFO orchestrator | Market regime: SPY above 200dma (770 vs 713, today -0.5%), VIX 14.5, VIX3M 17.8 (contango) -> risk-on, size x1.00.
+2026-09-23 10:14:37,740 INFO orchestrator | BOOK BETA: spy=0.83 qqq=0.55 iwm=0.65 invested=48.2% hedge=PSQ w=0 unhedged=0.83
+2026-09-23 10:14:38,040 INFO quiver | Quiver live/congresstrading -> 1000 row(s).
+2026-09-23 10:14:38,394 INFO screener | EDGAR Form-4 feed -> 63 filing(s) (scanning up to 100).
+2026-09-23 10:15:05,697 INFO screener | Options-flow most-actives pool -> 40 name(s).
+2026-09-23 10:15:31,691 INFO screener | Screener liquidity floor dropped 4/23 pre-cap: RCG $2.86<$5, VTGN $0.41<$5, MSTZ $2.36<$5, NVD $3.70<$5
+2026-09-23 10:15:31,695 INFO screener | Discovered 18 candidate(s) from 3 source(s) (200 merged, 19 above min_score, capped to 18).
+2026-09-23 10:15:31,698 INFO screener |   candidate SPDN [options_flow] score=+0.85 — Options flow: 96 call / 8 put vol (bullish call imbalance +0.85) on a most-active name.
+2026-09-23 10:15:31,703 INFO screener |   candidate WBD [options_flow] score=-0.73 — Options flow: 4,419 call / 28,608 put vol (bearish put imbalance -0.73) on a most-active name.
+2026-09-23 10:15:31,707 INFO screener |   candidate SNDQ [options_flow] score=+0.64 — Options flow: 1,750 call / 385 put vol (bullish call imbalance +0.64) on a most-active name.
+2026-09-23 10:15:31,709 INFO screener |   candidate SOXS [options_flow] score=+0.55 — Options flow: 27,462 call / 7,907 put vol (bullish call imbalance +0.55) on a most-active name.
+2026-09-23 10:15:31,712 INFO screener |   candidate ONDS [options_flow] score=+0.55 — Options flow: 77,554 call / 22,328 put vol (bullish call imbalance +0.55) on a most-active name.
+2026-09-23 10:15:31,715 INFO screener |   candidate IONQ [options_flow] score=+0.54 — Options flow: 65,875 call / 19,944 put vol (bullish call imbalance +0.54) on a most-active name.
+2026-09-23 10:15:31,717 INFO screener |   candidate TSLL [options_flow] score=+0.47 — Options flow: 40,876 call / 14,872 put vol (bullish call imbalance +0.47) on a most-active name.
+2026-09-23 10:15:31,719 INFO screener |   candidate SQQQ [options_flow] score=+0.46 — Options flow: 41,516 call / 15,442 put vol (bullish call imbalance +0.46) on a most-active name.
+2026-09-23 10:15:31,721 INFO screener |   candidate BITO [options_flow] score=+0.41 — Options flow: 2,456 call / 1,022 put vol (bullish call imbalance +0.41) on a most-active name.
+2026-09-23 10:15:31,723 INFO screener |   candidate NWPX [insider] score=-0.36 — Insider: 2 open-market SELL filing(s), 1,020 sh — bearish cluster (SEC Form 4, last filings feed).
+2026-09-23 10:15:31,725 INFO screener |   candidate GAM [insider] score=+0.30 — Insider: 1 open-market buy filing(s), 2,000 sh (SEC Form 4, last filings feed).
+2026-09-23 10:15:31,727 INFO screener |   candidate SCI [congress] score=-0.23 — Congress: 0 buy / 4 sell filings in last 60d (disclosures lag up to ~45d).
+2026-09-23 10:15:31,729 INFO screener |   candidate CPAY [congress] score=-0.23 — Congress: 0 buy / 6 sell filings in last 60d (disclosures lag up to ~45d).
+2026-09-23 10:15:31,731 INFO screener |   candidate MIDD [congress] score=-0.23 — Congress: 0 buy / 6 sell filings in last 60d (disclosures lag up to ~45d).
+2026-09-23 10:15:31,732 INFO screener |   candidate TDY [congress] score=-0.23 — Congress: 0 buy / 5 sell filings in last 60d (disclosures lag up to ~45d).
+2026-09-23 10:15:31,734 INFO screener |   candidate LH [congress] score=-0.23 — Congress: 0 buy / 4 sell filings in last 60d (disclosures lag up to ~45d).
+2026-09-23 10:15:31,736 INFO screener |   candidate MKL [congress] score=-0.23 — Congress: 0 buy / 4 sell filings in last 60d (disclosures lag up to ~45d).
+2026-09-23 10:15:31,737 INFO screener |   candidate VIK [congress] score=-0.23 — Congress: 0 buy / 6 sell filings in last 60d (disclosures lag up to ~45d).
+2026-09-23 10:15:53,278 INFO quiver | Quiver live/offexchange -> 5533 row(s).
+2026-09-23 10:15:54,325 INFO quiver | Quiver live/govcontractsall -> 20000 row(s).
+2026-09-23 10:15:55,319 INFO quiver | Quiver live/lobbying -> 20000 row(s).
+2026-09-23 10:16:45,139 WARNING signals | options-flow (signal): 1 of 29 chain read(s) failed — first: IONQ (ReadTimeout(ReadTimeoutError("HTTPSConnectionPool(host='api.polygon.io', port=443): Read timed out. (read timeout=20)"))). Flow read degraded this cycle.
+2026-09-23 10:16:45,148 INFO signals | options_chain: reading 25 of 29 symbols this cycle (cap).
+2026-09-23 10:16:51,575 INFO signals | Gathered signals for 29/29 symbols (+3 market signals).
+2026-09-23 10:16:51,648 INFO orchestrator | Composite index (29 scored, top: DBRG +2.69, ONON +1.86, SNXX +1.72, SMCI +1.56, BRK.B +1.49, ADC +1.39, IEMG +1.33, NOK +1.30; bear tail: LH -1.59, VIK -1.42, CPAY -1.04, SCI -0.76).
+2026-09-23 10:16:54,130 INFO robinhood | Imported 1 Robinhood holding(s) for context (read-only).
+2026-09-23 10:16:54,131 INFO orchestrator | FEEDS: 3/3 healthy news=vader-fallback earnings=rh
+2026-09-23 10:16:54,133 INFO orchestrator | Buy-excluded from slate this cycle: ADC (topped up 1.7h ago (next ok in 4h)), IEMG (topped up 1.7h ago (next ok in 4h)), SMCI (topped up 0.9h ago (next ok in 4h))
+2026-09-23 10:17:33,975 INFO usage | decision call: 20225 in / 2639 out (cache r=6603 w=0) ~$0.1704 [claude-opus-4-8]
+2026-09-23 10:17:33,980 INFO decision | Claude returned 2 proposal(s), 2 bearish verdict(s).
+2026-09-23 10:17:33,983 INFO orchestrator | Bearish verdict: SCI DECLINED — Technical -0.48 and insider open-market selling -1.00 are bearish, but options_chain reads +0.47 BULLISH (put/call OI 0.16) which directly contradicts a downsid
+2026-09-23 10:17:33,987 INFO orchestrator | Bearish verdict: VIK DECLINED — Below 200dma but timing contradicts a put: RSI 32 (oversold) with MACD bull suggests bounce risk, and options flow only -0.18 (improving trend) gives no bearish
+2026-09-23 10:17:35,566 INFO earnings | Robinhood earnings calendar: 712 name(s) reporting within 31d.
+2026-09-23 10:17:38,625 INFO risk | SLOT COUNT: 11/15 model rows (exempt: QQQ; raw 12)
+2026-09-23 10:17:38,629 INFO orchestrator | BUY IONQ -> resized: Sized to 455.166 sh ($19,868) within caps. Reduced from request. Starter haircut x0.5 (conviction 0.60 < 0.65). | NEW scanner name with a fresh technical anchor: technical +0.68 (RSI 60 not overbought, MACD bull), 
+2026-09-23 10:17:38,695 WARNING alpaca | IONQ: floored 455.166 sh -> 455 for the exchange bracket; $7.24 of the $19867.99 allocation NOT deployed (stays cash; core sweep / next cycle can redeploy).
+2026-09-23 10:17:38,745 INFO alpaca | BUY market IONQ qty=455.0 notional=None lim=None (order 94e718e4-1fcc-42e0-baf2-6db465f8b52a)
+2026-09-23 10:17:38,747 INFO orchestrator | ENTRY TAPE: IONQ spy_intraday=-0.48% regime=risk-on falling=0 would_haircut=$0 stop=10.00% stop_if_floor6=10.00%
+2026-09-23 10:17:38,752 INFO ledger | Ledger: BUY IONQ qty=455 $19861
+2026-09-23 10:17:38,967 INFO orchestrator | HOLD SOFI (no action) | Loser at -5.0% with only 0.8pp to stop; no concrete new adverse event, so the mechanical stop owns t
+2026-09-23 10:17:38,974 INFO orchestrator | BOOK BETA (post-exec): spy=0.89 qqq=0.60 iwm=0.72 invested=50.2% hedge=PSQ w=0 unhedged=0.89 (pre-exec spy=0.83 delta=+0.07)
+2026-09-23 10:17:38,978 INFO orchestrator | BEARISH FUNNEL: slate_bearish=4 [LH -1.59 gate-blocked; VIK -1.42 ELIGIBLE (below its 200dma) -> declined: Below 200dma but timing contradicts a put: RSI 32 (oversold); CPAY -1.04 gate-blocked; SCI -0.76 ELIGIBLE (below its 200dma) -> declined: Technical -0.48 and insider open-market selling -1.00 are be] put_proposals=0 put_approved=0 ignored=0 auto_hedge=flat proxy_put=none
+2026-09-23 10:17:38,982 INFO orchestrator | Cycle budget not fully deployed: $7.24 dropped by whole-share flooring across this cycle's buys (stays cash; core sweep / next cycle can redeploy).
+2026-09-23 10:17:38,983 INFO orchestrator | Core fill skipped: QQQ already at/above the 15% ceiling.
+2026-09-23 10:17:39,041 INFO config | BOOK BETA CAP vs hedge arm line: cap 1.20 - (target 1.00 + band 0.15) = +0.05 (cap-bound buys land inside the arm zone)
+2026-09-23 10:17:39,045 INFO alpaca | Alpaca client ready (mode=paper).
+2026-09-23 10:17:40,474 INFO dashboard | Wrote dashboard with 19 trades -> dashboard.html
+2026-09-23 11:06:51,953 INFO orchestrator | Order 94e718e4-1fcc-42e0-baf2-6db465f8b52a (IONQ) FILLED (455/455) @ 43.5989 x 455 [ledger stamped].
+2026-09-23 11:06:53,585 INFO orchestrator | Market regime: SPY above 200dma (768 vs 713, today -0.7%), VIX 14.9, VIX3M 17.9 (contango) -> risk-on, size x1.00.
+2026-09-23 11:06:55,402 INFO orchestrator | BOOK BETA: spy=0.89 qqq=0.60 iwm=0.71 invested=50.1% hedge=PSQ w=0 unhedged=0.89
+2026-09-23 11:06:56,223 INFO quiver | Quiver live/congresstrading -> 1000 row(s).
+2026-09-23 11:06:56,429 INFO screener | EDGAR Form-4 feed -> 64 filing(s) (scanning up to 100).
+2026-09-23 11:07:24,586 INFO screener | Options-flow most-actives pool -> 40 name(s).
+2026-09-23 11:07:49,170 INFO screener | Screener liquidity floor dropped 3/23 pre-cap: VTGN $0.38<$5, NVD $3.74<$5, MSTZ $2.41<$5
+2026-09-23 11:07:49,174 INFO screener | Discovered 18 candidate(s) from 3 source(s) (200 merged, 20 above min_score, capped to 18).
+2026-09-23 11:07:49,177 INFO screener |   candidate TSLG [options_flow] score=+0.97 — Options flow: 410 call / 7 put vol (bullish call imbalance +0.97) on a most-active name.
+2026-09-23 11:07:49,180 INFO screener |   candidate SPDN [options_flow] score=+0.85 — Options flow: 96 call / 8 put vol (bullish call imbalance +0.85) on a most-active name.
+2026-09-23 11:07:49,181 INFO screener |   candidate SNDQ [options_flow] score=+0.78 — Options flow: 3,199 call / 396 put vol (bullish call imbalance +0.78) on a most-active name.
+2026-09-23 11:07:49,183 INFO screener |   candidate WBD [options_flow] score=-0.71 — Options flow: 5,182 call / 30,118 put vol (bearish put imbalance -0.71) on a most-active name.
+2026-09-23 11:07:49,185 INFO screener |   candidate ONDS [options_flow] score=+0.62 — Options flow: 98,806 call / 23,193 put vol (bullish call imbalance +0.62) on a most-active name.
+2026-09-23 11:07:49,186 INFO screener |   candidate SOXS [options_flow] score=+0.55 — Options flow: 30,643 call / 9,015 put vol (bullish call imbalance +0.55) on a most-active name.
+2026-09-23 11:07:49,188 INFO screener |   candidate BITO [options_flow] score=+0.53 — Options flow: 3,062 call / 945 put vol (bullish call imbalance +0.53) on a most-active name.
+2026-09-23 11:07:49,190 INFO screener |   candidate QID [options_flow] score=+0.50 — Options flow: 437 call / 145 put vol (bullish call imbalance +0.50) on a most-active name.
+2026-09-23 11:07:49,193 INFO screener |   candidate SQQQ [options_flow] score=+0.49 — Options flow: 46,393 call / 15,814 put vol (bullish call imbalance +0.49) on a most-active name.
+2026-09-23 11:07:49,195 INFO screener |   candidate TSLL [options_flow] score=+0.43 — Options flow: 44,524 call / 17,885 put vol (bullish call imbalance +0.43) on a most-active name.
+2026-09-23 11:07:49,197 INFO screener |   candidate NWPX [insider] score=-0.36 — Insider: 2 open-market SELL filing(s), 1,020 sh — bearish cluster (SEC Form 4, last filings feed).
+2026-09-23 11:07:49,200 INFO screener |   candidate TPL [insider] score=+0.30 — Insider: 1 open-market buy filing(s), 1 sh (SEC Form 4, last filings feed).
+2026-09-23 11:07:49,201 INFO screener |   candidate SCI [congress] score=-0.23 — Congress: 0 buy / 4 sell filings in last 60d (disclosures lag up to ~45d).
+2026-09-23 11:07:49,206 INFO screener |   candidate CPAY [congress] score=-0.23 — Congress: 0 buy / 6 sell filings in last 60d (disclosures lag up to ~45d).
+2026-09-23 11:07:49,210 INFO screener |   candidate MIDD [congress] score=-0.23 — Congress: 0 buy / 6 sell filings in last 60d (disclosures lag up to ~45d).
+2026-09-23 11:07:49,212 INFO screener |   candidate TDY [congress] score=-0.23 — Congress: 0 buy / 5 sell filings in last 60d (disclosures lag up to ~45d).
+2026-09-23 11:07:49,214 INFO screener |   candidate LH [congress] score=-0.23 — Congress: 0 buy / 4 sell filings in last 60d (disclosures lag up to ~45d).
+2026-09-23 11:07:49,215 INFO screener |   candidate MKL [congress] score=-0.23 — Congress: 0 buy / 4 sell filings in last 60d (disclosures lag up to ~45d).
+2026-09-23 11:08:05,072 INFO quiver | Quiver live/offexchange -> 5533 row(s).
+2026-09-23 11:08:05,835 INFO quiver | Quiver live/govcontractsall -> 20000 row(s).
+2026-09-23 11:08:06,982 INFO quiver | Quiver live/lobbying -> 20000 row(s).
+2026-09-23 11:08:39,839 INFO signals | options_chain: reading 25 of 30 symbols this cycle (cap).
+2026-09-23 11:08:46,309 INFO signals | Gathered signals for 30/30 symbols (+3 market signals).
+2026-09-23 11:08:46,388 INFO orchestrator | Composite index (30 scored, top: DBRG +2.69, ONON +1.83, SNXX +1.77, SMCI +1.57, BRK.B +1.52, NOK +1.50, ADC +1.39, BITO +1.25; bear tail: LH -1.09, CPAY -1.04, SCI -0.76).
+2026-09-23 11:08:48,828 INFO robinhood | Imported 1 Robinhood holding(s) for context (read-only).
+2026-09-23 11:08:48,830 INFO orchestrator | FEEDS: 3/3 healthy news=vader-fallback earnings=rh
+2026-09-23 11:08:48,832 INFO orchestrator | Buy-excluded from slate this cycle: ADC (topped up 2.6h ago (next ok in 4h)), IEMG (topped up 2.6h ago (next ok in 4h)), IONQ (topped up 0.9h ago (next ok in 4h)), SMCI (topped up 1.7h ago (next ok in 4h))
+2026-09-23 11:09:44,224 INFO usage | decision call: 21090 in / 3676 out (cache r=6603 w=0) ~$0.2007 [claude-opus-4-8]
+2026-09-23 11:09:44,228 INFO decision | Claude returned 2 proposal(s), 2 bearish verdict(s).
+2026-09-23 11:09:44,233 INFO orchestrator | Bearish verdict: SCI DECLINED — Bearish technical (-0.49, below 200dma, MACD bear) and insider open-market selling -1.00 are offset by a BULLISH options chain lean (+0.47, put/call OI 0.16) an
+2026-09-23 11:09:45,880 INFO earnings | Robinhood earnings calendar: 712 name(s) reporting within 31d.
+2026-09-23 11:09:49,040 INFO orchestrator | BUY DBRG -> approved: Sized to 4965.45 sh ($79,373) within caps. | Top-up on strongest composite in book (+2.69): clean uptrend px>50>200, MACD bull, RSI 61 (not overb
+2026-09-23 11:09:49,095 WARNING alpaca | DBRG: floored 4965.45 sh -> 4965 for the exchange bracket; $7.13 of the $79372.65 allocation NOT deployed (stays cash; core sweep / next cycle can redeploy).
+2026-09-23 11:09:49,150 INFO alpaca | BUY market DBRG qty=4965.0 notional=None lim=None (order bba8dac8-76b9-431b-9161-43aba7d725fc)
+2026-09-23 11:09:49,154 INFO orchestrator | ENTRY TAPE: DBRG spy_intraday=-0.66% regime=risk-on falling=0 would_haircut=$0 stop=4.00% stop_if_floor6=6.00%
+2026-09-23 11:09:49,158 INFO ledger | Ledger: BUY DBRG qty=4965 $79366
+2026-09-23 11:09:49,386 INFO options | STRIKE SNAP: LH none — empty put chain around 2026-10-30; model legs stand
+2026-09-23 11:09:49,650 WARNING options | no quote available for LH261030P00305000 — contract unknown to feed
+2026-09-23 11:09:49,703 WARNING options | no quote available for LH261030P00305000 — contract unknown to feed
+2026-09-23 11:09:49,801 INFO risk | REJECT buy LH: Net credit / no debit — not a bounded-loss debit play.
+2026-09-23 11:09:49,805 INFO orchestrator | OPTION OptionStrategy.LONG_PUT LH -> rejected: Net credit / no debit — not a bounded-loss debit play. | Corroborated breakdown: -5.4% vs 20d SMA (gate passes), RSI 38, MACD bear, inflection-bearish techni
+2026-09-23 11:09:49,810 INFO orchestrator | BOOK BETA (post-exec): spy=0.91 qqq=0.62 iwm=0.73 invested=58.1% hedge=PSQ w=0 unhedged=0.91 (pre-exec spy=0.89 delta=+0.02)
+2026-09-23 11:09:49,814 INFO orchestrator | BEARISH FUNNEL: slate_bearish=3 [LH -1.09 ELIGIBLE (-5.4% vs 20d SMA breakdown) -> put proposed; CPAY -1.04 gate-blocked; SCI -0.76 ELIGIBLE (below its 200dma) -> declined: Bearish technical (-0.49, below 200dma, MACD bear) and insid] put_proposals=1 put_approved=0 ignored=0 auto_hedge=flat proxy_put=none
+2026-09-23 11:09:49,818 INFO orchestrator | Cycle budget not fully deployed: $7.13 dropped by whole-share flooring across this cycle's buys (stays cash; core sweep / next cycle can redeploy).
+2026-09-23 11:09:49,821 INFO orchestrator | Core fill skipped: QQQ already at/above the 15% ceiling.
+2026-09-23 11:09:49,877 INFO config | BOOK BETA CAP vs hedge arm line: cap 1.20 - (target 1.00 + band 0.15) = +0.05 (cap-bound buys land inside the arm zone)
+2026-09-23 11:09:49,879 INFO alpaca | Alpaca client ready (mode=paper).
+2026-09-23 11:09:51,237 INFO dashboard | Wrote dashboard with 20 trades -> dashboard.html
+2026-09-23 11:58:59,637 INFO orchestrator | Order bba8dac8-76b9-431b-9161-43aba7d725fc (DBRG) FILLED (4965/4965) @ 15.9900 x 4965 [ledger stamped].
+2026-09-23 11:59:01,391 INFO orchestrator | Market regime: SPY above 200dma (767 vs 713, today -0.8%), VIX 14.9, VIX3M 18.0 (contango) -> risk-on, size x1.00.
+2026-09-23 11:59:03,786 INFO orchestrator | BOOK BETA: spy=0.90 qqq=0.61 iwm=0.72 invested=58.1% hedge=PSQ w=0 unhedged=0.90
+2026-09-23 11:59:04,270 INFO quiver | Quiver live/congresstrading -> 1000 row(s).
+2026-09-23 11:59:08,884 INFO screener | EDGAR Form-4 feed -> 67 filing(s) (scanning up to 100).
+2026-09-23 11:59:39,363 INFO screener | Options-flow most-actives pool -> 40 name(s).
+2026-09-23 12:00:03,871 INFO screener | Screener liquidity floor dropped 4/25 pre-cap: VTGN $0.37<$5, GRAB $3.17<$5, NVD $3.75<$5, MSTZ $2.41<$5
+2026-09-23 12:00:03,879 INFO screener | Discovered 18 candidate(s) from 3 source(s) (203 merged, 21 above min_score, capped to 18).
+2026-09-23 12:00:03,882 INFO screener |   candidate TSLG [options_flow] score=+0.97 — Options flow: 409 call / 7 put vol (bullish call imbalance +0.97) on a most-active name.
+2026-09-23 12:00:03,887 INFO screener |   candidate RWM [options_flow] score=+0.91 — Options flow: 125 call / 6 put vol (bullish call imbalance +0.91) on a most-active name.
+2026-09-23 12:00:03,890 INFO screener |   candidate SPDN [options_flow] score=+0.85 — Options flow: 96 call / 8 put vol (bullish call imbalance +0.85) on a most-active name.
+2026-09-23 12:00:03,892 INFO screener |   candidate HYG [options_flow] score=-0.82 — Options flow: 22,720 call / 236,931 put vol (bearish put imbalance -0.82) on a most-active name.
+2026-09-23 12:00:03,894 INFO screener |   candidate WBD [options_flow] score=-0.69 — Options flow: 5,852 call / 31,654 put vol (bearish put imbalance -0.69) on a most-active name.
+2026-09-23 12:00:03,896 INFO screener |   candidate ONDS [options_flow] score=+0.67 — Options flow: 107,274 call / 21,338 put vol (bullish call imbalance +0.67) on a most-active name.
+2026-09-23 12:00:03,898 INFO screener |   candidate SOXS [options_flow] score=+0.55 — Options flow: 34,107 call / 9,871 put vol (bullish call imbalance +0.55) on a most-active name.
+2026-09-23 12:00:03,901 INFO screener |   candidate QID [options_flow] score=+0.54 — Options flow: 490 call / 145 put vol (bullish call imbalance +0.54) on a most-active name.
+2026-09-23 12:00:03,904 INFO screener |   candidate SQQQ [options_flow] score=+0.54 — Options flow: 54,731 call / 16,266 put vol (bullish call imbalance +0.54) on a most-active name.
+2026-09-23 12:00:03,906 INFO screener |   candidate BITO [options_flow] score=+0.51 — Options flow: 3,530 call / 1,136 put vol (bullish call imbalance +0.51) on a most-active name.
+2026-09-23 12:00:03,908 INFO screener |   candidate TSLL [options_flow] score=+0.42 — Options flow: 46,551 call / 18,983 put vol (bullish call imbalance +0.42) on a most-active name.
+2026-09-23 12:00:03,909 INFO screener |   candidate TPL [insider] score=+0.30 — Insider: 1 open-market buy filing(s), 1 sh (SEC Form 4, last filings feed).
+2026-09-23 12:00:03,911 INFO screener |   candidate UNG [options_flow] score=+0.30 — Options flow: 11,803 call / 6,350 put vol (bullish call imbalance +0.30) on a most-active name.
+2026-09-23 12:00:03,912 INFO screener |   candidate SCI [congress] score=-0.23 — Congress: 0 buy / 4 sell filings in last 60d (disclosures lag up to ~45d).
+2026-09-23 12:00:03,914 INFO screener |   candidate CPAY [congress] score=-0.23 — Congress: 0 buy / 6 sell filings in last 60d (disclosures lag up to ~45d).
+2026-09-23 12:00:03,915 INFO screener |   candidate MIDD [congress] score=-0.23 — Congress: 0 buy / 6 sell filings in last 60d (disclosures lag up to ~45d).
+2026-09-23 12:00:03,916 INFO screener |   candidate TDY [congress] score=-0.23 — Congress: 0 buy / 5 sell filings in last 60d (disclosures lag up to ~45d).
+2026-09-23 12:00:03,917 INFO screener |   candidate LH [congress] score=-0.23 — Congress: 0 buy / 4 sell filings in last 60d (disclosures lag up to ~45d).
+2026-09-23 12:00:40,815 INFO quiver | Quiver live/offexchange -> 5533 row(s).
+2026-09-23 12:00:41,301 INFO quiver | Quiver live/govcontractsall -> 20000 row(s).
+2026-09-23 12:00:42,327 INFO quiver | Quiver live/lobbying -> 20000 row(s).
+2026-09-23 12:01:10,264 INFO signals | options_chain: reading 25 of 30 symbols this cycle (cap).
+2026-09-23 12:01:16,510 INFO signals | Gathered signals for 30/30 symbols (+3 market signals).
+2026-09-23 12:01:16,605 INFO orchestrator | Composite index (30 scored, top: DBRG +2.69, ONON +1.91, SNXX +1.65, BRK.B +1.60, SMCI +1.58, NOK +1.45, ADC +1.37, BITO +1.30; bear tail: HYG -1.47, SCI -0.76, CPAY -0.64).
+2026-09-23 12:01:19,401 INFO robinhood | Imported 1 Robinhood holding(s) for context (read-only).
+2026-09-23 12:01:19,403 INFO orchestrator | FEEDS: 3/3 healthy news=vader-fallback earnings=rh
+2026-09-23 12:01:19,406 INFO orchestrator | Buy-excluded from slate this cycle: ADC (topped up 3.5h ago (next ok in 4h)), DBRG (topped up 0.9h ago (next ok in 4h)), IEMG (topped up 3.5h ago (next ok in 4h)), IONQ (topped up 1.7h ago (next ok in 4h)), SMCI (topped up 2.6h ago (next ok in 4h))
+2026-09-23 12:01:45,007 INFO usage | decision call: 20576 in / 1585 out (cache r=6603 w=0) ~$0.1458 [claude-opus-4-8]
+2026-09-23 12:01:45,013 INFO decision | Claude returned 1 proposal(s), 2 bearish verdict(s).
+2026-09-23 12:01:45,018 INFO orchestrator | Bearish verdict: SCI DECLINED — Bearish technical (-0.48, MACD bear) and insider selling (-1.00) are contradicted by a bullish options_chain lean +0.47 (put/call OI 0.16) and no bearish flow c
+2026-09-23 12:01:45,523 INFO options | STRIKE SNAP: HYG 2026-10-30 78P (OI 15, 0.2% OTM) -> 78.5P (OI 3203, 0.4% ITM); unsnapped would be rejected: open interest 15 < 100
+2026-09-23 12:01:46,897 INFO earnings | Robinhood earnings calendar: 712 name(s) reporting within 31d.
+2026-09-23 12:01:46,899 INFO risk | PER-UNDERLYING PREMIUM CAP: HYG debit budget clamped $9,900 -> $4,958 (open premium $0 of $4,958 cap).
+2026-09-23 12:01:46,900 INFO risk | Option HYG: clamping 62 contracts to 50 (thin-book count cap).
+2026-09-23 12:01:46,900 INFO orchestrator | OPTION OptionStrategy.LONG_PUT HYG -> approved: 50 contract(s), $3,950 debit (cap $4,958). [STRIKE SNAP: model legs 2026-10-30 78P -> 78.5P (spot 78.19 broker)] | Corroborated credit-ETF breakdown: below its 200dma (gate passes), composite -1.47, MACD bear, RSI 3
+2026-09-23 12:01:46,955 INFO alpaca | OPTION 1-leg order qty=50 limit=0.95 (order 83d318e2-a7f7-4045-be04-e945dfc8b5fd)
+2026-09-23 12:01:46,957 INFO ledger | Ledger: BUY HYG261030P00078500 qty=50 $3950
+2026-09-23 12:01:46,960 INFO orchestrator | BOOK BETA (post-exec): spy=0.90 qqq=0.61 iwm=0.72 invested=58.1% hedge=PSQ w=0 unhedged=0.90 (pre-exec spy=0.90 delta=+0.00)
+2026-09-23 12:01:46,962 INFO orchestrator | BEARISH FUNNEL: slate_bearish=3 [HYG -1.47 ELIGIBLE (below its 200dma) -> put proposed; SCI -0.76 ELIGIBLE (below its 200dma) -> declined: Bearish technical (-0.48, MACD bear) and insider selling (-1; CPAY -0.64 gate-blocked] put_proposals=1 put_approved=1 ignored=0 auto_hedge=flat proxy_put=none
+2026-09-23 12:01:47,097 INFO config | BOOK BETA CAP vs hedge arm line: cap 1.20 - (target 1.00 + band 0.15) = +0.05 (cap-bound buys land inside the arm zone)
+2026-09-23 12:01:47,100 INFO alpaca | Alpaca client ready (mode=paper).
+2026-09-23 12:01:48,431 INFO dashboard | Wrote dashboard with 21 trades -> dashboard.html
+2026-09-23 12:41:07,529 INFO orchestrator | FLOOR6 SHADOW: SOFI bracket_stop worst_close=-5.77% vs basis 17.68 (live stop 5.73%, floor under test 6%) -> would_survive=True (close-based proxy)
+2026-09-23 12:41:07,573 INFO ledger | LOT STAMP: SOFI bracket_stop entry_ts=2026-09-22 13:33 entry_fill=17.7800 (fill) conviction=0.60 composite=+0.85 stop=5.73% lots_n=1 key_signals=['insider net buying +0.75', 'fundamentals +0.42', 'options flow +0.41']
+2026-09-23 12:41:07,583 INFO ledger | Ledger: SELL SOFI qty=2261 $37691
+2026-09-23 12:41:07,585 INFO orchestrator | Backfilled exchange exit: SOFI 2261 sh @ 16.67 (stop -> bracket_stop, -5.7%) [fill stamped 2026-09-23T17:40:44.375013+00:00].
+2026-09-23 12:51:01,167 INFO ledger | Ledger: RESTATED OPTION BUY HYG261030P00078500 cost at fill 0.8900 (quote 0.7900): $3950.00 -> $4450.00 (+500.00) [order 83d318e2-a7f7-4045-be04-e945dfc8b5fd]
+2026-09-23 12:51:01,177 INFO orchestrator | Order 83d318e2-a7f7-4045-be04-e945dfc8b5fd (HYG) FILLED (50/50) @ 0.8900 x 50 [ledger stamped].
+2026-09-23 12:51:02,359 INFO orchestrator | Market regime: SPY above 200dma (768 vs 713, today -0.7%), VIX 15.4, VIX3M 18.2 (contango) -> risk-on, size x1.00.
+2026-09-23 12:51:04,622 INFO orchestrator | BOOK BETA: spy=0.80 qqq=0.56 iwm=0.62 invested=54.7% hedge=PSQ w=0 unhedged=0.80 [options at debit notional x underlying beta: HYG]
+2026-09-23 12:51:04,804 INFO quiver | Quiver live/congresstrading -> 0 row(s).
+2026-09-23 12:51:24,971 WARNING screener | EDGAR Form-4 feed returned 0 filings after 20s (timeout): HTTPSConnectionPool(host='www.sec.gov', port=443): Read timed out. (read timeout=20) — insider screener UNHEALTHY this cycle.
+2026-09-23 12:51:24,980 INFO screener | EDGAR Form-4 feed -> 0 filing(s) (scanning up to 100).
+2026-09-23 12:51:25,220 INFO screener | Options-flow most-actives pool -> 40 name(s).
+2026-09-23 12:51:48,519 INFO screener | Screener liquidity floor dropped 4/16 pre-cap: VTGN $0.37<$5, GRAB $3.18<$5, NVD $3.73<$5, MSTZ $2.41<$5
+2026-09-23 12:51:48,526 INFO screener | Discovered 12 candidate(s) from 3 source(s) (16 merged, 12 above min_score, capped to 18).
+2026-09-23 12:51:48,529 INFO screener |   candidate TSLG [options_flow] score=+0.97 — Options flow: 409 call / 7 put vol (bullish call imbalance +0.97) on a most-active name.
+2026-09-23 12:51:48,532 INFO screener |   candidate RWM [options_flow] score=+0.91 — Options flow: 126 call / 6 put vol (bullish call imbalance +0.91) on a most-active name.
+2026-09-23 12:51:48,535 INFO screener |   candidate WBD [options_flow] score=-0.81 — Options flow: 8,271 call / 78,526 put vol (bearish put imbalance -0.81) on a most-active name.
+2026-09-23 12:51:48,537 INFO screener |   candidate ONDS [options_flow] score=+0.70 — Options flow: 126,208 call / 22,444 put vol (bullish call imbalance +0.70) on a most-active name.
+2026-09-23 12:51:48,539 INFO screener |   candidate QID [options_flow] score=+0.68 — Options flow: 753 call / 145 put vol (bullish call imbalance +0.68) on a most-active name.
+2026-09-23 12:51:48,541 INFO screener |   candidate SQQQ [options_flow] score=+0.61 — Options flow: 67,782 call / 16,655 put vol (bullish call imbalance +0.61) on a most-active name.
+2026-09-23 12:51:48,543 INFO screener |   candidate SOXS [options_flow] score=+0.59 — Options flow: 40,277 call / 10,505 put vol (bullish call imbalance +0.59) on a most-active name.
+2026-09-23 12:51:48,546 INFO screener |   candidate BITO [options_flow] score=+0.43 — Options flow: 3,611 call / 1,433 put vol (bullish call imbalance +0.43) on a most-active name.
+2026-09-23 12:51:48,549 INFO screener |   candidate TSLL [options_flow] score=+0.40 — Options flow: 49,721 call / 21,267 put vol (bullish call imbalance +0.40) on a most-active name.
+2026-09-23 12:51:48,551 INFO screener |   candidate SOFI [options_flow] score=+0.35 — Options flow: 109,091 call / 52,132 put vol (bullish call imbalance +0.35) on a most-active name.
+2026-09-23 12:51:48,553 INFO screener |   candidate UNG [options_flow] score=+0.33 — Options flow: 12,622 call / 6,378 put vol (bullish call imbalance +0.33) on a most-active name.
+2026-09-23 12:51:48,554 INFO screener |   candidate TQQQ [options_flow] score=-0.31 — Options flow: 102,366 call / 192,628 put vol (bearish put imbalance -0.31) on a most-active name.
+2026-09-23 12:51:59,963 INFO quiver | Quiver live/offexchange -> 5533 row(s).
+2026-09-23 12:52:00,784 INFO quiver | Quiver live/govcontractsall -> 20000 row(s).
+2026-09-23 12:52:02,392 INFO quiver | Quiver live/lobbying -> 20000 row(s).
+2026-09-23 12:52:29,393 INFO signals | Gathered signals for 24/24 symbols (+3 market signals).
+2026-09-23 12:52:29,461 INFO orchestrator | Composite index (24 scored, top: DBRG +2.70, ONON +1.85, SMCI +1.57, NOK +1.54, BRK.B +1.44, SNXX +1.19, BITO +1.15, TSLG +1.13; bear tail: HYG -1.50, WBD -0.49).
+2026-09-23 12:52:31,520 INFO robinhood | Imported 1 Robinhood holding(s) for context (read-only).
+2026-09-23 12:52:31,521 WARNING orchestrator | FEEDS: 2/3 — insider UNHEALTHY (edgar: timeout) — EVAL WINDOW VALIDITY AT RISK news=vader-fallback earnings=rh
+2026-09-23 12:52:31,524 INFO orchestrator | Buy-excluded from slate this cycle: DBRG (topped up 1.7h ago (next ok in 4h)), HYG (topped up 0.8h ago (next ok in 4h)), IONQ (topped up 2.6h ago (next ok in 4h)), SMCI (topped up 3.5h ago (next ok in 4h)), SOFI (exited 0.2h ago (cooldown 24h))
+2026-09-23 12:53:01,029 INFO usage | decision call: 15284 in / 1856 out (cache r=6603 w=0) ~$0.1261 [claude-opus-4-8]
+2026-09-23 12:53:01,037 INFO decision | Claude returned 1 proposal(s), 1 bearish verdict(s).
+2026-09-23 12:53:01,771 INFO options | STRIKE SNAP: HYG 2026-11-20 78P (OI 154799, 0.2% OTM) -> 79P (OI 150484, 1.1% ITM); unsnapped would be rejected: bid-ask spread 14.8% > 10%
+2026-09-23 12:53:03,102 INFO earnings | Robinhood earnings calendar: 712 name(s) reporting within 31d.
+2026-09-23 12:53:03,103 INFO risk | PER-UNDERLYING PREMIUM CAP: HYG debit budget clamped $4,000 -> $505 (open premium $4,450 of $4,955 cap).
+2026-09-23 12:53:03,103 INFO orchestrator | OPTION OptionStrategy.LONG_PUT HYG -> approved: 3 contract(s), $456 debit (cap $505). [STRIKE SNAP: model legs 2026-11-20 78P -> 79P (spot 78.16 broker)] | Corroborated credit-ETF breakdown: composite -1.50, price below its own 200dma, MACD bear, options f
+2026-09-23 12:53:03,153 INFO alpaca | OPTION 1-leg order qty=3 limit=1.82 (order 3b71c69c-1a39-409b-aa0d-735394a463c7)
+2026-09-23 12:53:03,155 INFO ledger | Ledger: BUY HYG261120P00079000 qty=3 $456
+2026-09-23 12:53:03,158 INFO orchestrator | BOOK BETA (post-exec): spy=0.80 qqq=0.56 iwm=0.62 invested=54.7% hedge=PSQ w=0 unhedged=0.80 (pre-exec spy=0.80 delta=+0.00)
+2026-09-23 12:53:03,159 INFO orchestrator | BEARISH FUNNEL: slate_bearish=2 [HYG -1.50 ELIGIBLE (below its 200dma) -> put proposed; WBD -0.49 gate-blocked] put_proposals=1 put_approved=1 ignored=0 auto_hedge=flat proxy_put=none
+2026-09-23 12:53:03,160 INFO orchestrator | Core fill skipped: QQQ already at/above the 15% ceiling.
+2026-09-23 12:53:03,209 INFO config | BOOK BETA CAP vs hedge arm line: cap 1.20 - (target 1.00 + band 0.15) = +0.05 (cap-bound buys land inside the arm zone)
+2026-09-23 12:53:03,210 INFO alpaca | Alpaca client ready (mode=paper).
+2026-09-23 12:53:04,592 INFO dashboard | Wrote dashboard with 23 trades -> dashboard.html
+2026-09-23 13:43:17,005 INFO ledger | Ledger: RESTATED OPTION BUY HYG261120P00079000 cost at fill 1.5400 (quote 1.5200): $456.00 -> $462.00 (+6.00) [order 3b71c69c-1a39-409b-aa0d-735394a463c7]
+2026-09-23 13:43:17,014 INFO orchestrator | Order 3b71c69c-1a39-409b-aa0d-735394a463c7 (HYG) FILLED (3/3) @ 1.5400 x 3 [ledger stamped].
+2026-09-23 13:43:18,370 INFO orchestrator | Market regime: SPY above 200dma (768 vs 713, today -0.7%), VIX 14.9, VIX3M 18.0 (contango) -> risk-on, size x1.00.
+2026-09-23 13:43:20,197 INFO orchestrator | BOOK BETA: spy=0.80 qqq=0.56 iwm=0.62 invested=54.8% hedge=PSQ w=0 unhedged=0.80 [options at debit notional x underlying beta: HYG]
+2026-09-23 13:43:20,652 INFO quiver | Quiver live/congresstrading -> 1000 row(s).
+2026-09-23 13:43:35,439 INFO screener | EDGAR Form-4 feed -> 63 filing(s) (scanning up to 100).
+2026-09-23 13:44:12,689 INFO screener | Options-flow most-actives pool -> 40 name(s).
+2026-09-23 13:44:39,139 INFO screener | Screener liquidity floor dropped 4/23 pre-cap: VTGN $0.38<$5, GRAB $3.15<$5, NVD $3.72<$5, MSTZ $2.44<$5
+2026-09-23 13:44:39,148 INFO screener | Discovered 18 candidate(s) from 3 source(s) (201 merged, 19 above min_score, capped to 18).
+2026-09-23 13:44:39,150 INFO screener |   candidate TSLG [options_flow] score=+0.97 — Options flow: 425 call / 7 put vol (bullish call imbalance +0.97) on a most-active name.
+2026-09-23 13:44:39,155 INFO screener |   candidate WBD [options_flow] score=-0.77 — Options flow: 8,756 call / 66,129 put vol (bearish put imbalance -0.77) on a most-active name.
+2026-09-23 13:44:39,157 INFO screener |   candidate QID [options_flow] score=+0.71 — Options flow: 873 call / 145 put vol (bullish call imbalance +0.71) on a most-active name.
+2026-09-23 13:44:39,160 INFO screener |   candidate ONDS [options_flow] score=+0.70 — Options flow: 129,936 call / 22,819 put vol (bullish call imbalance +0.70) on a most-active name.
+2026-09-23 13:44:39,163 INFO screener |   candidate SQQQ [options_flow] score=+0.62 — Options flow: 72,189 call / 17,099 put vol (bullish call imbalance +0.62) on a most-active name.
+2026-09-23 13:44:39,165 INFO screener |   candidate SOXS [options_flow] score=+0.60 — Options flow: 43,718 call / 10,995 put vol (bullish call imbalance +0.60) on a most-active name.
+2026-09-23 13:44:39,168 INFO screener |   candidate TSLL [options_flow] score=+0.41 — Options flow: 52,400 call / 21,935 put vol (bullish call imbalance +0.41) on a most-active name.
+2026-09-23 13:44:39,171 INFO screener |   candidate BITO [options_flow] score=+0.38 — Options flow: 3,737 call / 1,697 put vol (bullish call imbalance +0.38) on a most-active name.
+2026-09-23 13:44:39,173 INFO screener |   candidate UNG [options_flow] score=+0.36 — Options flow: 13,903 call / 6,500 put vol (bullish call imbalance +0.36) on a most-active name.
+2026-09-23 13:44:39,174 INFO screener |   candidate SOFI [options_flow] score=+0.34 — Options flow: 124,756 call / 61,286 put vol (bullish call imbalance +0.34) on a most-active name.
+2026-09-23 13:44:39,176 INFO screener |   candidate CRAFX [insider] score=+0.30 — Insider: 1 open-market buy filing(s), 500,000 sh (SEC Form 4, last filings feed).
+2026-09-23 13:44:39,178 INFO screener |   candidate SCI [congress] score=-0.23 — Congress: 0 buy / 4 sell filings in last 60d (disclosures lag up to ~45d).
+2026-09-23 13:44:39,179 INFO screener |   candidate CPAY [congress] score=-0.23 — Congress: 0 buy / 6 sell filings in last 60d (disclosures lag up to ~45d).
+2026-09-23 13:44:39,181 INFO screener |   candidate MIDD [congress] score=-0.23 — Congress: 0 buy / 6 sell filings in last 60d (disclosures lag up to ~45d).
+2026-09-23 13:44:39,182 INFO screener |   candidate TDY [congress] score=-0.23 — Congress: 0 buy / 5 sell filings in last 60d (disclosures lag up to ~45d).
+2026-09-23 13:44:39,183 INFO screener |   candidate LH [congress] score=-0.23 — Congress: 0 buy / 4 sell filings in last 60d (disclosures lag up to ~45d).
+2026-09-23 13:44:39,184 INFO screener |   candidate MKL [congress] score=-0.23 — Congress: 0 buy / 4 sell filings in last 60d (disclosures lag up to ~45d).
+2026-09-23 13:44:39,185 INFO screener |   candidate VIK [congress] score=-0.23 — Congress: 0 buy / 6 sell filings in last 60d (disclosures lag up to ~45d).
+2026-09-23 13:44:54,121 INFO quiver | Quiver live/offexchange -> 5533 row(s).
+2026-09-23 13:44:54,629 INFO quiver | Quiver live/govcontractsall -> 20000 row(s).
+2026-09-23 13:44:58,052 INFO quiver | Quiver live/lobbying -> 20000 row(s).
+2026-09-23 13:45:22,494 INFO signals | options_chain: reading 25 of 30 symbols this cycle (cap).
+2026-09-23 13:45:29,695 INFO signals | Gathered signals for 29/30 symbols (+3 market signals).
+2026-09-23 13:45:29,757 INFO orchestrator | Composite index (29 scored, top: DBRG +2.70, ONON +1.91, BRK.B +1.67, SNXX +1.64, SMCI +1.56, NOK +1.44, TSLG +1.13, BITO +1.10; bear tail: HYG -1.52, VIK -1.15, CPAY -1.04, SCI -0.77).
+2026-09-23 13:45:32,765 INFO robinhood | Imported 1 Robinhood holding(s) for context (read-only).
+2026-09-23 13:45:32,766 INFO orchestrator | FEEDS: 3/3 healthy news=vader-fallback earnings=rh
+2026-09-23 13:45:32,769 INFO orchestrator | Buy-excluded from slate this cycle: DBRG (topped up 2.6h ago (next ok in 4h)), HYG (topped up 0.9h ago (next ok in 4h)), IONQ (topped up 3.5h ago (next ok in 4h)), SOFI (exited 1.1h ago (cooldown 24h))
+2026-09-23 13:46:04,074 INFO usage | decision call: 19693 in / 1972 out (cache r=6603 w=0) ~$0.1511 [claude-opus-4-8]
+2026-09-23 13:46:04,079 INFO decision | Claude returned 1 proposal(s), 3 bearish verdict(s).
+2026-09-23 13:46:04,082 INFO orchestrator | Bearish verdict: HYG DECLINED — Thesis is corroborated (composite -1.52, put flow -0.74, bearish chain, below 200dma) but the account already holds HYG long_puts topped up 0.9h ago (cooldown);
+2026-09-23 13:46:04,085 INFO orchestrator | Bearish verdict: SCI DECLINED — Bearish technical -0.49/MACD bear and insider selling are offset by a BULLISH options chain +0.47 (put/call OI 0.16) — positioning contradicts the downside thes
+2026-09-23 13:46:04,088 INFO orchestrator | Bearish verdict: VIK DECLINED — Breakdown thin: driver is congress -1.00 (w=0.23, lagged) and insider selling; technical MACD is actually bull and options flow +0.09 improving with no bearish 
+2026-09-23 13:46:05,747 INFO earnings | Robinhood earnings calendar: 712 name(s) reporting within 31d.
+2026-09-23 13:46:06,122 INFO risk | SLOT COUNT: 11/15 model rows (exempt: QQQ; raw 12)
+2026-09-23 13:46:06,125 INFO risk | REJECT buy BITO: Return correlation 1.00 with held IBIT >= 0.85 cap — effectively the same bet; diversify instead.
+2026-09-23 13:46:06,128 INFO orchestrator | BUY BITO -> rejected: Return correlation 1.00 with held IBIT >= 0.85 cap — effectively the same bet; diversify instead. | NEW scanner name: bullish options flow +0.32 (3,738c/1,697p), bullish chain +0.36 (put/call OI 0.34)
+2026-09-23 13:46:06,133 INFO orchestrator | BOOK BETA (post-exec): spy=0.80 qqq=0.56 iwm=0.62 invested=54.8% hedge=PSQ w=0 unhedged=0.80 (pre-exec spy=0.80 delta=+0.00)
+2026-09-23 13:46:06,136 INFO orchestrator | BEARISH FUNNEL: slate_bearish=4 [HYG -1.52 ELIGIBLE (below its 200dma) -> declined: Thesis is corroborated (composite -1.52, put flow -0.74, bea; VIK -1.15 ELIGIBLE (below its 200dma) -> declined: Breakdown thin: driver is congress -1.00 (w=0.23, lagged) an; CPAY -1.04 gate-blocked; SCI -0.77 ELIGIBLE (below its 200dma) -> declined: Bearish technical -0.49/MACD bear and insider selling are of] put_proposals=0 put_approved=0 ignored=0 auto_hedge=flat proxy_put=none
+2026-09-23 13:46:06,139 INFO orchestrator | Core fill skipped: QQQ already at/above the 15% ceiling.
+2026-09-23 13:46:06,193 INFO config | BOOK BETA CAP vs hedge arm line: cap 1.20 - (target 1.00 + band 0.15) = +0.05 (cap-bound buys land inside the arm zone)
+2026-09-23 13:46:06,195 INFO alpaca | Alpaca client ready (mode=paper).
+2026-09-23 13:46:07,580 INFO dashboard | Wrote dashboard with 23 trades -> dashboard.html
+2026-09-23 14:35:21,080 INFO orchestrator | Market regime: SPY above 200dma (768 vs 714, today -0.7%), VIX 15.1, VIX3M 18.1 (contango) -> risk-on, size x1.00.
+2026-09-23 14:35:23,389 INFO orchestrator | BOOK BETA: spy=0.80 qqq=0.56 iwm=0.62 invested=54.8% hedge=PSQ w=0 unhedged=0.80 [options at debit notional x underlying beta: HYG]
+2026-09-23 14:35:23,691 INFO quiver | Quiver live/congresstrading -> 1000 row(s).
+2026-09-23 14:35:23,984 INFO screener | EDGAR Form-4 feed -> 67 filing(s) (scanning up to 100).
+2026-09-23 14:35:56,970 INFO screener | Options-flow most-actives pool -> 40 name(s).
+2026-09-23 14:36:34,841 INFO screener | Screener liquidity floor dropped 4/22 pre-cap: VTGN $0.37<$5, GRAB $3.19<$5, NVD $3.73<$5, MSTZ $2.41<$5
+2026-09-23 14:36:34,848 INFO screener | Discovered 18 candidate(s) from 3 source(s) (200 merged, 18 above min_score, capped to 18).
+2026-09-23 14:36:34,851 INFO screener |   candidate TSLG [options_flow] score=+0.82 — Options flow: 425 call / 41 put vol (bullish call imbalance +0.82) on a most-active name.
+2026-09-23 14:36:34,856 INFO screener |   candidate QID [options_flow] score=+0.79 — Options flow: 990 call / 119 put vol (bullish call imbalance +0.79) on a most-active name.
+2026-09-23 14:36:34,857 INFO screener |   candidate AUR [options_flow] score=+0.77 — Options flow: 18,072 call / 2,298 put vol (bullish call imbalance +0.77) on a most-active name.
+2026-09-23 14:36:34,859 INFO screener |   candidate WBD [options_flow] score=-0.76 — Options flow: 9,234 call / 66,830 put vol (bearish put imbalance -0.76) on a most-active name.
+2026-09-23 14:36:34,861 INFO screener |   candidate ONDS [options_flow] score=+0.70 — Options flow: 142,555 call / 24,845 put vol (bullish call imbalance +0.70) on a most-active name.
+2026-09-23 14:36:34,862 INFO screener |   candidate SQQQ [options_flow] score=+0.63 — Options flow: 76,762 call / 17,571 put vol (bullish call imbalance +0.63) on a most-active name.
+2026-09-23 14:36:34,864 INFO screener |   candidate SOXS [options_flow] score=+0.62 — Options flow: 48,022 call / 11,215 put vol (bullish call imbalance +0.62) on a most-active name.
+2026-09-23 14:36:34,866 INFO screener |   candidate BITO [options_flow] score=+0.41 — Options flow: 4,253 call / 1,765 put vol (bullish call imbalance +0.41) on a most-active name.
+2026-09-23 14:36:34,868 INFO screener |   candidate TSLL [options_flow] score=+0.40 — Options flow: 53,351 call / 22,709 put vol (bullish call imbalance +0.40) on a most-active name.
+2026-09-23 14:36:34,870 INFO screener |   candidate SOFI [options_flow] score=+0.30 — Options flow: 143,556 call / 77,246 put vol (bullish call imbalance +0.30) on a most-active name.
+2026-09-23 14:36:34,872 INFO screener |   candidate SCI [congress] score=-0.23 — Congress: 0 buy / 4 sell filings in last 60d (disclosures lag up to ~45d).
+2026-09-23 14:36:34,874 INFO screener |   candidate CPAY [congress] score=-0.23 — Congress: 0 buy / 6 sell filings in last 60d (disclosures lag up to ~45d).
+2026-09-23 14:36:34,876 INFO screener |   candidate MIDD [congress] score=-0.23 — Congress: 0 buy / 6 sell filings in last 60d (disclosures lag up to ~45d).
+2026-09-23 14:36:34,877 INFO screener |   candidate TDY [congress] score=-0.23 — Congress: 0 buy / 5 sell filings in last 60d (disclosures lag up to ~45d).
+2026-09-23 14:36:34,879 INFO screener |   candidate LH [congress] score=-0.23 — Congress: 0 buy / 4 sell filings in last 60d (disclosures lag up to ~45d).
+2026-09-23 14:36:34,880 INFO screener |   candidate MKL [congress] score=-0.23 — Congress: 0 buy / 4 sell filings in last 60d (disclosures lag up to ~45d).
+2026-09-23 14:36:34,882 INFO screener |   candidate VIK [congress] score=-0.23 — Congress: 0 buy / 6 sell filings in last 60d (disclosures lag up to ~45d).
+2026-09-23 14:36:34,883 INFO screener |   candidate STE [congress] score=-0.23 — Congress: 0 buy / 4 sell filings in last 60d (disclosures lag up to ~45d).
+2026-09-23 14:36:48,402 INFO quiver | Quiver live/offexchange -> 5533 row(s).
+2026-09-23 14:36:48,889 INFO quiver | Quiver live/govcontractsall -> 20000 row(s).
+2026-09-23 14:36:49,983 INFO quiver | Quiver live/lobbying -> 20000 row(s).
+2026-09-23 14:38:09,119 INFO signals | options_chain: reading 25 of 30 symbols this cycle (cap).
+2026-09-23 14:38:15,358 INFO signals | Gathered signals for 30/30 symbols (+3 market signals).
+2026-09-23 14:38:15,444 INFO orchestrator | Composite index (30 scored, top: DBRG +2.70, SNXX +1.83, ONON +1.71, BRK.B +1.70, SMCI +1.58, NOK +1.32, BITO +1.24, IBIT +1.15; bear tail: HYG -1.55, STE -1.35, VIK -1.20, CPAY -1.04, SCI -0.77).
+2026-09-23 14:38:15,446 INFO orchestrator | NAME FALLING: SNXX -7.4% today vs SPY -0.7% — defense read armed (loss-cut release + HELD-line note).
+2026-09-23 14:38:17,875 INFO robinhood | Imported 1 Robinhood holding(s) for context (read-only).
+2026-09-23 14:38:17,878 INFO orchestrator | FEEDS: 3/3 healthy news=vader-fallback earnings=rh
+2026-09-23 14:38:17,880 INFO orchestrator | Buy-excluded from slate this cycle: AUR (exited 5.8h ago (cooldown 24h)), DBRG (topped up 3.5h ago (next ok in 4h)), HYG (topped up 1.8h ago (next ok in 4h)), SOFI (exited 2.0h ago (cooldown 24h))
+2026-09-23 14:38:57,083 INFO usage | decision call: 20089 in / 2527 out (cache r=6603 w=0) ~$0.1669 [claude-opus-4-8]
+2026-09-23 14:38:57,088 INFO decision | Claude returned 2 proposal(s), 4 bearish verdict(s).
+2026-09-23 14:38:57,093 INFO orchestrator | Bearish verdict: HYG DECLINED — Already holding a long_put opened today (2x, $4,406 debit) — thesis already expressed; at cap (topped up 1.8h ago, next ok 4h). No new evidence to add exposure.
+2026-09-23 14:38:57,099 INFO orchestrator | Bearish verdict: SCI DECLINED — Conflicting: options chain is BULLISH +0.47 (put/call OI 0.16) directly against the -0.49 technical breakdown; positioning does not corroborate a put.
+2026-09-23 14:38:57,102 INFO orchestrator | Bearish verdict: VIK DECLINED — Bearish thesis not clean: MACD reads BULL and RSI 32 is oversold (bounce risk), technical only -0.35; the sell case rests mostly on lagged congress/insider fili
+2026-09-23 14:38:58,533 INFO earnings | Robinhood earnings calendar: 712 name(s) reporting within 31d.
+2026-09-23 14:38:58,534 INFO risk | SELL AUTHORITY: SNXX decision-sell allowed on event(s) name_falling:-7.4% today vs SPY -0.7% (unrealized -3.7%).
+2026-09-23 14:38:58,534 INFO orchestrator | SELL SNXX -> approved: Closing existing position. | NAME FALLING -7.4% today vs SPY -0.7% — name-level defense armed and loss-cut SELL passes rotation g
+2026-09-23 14:38:58,784 WARNING alpaca | Exit via resting sell a43f5204-3d8a-41bb-a549-27dffd75daf3 (SNXX): replaced limit -> 17.87 (marketable; new order e231f82f-c6b7-4c22-9c16-3fd82bda439b).
+2026-09-23 14:38:58,794 INFO ledger | LOT STAMP: SNXX decision entry_ts=2026-09-22 15:18 entry_fill=19.0400 (fill) conviction=0.60 composite=+1.90 stop=10.00% lots_n=1 key_signals=['technical +0.77 uptrend MACD bull RSI 61', 'options_flow +0.37 bullish call imbalance', 'options_chain +0.57 bullish positioning']
+2026-09-23 14:38:58,810 INFO ledger | Ledger: SELL SNXX qty=524 $9560
+2026-09-23 14:38:58,819 WARNING watchdog | Partial close SNXX (decision): sold 0 available share(s), made 1 resting sell(s) marketable; 524 reserved by open orders — will retry the full close next tick.
+2026-09-23 14:38:58,828 INFO orchestrator | ROTATION: SNXX slot + $9560 folded into this cycle pending fill
+2026-09-23 14:38:59,055 INFO options | STRIKE SNAP: STE none — empty put chain around 2026-10-31; model legs stand
+2026-09-23 14:38:59,277 WARNING options | no quote available for STE261031P00210000 — contract unknown to feed
+2026-09-23 14:38:59,327 WARNING options | no quote available for STE261031P00210000 — contract unknown to feed
+2026-09-23 14:38:59,438 INFO risk | REJECT buy STE: Net credit / no debit — not a bounded-loss debit play.
+2026-09-23 14:38:59,441 INFO orchestrator | OPTION OptionStrategy.LONG_PUT STE -> rejected: Net credit / no debit — not a bounded-loss debit play. | Corroborated breakdown: below 200dma, technical -0.49 (RSI 36, MACD bear, downtrend), insider open-m
+2026-09-23 14:38:59,445 INFO orchestrator | BOOK BETA (post-exec): spy=0.73 qqq=0.49 iwm=0.56 invested=53.8% hedge=PSQ w=0 unhedged=0.73 (pre-exec spy=0.80 delta=-0.07)
+2026-09-23 14:38:59,447 INFO orchestrator | BEARISH FUNNEL: slate_bearish=5 [HYG -1.55 ELIGIBLE (below its 200dma) -> declined: Already holding a long_put opened today (2x, $4,406 debit) —; STE -1.35 ELIGIBLE (below its 200dma) -> put proposed; VIK -1.20 ELIGIBLE (below its 200dma) -> declined: Bearish thesis not clean: MACD reads BULL and RSI 32 is over; CPAY -1.04 gate-blocked; SCI -0.77 ELIGIBLE (below its 200dma) -> declined: Conflicting: options chain is BULLISH +0.47 (put/call OI 0.1] put_proposals=1 put_approved=0 ignored=0 auto_hedge=flat proxy_put=none
+2026-09-23 14:38:59,455 INFO orchestrator | Core fill skipped: QQQ already at/above the 15% ceiling.
+2026-09-23 14:38:59,514 INFO config | BOOK BETA CAP vs hedge arm line: cap 1.20 - (target 1.00 + band 0.15) = +0.05 (cap-bound buys land inside the arm zone)
+2026-09-23 14:38:59,519 INFO alpaca | Alpaca client ready (mode=paper).
+2026-09-23 14:39:00,909 INFO dashboard | Wrote dashboard with 24 trades -> dashboard.html
+2026-09-23 15:27:42,874 INFO orchestrator | Market closed; skipping decision cycle.
+2026-09-23 15:27:43,235 INFO status | Equity close row 2026-09-23 day_pl self-consistent: -7721.33 = equity 990645.69 - prev 2026-09-22 equity 998367.02; broker_day_pl -8039.83 (last_equity restatement +318.50).
+2026-09-23 15:27:43,241 INFO orchestrator | Equity close row stamped for 2026-09-23 (basis=close).
+2026-09-23 15:27:43,242 INFO orchestrator | Running nightly post-mortem for 2026-09-23 …
+2026-09-23 15:27:43,273 INFO alpaca | Alpaca client ready (mode=paper).
+2026-09-23 15:27:44,559 INFO postmortem | Postmortem day attribution (close-to-close): 14 name(s); Day WINNER by close-to-close: ONON +747 USD; Day LOSER by close-to-close: AUR -2,368 USD
+2026-09-23 15:27:57,379 INFO usage | postmortem call: 4688 in / 687 out (cache r=0 w=0) ~$0.0406 [claude-opus-4-8]
+2026-09-23 15:27:57,387 INFO postmortem | Post-mortem written to state/lessons/2026-09-23.md
+2026-09-23 15:27:57,403 INFO postmortem | Post-mortem lessons: When one name exceeds 50% of the day's buy dollars (DBRG $79k of $153k), flag and cap to force diversification. | Momentum/high-composite longs (AUR, SOFI, SNXX) all stopped out same-day; require a pullback or non-extended entry before buying strength.
+2026-09-23 15:27:57,417 INFO orchestrator | API spend today: $1.40 across 9 calls (160,022 in / 20,271 out tokens).
+2026-09-23 15:27:57,467 INFO config | BOOK BETA CAP vs hedge arm line: cap 1.20 - (target 1.00 + band 0.15) = +0.05 (cap-bound buys land inside the arm zone)
+2026-09-23 15:27:57,470 INFO alpaca | Alpaca client ready (mode=paper).
+2026-09-23 15:27:58,774 INFO dashboard | Wrote dashboard with 24 trades -> dashboard.html
+2026-09-23 16:20:11,649 INFO orchestrator | Market closed; skipping decision cycle.
+2026-09-23 17:12:24,904 INFO orchestrator | Market closed; skipping decision cycle.
+2026-09-23 18:04:38,081 INFO orchestrator | Market closed; skipping decision cycle.
+2026-09-23 18:56:50,755 INFO orchestrator | Market closed; skipping decision cycle.
+2026-09-23 19:49:04,069 INFO orchestrator | Market closed; skipping decision cycle.
+2026-09-23 20:41:17,029 INFO orchestrator | Market closed; skipping decision cycle.
+2026-09-23 21:33:30,512 INFO orchestrator | Market closed; skipping decision cycle.
+2026-09-23 22:25:42,910 INFO orchestrator | Market closed; skipping decision cycle.
+2026-09-23 23:17:56,291 INFO orchestrator | Session calendar refreshed: 15 session(s) 2026-09-14..2026-10-04 -> state/session_calendar.json.
+2026-09-23 23:17:56,357 INFO orchestrator | Market closed; skipping decision cycle.
