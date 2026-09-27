@@ -1598,3 +1598,38 @@ https://claude.ai/code/artifact/9099ad65-64b1-495c-82b9-db7226a1bbbf
             NEXT (user): give the new repo URL with push access from this Mac (own SSH key / gh
             login, or add the current account as a collaborator); private first, public after the
             gitleaks + personal-data review; Mon Sep 28 run7_morning_check.py ~08:50 + ~15:35 CT.
+
+2026-09-27  ~12:30 CT — PR #68 MERGED + PULLED; PERSONAL REPO IDENTIFIED; ARCHITECTURE.md
+            (resident session; the user shared ~/.ssh/config: alias github-personal ->
+            ~/.ssh/id_ed25519_personal; asked to move the history there, whether all commits
+            move, and for the staff-engineer-level walkthrough of the design)
+            LIVE TREE: main 3642a61 -> 7be2f99 (ff, PR #68); frozen tree 2a6ec147; LICENSE now
+            in the owner's name. Sep 26 (Sat) dated log committed here: 62 lines, 0 CRITICAL/ERROR.
+            PERSONAL ACCOUNT: `ssh -T git@github-personal` authenticates as Srikanth-Pusapati.
+            No repo with a likely name exists there yet (ls-remote over that key: not found).
+            BLOCKED (auto-mode classifier, 'credential leakage'): the one-shot create-then-push
+            (gh repo create Srikanth-Pusapati/Investment_strategy + push over github-personal).
+            Reading of the block: (a) the gh CLI here is the other account's login and must not
+            act for the personal one; (b) the moved history still contains the gitleaks item
+            (runs/pre-final-test-run-4/analysis/config.json:84 ANTHROPIC_API_KEY, unjudged) and
+            transporting it to a new host is a leak if it is live. Both are operator calls:
+              1. create Srikanth-Pusapati/Investment_strategy on github.com (empty, private);
+              2. check that line 84; if live -> rotate + say so (the file is then dropped from
+                 the moved history with --path/--invert-paths before the push).
+            Then the push is `rebuild_mirror.sh` + `git push --all` over github-personal.
+            The rebuild tooling (rebuild_mirror.sh, mailmap, msgcb.py, sha_map.txt) is kept at
+            ~/.claude/projects/-Users-spusapati-Personal-Investment-stratergy/repo-move/ (outside
+            both repos; the mailmap carries the previous owner's e-mail, which is exactly what
+            the moved history must not contain as file content).
+            ALL HISTORY MOVES: 266 commits, 5 branches, real dates Jun 25 -> Sep 26; only trailer
+            lines and the web-merge identity change. PR threads / issue comments are GitHub
+            objects, not git, and stay on the old repo.
+            docs/ARCHITECTURE.md (this commit): the design in the order a systems engineer asks
+            about it — propose/dispose invariant, four stages + two clocks, risk limits as code,
+            the watchdog, broker realities, portfolio construction, bearish expression, report-
+            only learning loops, measurement/contract discipline, ops, cost, security, testing,
+            what is not proven, and an interviewer's question map. Written from the module
+            docstrings, the reject-prefix inventory and the run journals; no claims beyond them.
+            NOT DONE, ON PURPOSE: no fabricated timeline, no synthetic commits, no date changes.
+            The first commits (Jun 25-26) already build the LLM decision engine; the repo's own
+            history is the honest record and the strongest evidence of authorship of the design.
