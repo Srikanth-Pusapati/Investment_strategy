@@ -1,0 +1,47 @@
+2026-09-27 00:31:23,602 INFO orchestrator | Market closed; skipping decision cycle.
+2026-09-27 01:23:36,683 INFO orchestrator | Market closed; skipping decision cycle.
+2026-09-27 02:15:49,711 INFO orchestrator | Market closed; skipping decision cycle.
+2026-09-27 03:08:02,893 INFO orchestrator | Market closed; skipping decision cycle.
+2026-09-27 04:00:15,038 INFO orchestrator | Market closed; skipping decision cycle.
+2026-09-27 04:52:27,910 INFO orchestrator | Market closed; skipping decision cycle.
+2026-09-27 05:44:40,349 INFO orchestrator | Market closed; skipping decision cycle.
+2026-09-27 06:36:53,268 INFO orchestrator | Market closed; skipping decision cycle.
+2026-09-27 07:29:06,554 INFO orchestrator | Market closed; skipping decision cycle.
+2026-09-27 08:21:19,211 INFO orchestrator | Market closed; skipping decision cycle.
+2026-09-27 09:13:31,616 INFO orchestrator | Market closed; skipping decision cycle.
+2026-09-27 10:05:44,666 INFO orchestrator | Market closed; skipping decision cycle.
+2026-09-27 10:57:56,905 INFO orchestrator | Market closed; skipping decision cycle.
+2026-09-27 11:50:08,279 INFO orchestrator | Market closed; skipping decision cycle.
+2026-09-27 12:42:15,737 INFO orchestrator | Market closed; skipping decision cycle.
+2026-09-27 13:34:25,819 INFO orchestrator | Market closed; skipping decision cycle.
+2026-09-27 14:26:39,152 INFO orchestrator | Market closed; skipping decision cycle.
+2026-09-27 15:18:52,202 INFO orchestrator | Market closed; skipping decision cycle.
+2026-09-27 16:11:05,606 INFO orchestrator | Market closed; skipping decision cycle.
+2026-09-27 17:03:18,786 INFO orchestrator | Market closed; skipping decision cycle.
+2026-09-27 17:55:19,533 INFO orchestrator | Market closed; skipping decision cycle.
+2026-09-27 18:47:29,857 INFO orchestrator | Market closed; skipping decision cycle.
+2026-09-27 19:39:43,325 INFO orchestrator | Market closed; skipping decision cycle.
+2026-09-27 20:31:57,064 INFO orchestrator | Market closed; skipping decision cycle.
+2026-09-27 21:24:10,481 INFO orchestrator | Market closed; skipping decision cycle.
+2026-09-27 22:16:23,875 INFO orchestrator | Market closed; skipping decision cycle.
+2026-09-27 22:53:05,234 WARNING alpaca | get_account: transient network error (ConnectionError); retry 1/2.
+2026-09-27 23:03:17,542 WARNING orchestrator | DARK GAP (market closed): no loop tick for 10 min (sleep/suspend?) — positions could not move; not paging.
+2026-09-27 23:03:17,658 WARNING alpaca | get_account: transient network error (ConnectionError); retry 1/2.
+2026-09-27 23:09:15,564 WARNING orchestrator | DARK GAP (market closed): no loop tick for 6 min (sleep/suspend?) — positions could not move; not paging.
+2026-09-27 23:09:15,819 WARNING alpaca | get_account: transient network error (ConnectionError); retry 1/2.
+2026-09-27 23:09:17,447 INFO orchestrator | Resumed after a 6-min gap — settling the network (<= 20s) before the first cycle.
+2026-09-27 23:10:53,295 WARNING alpaca | get_calendar: transient network error (ConnectionError); retry 1/2.
+2026-09-27 23:10:54,034 INFO orchestrator | Session calendar refreshed: 15 session(s) 2026-09-18..2026-10-08 -> state/session_calendar.json.
+2026-09-27 23:10:54,089 INFO orchestrator | Market closed; skipping decision cycle.
+2026-09-27 23:15:40,733 WARNING orchestrator | DARK GAP (market closed): no loop tick for 6 min (sleep/suspend?) — positions could not move; not paging.
+2026-09-27 23:15:40,825 WARNING alpaca | get_account: transient network error (ConnectionError); retry 1/2.
+2026-09-27 23:27:20,647 WARNING orchestrator | DARK GAP (market closed): no loop tick for 12 min (sleep/suspend?) — positions could not move; not paging.
+2026-09-27 23:27:20,764 WARNING alpaca | get_account: transient network error (ConnectionError); retry 1/2.
+2026-09-27 23:33:27,209 WARNING orchestrator | DARK GAP (market closed): no loop tick for 6 min (sleep/suspend?) — positions could not move; not paging.
+2026-09-27 23:33:27,661 WARNING alpaca | get_account: transient network error (ConnectionError); retry 1/2.
+2026-09-27 23:36:07,256 WARNING orchestrator | DARK GAP (market closed): no loop tick for 3 min (sleep/suspend?) — positions could not move; not paging.
+2026-09-27 23:39:11,216 WARNING orchestrator | DARK GAP (market closed): no loop tick for 3 min (sleep/suspend?) — positions could not move; not paging.
+2026-09-27 23:40:02,226 WARNING alpaca | get_account: transient network error (ConnectionError); retry 1/2.
+2026-09-27 23:53:15,485 WARNING orchestrator | DARK GAP (market closed): no loop tick for 14 min (sleep/suspend?) — positions could not move; not paging.
+2026-09-27 23:53:15,558 WARNING alpaca | get_account: transient network error (ConnectionError); retry 1/2.
+2026-09-27 23:57:32,976 WARNING orchestrator | DARK GAP (market closed): no loop tick for 4 min (sleep/suspend?) — positions could not move; not paging.

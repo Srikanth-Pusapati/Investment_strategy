@@ -70,3 +70,14 @@ Under the cached insider read the same three decisions would have been reached: 
 | Further EDGAR-timeout breach days (append before the last close row) | Degraded cycles (CT) | Decisions in those cycles |
 |---|---|---|
 | — | — | — |
+
+## Repository move note (2026-09-29, docs only — not an amendment)
+
+The repository moved to the author's own GitHub account mid-window. The move is a commit-message and
+identity rewrite plus the removal of one archived run-4 file (`runs/SHA_MAP_2026-09-26_repo-move.md` has the
+full description and the old → new SHA table). It changes **no counted rule, statistic, threshold or
+validity condition**, and it does not touch the frozen surface: the `investment_strategy/` tree id on `main`
+is still `2a6ec14778beafd22d402faae80c82eafb0353b0` and `.env` is unchanged, so the Config row's fingerprint
+holds. The Config row's merge SHA `eec9727…` maps to `3d3ee6e4…` in this repository. The bot restart that
+accompanies the re-pointing of the live checkout is logged in `Todo-4.txt` under the Freeze clause, like
+the Sep 21, Sep 23 and Sep 28 restarts. The verdict command is unchanged.
