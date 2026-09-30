@@ -1671,3 +1671,35 @@ https://claude.ai/code/artifact/9099ad65-64b1-495c-82b9-db7226a1bbbf
             session pushes feature/preview and the owner opens/merges the PR from the compare
             URL — the merge is the review. Old repository: left as-is (archive it from that
             account if desired).
+
+2026-09-29  22:00 CT — LIVE TREE RE-POINTED TO THE PERSONAL REPO; BOT RESTARTED (operator ran
+            repo-move/switch_live_tree.sh; the session patched two macOS bugs first: pgrep has no
+            -c, and an EMPTY remote returns 'no refs' to `ls-remote --exit-code`)
+            Script output, verbatim: "2026-09-29 22:00 CT — live tree re-pointed to
+            git@github-personal:Srikanth-Pusapati/Investment_strategy.git, main b4bec03, bot pid
+            93507 -> 24288". Frozen tree 2a6ec147 identical before/after; one instance; morning
+            check READY (with warnings) 0 fail / 1 warn — the warn is today's 09:26:06 CT decision
+            call: 'Error code: 503 overloaded_error … Grammar compilation' (Anthropic side; that
+            cycle was lost, 7 of 8 ran; watchdog unaffected).
+            LEAK ON THE FIRST PUSH: `git push --all` from the live tree sent 7 branches, 3 of
+            them OLD history — feature/preview @ f31c6b2 (181 trailers), backup/pre-run7-switch-
+            20260921-1614 @ 1a82724, feature/run7-changeset @ 74c73fa — because the stale
+            scratchpad worktree left by a refused command still pinned local feature/preview
+            ('cannot force update the branch … used by worktree'), so the script's `branch -f`
+            failed for that one branch and --all took whatever was local. The other 4 branches
+            match the mirror. LESSON: never `git push --all` from the live tree; push named
+            branches, and prune worktrees before moving branches.
+            FIX HANDED TO THE OPERATOR (the session's force-push + remote deletes were refused
+            by the auto-mode classifier): repo-move/fix_branches.sh — force-replaces
+            feature/preview with a lease on the old SHA, deletes the two stray remote branches,
+            prunes the stale worktree, moves local feature/preview to origin's, deletes the two
+            old-history local branches, then diffs remote heads against the mirror and audits
+            every remote commit for trailers / the previous identity (expects 0).
+            OPERATOR INSTRUCTION 22:05 CT: "keep using the setup from this new repo and delete
+            the old folder and files". Deleted: the session's scratchpad worktree; the leaked
+            remote branches + old local branches go with fix_branches.sh; the staging mirror is
+            deleted once the remote verifies. NOT deleted without a named target: the previous
+            owner's GitHub repository (archive/delete is theirs to say), and
+            ~/Personal/Investment_stratergy, which is the LIVE bot's home — launchd jobs, .venv,
+            state/, logs/ and the session memory are keyed to that path. The empty clone at
+            ~/PersonalProjects/Investment_strategy is a second checkout of the NEW repo.
