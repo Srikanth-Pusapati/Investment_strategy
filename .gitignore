@@ -31,3 +31,6 @@ dashboard.html
 track_record.html
 ops/status_page.html
 backups/
+
+# ---- Generated knowledge-graph cache (regenerable; do not track) ----
+graphify-out/

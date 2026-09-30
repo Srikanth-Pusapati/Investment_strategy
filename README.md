@@ -147,40 +147,36 @@ it by accident.
 
 ---
 
-## Want the deep dive?
+## Where things are
 
-The mechanics of each stage, every config knob, options trading, and the multi-user
-roadmap live in [Todo-2.txt](Todo-2.txt) and [completed.txt](completed.txt), and the
-code is small and commented — start at [orchestrator.py](investment_strategy/orchestrator.py)
-(the loop) and [risk.py](investment_strategy/risk.py) (the safety core).
+| Want to… | Go to |
+|---|---|
+| know what to do next | [`TODO.md`](TODO.md) — the plan: one line per item, always current |
+| understand the design and why each decision was made | [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) |
+| look up a config knob | [`docs/env-variable-reference.md`](docs/env-variable-reference.md) |
+| switch trial windows or check readiness | [`docs/RUN7_SWITCH.md`](docs/RUN7_SWITCH.md), `scripts/run7_morning_check.py` |
+| see how a window was judged | [`runs/`](runs/README.md) — one folder per window with its pre-registered contract and checker output |
+| read the history (incidents, decisions, why) | [`docs/journal/`](docs/journal/README.md) — dated entries; `JOURNAL.md` is current |
+| operate the host (dead-man, control panel, backups, away mode) | [`ops/`](ops/README.md) |
 
+The code is commented; start at [orchestrator.py](investment_strategy/orchestrator.py) (the two loops) and
+[risk.py](investment_strategy/risk.py) (the gate every trade must pass).
 
+## Manual operations
 
+```bash
+# Readiness / day verify (PASS-WARN-FAIL); run with the venv interpreter, never system python
+.venv/bin/python scripts/run7_morning_check.py
 
-# 1. Identify the running bot Stop the running bot
-ps aux | grep "[i]nvestment_strategy"
-# Get the PID from above ex: 48896
+# Restart the bot through the control panel (never kill + nohup by hand — the panel holds the lock discipline)
+curl -X POST http://127.0.0.1:8787/api/restart
 
-# 2. Stop the running bot
-kill 48896
+# Confirm exactly one instance and a fresh tick
+pgrep -f "Python -m investment_strategy" | wc -l ; cat state/bot.lock ; cat state/last_tick.stamp
 
-# 3. Wait for it to exit and release state/bot.lock (~2s), then confirm it's gone
-sleep 3 && ps aux | grep "[i]nvestment_strategy"     
-# should print nothing
-
-# 4. Start a fresh detached instance
-cd ~/Personal/Investment_stratergy
-nohup .venv/bin/python -m investment_strategy >> logs/stdout.log 2>&1 &
-
-# 5. Confirm exactly one is running and it holds the lock
-sleep 3 && ps aux | grep "[i]nvestment_strategy" | grep -v caffeinate
-cat state/bot.lock          
-
-# should show the new PID
-
-# 6. tail the logs to see whats happening
-tail -f ~/Personal/Investment_stratergy/logs/stdout.log
-
-
-# 7. When ever the Robinhood token expires perform this
+# Robinhood token expired (the morning check says NEEDS LOGIN) — browser handshake, ~1 minute
 .venv/bin/python -m investment_strategy.portfolio.robinhood_auth login
+
+# Follow the live log
+tail -f logs/stdout.log
+```

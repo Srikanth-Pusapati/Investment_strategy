@@ -56,7 +56,7 @@ now=$(date +%s)
 #     claude); the desktop app's "Claude Helper" processes never match.
 #   * cwd via `lsof -a -p PID -d cwd -Fn` (≈6 ms per pid); only cwd == $ROOT
 #     or a directory beneath it counts — a session in another project (Sep 11
-#     probe: pid 82870 in ~/leaseNPose) must not suppress the fallback.
+#     probe: pid 82870 in another checkout) must not suppress the fallback.
 #   * a still-running headless fallback (`claude -p …`, cwd == $ROOT) also
 #     matches, which is the right answer: never start a second one beside it.
 # Residual (documented in ops/away_mode.md): a session left open but idle

@@ -187,7 +187,7 @@ handshake happens on the operator's schedule. `rh=dead` stays pre-declared; this
 2. **Robinhood:** `.venv/bin/python -m investment_strategy.portfolio.robinhood_auth login` (browser). Not
    needed to trade; restores `earnings=rh` and the holdings context. Expect the next expiry ~6 days later.
 3. **Monday Sep 28:** `.venv/bin/python scripts/run7_morning_check.py` at ~08:50 CT and again at
-   ~15:35 CT; append its FAIL/WARN lines to `Todo-4.txt`. If FEEDS prints `insider UNHEALTHY` in > 2
+   ~15:35 CT; append its FAIL/WARN lines to `docs/journal/JOURNAL.md`. If FEEDS prints `insider UNHEALTHY` in > 2
    cycles, append the day to Amendment 1's table the same evening.
 4. **Merge the PR** carrying this draft + `BACKTRACK_2026-09-26.md` + Amendment 1 + the Sep 23–25 logs.
    The merge is the acceptance step for Amendment 1. Then `git pull` on the live tree (the untracked log
