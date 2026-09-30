@@ -165,7 +165,7 @@ Verify after pasting:
 
 Fingerprint = (sha256 of the `investment_strategy/` tree at the frozen merge;
 the sorted keys below with their values; adaptive loops off). Commits touching
-only `scripts/`, `ops/`, `docs/`, `runs/`, `Todo-4.txt` or logs do not enter it.
+only `scripts/`, `ops/`, `docs/`, `runs/`, `docs/journal/` or logs do not enter it.
 Run-6's fingerprint differs (S-1..S-7), so run-6 is a reference sample beside
 run-7, never summed.
 
@@ -283,7 +283,7 @@ Per Amendment 3 point 1: `--end 2026-09-18`, run once, after the row exists;
     # exit 0 GO / 2 NO-GO / 3 PENDING (UNDER-FLOOR if N < 24 — judged as-is, no second extension)
 
 Record the verdict + both exit codes in `runs/pre-final-test-run-6/RUN_SUMMARY.md`
-and `Todo-4.txt`.
+and `docs/journal/JOURNAL.md`.
 
 ### 3. Archive run-6 state (before anything moves)
 
@@ -363,7 +363,7 @@ first session dropped`. Fix before Monday (restart again the same evening; a
 second restart writes no second `late` row — the writer stamps ONE late row per
 date).
 
-Record day-0 equity (the `late` row's `equity`) in `Todo-4.txt` as run-7 day 0,
+Record day-0 equity (the `late` row's `equity`) in `docs/journal/JOURNAL.md` as run-7 day 0,
 plus the fresh account id.
 
 ### 9. First-cycle handles (still Fri evening, any cycle after the restart)
