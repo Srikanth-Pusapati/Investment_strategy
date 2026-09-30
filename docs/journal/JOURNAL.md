@@ -31,3 +31,14 @@ duplicates removed (hash-verified); `runs/README.md` added; README rewritten pas
 run-8 change-set). Not touched: `investment_strategy/`, `.env`, `tests/` (run-7 freeze to Oct 20) —
 code-level cleanup is a run-8 item.
 Plan: opens TODO.md C-8 "code hygiene after the freeze"; closes "repo cleanup".
+
+## 2026-09-30 18:05 CT — PR #1 merged; branches reduced to main + feature/preview
+Facts: owner merged PR #1 (`feature/preview` → `main`, 8e1c901) on the new repo under their own account;
+live tree pulled (frozen tree `2a6ec147` unchanged, bot pid 24288). The old repository no longer resolves
+on GitHub; the empty duplicate clone under `~/PersonalProjects` (0 commits, 0 files) deleted.
+`feature/run6-changeset`, `feature/run7-aplus`, `docs/run6-amendment4-freeze-disclosure` verified as
+ancestors of `main` and deleted on the remote and locally; `feature/preview` fast-forwarded to `main`.
+Cause: owner's instruction — keep `main` and `feature/preview` only; merge into preview, into main when done.
+Action: branch policy written into README (two permanent branches; next-window code on a short-lived
+`feature/runN-changeset` so preview stays mergeable); TODO N1 done, N6 dropped (nothing left to archive).
+Plan: closes N1, N6; opens nothing.

@@ -180,3 +180,13 @@ pgrep -f "Python -m investment_strategy" | wc -l ; cat state/bot.lock ; cat stat
 # Follow the live log
 tail -f logs/stdout.log
 ```
+
+## Branches
+
+Two permanent branches. `main` is what the bot runs. `feature/preview` is where every change lands first;
+the owner opens and merges the pull request into `main`, which is the review. Merges into `main` happen at
+milestones (a trial window's close and switch) and for docs or ops changes that must be live on the host
+mid-window — those never touch `investment_strategy/` or `.env`, so the window's fingerprint holds. Code for
+the next trial window is built on a short-lived `feature/runN-changeset` branch and merged into
+`feature/preview` only at the current window's close, so `feature/preview` stays mergeable at any time.
+Delete the short-lived branch after the merge. Never `git push --all`.

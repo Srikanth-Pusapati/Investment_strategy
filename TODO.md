@@ -1,18 +1,16 @@
 # TODO — the plan
 
-Updated 2026-09-30. One line per item; `[ ]` open, `[~]` in progress, `[x]` done (kept two weeks, then pruned).
+Updated 2026-09-30 (evening). One line per item; `[ ]` open, `[~]` in progress, `[x]` done (kept two weeks, then pruned).
 History and reasons live in [`docs/journal/JOURNAL.md`](docs/journal/JOURNAL.md). **Freeze:** no change to
 `investment_strategy/` or `.env` until the run-7 close (Tue Oct 20; Oct 27 if extended). Detail for the run-8
 items is in [`runs/pre-final-test-run-8/CHANGESET_DRAFT.md`](runs/pre-final-test-run-8/CHANGESET_DRAFT.md).
 
 ## Now (this week)
 
-- [ ] N1 **Merge `feature/preview` → `main`** on GitHub, then in the live tree `git pull --ff-only && git fetch --prune` — done when main carries this file and the two stale `origin/*` refs are gone (operator)
 - [ ] N2 **Review sessions 5–6 (Sep 28–29)**: the battery night + dead-man relaunch, −$6,228 day, book 98% invested, the 09:26 CT 503 — done when a journal entry exists and any new run-8 item is on this list
 - [ ] N3 Add `"includeCoAuthoredBy": false` to `~/.claude/settings.json` (operator; the session's edit was refused)
 - [ ] N4 `gh auth login` for `Srikanth-Pusapati` with SSH so PRs open in your name; until then PRs go via the compare URL (operator)
 - [ ] N5 Check `ANTHROPIC_API_KEY` at `runs/pre-final-test-run-4/analysis/config.json:84` **in the old repo**; rotate if live (operator; the file is gone from this repo's history)
-- [ ] N6 Old repo `sylu-leaseNPose/Investment_stratergy`: archive (recommended) or delete, from that account (operator)
 - [ ] N7 Personal-data review before any public flip: your e-mail in the dated logs, paper account IDs, `docs/ga/` notes (operator)
 - [ ] N8 **Power**: 94 W charger stays attached through Oct 20; the real fix is an always-on host (`ops/Dockerfile`) — 4 battery incidents so far in run-7 (operator)
 - [ ] N9 Off-machine backup target for `ops/backup_state.sh` (`BACKUP_DIR` on iCloud/Dropbox, or an rclone remote) — done when a nightly tarball lands off this disk
@@ -86,6 +84,7 @@ items is in [`runs/pre-final-test-run-8/CHANGESET_DRAFT.md`](runs/pre-final-test
 
 ## Done (last two weeks)
 
+- [x] 2026-09-30 PR #1 merged by the owner; live tree pulled; old repo already gone from GitHub; empty duplicate clone deleted; three fully-merged branches deleted — remote is `main` + `feature/preview` only (branch policy in README)
 - [x] 2026-09-30 Repo cleanup: plan split from journal (`TODO.md`, `docs/journal/`), 72 duplicates removed, `graphify-out/` untracked, README rewritten past Safety; `fix_branches.sh` run by the operator — remote == mirror, 0 trailer/identity hits; staging mirror deleted
 - [x] 2026-09-29 Live tree re-pointed to `Srikanth-Pusapati/Investment_strategy` in place; bot restarted (pid 24288); 5 branches pushed with the rewritten history (tree ids unchanged)
 - [x] 2026-09-27 `docs/ARCHITECTURE.md`; LICENSE in the author's name; commit-SHA map for the move
