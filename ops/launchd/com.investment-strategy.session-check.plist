@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Run-8 C-1: in-session health check at 09:55 and 15:35 ET on weekdays
+     (ops/in_session_check.sh -> scripts/run8_morning_check.py). Appends to
+     logs/morning_check.log and pages on FAIL through the bot's alert sink.
+     launchd uses the host's LOCAL clock: the hours below are America/Chicago
+     (08:55 / 14:35 CT = 09:55 / 15:35 ET; both zones shift DST on the same
+     dates). Move the host to another zone -> edit the Hour keys.
+     Install:
+       cp ops/launchd/com.investment-strategy.session-check.plist ~/Library/LaunchAgents/
+       launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.investment-strategy.session-check.plist
+     Uninstall:
+       launchctl bootout gui/$(id -u)/com.investment-strategy.session-check -->
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.investment-strategy.session-check</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>/bin/sh</string>
+        <string>ops/in_session_check.sh</string>
+    </array>
+    <key>WorkingDirectory</key>
+    <string>/Users/spusapati/Personal/Investment_stratergy</string>
+    <key>StartCalendarInterval</key>
+    <array>
+        <dict><key>Weekday</key><integer>1</integer><key>Hour</key><integer>8</integer><key>Minute</key><integer>55</integer></dict>
+        <dict><key>Weekday</key><integer>2</integer><key>Hour</key><integer>8</integer><key>Minute</key><integer>55</integer></dict>
+        <dict><key>Weekday</key><integer>3</integer><key>Hour</key><integer>8</integer><key>Minute</key><integer>55</integer></dict>
+        <dict><key>Weekday</key><integer>4</integer><key>Hour</key><integer>8</integer><key>Minute</key><integer>55</integer></dict>
+        <dict><key>Weekday</key><integer>5</integer><key>Hour</key><integer>8</integer><key>Minute</key><integer>55</integer></dict>
+        <dict><key>Weekday</key><integer>1</integer><key>Hour</key><integer>14</integer><key>Minute</key><integer>35</integer></dict>
+        <dict><key>Weekday</key><integer>2</integer><key>Hour</key><integer>14</integer><key>Minute</key><integer>35</integer></dict>
+        <dict><key>Weekday</key><integer>3</integer><key>Hour</key><integer>14</integer><key>Minute</key><integer>35</integer></dict>
+        <dict><key>Weekday</key><integer>4</integer><key>Hour</key><integer>14</integer><key>Minute</key><integer>35</integer></dict>
+        <dict><key>Weekday</key><integer>5</integer><key>Hour</key><integer>14</integer><key>Minute</key><integer>35</integer></dict>
+    </array>
+    <key>StandardOutPath</key>
+    <string>/Users/spusapati/Personal/Investment_stratergy/logs/session_check.launchd.log</string>
+    <key>StandardErrorPath</key>
+    <string>/Users/spusapati/Personal/Investment_stratergy/logs/session_check.launchd.log</string>
+</dict>
+</plist>

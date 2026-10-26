@@ -70,6 +70,12 @@ class PortfolioState:
         # rejects an add whose conviction shows no new edge over the prior entry
         # ("adding to a winner" is not a signal).
         self.last_buy_convictions: dict[str, float] = {}
+        # Run-8 B-1: what the LAST buy of a held name looked like — composite,
+        # fill/quote price, cited key-signal families, and the lot count — so
+        # the top-up authority gate can judge an ADD on deterministic EVENTS
+        # (composite up, price up, a new family) instead of the model's
+        # restated conviction. Dropped on exit (a re-entry starts at lot 1).
+        self.last_buy_meta: dict[str, dict] = {}
         # Daily concentration accumulators (the all-LLY guard): $ submitted and
         # buy count per symbol for ONE ET trading day. Keyed to the exchange's
         # calendar (not UTC) so an evening restart doesn't hand back a fresh
@@ -184,6 +190,10 @@ class PortfolioState:
             self.last_buy_convictions = {
                 k: float(v) for k, v in d.get("last_buy_convictions", {}).items()
             }
+            self.last_buy_meta = {
+                k: dict(v) for k, v in d.get("last_buy_meta", {}).items()
+                if isinstance(v, dict)
+            }
             self.daily_deploy_day = str(d.get("daily_deploy_day", ""))
             self.daily_deploy_usd = {
                 k: float(v) for k, v in d.get("daily_deploy_usd", {}).items()
@@ -242,6 +252,7 @@ class PortfolioState:
                         "exit_times": self.exit_times,
                         "exit_prices": self.exit_prices,
                         "last_buy_convictions": self.last_buy_convictions,
+                        "last_buy_meta": self.last_buy_meta,
                         "daily_deploy_day": self.daily_deploy_day,
                         "daily_deploy_usd": self.daily_deploy_usd,
                         "daily_buy_counts": self.daily_buy_counts,
@@ -398,15 +409,37 @@ class PortfolioState:
     def register_buy(
         self, symbol: str, when: datetime | None = None,
         conviction: float | None = None,
+        composite: float | None = None, price: float | None = None,
+        families: list[str] | tuple[str, ...] | set[str] | None = None,
+        events: list[str] | tuple[str, ...] | None = None,
     ) -> None:
         """Stamp the LAST buy-submit time for `symbol` (every buy, unlike
         register_entry which only stamps the first). Drives the same-symbol
         top-up spacing guard. Also records the buy's conviction when given —
-        the top-up evidence gate compares the next add against it."""
+        the top-up evidence gate compares the next add against it.
+
+        Run-8 B-1: `composite`, `price` and `families` (the cited key-signal
+        families) are kept in last_buy_meta together with the lot count `n`
+        (1 on the first stamped buy, +1 per later buy while held) and the
+        `events` the authority gate approved this buy on — the deterministic
+        basis the NEXT top-up is judged against."""
         with self._lock:
             self.last_buy_times[symbol] = (
                 when or datetime.now(timezone.utc)
             ).isoformat()
+            prior = self.last_buy_meta.get(symbol) or {}
+            self.last_buy_meta.pop(symbol, None)
+            self.last_buy_meta[symbol] = {
+                "ts": (when or datetime.now(timezone.utc)).isoformat(),
+                "conviction": None if conviction is None else float(conviction),
+                "composite": None if composite is None else float(composite),
+                "price": None if price is None else float(price),
+                "families": sorted({str(f) for f in (families or ())}),
+                "n": int(prior.get("n") or 0) + 1,
+                "events": [str(e) for e in (events or ())],
+            }
+            while len(self.last_buy_meta) > self._CONVICTION_MAX_ENTRIES:
+                del self.last_buy_meta[next(iter(self.last_buy_meta))]
             if conviction is not None:
                 # Re-insert so dict order == recency (the size cap below
                 # drops the OLDEST buys first).
@@ -429,6 +462,21 @@ class PortfolioState:
     def last_buy_conviction(self, symbol: str) -> float | None:
         return self.last_buy_convictions.get(symbol)
 
+    def last_buy_meta_for(self, symbol: str) -> dict | None:
+        """Run-8 B-1: the last buy's {ts, conviction, composite, price,
+        families, n, events} for a held name, or None when never stamped
+        (a name bought before the stamp existed — the authority gate then
+        fails open once and the buy itself lays the stamp)."""
+        m = self.last_buy_meta.get(symbol)
+        return dict(m) if m else None
+
+    def clear_buy_meta(self, symbol: str) -> None:
+        """Run-8 B-1: forget the lot history when the position is gone, so a
+        later re-entry starts at lot 1 (called from register_exit)."""
+        with self._lock:
+            if self.last_buy_meta.pop(symbol, None) is not None:
+                self._save()
+
     def register_exit(
         self, symbol: str, when: datetime | None = None,
         price: float | None = None, pl_pct: float | None = None,
@@ -444,6 +492,9 @@ class PortfolioState:
             self.exit_times[symbol] = (
                 when or datetime.now(timezone.utc)
             ).isoformat()
+            # Run-8 B-1: the lot history ends with the position — a later
+            # re-entry is judged as lot 1 (no event needed for a fresh buy).
+            self.last_buy_meta.pop(symbol, None)
             if price is not None and price > 0:
                 self.exit_prices[symbol] = float(price)
             if pl_pct is not None:

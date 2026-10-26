@@ -74,7 +74,7 @@ never loosened unattended.**
    expectancy and win rate from `trades.jsonl` (window = since Aug 3);
    open option groups from `/v2/positions` (OCC symbols, net uP/L).
 4. **Archive**: `git add logs/*_*_*.log` for any completed day, commit
-   (`Archive <day> daily log`), push `feature/preview`. Keeps GitHub current
+   (`Archive <day> daily log`), push a `feature/*` branch and open a PR into `main` — the live tree is ON `main`, never push to it directly. Keeps GitHub current
    so phone-side claude.ai/code sessions can read the latest state.
 5. **Status page**: update `ops/status_page.html` (banner verdict, as-of
    stamp, Today, Window, Open option risk, Watch items) and republish to the
@@ -83,7 +83,7 @@ never loosened unattended.**
    position — say plainly what happened and what was done.
 6. **Fix authority (bugs only)**: crash loops, close-path failures, watchdog
    misfires, API-shape breaks. Full test suite must pass; commit/push to
-   `feature/preview` (PR into main; the operator merges on return); restart
+   a `feature/*` branch (PR into `main`; the live tree is on `main`; the operator merges on return); restart
    via the panel. NO strategy/prompt/gate/knob changes, with one exception ↓.
 7. **KILL file**: if `state/KILL` exists, reconcile broker vs ledger
    (positions + orders via Alpaca API). Clear it ONLY when they verifiably

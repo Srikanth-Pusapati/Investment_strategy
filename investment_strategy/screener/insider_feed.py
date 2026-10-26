@@ -18,14 +18,25 @@ the corroboration bar downstream (the LLM won't buy a put on one signal alone)
 is the second line of defence.
 
 Free, no API key — only a descriptive SEC User-Agent and ~10 req/s politeness.
+
+Resilience (run-8 C-2): sec.gov times out in short bursts — on 2026-09-25 three
+timeouts made 3/8 cycles read `insider UNHEALTHY`, a pre-registered validity
+breach for what was a network blip. The feed GET is therefore tried twice (a
+1 s pause between), every successful scan leaves `insider_snapshot.json` next
+to the state file, and with INSIDER_CACHE_MAX_AGE_H > 0 a pull that still fails
+serves that snapshot (exposed as `cached_age_h`, never as `degraded`) when it is
+young enough. Knob 0 = run-7 behaviour: a failed pull is UNHEALTHY, period.
 """
 from __future__ import annotations
 
+import json
 import logging
+import os
 import re
 import time
 import xml.etree.ElementTree as ET
 from collections import defaultdict
+from datetime import datetime, timezone
 
 import requests
 
@@ -44,6 +55,8 @@ _SUBMISSION_TXT = "https://www.sec.gov/Archives/edgar/data/{cik}/{accno}/{acc_da
 # href in the atom feed: .../Archives/edgar/data/<cik>/<accno>/<acc-dash>-index.htm
 _HREF_RE = re.compile(r"/edgar/data/(\d+)/(\d+)/([\d-]+)-index")
 _OWNERSHIP_RE = re.compile(r"<ownershipDocument>.*?</ownershipDocument>", re.DOTALL)
+# Last good scan, written next to the state file (see Config.state_file).
+_SNAPSHOT_NAME = "insider_snapshot.json"
 
 
 class InsiderFeedScreener(Screener):
@@ -52,6 +65,11 @@ class InsiderFeedScreener(Screener):
     # An EDGAR pull that fails or times out (>= this many seconds with 0 rows)
     # is a feed OUTAGE for the cycle, not "no insider activity".
     _DEGRADED_AFTER_S = 15.0
+    # C-2: the current-filings GET is tried this many times, pausing between
+    # attempts, before the pull is declared degraded. Class attributes so a
+    # test can zero the pause on its instance.
+    _ATTEMPTS = 2
+    _RETRY_PAUSE_S = 1.0
 
     def __init__(self, cfg: Config):
         self.cfg = cfg
@@ -60,6 +78,10 @@ class InsiderFeedScreener(Screener):
         # FEEDS line so the cycle reports 'insider UNHEALTHY (edgar: timeout)'
         # instead of a silent 0-candidate healthy feed (run-6, Aug 25 review).
         self.degraded: str | None = None
+        # C-2: age in hours of the snapshot served in place of a failed pull;
+        # None on every normal AND every degraded cycle. The orchestrator's
+        # FEEDS line renders it as 'insider=cached(<h>h)'.
+        self.cached_age_h: float | None = None
 
     @property
     def enabled(self) -> bool:
@@ -67,6 +89,7 @@ class InsiderFeedScreener(Screener):
 
     def scan(self) -> list[Candidate]:
         self.degraded = None
+        self.cached_age_h = None
         filings = self._recent_form4_filings()
         limit = self.cfg.screener.insider_scan_limit
         # Surface the raw feed size so an empty/blocked EDGAR pull is visible
@@ -74,6 +97,10 @@ class InsiderFeedScreener(Screener):
         log.info("EDGAR Form-4 feed -> %d filing(s) (scanning up to %d).",
                  len(filings), limit)
         if not filings:
+            if self.degraded:
+                cached = self._cached_candidates()
+                if cached is not None:
+                    return cached
             return []
 
         buys: dict[str, int] = defaultdict(int)
@@ -121,37 +148,57 @@ class InsiderFeedScreener(Screener):
             candidates.append(Candidate(
                 symbol=sym, sources=[self.name], reason=reason, score=net,
             ))
+        # A pull that returned filings is a good scan — whatever it netted to —
+        # and becomes the snapshot a later outage can serve.
+        self._write_snapshot(candidates)
         return candidates
 
     # -- EDGAR "latest filings" feed --------------------------------------- #
     def _recent_form4_filings(self) -> list[tuple[str, str, str]]:
-        """Return (cik, accession_nodash, accession_dashed) for the newest Form 4s."""
+        """Return (cik, accession_nodash, accession_dashed) for the newest Form 4s.
+        The GET is tried `_ATTEMPTS` times with `_RETRY_PAUSE_S` between them;
+        only when the LAST attempt fails is the pull marked degraded."""
         t0 = time.monotonic()
+        for attempt in range(1, self._ATTEMPTS + 1):
+            reason, detail, text = self._fetch_current_feed()
+            if reason is None:
+                out = self._parse_feed(text)
+                if out or (time.monotonic() - t0) < self._DEGRADED_AFTER_S:
+                    return out
+                reason = "timeout"               # slow 200 with an empty body
+            if attempt < self._ATTEMPTS:
+                log.info("EDGAR Form-4 feed %s on attempt %d/%d — retrying in %.0fs.",
+                         reason, attempt, self._ATTEMPTS, self._RETRY_PAUSE_S)
+                time.sleep(self._RETRY_PAUSE_S)
+                continue
+            self._mark_degraded(reason, t0, detail=detail)
+        return []
+
+    def _fetch_current_feed(self) -> tuple[str | None, str, str]:
+        """One GET of the current-filings atom feed -> (failure_reason | None,
+        detail, body). A non-200 is a failure like an exception is."""
         try:
             r = requests.get(_CURRENT_URL, headers=self._headers, timeout=20, params={
                 "action": "getcurrent", "type": "4", "owner": "include",
                 "count": "100", "output": "atom",
             })
-            if r.status_code != 200:
-                self._mark_degraded(f"http {r.status_code}", t0)
-                return []
         except Exception as e:
-            self._mark_degraded(
-                "timeout" if isinstance(e, requests.exceptions.Timeout) else "error",
-                t0, detail=str(e),
-            )
-            return []
+            reason = "timeout" if isinstance(e, requests.exceptions.Timeout) else "error"
+            return reason, str(e), ""
+        if r.status_code != 200:
+            return f"http {r.status_code}", "", ""
+        return None, "", r.text
 
+    @staticmethod
+    def _parse_feed(text: str) -> list[tuple[str, str, str]]:
         out: list[tuple[str, str, str]] = []
         seen: set[str] = set()
-        for m in _HREF_RE.finditer(r.text):
+        for m in _HREF_RE.finditer(text):
             cik, accno, acc_dash = m.group(1), m.group(2), m.group(3)
             if acc_dash in seen:
                 continue
             seen.add(acc_dash)
             out.append((cik, accno, acc_dash))
-        if not out and (time.monotonic() - t0) >= self._DEGRADED_AFTER_S:
-            self._mark_degraded("timeout", t0)   # slow 200 with an empty body
         return out
 
     def _mark_degraded(self, reason: str, t0: float, detail: str = "") -> None:
@@ -163,6 +210,66 @@ class InsiderFeedScreener(Screener):
             "screener UNHEALTHY this cycle.",
             time.monotonic() - t0, reason, f": {detail}" if detail else "",
         )
+
+    # -- C-2: last-good snapshot ------------------------------------------- #
+    def _snapshot_path(self) -> str | None:
+        """`<dirname(state_file)>/insider_snapshot.json`, or None when the config
+        carries no state file (bare test fixtures) — then no snapshot I/O at all."""
+        state_file = getattr(self.cfg, "state_file", "") or ""
+        if not state_file:
+            return None
+        return os.path.join(os.path.dirname(state_file) or ".", _SNAPSHOT_NAME)
+
+    def _write_snapshot(self, candidates: list[Candidate]) -> None:
+        """Persist the scan atomically (tmp + os.replace) so a crash mid-write
+        can never leave a half-written file for the next outage to serve."""
+        path = self._snapshot_path()
+        if path is None:
+            return
+        tmp = path + ".tmp"
+        try:
+            os.makedirs(os.path.dirname(path), exist_ok=True)
+            with open(tmp, "w", encoding="utf-8") as fh:
+                json.dump({
+                    "ts": datetime.now(timezone.utc).isoformat(),
+                    "candidates": [c.model_dump() for c in candidates],
+                }, fh)
+            os.replace(tmp, path)
+        except Exception as e:
+            log.warning("insider snapshot write failed (%s): %s", path, e)
+
+    def _cached_candidates(self) -> list[Candidate] | None:
+        """On a degraded pull: the snapshot's candidates when INSIDER_CACHE_MAX_AGE_H
+        > 0 and the snapshot is at most that old — the cycle is then NOT degraded
+        and `cached_age_h` says how stale the rows are. None = fall through to
+        today's behaviour (degraded stays latched, [] goes out)."""
+        max_age_h = float(getattr(self.cfg, "insider_cache_max_age_h", 0.0) or 0.0)
+        path = self._snapshot_path()
+        if max_age_h <= 0 or path is None:
+            return None
+        try:
+            with open(path, encoding="utf-8") as fh:
+                snap = json.load(fh)
+            ts = datetime.fromisoformat(snap["ts"])
+            if ts.tzinfo is None:
+                ts = ts.replace(tzinfo=timezone.utc)
+            age_h = max(0.0, (datetime.now(timezone.utc) - ts).total_seconds() / 3600.0)
+            rows = [Candidate.model_validate(r) for r in snap.get("candidates", [])]
+        except FileNotFoundError:
+            return None
+        except Exception as e:
+            log.warning("insider snapshot unreadable (%s): %s — not serving it.", path, e)
+            return None
+        if age_h > max_age_h:
+            log.info("insider snapshot is %.1fh old (cap %.1fh) — too stale to serve; "
+                     "cycle stays UNHEALTHY.", age_h, max_age_h)
+            return None
+        reason = (self.degraded or "").removeprefix("edgar: ")
+        self.degraded = None
+        self.cached_age_h = age_h
+        log.info("INSIDER CACHED: serving the %.1fh-old Form-4 snapshot (%d candidates) "
+                 "— EDGAR %s", age_h, len(rows), reason)
+        return rows
 
     # -- per-filing parse (ticker + buy/sell shares straight from the XML) -- #
     def _parse_submission(

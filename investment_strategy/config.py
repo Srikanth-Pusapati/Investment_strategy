@@ -53,6 +53,19 @@ def _flag(name: str, default: str = "off") -> bool:
     return os.getenv(name, default).strip().lower() in {"on", "true", "1", "yes"}
 
 
+def _choice(name: str, default: str, allowed: tuple[str, ...]) -> str:
+    """Env enum -> one of `allowed` (case-insensitive); an unknown value logs a
+    WARNING and falls back to `default` so a typo in .env cannot silently pick
+    a mode (run-8 change-set knobs)."""
+    raw = os.getenv(name, default).strip().lower()
+    if raw in allowed:
+        return raw
+    logging.getLogger("config").warning(
+        "%s=%r is not one of %s — using %r.", name, raw, "/".join(allowed), default,
+    )
+    return default
+
+
 @dataclass(frozen=True)
 class RiskLimits:
     """Hard caps enforced by RiskManager. The LLM cannot exceed these."""
@@ -278,6 +291,54 @@ class RiskLimits:
     # this much ABOVE the prior entry's — "adding to a winner" with the same
     # number is a reflex, not a signal. Fails open on a missing prior. 0 = off.
     topup_min_conviction_delta: float = 0.0    # 0 = off; load_config enables 0.05
+    # --- Run-8 change-set (Oct 26 2026) — every knob below is OFF / legacy in
+    # code; docs/RUN8_SWITCH.md section 1c turns them on. Evidence for each
+    # item: runs/pre-final-test-run-8/CHANGESET_DRAFT.md and the run-7 close
+    # summary (runs/pre-final-test-run-7/RUN_SUMMARY.md). ---
+    # B-1 TOPUP_AUTHORITY: 'legacy' = the conviction-delta gate above decides a
+    # top-up; 'events_only' = a top-up needs a deterministic EVENT since the
+    # symbol's last buy — composite up >= topup_min_composite_delta, price >=
+    # last fill x (1 + topup_min_gain_pct/100), or a key-signal family cited
+    # now that was not cited at the last buy. The model's conviction delta is
+    # recorded on the row, never gating. Run-7: the model restated conviction
+    # +0.05/+0.06 per top-up (DBRG 0.60->0.66->0.72->0.77 on a FALLING
+    # composite) and the 3-lot INTC alone lost $7,474 of the window's $29k.
+    topup_authority: str = "legacy"            # TOPUP_AUTHORITY
+    topup_min_composite_delta: float = 0.25    # TOPUP_MIN_COMPOSITE_DELTA
+    topup_min_gain_pct: float = 2.0            # TOPUP_MIN_GAIN_PCT
+    # B-1 TOPUP_MAX_MULTIPLE_OF_HELD: one top-up may not exceed this multiple
+    # of the symbol's current market value (run-7: one lot was 4x its
+    # starter). 0 = off.
+    topup_max_multiple_of_held: float = 0.0    # TOPUP_MAX_MULTIPLE_OF_HELD
+    # B-2 MAX_TOP3_SATELLITE_PCT: a buy that would lift the sum of the three
+    # largest SATELLITE weights (non-system, non-option) above this % of
+    # equity is resized to the headroom or rejected. Run-7: top-3 satellites
+    # 38% of equity, DBRG 18% > the QQQ core 15%. 0 = off.
+    max_top3_satellite_pct: float = 0.0        # MAX_TOP3_SATELLITE_PCT
+    # B-7b OPTION_OI_PER_CONTRACT: contracts are clamped so that every leg's
+    # open interest >= this x contracts (a 50-lot needs OI >= 1,000 at 20).
+    # Run-7: the HYG 78.5P 50-lot passed OI 100 and was unmarkable for 13
+    # sessions. 0 = off.
+    option_oi_per_contract: float = 0.0        # OPTION_OI_PER_CONTRACT
+    # B-5 OPTION_ENTRY_TIER1_BUFFER_PCT: entry limit buffer for a structure
+    # whose EVERY leg has quoted spread <= 5% and OI >= 1,000 (tier 1); other
+    # structures keep the 20% legacy buffer. Run-7: HYG 50-lot filled +12.7%
+    # over the estimate inside the 20% buffer. 0 = off (20% for all).
+    option_entry_tier1_buffer_pct: float = 0.0  # OPTION_ENTRY_TIER1_BUFFER_PCT
+    # B-7c OPTION_MARK_FALLBACK: 'off' = an absurd-spread NBBO skips the
+    # watchdog tick (run-7: 977-3,055 skipped ticks/day Oct 8-20, the HYG
+    # puts had no working stop); 'conservative' = after
+    # option_mark_fallback_ticks consecutive absurd-spread ticks the
+    # structure is marked at liquidation (long legs at bid, short legs at
+    # ask) and the premium stop/take evaluates on that mark.
+    option_mark_fallback: str = "off"          # OPTION_MARK_FALLBACK
+    option_mark_fallback_ticks: int = 10       # OPTION_MARK_FALLBACK_TICKS
+    # N-1 OPTION_EXITS_RTH_ONLY: option premium stop/take and expiry closes
+    # are submitted only during the regular session; outside it a breach is
+    # logged once as queued for the open. Alpaca rejects option MARKET orders
+    # outside RTH (code 42210000): Oct 26 2026 the watchdog retried 113x
+    # pre-market, each a CRITICAL page. off = legacy.
+    option_exits_rth_only: bool = False        # OPTION_EXITS_RTH_ONLY
     # Fail-closed sizing when a concentration guard is BLIND: if sector or
     # correlation data is missing for a new buy, multiply size by this instead
     # of skipping the guard (multipliers stack — blinder = smaller). 1.0
@@ -911,6 +972,41 @@ class Config:
     # (only ever tightens; clears with the falling read). Off (code default)
     # = run-7 behaviour. Log: 'REGIME FALLING-TAPE CAP:'.
     regime_falling_tape_cap: bool = False  # REGIME_FALLING_TAPE_CAP
+    # --- Run-8 change-set (Oct 26 2026): orchestrator-level knobs, all OFF /
+    # legacy in code; docs/RUN8_SWITCH.md section 1c turns them on. ---
+    # B-3 ENTRY_OPEN_DELAY_MIN: fresh equity BUYs (not held, not system) that
+    # the first cycle proposes while the session is younger than this many
+    # minutes are DEFERRED; the loop re-runs a decision cycle at open + delay
+    # with fresh quotes (the same anti-chase / overextension gates re-judge).
+    # Run-7: 12 of 12 entries placed in the first 15 minutes lost ($-17,135,
+    # 0% win rate) vs 38% WR for 15-60 min entries. 0 = off.
+    # Log: 'ENTRY DEFERRED (open window):' / 'ENTRY DEFERRED RESULT:'.
+    entry_open_delay_min: float = 0.0          # ENTRY_OPEN_DELAY_MIN
+    # B-4 BEARISH_IGNORED_FALLBACK: 'log_only' = an ELIGIBLE bearish name the
+    # model returned no verdict for is logged '-> IGNORED' (run-7: 1-30
+    # name-cycles per session, every session); 'proxy_put' = the single most
+    # bearish IGNORED name gets ONE scoped follow-up call (the option-fallback
+    # path) that may return a defined-risk put or HOLD — silence/HOLD = no
+    # trade; the proposal then runs the full gate stack and the proxy-put
+    # liquidity fallback. Log: 'BEARISH FALLBACK:'.
+    bearish_ignored_fallback: str = "log_only"  # BEARISH_IGNORED_FALLBACK
+    # B-6 PUT_NOQUOTE_COOLDOWN_CYCLES: a name whose put died on 'no NBBO on
+    # feed' leaves the bearish slate for this many decision cycles (run-7:
+    # the same dead IWM weekly re-proposed 10x; STE 9x in run-7 week 1).
+    # 0 = off. Log: 'PUT NO-QUOTE:'.
+    put_noquote_cooldown_cycles: int = 0       # PUT_NOQUOTE_COOLDOWN_CYCLES
+    # B-8 PREMIUM_CAP_SLATE_EXCLUDE: an underlying whose option debit was
+    # rejected by the PER-UNDERLYING PREMIUM CAP leaves the bearish slate
+    # for the rest of the ET day (run-7: 6 HYG DECLINED verdicts spent on a
+    # name the cap would not let the bot add to). Shows on the Buy-excluded
+    # line as '<SYM> (option premium cap)'. off = legacy.
+    premium_cap_slate_exclude: bool = False    # PREMIUM_CAP_SLATE_EXCLUDE
+    # C-2 INSIDER_CACHE_MAX_AGE_H: when the EDGAR Form-4 pull fails, serve the
+    # last good insider snapshot if it is at most this old, reported as
+    # 'insider=cached(<h>h)' on the FEEDS line instead of UNHEALTHY. 0 = off
+    # (run-7 behaviour: a sec.gov timeout = UNHEALTHY cycle; Sep 25 2026 3/8
+    # cycles = a validity breach). Ops/measurement — not a strategy key.
+    insider_cache_max_age_h: float = 0.0       # INSIDER_CACHE_MAX_AGE_H
 
     @property
     def is_live(self) -> bool:
@@ -1136,6 +1232,18 @@ def load_config() -> Config:
             max_daily_buys_per_symbol=_i("MAX_DAILY_BUYS_PER_SYMBOL", 3),
             max_cycle_symbol_share_pct=_f("MAX_CYCLE_SYMBOL_SHARE_PCT", 60.0),
             topup_min_conviction_delta=_f("TOPUP_MIN_CONVICTION_DELTA", 0.05),
+            # Run-8 change-set (see the RiskLimits field notes; all off/legacy here)
+            topup_authority=_choice("TOPUP_AUTHORITY", "legacy", ("legacy", "events_only")),
+            topup_min_composite_delta=_f("TOPUP_MIN_COMPOSITE_DELTA", 0.25),
+            topup_min_gain_pct=_f("TOPUP_MIN_GAIN_PCT", 2.0),
+            topup_max_multiple_of_held=_f("TOPUP_MAX_MULTIPLE_OF_HELD", 0.0),
+            max_top3_satellite_pct=_f("MAX_TOP3_SATELLITE_PCT", 0.0),
+            option_oi_per_contract=_f("OPTION_OI_PER_CONTRACT", 0.0),
+            option_entry_tier1_buffer_pct=_f("OPTION_ENTRY_TIER1_BUFFER_PCT", 0.0),
+            option_mark_fallback=_choice(
+                "OPTION_MARK_FALLBACK", "off", ("off", "conservative")),
+            option_mark_fallback_ticks=max(1, _i("OPTION_MARK_FALLBACK_TICKS", 10)),
+            option_exits_rth_only=_flag("OPTION_EXITS_RTH_ONLY", "off"),
             missing_data_mult=_f("MISSING_DATA_MULT", 1.0),
             # Anti-chasing overextension gate (see the RiskLimits field notes).
             overextension_gate_enabled=_flag("OVEREXTENSION_GATE_ENABLED", "on"),
@@ -1285,6 +1393,13 @@ def load_config() -> Config:
         regime_falling_tape_cap=_flag("REGIME_FALLING_TAPE_CAP", "off"),
         hedge_starved_trim_max_pct=max(
             0.0, min(100.0, _f("HEDGE_STARVED_TRIM_MAX_PCT", 50.0))),
+        # Run-8 change-set (Oct 26 2026) — see the Config field notes
+        entry_open_delay_min=max(0.0, _f("ENTRY_OPEN_DELAY_MIN", 0.0)),
+        bearish_ignored_fallback=_choice(
+            "BEARISH_IGNORED_FALLBACK", "log_only", ("log_only", "proxy_put")),
+        put_noquote_cooldown_cycles=max(0, _i("PUT_NOQUOTE_COOLDOWN_CYCLES", 0)),
+        premium_cap_slate_exclude=_flag("PREMIUM_CAP_SLATE_EXCLUDE", "off"),
+        insider_cache_max_age_h=max(0.0, _f("INSIDER_CACHE_MAX_AGE_H", 0.0)),
     )
 
     missing = [

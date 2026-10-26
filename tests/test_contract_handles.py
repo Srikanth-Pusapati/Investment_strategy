@@ -43,7 +43,9 @@ import investment_strategy
 
 ROOT = Path(__file__).resolve().parent.parent
 SRC = Path(investment_strategy.__file__).resolve().parent
-CONTRACT = ROOT / "runs" / "pre-final-test-run-7" / "EVAL_CONTRACT.md"
+# Run-8: the v4 contract (same rules, more handles). The v3 file stays as the
+# run-7 record; the parser reads whichever is current.
+CONTRACT = ROOT / "runs" / "pre-final-test-run-8" / "EVAL_CONTRACT.md"
 
 _spec = importlib.util.spec_from_file_location(
     "eval_contract_check", ROOT / "scripts" / "eval_contract_check.py")
@@ -81,6 +83,22 @@ PINNED_HANDLES: tuple[str, ...] = (
     "AUTO-HEDGE STARVED:",
     "REGIME FALLING-TAPE CAP:",
     "Options opened",
+    # Run-8 change-set (Oct 26 2026) — B-1..B-8, N-1, C-2, C-9
+    "TOPUP AUTHORITY:",
+    "BUCKET CAP:",
+    "ENTRY DEFERRED (open window):",
+    "ENTRY DEFERRED RESULT:",
+    "BEARISH FALLBACK:",
+    "OPTION ENTRY SLIP:",
+    "PUT NO-QUOTE:",
+    "Bearish-slate excluded this cycle:",
+    "(option premium cap)",
+    "no NBBO on feed for",
+    "OPTION LOT CAP:",
+    "OPTION MARK FALLBACK:",
+    "OPTION EXIT QUEUED",
+    "INSIDER CACHED:",
+    "already on disk",
 )
 # Verbatim from v3 rule 1 ("exit_reason not in the system set **{...}**").
 PINNED_SYSTEM_EXIT_REASONS = frozenset(

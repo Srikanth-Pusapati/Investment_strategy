@@ -1,0 +1,69 @@
+=== EVAL-CONTRACT pre-final-test-run-7 (v3) | window 2026-09-22..2026-10-20 | contract v3 ===
+day-0 predecessor: 2026-09-21 $1,000,000.00 (basis=late) — first point of the series; day 1 = 2026-09-22 forms a pair
+--- (1) satellite closed trips (rule 1: sample floor) ---
+satellite closed trips (action=sell, realized_pl non-null, exit_reason and symbol not system-managed, ts in window): N=30
+excluded system-managed rows (exit_reason beta_trim/core_defense/correction/defensive_rotate/hedge_unwind/regime_trim; symbols PSQ/QQQ): n=1 sum=$-1,780.40  [2026-10-08 PSQ hedge_unwind -1,780.40]
+sum realized P&L: $-25,641.23
+win rate: 20.0% (6W / 24L / 0 flat)
+avg win: $2,694.00   avg loss: $-1,741.88
+expectancy/trade: $-854.71
+phantom/dupe sell rows dropped (this ledger): n=0 sum=$0.00 [-]
+--- (2) window expectancy (rule 2: one-sided 95% t, H1: mean > 0; counted at N >= 24) ---
+t-stat: -1.904  df=29  crit(95%, one-sided)=1.699
+result: FAIL (t <= crit)
+bootstrap95=[$-1,767.78, $6.24]   profit factor=0.39
+concentration: top-3 trips sum=$12,746.12 (-49.7% of realized)   mean ex-top-3=$-1,421.75 over 27 trip(s)
+equity-only: N=24 sum=$-29,442.23 mean=$-1,226.76
+option-only: N=6 sum=$3,801.00 mean=$633.50
+--- (3) pooled expectancy (rule 3: live-pilot bar, pooled satellite N >= 60; never a window rule) ---
+this window 2026-09-22..2026-10-20: N=30 mean=$-854.71 t=-1.904 (df=29) bootstrap95=[$-1,767.78, $6.24]
+POOLED: N=30 (1 window(s)) mean=$-854.71 t=-1.904 crit=1.699  -> PENDING (needs N >= 60)
+[NOTE] same-config: pooling is valid only across windows with an IDENTICAL config fingerprint (merge SHA + sorted .env STRATEGY KEYS + adaptive loops off, per docs/RUN7_SWITCH.md); the checker does not verify fingerprints — every --pool file is the operator's assertion of same-config
+--- (4) equity series (verdict rows = basis='close', or 'late' on a date with no close row; + day-0 predecessor) ---
+verdict rows: 21 close row(s) in window + day-0 = 22 point(s), 21 pair(s)
+equity basis: close=21 row(s)
+max drawdown: -3.20% (peak 2026-09-21 -> trough 2026-10-15, 22 point(s))
+worst day (delta-equity, self-consistent): 2026-10-08 $-16,501.40   broker day_pl that date: $156,633.11
+--- (4b) telescoping: sum(day_pl) vs equity difference (validity, not a verdict rule) ---
+day_pl basis on close rows: self-consistent=21 broker=0
+sum day_pl: $-23,172.99   equity diff (day-0->last row): $-23,172.99   pairs=21 skipped=0
+max per-day gap |delta-equity - day_pl|: $0.00 on 2026-10-09  -> PASS (limit $1.00)
+broker last_equity restatement (informational): max |delta-equity - broker_day_pl| $178,886.91 on 2026-10-05 (21 row(s))
+--- (5) up/down capture vs SPY (rule 7: counted at >= 6 up AND >= 6 down pairs) ---
+SPY pairs in window: 9 up / 12 down
+up-capture: -2.5%   down-capture: 45.1%
+--- (5b) capture vs IWM (informational, not judged) ---
+IWM pairs in window: 9 up / 12 down
+up-capture: -3.9%   down-capture: 20.8%
+--- (5b) capture vs QQQ (informational, not judged) ---
+QQQ pairs in window: 10 up / 11 down
+up-capture: 13.0%   down-capture: 33.5%
+--- (6) daily alpha & beta (rules 4-5: OLS book return ~ SPY return over consecutive close rows incl. day 1) ---
+pairs=21  alpha/day=-0.103%  SE(alpha)=0.131%  t(alpha)=-0.78  r2=0.06
+beta=0.27  SE(beta)=0.24  90% CI=[-0.13, 0.66]  band=[0.80, 1.20]  -> NO OVERLAP
+mean ex-ante book_beta_spy=0.73 over 21 stamped close row(s) (range 0.17..1.09) vs target 1.00 +/- 0.2: OUTSIDE
+--- (6b) beta-adjusted capture: book / (beta_exante x index) (informational) ---
+ex-ante beta source: 21 stamped close row(s) (book_beta_spy); fallback beta=0.18 for the rest
+IWM: up-capture -7.3%   down-capture 29.5%   (9 up / 12 down, 20 stamped-beta pairs)
+QQQ: up-capture 18.0%   down-capture 55.7%   (10 up / 11 down, 20 stamped-beta pairs)
+SPY: up-capture -3.1%   down-capture 67.0%   (9 up / 12 down, 20 stamped-beta pairs)
+--- (7) UNSANCTIONED decision-sell losses below 0.5x planned stop (rule 8) ---
+decision-sell losses in window: 13  unsanctioned below 0.5x stop: 0  event-sanctioned below 0.5x stop (not counted): 7  no joinable stop: 0
+  2026-09-22 CRML realized -1.26% vs stop 10.00% (0.13x)  sanctioned: name_falling:-8.3% today vs SPY -0.1%
+  2026-09-23 SNXX realized -4.20% vs stop 10.00% (0.42x)  sanctioned: name_falling:-7.4% today vs SPY -0.7%
+  2026-09-25 BB realized -2.54% vs stop 6.85% (0.37x)  sanctioned: name_falling:-7.8% today vs SPY +0.5%
+  2026-10-07 IONQ realized -4.85% vs stop 10.00% (0.48x)  sanctioned: name_falling:-4.9% today vs SPY -0.6%
+  2026-10-08 SMCI realized -1.20% vs stop 10.00% (0.12x)  sanctioned: name_falling:-5.9% today vs SPY -0.6%
+  2026-10-08 SMCI realized -1.20% vs stop 10.00% (0.12x)  sanctioned: name_falling:-5.9% today vs SPY -0.6%
+  2026-10-13 SPCX realized -2.99% vs stop 6.06% (0.49x)  sanctioned: name_falling:-4.1% today vs SPY -0.1%
+--- (8) verdict: pre-final-test-run-7 contract v3 ---
+[INFO] rule 1 sample floor N >= 24: N=30 (met)
+[FAIL] rule 2 window expectancy > 0 @ 95% one-sided  (N=30, t=-1.904 vs crit=1.699, df=29)
+[INFO] rule 3 live-pilot bar: pooled N=30 < 60 — PENDING (not a window rule)
+[FAIL] rule 4 daily alpha > 0  (alpha/day=-0.103%, t=-0.78, 21 pairs)
+[FAIL] rule 5a mean ex-ante book_beta_spy within +/-0.2 of 1.00  (mean=0.73 over 21 close row(s), 21 pairs)
+[FAIL] rule 5b OLS beta 90% CI [-0.13, 0.66] overlaps [0.80, 1.20]  (beta=0.27, 21 pairs)
+[PASS] rule 6 max drawdown > -5%  (-3.20%)
+[FAIL] rule 7 up-capture > down-capture AND down-capture < 100%  (up -2.5% vs down 45.1%, 9 up / 12 down pairs)
+[PASS] rule 8 zero UNSANCTIONED decision-sell losses below 0.5x stop  (count=0, sanctioned=7, unknown stop=0)
+VERDICT: FAIL  (window expectancy, daily alpha, beta ex-ante mean, beta OLS CI, capture)

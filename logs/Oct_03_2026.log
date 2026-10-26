@@ -1,0 +1,41 @@
+2026-10-03 00:10:46,098 INFO orchestrator | Market closed; skipping decision cycle.
+2026-10-03 01:03:00,272 INFO orchestrator | Market closed; skipping decision cycle.
+2026-10-03 01:55:13,770 INFO orchestrator | Market closed; skipping decision cycle.
+2026-10-03 02:47:27,441 INFO orchestrator | Market closed; skipping decision cycle.
+2026-10-03 03:39:40,961 INFO orchestrator | Market closed; skipping decision cycle.
+2026-10-03 04:31:54,481 INFO orchestrator | Market closed; skipping decision cycle.
+2026-10-03 05:24:08,221 INFO orchestrator | Market closed; skipping decision cycle.
+2026-10-03 06:16:21,658 INFO orchestrator | Market closed; skipping decision cycle.
+2026-10-03 06:54:58,915 WARNING alpaca | get_account: transient network error (ReadTimeout); retry 1/2.
+2026-10-03 06:55:14,448 WARNING alpaca | get_account: broker HTTP 500 (GET https://paper-api.alpaca.markets/v2/account: {"code":50010000,"message":"internal server error occurred"}); retry 2/2.
+2026-10-03 06:55:15,717 WARNING orchestrator | Watchdog tick skipped on broker HTTP 500 (GET https://paper-api.alpaca.markets/v2/account: {"code":50010000,"message":"internal server error occurred"}); retrying next tick (1 in a row).
+2026-10-03 06:55:46,015 WARNING alpaca | get_account: broker HTTP 500 (GET https://paper-api.alpaca.markets/v2/account: {"code":50010000,"message":"internal server error occurred"}); retry 1/2.
+2026-10-03 06:55:46,723 WARNING alpaca | get_account: broker HTTP 500 (GET https://paper-api.alpaca.markets/v2/account: {"code":50010000,"message":"internal server error occurred"}); retry 2/2.
+2026-10-03 06:55:47,934 WARNING orchestrator | Watchdog tick skipped on broker HTTP 500 (GET https://paper-api.alpaca.markets/v2/account: {"code":50010000,"message":"internal server error occurred"}); retrying next tick (2 in a row).
+2026-10-03 06:56:18,143 WARNING alpaca | get_account: broker HTTP 500 (GET https://paper-api.alpaca.markets/v2/account: {"code":50010000,"message":"internal server error occurred"}); retry 1/2.
+2026-10-03 06:56:18,856 WARNING alpaca | get_account: broker HTTP 500 (GET https://paper-api.alpaca.markets/v2/account: {"code":50010000,"message":"internal server error occurred"}); retry 2/2.
+2026-10-03 06:56:20,124 WARNING orchestrator | Watchdog tick skipped on broker HTTP 500 (GET https://paper-api.alpaca.markets/v2/account: {"code":50010000,"message":"internal server error occurred"}); retrying next tick (3 in a row).
+2026-10-03 06:56:50,359 WARNING alpaca | get_account: broker HTTP 500 (GET https://paper-api.alpaca.markets/v2/account: {"code":50010000,"message":"internal server error occurred"}); retry 1/2.
+2026-10-03 06:56:51,389 WARNING alpaca | get_account: broker HTTP 500 (GET https://paper-api.alpaca.markets/v2/account: {"code":50010000,"message":"internal server error occurred"}); retry 2/2.
+2026-10-03 06:56:53,464 WARNING orchestrator | Watchdog tick skipped on broker HTTP 500 (GET https://paper-api.alpaca.markets/v2/account: {"code":50010000,"message":"internal server error occurred"}); retrying next tick (4 in a row).
+2026-10-03 07:08:34,984 INFO orchestrator | Market closed; skipping decision cycle.
+2026-10-03 08:00:48,273 INFO orchestrator | Market closed; skipping decision cycle.
+2026-10-03 08:53:01,398 INFO orchestrator | Market closed; skipping decision cycle.
+2026-10-03 09:45:14,778 INFO orchestrator | Market closed; skipping decision cycle.
+2026-10-03 10:37:28,078 INFO orchestrator | Market closed; skipping decision cycle.
+2026-10-03 11:29:41,437 INFO orchestrator | Market closed; skipping decision cycle.
+2026-10-03 12:21:55,068 INFO orchestrator | Market closed; skipping decision cycle.
+2026-10-03 13:14:08,030 INFO orchestrator | Market closed; skipping decision cycle.
+2026-10-03 14:06:21,154 INFO orchestrator | Market closed; skipping decision cycle.
+2026-10-03 14:58:34,465 INFO orchestrator | Market closed; skipping decision cycle.
+2026-10-03 15:50:47,443 INFO orchestrator | Market closed; skipping decision cycle.
+2026-10-03 16:43:01,220 INFO orchestrator | Market closed; skipping decision cycle.
+2026-10-03 17:35:15,015 INFO orchestrator | Market closed; skipping decision cycle.
+2026-10-03 18:27:28,454 INFO orchestrator | Market closed; skipping decision cycle.
+2026-10-03 19:19:41,568 INFO orchestrator | Market closed; skipping decision cycle.
+2026-10-03 20:11:55,113 INFO orchestrator | Market closed; skipping decision cycle.
+2026-10-03 21:04:09,193 INFO orchestrator | Market closed; skipping decision cycle.
+2026-10-03 21:56:22,270 INFO orchestrator | Market closed; skipping decision cycle.
+2026-10-03 22:48:35,607 INFO orchestrator | Market closed; skipping decision cycle.
+2026-10-03 23:40:48,905 INFO orchestrator | Session calendar refreshed: 15 session(s) 2026-09-24..2026-10-14 -> state/session_calendar.json.
+2026-10-03 23:40:49,035 INFO orchestrator | Market closed; skipping decision cycle.

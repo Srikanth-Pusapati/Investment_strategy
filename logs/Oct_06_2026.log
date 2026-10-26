@@ -1,0 +1,552 @@
+2026-10-06 00:10:53,986 INFO orchestrator | Market closed; skipping decision cycle.
+2026-10-06 01:03:07,474 INFO orchestrator | Market closed; skipping decision cycle.
+2026-10-06 01:55:21,144 INFO orchestrator | Market closed; skipping decision cycle.
+2026-10-06 02:47:34,145 INFO orchestrator | Market closed; skipping decision cycle.
+2026-10-06 03:39:47,529 INFO orchestrator | Market closed; skipping decision cycle.
+2026-10-06 04:32:01,536 INFO orchestrator | Market closed; skipping decision cycle.
+2026-10-06 05:24:15,288 INFO orchestrator | Market closed; skipping decision cycle.
+2026-10-06 06:16:28,839 INFO orchestrator | Market closed; skipping decision cycle.
+2026-10-06 07:08:42,212 INFO orchestrator | Market closed; skipping decision cycle.
+2026-10-06 08:00:55,405 INFO orchestrator | Market closed; skipping decision cycle.
+2026-10-06 08:30:04,080 INFO orchestrator | Market regime: SPY above 200dma (775 vs 718, today +0.7%), VIX 15.3, VIX3M 18.0 (contango) -> risk-on, size x1.00.
+2026-10-06 08:30:07,561 INFO orchestrator | BOOK BETA: spy=1.08 qqq=0.79 iwm=0.82 invested=98.5% hedge=PSQ w=0.108 beta=-1.40 unhedged=1.23 [options at debit notional x underlying beta: AGNC,CL,HYG,IWM,LQD]
+2026-10-06 08:30:07,573 INFO orchestrator | Auto-hedge: beta: book spy-beta 1.08 within 1.00 +/- 0.15 — holding $107603 PSQ.
+2026-10-06 08:30:07,984 INFO quiver | Quiver live/congresstrading -> 1000 row(s).
+2026-10-06 08:30:08,412 INFO screener | EDGAR Form-4 feed -> 63 filing(s) (scanning up to 100).
+2026-10-06 08:30:10,024 WARNING watchdog | Option CL 2026-11-20 premium mark unreliable (absurd 135% spread on CL261120P00085000 (> 10% cap): bid=0.73 ask=3.77), skipping tick — breach streak held at 0/2, not reset.
+2026-10-06 08:30:34,825 INFO screener | Options-flow most-actives pool -> 40 name(s).
+2026-10-06 08:30:40,912 WARNING watchdog | Option CL 2026-11-20 premium mark unreliable (absurd 35% spread on CL261120P00085000 (> 10% cap): bid=1.73 ask=2.47), skipping tick — breach streak held at 0, not reset.
+2026-10-06 08:30:40,980 WARNING watchdog | Option HYG 2026-11-20 premium mark unreliable (absurd 187% spread on HYG261120P00079000 (> 10% cap): bid=0.13 ask=3.85), skipping tick — breach streak held at 0/2, not reset.
+2026-10-06 08:31:05,363 INFO screener | Screener liquidity floor dropped 8/27 pre-cap: BORR $4.24<$5, UXIN $1.26<$5, BBD $4.51<$5, ALEC $2.13<$5, PDSB $1.21<$5, GRAB $3.19<$5, RXRX $4.77<$5, FNGR $0.26<$5
+2026-10-06 08:31:05,372 INFO screener | Discovered 18 candidate(s) from 3 source(s) (192 merged, 19 above min_score, capped to 18).
+2026-10-06 08:31:05,374 INFO screener |   candidate CTVA [options_flow] score=+0.79 — Options flow: 1,493 call / 173 put vol (bullish call imbalance +0.79) on a most-active name.
+2026-10-06 08:31:05,377 INFO screener |   candidate ITUB [options_flow] score=+0.63 — Options flow: 3,014 call / 689 put vol (bullish call imbalance +0.63) on a most-active name.
+2026-10-06 08:31:05,379 INFO screener |   candidate XP [options_flow] score=+0.52 — Options flow: 43,358 call / 13,717 put vol (bullish call imbalance +0.52) on a most-active name.
+2026-10-06 08:31:05,380 INFO screener |   candidate TSLL [options_flow] score=+0.51 — Options flow: 89,641 call / 29,025 put vol (bullish call imbalance +0.51) on a most-active name.
+2026-10-06 08:31:05,382 INFO screener |   candidate NU [options_flow] score=+0.48 — Options flow: 215,335 call / 75,399 put vol (bullish call imbalance +0.48) on a most-active name.
+2026-10-06 08:31:05,384 INFO screener |   candidate SOFI [options_flow] score=+0.46 — Options flow: 187,018 call / 69,854 put vol (bullish call imbalance +0.46) on a most-active name.
+2026-10-06 08:31:05,386 INFO screener |   candidate EWZ [options_flow] score=+0.41 — Options flow: 1,410,838 call / 587,048 put vol (bullish call imbalance +0.41) on a most-active name.
+2026-10-06 08:31:05,389 INFO screener |   candidate SOXS [options_flow] score=+0.41 — Options flow: 29,266 call / 12,182 put vol (bullish call imbalance +0.41) on a most-active name.
+2026-10-06 08:31:05,391 INFO screener |   candidate PBR [options_flow] score=+0.41 — Options flow: 63,819 call / 26,730 put vol (bullish call imbalance +0.41) on a most-active name.
+2026-10-06 08:31:05,393 INFO screener |   candidate BITO [options_flow] score=+0.33 — Options flow: 3,197 call / 1,600 put vol (bullish call imbalance +0.33) on a most-active name.
+2026-10-06 08:31:05,395 INFO screener |   candidate NKE [congress+options_flow] score=+0.32 — Congress: 0 buy / 2 sell filings in last 60d (disclosures lag up to ~45d). | Options flow: 115,700 call / 45,229 put vol (bullish call imbalance +0.44) on a most-active name.
+2026-10-06 08:31:05,397 INFO screener |   candidate WBD [options_flow] score=+0.32 — Options flow: 23,736 call / 12,234 put vol (bullish call imbalance +0.32) on a most-active name.
+2026-10-06 08:31:05,399 INFO screener |   candidate ACCV [insider] score=+0.30 — Insider: 1 open-market buy filing(s), 203,200 sh (SEC Form 4, last filings feed).
+2026-10-06 08:31:05,401 INFO screener |   candidate AVR [insider] score=+0.30 — Insider: 1 open-market buy filing(s), 884,809 sh (SEC Form 4, last filings feed).
+2026-10-06 08:31:05,402 INFO screener |   candidate TJX [congress] score=-0.23 — Congress: 0 buy / 4 sell filings in last 60d (disclosures lag up to ~45d).
+2026-10-06 08:31:05,403 INFO screener |   candidate JPM [congress] score=-0.23 — Congress: 0 buy / 4 sell filings in last 60d (disclosures lag up to ~45d).
+2026-10-06 08:31:05,405 INFO screener |   candidate TDY [congress] score=-0.23 — Congress: 0 buy / 5 sell filings in last 60d (disclosures lag up to ~45d).
+2026-10-06 08:31:05,406 INFO screener |   candidate ITW [congress] score=-0.23 — Congress: 0 buy / 4 sell filings in last 60d (disclosures lag up to ~45d).
+2026-10-06 08:31:11,876 WARNING watchdog | Option CL 2026-11-20 premium mark unreliable (absurd 38% spread on CL261120P00085000 (> 10% cap): bid=1.73 ask=2.53), skipping tick — breach streak held at 0, not reset.
+2026-10-06 08:31:11,951 WARNING watchdog | Option HYG 2026-11-20 premium mark unreliable (absurd 186% spread on HYG261120P00079000 (> 10% cap): bid=0.14 ask=3.73), skipping tick — breach streak held at 0/2, not reset.
+2026-10-06 08:31:32,808 INFO quiver | Quiver live/offexchange -> 5551 row(s).
+2026-10-06 08:31:33,310 INFO quiver | Quiver live/govcontractsall -> 20000 row(s).
+2026-10-06 08:31:34,269 INFO quiver | Quiver live/lobbying -> 20000 row(s).
+2026-10-06 08:31:43,091 WARNING watchdog | Option CL 2026-11-20 premium mark unreliable (absurd 38% spread on CL261120P00085000 (> 10% cap): bid=1.73 ask=2.53), skipping tick — breach streak held at 0, not reset.
+2026-10-06 08:31:43,147 WARNING watchdog | Option HYG 2026-11-20 premium mark unreliable (absurd 186% spread on HYG261120P00079000 (> 10% cap): bid=0.14 ask=3.78), skipping tick — breach streak held at 0/2, not reset.
+2026-10-06 08:32:14,180 WARNING watchdog | Option CL 2026-11-20 premium mark unreliable (absurd 35% spread on CL261120P00085000 (> 10% cap): bid=1.77 ask=2.52), skipping tick — breach streak held at 0, not reset.
+2026-10-06 08:32:14,238 WARNING watchdog | Option HYG 2026-11-20 premium mark unreliable (absurd 135% spread on HYG261120P00079000 (> 10% cap): bid=0.68 ask=3.51), skipping tick — breach streak held at 0/2, not reset.
+2026-10-06 08:32:45,189 WARNING watchdog | Option CL 2026-11-20 premium mark unreliable (absurd 39% spread on CL261120P00085000 (> 10% cap): bid=1.72 ask=2.55), skipping tick — breach streak held at 0, not reset.
+2026-10-06 08:32:45,251 WARNING watchdog | Option HYG 2026-11-20 premium mark unreliable (absurd 16% spread on HYG261120P00079000 (> 10% cap): bid=1.89 ask=2.21), skipping tick — breach streak held at 0, not reset.
+2026-10-06 08:33:16,060 WARNING watchdog | Option CL 2026-11-20 premium mark unreliable (absurd 33% spread on CL261120P00085000 (> 10% cap): bid=1.77 ask=2.48), skipping tick — breach streak held at 0, not reset.
+2026-10-06 08:33:16,142 WARNING watchdog | Option HYG 2026-11-20 premium mark unreliable (absurd 14% spread on HYG261120P00079000 (> 10% cap): bid=1.93 ask=2.21), skipping tick — breach streak held at 0, not reset.
+2026-10-06 08:33:46,985 WARNING watchdog | Option CL 2026-11-20 premium mark unreliable (absurd 36% spread on CL261120P00085000 (> 10% cap): bid=1.78 ask=2.55), skipping tick — breach streak held at 0, not reset.
+2026-10-06 08:33:47,043 WARNING watchdog | Option HYG 2026-11-20 premium mark unreliable (absurd 14% spread on HYG261120P00079000 (> 10% cap): bid=1.93 ask=2.21), skipping tick — breach streak held at 0, not reset.
+2026-10-06 08:33:55,343 INFO signals | options_chain: reading 25 of 35 symbols this cycle (cap).
+2026-10-06 08:34:03,038 INFO signals | Gathered signals for 35/35 symbols (+3 market signals).
+2026-10-06 08:34:03,188 INFO orchestrator | Composite index (35 scored, top: PBR +1.81, ONON +1.64, INTC +1.47, DVN +1.37, EWZ +1.25, NOK +1.23, NU +1.16, DBRG +1.11; bear tail: AGNC -3.04, HYG -0.93, LQD -0.81, NKE -0.71, CL -0.58, IWM -0.55).
+2026-10-06 08:34:03,214 INFO orchestrator | Expectancy gate (off, report-only): would have armed against: options_flow -1.0%/trip x9, technical -1.2%/trip x9
+2026-10-06 08:34:03,553 WARNING robinhood | Robinhood OAuth token file changed since the dead-auth latch — re-enabling context reads; the next call verifies (and re-latches if the new token is also dead).
+2026-10-06 08:34:06,744 INFO robinhood | Imported 1 Robinhood holding(s) for context (read-only).
+2026-10-06 08:34:06,745 INFO orchestrator | FEEDS: 3/3 healthy news=vader-fallback earnings=rh
+2026-10-06 08:34:06,751 INFO orchestrator | Buy-excluded from slate this cycle: NU (exited 23.9h ago (cooldown 24h))
+2026-10-06 08:34:18,005 WARNING watchdog | Option CL 2026-11-20 premium mark unreliable (absurd 33% spread on CL261120P00085000 (> 10% cap): bid=1.78 ask=2.48), skipping tick — breach streak held at 0, not reset.
+2026-10-06 08:34:18,061 WARNING watchdog | Option HYG 2026-11-20 premium mark unreliable (absurd 15% spread on HYG261120P00079000 (> 10% cap): bid=1.94 ask=2.25), skipping tick — breach streak held at 0, not reset.
+2026-10-06 08:34:35,186 INFO usage | decision call: 23845 in / 1911 out (cache r=0 w=6603) ~$0.2330 [claude-opus-4-8]
+2026-10-06 08:34:35,191 INFO decision | Claude returned 1 proposal(s), 4 bearish verdict(s).
+2026-10-06 08:34:35,196 INFO orchestrator | Bearish verdict: AGNC DECLINED — Thesis is corroborated bearish (composite -3.04, flow -0.75, chain -0.82, insider selling) but RSI 16 is extreme-oversold at $8.68 — high bounce risk and tiny o
+2026-10-06 08:34:35,199 WARNING orchestrator | Bearish verdict: CL ELIGIBLE but IGNORED — model returned no bearish_verdicts entry for an ELIGIBLE name (the schema requires one per listed name).
+2026-10-06 08:34:35,201 INFO orchestrator | Bearish verdict: HYG DECLINED — ATM IV only 7% and HYG moves little; theta bleed on a low-vol credit ETF outweighs the modest bearish lean (composite -0.93, RSI 32 already neutral-low). Not wo
+2026-10-06 08:34:35,204 INFO orchestrator | Bearish verdict: LQD DECLINED — ATM IV 9% on an investment-grade bond ETF — move magnitude too small to overcome premium/theta; bearish composite -0.81 is thin and already oversold (RSI 32).
+2026-10-06 08:34:35,206 INFO orchestrator | Bearish verdict: NKE DECLINED — Conflicting evidence: technical bearish (RSI 29, downtrend) but options flow bullish +0.37, chain bullish +0.16, and insider net positive +0.24 — no corroborate
+2026-10-06 08:34:35,208 WARNING orchestrator | Bearish verdict: SOXS ELIGIBLE but IGNORED — model returned no bearish_verdicts entry for an ELIGIBLE name (the schema requires one per listed name).
+2026-10-06 08:34:35,513 WARNING options | no quote available for PBR261121C00024000 — contract unknown to feed
+2026-10-06 08:34:35,568 WARNING options | no quote available for PBR261121C00024000 — contract unknown to feed
+2026-10-06 08:34:37,313 INFO earnings | Robinhood earnings calendar: 3120 name(s) reporting within 31d.
+2026-10-06 08:34:37,314 WARNING risk | OPTIONS SINGLE-NAME BULLISH: PBR OptionStrategy.LONG_CALL rejected (OPTIONS_SINGLE_NAME_BULLISH=off) — counterfactual debit $0/contract, budget $9,944.
+2026-10-06 08:34:37,315 INFO risk | REJECT buy PBR: single-name bullish option debits disabled for this window (OPTIONS_SINGLE_NAME_BULLISH=off; counterfactual debit $0/contract).
+2026-10-06 08:34:37,315 INFO orchestrator | OPTION OptionStrategy.LONG_CALL PBR -> rejected: single-name bullish option debits disabled for this window (OPTIONS_SINGLE_NAME_BULLISH=off; counterfactual debit $0/contract). | Strongest new composite in slate (+1.81): fundamentals +0.80 ($243B EBITDA, 44.3% margin, +42.3% rev
+2026-10-06 08:34:37,316 INFO orchestrator | BOOK BETA (post-exec): spy=1.08 qqq=0.79 iwm=0.82 invested=98.5% hedge=PSQ w=0.108 beta=-1.40 unhedged=1.23 (pre-exec spy=1.08 delta=+0.00)
+2026-10-06 08:34:37,317 INFO orchestrator | BEARISH FUNNEL: slate_bearish=7 [AGNC -3.04 ELIGIBLE (below its 200dma) -> declined: Thesis is corroborated bearish (composite -3.04, flow -0.75,; HYG -0.93 ELIGIBLE (below its 200dma) -> declined: ATM IV only 7% and HYG moves little; theta bleed on a low-vo; LQD -0.81 ELIGIBLE (below its 200dma) -> declined: ATM IV 9% on an investment-grade bond ETF — move magnitude t; NKE -0.71 ELIGIBLE (below its 200dma) -> declined: Conflicting evidence: technical bearish (RSI 29, downtrend); CL -0.58 ELIGIBLE (below its 200dma) -> IGNORED; IWM -0.55 gate-blocked; SOXS -0.44 ELIGIBLE (below its 200dma) -> IGNORED] put_proposals=0 put_approved=0 ignored=2 auto_hedge=$107,603 PSQ(beta:1.08) proxy_put=none
+2026-10-06 08:34:37,450 INFO config | BOOK BETA CAP vs hedge arm line: cap 1.20 - (target 1.00 + band 0.15) = +0.05 (cap-bound buys land inside the arm zone)
+2026-10-06 08:34:37,454 INFO alpaca | Alpaca client ready (mode=paper).
+2026-10-06 08:34:39,438 INFO dashboard | Wrote dashboard with 47 trades -> dashboard.html
+2026-10-06 08:34:49,198 WARNING watchdog | Option CL 2026-11-20 premium mark unreliable (absurd 33% spread on CL261120P00085000 (> 10% cap): bid=1.78 ask=2.48), skipping tick — breach streak held at 0, not reset.
+2026-10-06 08:34:49,262 WARNING watchdog | Option HYG 2026-11-20 premium mark unreliable (absurd 15% spread on HYG261120P00079000 (> 10% cap): bid=1.94 ask=2.25), skipping tick — breach streak held at 0, not reset.
+2026-10-06 08:35:20,361 WARNING watchdog | Option CL 2026-11-20 premium mark unreliable (absurd 38% spread on CL261120P00085000 (> 10% cap): bid=1.73 ask=2.55), skipping tick — breach streak held at 0, not reset.
+2026-10-06 08:35:20,561 WARNING watchdog | Option HYG 2026-11-20 premium mark unreliable (absurd 15% spread on HYG261120P00079000 (> 10% cap): bid=1.89 ask=2.19), skipping tick — breach streak held at 0, not reset.
+2026-10-06 08:35:51,623 WARNING watchdog | Option CL 2026-11-20 premium mark unreliable (absurd 33% spread on CL261120P00085000 (> 10% cap): bid=1.77 ask=2.47), skipping tick — breach streak held at 0, not reset.
+2026-10-06 08:35:51,693 WARNING watchdog | Option HYG 2026-11-20 premium mark unreliable (absurd 15% spread on HYG261120P00079000 (> 10% cap): bid=1.89 ask=2.19), skipping tick — breach streak held at 0, not reset.
+2026-10-06 08:36:22,654 WARNING watchdog | Option CL 2026-11-20 premium mark unreliable (absurd 38% spread on CL261120P00085000 (> 10% cap): bid=1.73 ask=2.53), skipping tick — breach streak held at 0, not reset.
+2026-10-06 08:36:22,716 WARNING watchdog | Option HYG 2026-11-20 premium mark unreliable (absurd 17% spread on HYG261120P00079000 (> 10% cap): bid=1.89 ask=2.23), skipping tick — breach streak held at 0, not reset.
+2026-10-06 08:36:53,616 WARNING watchdog | Option CL 2026-11-20 premium mark unreliable (absurd 33% spread on CL261120P00085000 (> 10% cap): bid=1.77 ask=2.48), skipping tick — breach streak held at 0, not reset.
+2026-10-06 08:36:53,687 WARNING watchdog | Option HYG 2026-11-20 premium mark unreliable (absurd 13% spread on HYG261120P00079000 (> 10% cap): bid=1.93 ask=2.19), skipping tick — breach streak held at 0, not reset.
+2026-10-06 08:37:24,633 WARNING watchdog | Option CL 2026-11-20 premium mark unreliable (absurd 33% spread on CL261120P00085000 (> 10% cap): bid=1.77 ask=2.48), skipping tick — breach streak held at 0, not reset.
+2026-10-06 08:37:24,817 WARNING watchdog | Option HYG 2026-11-20 premium mark unreliable (absurd 12% spread on HYG261120P00079000 (> 10% cap): bid=1.94 ask=2.18), skipping tick — breach streak held at 0, not reset.
+2026-10-06 08:37:55,870 WARNING watchdog | Option CL 2026-11-20 premium mark unreliable (absurd 33% spread on CL261120P00085000 (> 10% cap): bid=1.77 ask=2.48), skipping tick — breach streak held at 0, not reset.
+2026-10-06 08:37:55,940 WARNING watchdog | Option HYG 2026-11-20 premium mark unreliable (absurd 12% spread on HYG261120P00079000 (> 10% cap): bid=1.94 ask=2.18), skipping tick — breach streak held at 0, not reset.
+2026-10-06 08:38:26,896 WARNING watchdog | Option CL 2026-11-20 premium mark unreliable (absurd 33% spread on CL261120P00085000 (> 10% cap): bid=1.77 ask=2.47), skipping tick — breach streak held at 0, not reset.
+2026-10-06 08:38:26,953 WARNING watchdog | Option HYG 2026-11-20 premium mark unreliable (absurd 13% spread on HYG261120P00079000 (> 10% cap): bid=1.93 ask=2.19), skipping tick — breach streak held at 0, not reset.
+2026-10-06 08:38:57,890 WARNING watchdog | Option CL 2026-11-20 premium mark unreliable (absurd 33% spread on CL261120P00085000 (> 10% cap): bid=1.77 ask=2.48), skipping tick — breach streak held at 0, not reset.
+2026-10-06 08:38:57,946 WARNING watchdog | Option HYG 2026-11-20 premium mark unreliable (absurd 13% spread on HYG261120P00079000 (> 10% cap): bid=1.93 ask=2.19), skipping tick — breach streak held at 0, not reset.
+2026-10-06 08:39:28,892 WARNING watchdog | Option CL 2026-11-20 premium mark unreliable (absurd 35% spread on CL261120P00085000 (> 10% cap): bid=1.77 ask=2.53), skipping tick — breach streak held at 0, not reset.
+2026-10-06 08:39:28,962 WARNING watchdog | Option HYG 2026-11-20 premium mark unreliable (absurd 17% spread on HYG261120P00079000 (> 10% cap): bid=1.89 ask=2.23), skipping tick — breach streak held at 0, not reset.
+2026-10-06 08:40:00,010 WARNING watchdog | Option CL 2026-11-20 premium mark unreliable (absurd 33% spread on CL261120P00085000 (> 10% cap): bid=1.77 ask=2.48), skipping tick — breach streak held at 0, not reset.
+2026-10-06 08:40:00,077 WARNING watchdog | Option HYG 2026-11-20 premium mark unreliable (absurd 17% spread on HYG261120P00079000 (> 10% cap): bid=1.89 ask=2.23), skipping tick — breach streak held at 0, not reset.
+2026-10-06 08:40:31,122 WARNING watchdog | Option CL 2026-11-20 premium mark unreliable (absurd 33% spread on CL261120P00085000 (> 10% cap): bid=1.77 ask=2.48), skipping tick — breach streak held at 0, not reset.
+2026-10-06 08:40:31,180 WARNING watchdog | Option HYG 2026-11-20 premium mark unreliable (absurd 17% spread on HYG261120P00079000 (> 10% cap): bid=1.89 ask=2.23), skipping tick — breach streak held at 0, not reset.
+2026-10-06 08:41:02,163 WARNING watchdog | Option CL 2026-11-20 premium mark unreliable (absurd 33% spread on CL261120P00085000 (> 10% cap): bid=1.77 ask=2.48), skipping tick — breach streak held at 0, not reset.
+2026-10-06 08:41:02,221 WARNING watchdog | Option HYG 2026-11-20 premium mark unreliable (absurd 17% spread on HYG261120P00079000 (> 10% cap): bid=1.89 ask=2.23), skipping tick — breach streak held at 0, not reset.
+2026-10-06 08:41:33,132 WARNING watchdog | Option CL 2026-11-20 premium mark unreliable (absurd 38% spread on CL261120P00085000 (> 10% cap): bid=1.73 ask=2.53), skipping tick — breach streak held at 0, not reset.
+2026-10-06 08:41:33,206 WARNING watchdog | Option HYG 2026-11-20 premium mark unreliable (absurd 17% spread on HYG261120P00079000 (> 10% cap): bid=1.89 ask=2.23), skipping tick — breach streak held at 0, not reset.
+2026-10-06 08:42:04,053 WARNING watchdog | Option CL 2026-11-20 premium mark unreliable (absurd 38% spread on CL261120P00085000 (> 10% cap): bid=1.73 ask=2.53), skipping tick — breach streak held at 0, not reset.
+2026-10-06 08:42:04,119 WARNING watchdog | Option HYG 2026-11-20 premium mark unreliable (absurd 17% spread on HYG261120P00079000 (> 10% cap): bid=1.89 ask=2.23), skipping tick — breach streak held at 0, not reset.
+2026-10-06 08:42:34,989 WARNING watchdog | Option CL 2026-11-20 premium mark unreliable (absurd 38% spread on CL261120P00085000 (> 10% cap): bid=1.73 ask=2.53), skipping tick — breach streak held at 0, not reset.
+2026-10-06 08:42:35,050 WARNING watchdog | Option HYG 2026-11-20 premium mark unreliable (absurd 14% spread on HYG261120P00079000 (> 10% cap): bid=1.88 ask=2.17), skipping tick — breach streak held at 0, not reset.
+2026-10-06 08:43:05,862 WARNING watchdog | Option CL 2026-11-20 premium mark unreliable (absurd 33% spread on CL261120P00085000 (> 10% cap): bid=1.77 ask=2.48), skipping tick — breach streak held at 0, not reset.
+2026-10-06 08:43:05,928 WARNING watchdog | Option HYG 2026-11-20 premium mark unreliable (absurd 14% spread on HYG261120P00079000 (> 10% cap): bid=1.88 ask=2.17), skipping tick — breach streak held at 0, not reset.
+2026-10-06 08:43:36,862 WARNING watchdog | Option CL 2026-11-20 premium mark unreliable (absurd 35% spread on CL261120P00085000 (> 10% cap): bid=1.73 ask=2.47), skipping tick — breach streak held at 0, not reset.
+2026-10-06 08:43:36,943 WARNING watchdog | Option HYG 2026-11-20 premium mark unreliable (absurd 14% spread on HYG261120P00079000 (> 10% cap): bid=1.88 ask=2.17), skipping tick — breach streak held at 0, not reset.
+2026-10-06 08:44:07,999 WARNING watchdog | Option CL 2026-11-20 premium mark unreliable (absurd 32% spread on CL261120P00085000 (> 10% cap): bid=1.78 ask=2.46), skipping tick — breach streak held at 0, not reset.
+2026-10-06 08:44:08,059 WARNING watchdog | Option HYG 2026-11-20 premium mark unreliable (absurd 14% spread on HYG261120P00079000 (> 10% cap): bid=1.88 ask=2.17), skipping tick — breach streak held at 0, not reset.
+2026-10-06 08:44:38,937 WARNING watchdog | Option CL 2026-11-20 premium mark unreliable (absurd 35% spread on CL261120P00085000 (> 10% cap): bid=1.78 ask=2.53), skipping tick — breach streak held at 0, not reset.
+2026-10-06 08:44:39,000 WARNING watchdog | Option HYG 2026-11-20 premium mark unreliable (absurd 14% spread on HYG261120P00079000 (> 10% cap): bid=1.88 ask=2.17), skipping tick — breach streak held at 0, not reset.
+2026-10-06 08:45:10,081 WARNING watchdog | Option CL 2026-11-20 premium mark unreliable (absurd 38% spread on CL261120P00085000 (> 10% cap): bid=1.73 ask=2.53), skipping tick — breach streak held at 0, not reset.
+2026-10-06 08:45:10,143 INFO watchdog | Option HYG 2026-11-20 premium back inside stop/take thresholds (now +27.3%) — breach streak reset.
+2026-10-06 08:45:41,205 WARNING watchdog | Option CL 2026-11-20 premium mark unreliable (absurd 33% spread on CL261120P00085000 (> 10% cap): bid=1.77 ask=2.47), skipping tick — breach streak held at 0, not reset.
+2026-10-06 08:46:12,157 WARNING watchdog | Option CL 2026-11-20 premium mark unreliable (absurd 33% spread on CL261120P00085000 (> 10% cap): bid=1.77 ask=2.48), skipping tick — breach streak held at 0, not reset.
+2026-10-06 08:46:43,251 WARNING watchdog | Option CL 2026-11-20 premium mark unreliable (absurd 35% spread on CL261120P00085000 (> 10% cap): bid=1.77 ask=2.52), skipping tick — breach streak held at 0, not reset.
+2026-10-06 08:47:14,247 WARNING watchdog | Option CL 2026-11-20 premium mark unreliable (absurd 33% spread on CL261120P00085000 (> 10% cap): bid=1.78 ask=2.48), skipping tick — breach streak held at 0, not reset.
+2026-10-06 08:47:45,229 WARNING watchdog | Option CL 2026-11-20 premium mark unreliable (absurd 36% spread on CL261120P00085000 (> 10% cap): bid=1.73 ask=2.48), skipping tick — breach streak held at 0, not reset.
+2026-10-06 08:48:16,219 WARNING watchdog | Option CL 2026-11-20 premium mark unreliable (absurd 35% spread on CL261120P00085000 (> 10% cap): bid=1.78 ask=2.54), skipping tick — breach streak held at 0, not reset.
+2026-10-06 08:48:47,181 WARNING watchdog | Option CL 2026-11-20 premium mark unreliable (absurd 34% spread on CL261120P00085000 (> 10% cap): bid=1.78 ask=2.52), skipping tick — breach streak held at 0, not reset.
+2026-10-06 08:49:18,198 WARNING watchdog | Option CL 2026-11-20 premium mark unreliable (absurd 34% spread on CL261120P00085000 (> 10% cap): bid=1.78 ask=2.52), skipping tick — breach streak held at 0, not reset.
+2026-10-06 08:49:49,320 WARNING watchdog | Option CL 2026-11-20 premium mark unreliable (absurd 36% spread on CL261120P00085000 (> 10% cap): bid=1.77 ask=2.54), skipping tick — breach streak held at 0, not reset.
+2026-10-06 08:50:20,354 WARNING watchdog | Option CL 2026-11-20 premium mark unreliable (absurd 33% spread on CL261120P00085000 (> 10% cap): bid=1.78 ask=2.48), skipping tick — breach streak held at 0, not reset.
+2026-10-06 08:50:51,186 WARNING watchdog | Option CL 2026-11-20 premium mark unreliable (absurd 37% spread on CL261120P00085000 (> 10% cap): bid=1.73 ask=2.52), skipping tick — breach streak held at 0, not reset.
+2026-10-06 08:51:22,242 WARNING watchdog | Option CL 2026-11-20 premium mark unreliable (absurd 35% spread on CL261120P00085000 (> 10% cap): bid=1.72 ask=2.45), skipping tick — breach streak held at 0, not reset.
+2026-10-06 08:51:53,271 WARNING watchdog | Option CL 2026-11-20 premium mark unreliable (absurd 37% spread on CL261120P00085000 (> 10% cap): bid=1.73 ask=2.52), skipping tick — breach streak held at 0, not reset.
+2026-10-06 08:52:24,185 WARNING watchdog | Option CL 2026-11-20 premium mark unreliable (absurd 38% spread on CL261120P00085000 (> 10% cap): bid=1.72 ask=2.52), skipping tick — breach streak held at 0, not reset.
+2026-10-06 08:52:55,202 WARNING watchdog | Option CL 2026-11-20 premium mark unreliable (absurd 33% spread on CL261120P00085000 (> 10% cap): bid=1.77 ask=2.46), skipping tick — breach streak held at 0, not reset.
+2026-10-06 08:53:26,158 WARNING watchdog | Option CL 2026-11-20 premium mark unreliable (absurd 33% spread on CL261120P00085000 (> 10% cap): bid=1.77 ask=2.46), skipping tick — breach streak held at 0, not reset.
+2026-10-06 08:53:57,190 WARNING watchdog | Option CL 2026-11-20 premium mark unreliable (absurd 33% spread on CL261120P00085000 (> 10% cap): bid=1.77 ask=2.48), skipping tick — breach streak held at 0, not reset.
+2026-10-06 08:54:28,082 WARNING watchdog | Option CL 2026-11-20 premium mark unreliable (absurd 33% spread on CL261120P00085000 (> 10% cap): bid=1.77 ask=2.48), skipping tick — breach streak held at 0, not reset.
+2026-10-06 08:54:58,936 WARNING watchdog | Option CL 2026-11-20 premium mark unreliable (absurd 35% spread on CL261120P00085000 (> 10% cap): bid=1.77 ask=2.52), skipping tick — breach streak held at 0, not reset.
+2026-10-06 08:55:29,885 WARNING watchdog | Option CL 2026-11-20 premium mark unreliable (absurd 33% spread on CL261120P00085000 (> 10% cap): bid=1.77 ask=2.48), skipping tick — breach streak held at 0, not reset.
+2026-10-06 08:56:00,844 WARNING watchdog | Option CL 2026-11-20 premium mark unreliable (absurd 33% spread on CL261120P00085000 (> 10% cap): bid=1.77 ask=2.47), skipping tick — breach streak held at 0, not reset.
+2026-10-06 08:56:31,785 WARNING watchdog | Option CL 2026-11-20 premium mark unreliable (absurd 33% spread on CL261120P00085000 (> 10% cap): bid=1.77 ask=2.48), skipping tick — breach streak held at 0, not reset.
+2026-10-06 08:57:02,668 WARNING watchdog | Option CL 2026-11-20 premium mark unreliable (absurd 32% spread on CL261120P00085000 (> 10% cap): bid=1.78 ask=2.46), skipping tick — breach streak held at 0, not reset.
+2026-10-06 08:57:33,669 WARNING watchdog | Option CL 2026-11-20 premium mark unreliable (absurd 32% spread on CL261120P00085000 (> 10% cap): bid=1.78 ask=2.46), skipping tick — breach streak held at 0, not reset.
+2026-10-06 08:58:04,497 WARNING watchdog | Option CL 2026-11-20 premium mark unreliable (absurd 36% spread on CL261120P00085000 (> 10% cap): bid=1.72 ask=2.47), skipping tick — breach streak held at 0, not reset.
+2026-10-06 08:58:35,417 WARNING watchdog | Option CL 2026-11-20 premium mark unreliable (absurd 36% spread on CL261120P00085000 (> 10% cap): bid=1.72 ask=2.47), skipping tick — breach streak held at 0, not reset.
+2026-10-06 08:59:06,344 WARNING watchdog | Option CL 2026-11-20 premium mark unreliable (absurd 35% spread on CL261120P00085000 (> 10% cap): bid=1.77 ask=2.53), skipping tick — breach streak held at 0, not reset.
+2026-10-06 08:59:37,268 WARNING watchdog | Option CL 2026-11-20 premium mark unreliable (absurd 33% spread on CL261120P00085000 (> 10% cap): bid=1.78 ask=2.48), skipping tick — breach streak held at 0, not reset.
+2026-10-06 09:00:08,509 WARNING watchdog | Option CL 2026-11-20 premium mark unreliable (absurd 37% spread on CL261120P00085000 (> 10% cap): bid=1.73 ask=2.52), skipping tick — breach streak held at 0, not reset.
+2026-10-06 09:00:39,798 WARNING watchdog | Option CL 2026-11-20 premium mark unreliable (absurd 37% spread on CL261120P00085000 (> 10% cap): bid=1.73 ask=2.52), skipping tick — breach streak held at 0, not reset.
+2026-10-06 09:01:11,002 WARNING watchdog | Option CL 2026-11-20 premium mark unreliable (absurd 33% spread on CL261120P00085000 (> 10% cap): bid=1.77 ask=2.48), skipping tick — breach streak held at 0, not reset.
+2026-10-06 09:01:41,924 WARNING watchdog | Option CL 2026-11-20 premium mark unreliable (absurd 36% spread on CL261120P00085000 (> 10% cap): bid=1.76 ask=2.52), skipping tick — breach streak held at 0, not reset.
+2026-10-06 09:02:12,834 WARNING watchdog | Option CL 2026-11-20 premium mark unreliable (absurd 36% spread on CL261120P00085000 (> 10% cap): bid=1.76 ask=2.52), skipping tick — breach streak held at 0, not reset.
+2026-10-06 09:02:48,485 WARNING watchdog | Option CL 2026-11-20 premium mark unreliable (absurd 35% spread on CL261120P00085000 (> 10% cap): bid=1.78 ask=2.53), skipping tick — breach streak held at 0, not reset.
+2026-10-06 09:03:19,461 WARNING watchdog | Option CL 2026-11-20 premium mark unreliable (absurd 36% spread on CL261120P00085000 (> 10% cap): bid=1.77 ask=2.54), skipping tick — breach streak held at 0, not reset.
+2026-10-06 09:03:50,399 WARNING watchdog | Option CL 2026-11-20 premium mark unreliable (absurd 36% spread on CL261120P00085000 (> 10% cap): bid=1.77 ask=2.55), skipping tick — breach streak held at 0, not reset.
+2026-10-06 09:04:21,261 WARNING watchdog | Option CL 2026-11-20 premium mark unreliable (absurd 32% spread on CL261120P00085000 (> 10% cap): bid=1.83 ask=2.52), skipping tick — breach streak held at 0, not reset.
+2026-10-06 09:04:52,219 WARNING watchdog | Option CL 2026-11-20 premium mark unreliable (absurd 35% spread on CL261120P00085000 (> 10% cap): bid=1.77 ask=2.53), skipping tick — breach streak held at 0, not reset.
+2026-10-06 09:05:23,000 WARNING watchdog | Option CL 2026-11-20 premium mark unreliable (absurd 35% spread on CL261120P00085000 (> 10% cap): bid=1.77 ask=2.53), skipping tick — breach streak held at 0, not reset.
+2026-10-06 09:05:54,087 WARNING watchdog | Option CL 2026-11-20 premium mark unreliable (absurd 31% spread on CL261120P00085000 (> 10% cap): bid=1.82 ask=2.48), skipping tick — breach streak held at 0, not reset.
+2026-10-06 09:06:25,035 WARNING watchdog | Option CL 2026-11-20 premium mark unreliable (absurd 22% spread on CL261120P00085000 (> 10% cap): bid=1.82 ask=2.28), skipping tick — breach streak held at 0, not reset.
+2026-10-06 09:06:56,029 WARNING watchdog | Option CL 2026-11-20 premium mark unreliable (absurd 22% spread on CL261120P00085000 (> 10% cap): bid=1.83 ask=2.28), skipping tick — breach streak held at 0, not reset.
+2026-10-06 09:07:27,063 WARNING watchdog | Option CL 2026-11-20 premium mark unreliable (absurd 24% spread on CL261120P00085000 (> 10% cap): bid=1.83 ask=2.34), skipping tick — breach streak held at 0, not reset.
+2026-10-06 09:07:57,966 WARNING watchdog | Option CL 2026-11-20 premium mark unreliable (absurd 17% spread on CL261120P00085000 (> 10% cap): bid=1.88 ask=2.23), skipping tick — breach streak held at 0, not reset.
+2026-10-06 09:08:28,927 WARNING watchdog | Option CL 2026-11-20 premium mark unreliable (absurd 22% spread on CL261120P00085000 (> 10% cap): bid=1.83 ask=2.28), skipping tick — breach streak held at 0, not reset.
+2026-10-06 09:08:59,846 WARNING watchdog | Option CL 2026-11-20 premium mark unreliable (absurd 20% spread on CL261120P00085000 (> 10% cap): bid=1.83 ask=2.23), skipping tick — breach streak held at 0, not reset.
+2026-10-06 09:09:30,729 WARNING watchdog | Option CL 2026-11-20 premium mark unreliable (absurd 20% spread on CL261120P00085000 (> 10% cap): bid=1.87 ask=2.28), skipping tick — breach streak held at 0, not reset.
+2026-10-06 09:10:01,619 WARNING watchdog | Option CL 2026-11-20 premium mark unreliable (absurd 17% spread on CL261120P00085000 (> 10% cap): bid=1.87 ask=2.21), skipping tick — breach streak held at 0, not reset.
+2026-10-06 09:10:32,639 WARNING watchdog | Option CL 2026-11-20 premium mark unreliable (absurd 19% spread on CL261120P00085000 (> 10% cap): bid=1.88 ask=2.27), skipping tick — breach streak held at 0, not reset.
+2026-10-06 09:11:03,604 WARNING watchdog | Option CL 2026-11-20 premium mark unreliable (absurd 19% spread on CL261120P00085000 (> 10% cap): bid=1.88 ask=2.27), skipping tick — breach streak held at 0, not reset.
+2026-10-06 09:11:34,470 WARNING watchdog | Option CL 2026-11-20 premium mark unreliable (absurd 19% spread on CL261120P00085000 (> 10% cap): bid=1.88 ask=2.27), skipping tick — breach streak held at 0, not reset.
+2026-10-06 09:12:05,438 WARNING watchdog | Option CL 2026-11-20 premium mark unreliable (absurd 19% spread on CL261120P00085000 (> 10% cap): bid=1.82 ask=2.21), skipping tick — breach streak held at 0, not reset.
+2026-10-06 09:12:36,404 WARNING watchdog | Option CL 2026-11-20 premium mark unreliable (absurd 20% spread on CL261120P00085000 (> 10% cap): bid=1.83 ask=2.23), skipping tick — breach streak held at 0, not reset.
+2026-10-06 09:13:07,361 WARNING watchdog | Option CL 2026-11-20 premium mark unreliable (absurd 20% spread on CL261120P00085000 (> 10% cap): bid=1.83 ask=2.23), skipping tick — breach streak held at 0, not reset.
+2026-10-06 09:13:38,344 WARNING watchdog | Option CL 2026-11-20 premium mark unreliable (absurd 20% spread on CL261120P00085000 (> 10% cap): bid=1.83 ask=2.23), skipping tick — breach streak held at 0, not reset.
+2026-10-06 09:14:09,179 WARNING watchdog | Option CL 2026-11-20 premium mark unreliable (absurd 16% spread on CL261120P00085000 (> 10% cap): bid=1.88 ask=2.21), skipping tick — breach streak held at 0, not reset.
+2026-10-06 09:14:40,102 WARNING watchdog | Option CL 2026-11-20 premium mark unreliable (absurd 19% spread on CL261120P00085000 (> 10% cap): bid=1.88 ask=2.28), skipping tick — breach streak held at 0, not reset.
+2026-10-06 09:15:11,140 WARNING watchdog | Option CL 2026-11-20 premium mark unreliable (absurd 14% spread on CL261120P00085000 (> 10% cap): bid=1.93 ask=2.23), skipping tick — breach streak held at 0, not reset.
+2026-10-06 09:15:42,044 WARNING watchdog | Option CL 2026-11-20 premium mark unreliable (absurd 14% spread on CL261120P00085000 (> 10% cap): bid=1.92 ask=2.21), skipping tick — breach streak held at 0, not reset.
+2026-10-06 09:16:12,974 WARNING watchdog | Option CL 2026-11-20 premium mark unreliable (absurd 13% spread on CL261120P00085000 (> 10% cap): bid=1.92 ask=2.18), skipping tick — breach streak held at 0, not reset.
+2026-10-06 09:16:43,911 WARNING watchdog | Option CL 2026-11-20 premium mark unreliable (absurd 15% spread on CL261120P00085000 (> 10% cap): bid=1.87 ask=2.18), skipping tick — breach streak held at 0, not reset.
+2026-10-06 09:17:14,888 WARNING watchdog | Option CL 2026-11-20 premium mark unreliable (absurd 15% spread on CL261120P00085000 (> 10% cap): bid=1.87 ask=2.18), skipping tick — breach streak held at 0, not reset.
+2026-10-06 09:17:45,878 WARNING watchdog | Option CL 2026-11-20 premium mark unreliable (absurd 15% spread on CL261120P00085000 (> 10% cap): bid=1.87 ask=2.18), skipping tick — breach streak held at 0, not reset.
+2026-10-06 09:18:16,807 WARNING watchdog | Option CL 2026-11-20 premium mark unreliable (absurd 21% spread on CL261120P00085000 (> 10% cap): bid=1.82 ask=2.24), skipping tick — breach streak held at 0, not reset.
+2026-10-06 09:18:47,683 WARNING watchdog | Option CL 2026-11-20 premium mark unreliable (absurd 15% spread on CL261120P00085000 (> 10% cap): bid=1.87 ask=2.18), skipping tick — breach streak held at 0, not reset.
+2026-10-06 09:19:18,659 WARNING watchdog | Option CL 2026-11-20 premium mark unreliable (absurd 14% spread on CL261120P00085000 (> 10% cap): bid=1.89 ask=2.18), skipping tick — breach streak held at 0, not reset.
+2026-10-06 09:19:49,513 WARNING watchdog | Option CL 2026-11-20 premium mark unreliable (absurd 20% spread on CL261120P00085000 (> 10% cap): bid=1.83 ask=2.24), skipping tick — breach streak held at 0, not reset.
+2026-10-06 09:20:20,476 WARNING watchdog | Option CL 2026-11-20 premium mark unreliable (absurd 20% spread on CL261120P00085000 (> 10% cap): bid=1.83 ask=2.24), skipping tick — breach streak held at 0, not reset.
+2026-10-06 09:20:51,418 WARNING watchdog | Option CL 2026-11-20 premium mark unreliable (absurd 15% spread on CL261120P00085000 (> 10% cap): bid=1.88 ask=2.18), skipping tick — breach streak held at 0, not reset.
+2026-10-06 09:21:22,312 WARNING watchdog | Option CL 2026-11-20 premium mark unreliable (absurd 17% spread on CL261120P00085000 (> 10% cap): bid=1.83 ask=2.18), skipping tick — breach streak held at 0, not reset.
+2026-10-06 09:21:53,246 WARNING watchdog | Option CL 2026-11-20 premium mark unreliable (absurd 13% spread on CL261120P00085000 (> 10% cap): bid=1.97 ask=2.24), skipping tick — breach streak held at 0, not reset.
+2026-10-06 09:22:22,354 INFO orchestrator | Market regime: SPY above 200dma (780 vs 718, today +0.6%), VIX 15.4, VIX3M 18.0 (contango) -> risk-on, size x1.00.
+2026-10-06 09:22:24,215 WARNING watchdog | Option CL 2026-11-20 premium mark unreliable (absurd 12% spread on CL261120P00085000 (> 10% cap): bid=1.97 ask=2.23), skipping tick — breach streak held at 0, not reset.
+2026-10-06 09:22:25,216 INFO orchestrator | BOOK BETA: spy=1.06 qqq=0.78 iwm=0.80 invested=98.5% hedge=PSQ w=0.108 beta=-1.38 unhedged=1.21 [options at debit notional x underlying beta: AGNC,CL,HYG,IWM,LQD]
+2026-10-06 09:22:25,240 INFO orchestrator | Auto-hedge: beta: book spy-beta 1.06 within 1.00 +/- 0.15 — holding $107445 PSQ.
+2026-10-06 09:22:25,604 INFO quiver | Quiver live/congresstrading -> 1000 row(s).
+2026-10-06 09:22:25,901 INFO screener | EDGAR Form-4 feed -> 66 filing(s) (scanning up to 100).
+2026-10-06 09:22:54,102 INFO screener | Options-flow most-actives pool -> 40 name(s).
+2026-10-06 09:22:55,132 WARNING watchdog | Option CL 2026-11-20 premium mark unreliable (absurd 12% spread on CL261120P00085000 (> 10% cap): bid=1.93 ask=2.17), skipping tick — breach streak held at 0, not reset.
+2026-10-06 09:23:20,777 INFO screener | Screener liquidity floor dropped 5/18 pre-cap: UXIN $1.26<$5, RXRX $4.55<$5, PACB $2.79<$5, MSTZ $2.27<$5, GRAB $3.17<$5
+2026-10-06 09:23:20,784 INFO screener | Discovered 13 candidate(s) from 3 source(s) (183 merged, 13 above min_score, capped to 18).
+2026-10-06 09:23:20,786 INFO screener |   candidate CTVA [options_flow] score=+0.78 — Options flow: 1,076 call / 132 put vol (bullish call imbalance +0.78) on a most-active name.
+2026-10-06 09:23:20,789 INFO screener |   candidate XLU [options_flow] score=+0.77 — Options flow: 34,137 call / 4,451 put vol (bullish call imbalance +0.77) on a most-active name.
+2026-10-06 09:23:20,791 INFO screener |   candidate SQQQ [options_flow] score=+0.71 — Options flow: 20,536 call / 3,410 put vol (bullish call imbalance +0.71) on a most-active name.
+2026-10-06 09:23:20,794 INFO screener |   candidate SPCX [congress+options_flow] score=+0.46 — Congress: 2 buy / 0 sell filings in last 60d (disclosures lag up to ~45d). | Options flow: 261,996 call / 126,557 put vol (bullish call imbalance +0.35) on a most-active name.
+2026-10-06 09:23:20,797 INFO screener |   candidate SOXS [options_flow] score=+0.45 — Options flow: 17,645 call / 6,712 put vol (bullish call imbalance +0.45) on a most-active name.
+2026-10-06 09:23:20,799 INFO screener |   candidate TSLL [options_flow] score=+0.45 — Options flow: 13,213 call / 5,025 put vol (bullish call imbalance +0.45) on a most-active name.
+2026-10-06 09:23:20,801 INFO screener |   candidate SNXX [options_flow] score=+0.39 — Options flow: 8,621 call / 3,797 put vol (bullish call imbalance +0.39) on a most-active name.
+2026-10-06 09:23:20,804 INFO screener |   candidate NU [options_flow] score=-0.31 — Options flow: 15,235 call / 29,194 put vol (bearish put imbalance -0.31) on a most-active name.
+2026-10-06 09:23:20,806 INFO screener |   candidate TJX [congress] score=-0.23 — Congress: 0 buy / 4 sell filings in last 60d (disclosures lag up to ~45d).
+2026-10-06 09:23:20,807 INFO screener |   candidate JPM [congress] score=-0.23 — Congress: 0 buy / 4 sell filings in last 60d (disclosures lag up to ~45d).
+2026-10-06 09:23:20,809 INFO screener |   candidate TDY [congress] score=-0.23 — Congress: 0 buy / 5 sell filings in last 60d (disclosures lag up to ~45d).
+2026-10-06 09:23:20,810 INFO screener |   candidate ITW [congress] score=-0.23 — Congress: 0 buy / 4 sell filings in last 60d (disclosures lag up to ~45d).
+2026-10-06 09:23:20,811 INFO screener |   candidate MRSH [congress] score=-0.23 — Congress: 0 buy / 4 sell filings in last 60d (disclosures lag up to ~45d).
+2026-10-06 09:23:26,023 WARNING watchdog | Option CL 2026-11-20 premium mark unreliable (absurd 17% spread on CL261120P00085000 (> 10% cap): bid=1.88 ask=2.23), skipping tick — breach streak held at 0, not reset.
+2026-10-06 09:23:45,412 INFO quiver | Quiver live/offexchange -> 5551 row(s).
+2026-10-06 09:23:46,291 INFO quiver | Quiver live/govcontractsall -> 20000 row(s).
+2026-10-06 09:23:47,214 INFO quiver | Quiver live/lobbying -> 20000 row(s).
+2026-10-06 09:23:57,002 WARNING watchdog | Option CL 2026-11-20 premium mark unreliable (absurd 12% spread on CL261120P00085000 (> 10% cap): bid=1.93 ask=2.18), skipping tick — breach streak held at 0, not reset.
+2026-10-06 09:24:27,895 INFO watchdog | Option CL 2026-11-20 premium back inside stop/take thresholds (now -30.4%) — breach streak reset.
+2026-10-06 09:24:31,645 INFO signals | options_chain: reading 25 of 30 symbols this cycle (cap).
+2026-10-06 09:24:39,436 INFO signals | Gathered signals for 30/30 symbols (+3 market signals).
+2026-10-06 09:24:39,544 INFO orchestrator | Composite index (30 scored, top: INTC +1.53, SPCX +1.46, NOK +1.40, SMCI +1.22, ONON +1.12, DBRG +1.11, BRK.B +0.95, SNXX +0.92; bear tail: AGNC -2.60, MRSH -1.29, HYG -0.99, LQD -0.84, CL -0.62, IWM -0.61).
+2026-10-06 09:24:39,552 INFO orchestrator | Expectancy gate (off, report-only): would have armed against: options_flow -1.0%/trip x9, technical -1.2%/trip x9
+2026-10-06 09:24:42,249 INFO robinhood | Imported 1 Robinhood holding(s) for context (read-only).
+2026-10-06 09:24:42,251 INFO orchestrator | FEEDS: 3/3 healthy news=vader-fallback earnings=rh
+2026-10-06 09:25:20,505 INFO usage | decision call: 21991 in / 2549 out (cache r=6603 w=0) ~$0.1770 [claude-opus-4-8]
+2026-10-06 09:25:20,516 INFO decision | Claude returned 1 proposal(s), 4 bearish verdict(s).
+2026-10-06 09:25:20,522 INFO orchestrator | Bearish verdict: AGNC DECLINED — Bearish thesis is corroborated (composite -2.60, insider selling 20k sh, bearish flow/chain) but RSI is 15 — an extreme oversold reading that makes a fresh put 
+2026-10-06 09:25:20,526 WARNING orchestrator | Bearish verdict: CL ELIGIBLE but IGNORED — model returned no bearish_verdicts entry for an ELIGIBLE name (the schema requires one per listed name).
+2026-10-06 09:25:20,528 INFO orchestrator | Bearish verdict: LQD DECLINED — Thin and mixed: bearish flow/chain and downtrend present but this is a rate-driven IG bond ETF, news sentiment is positive (+0.28), and there is no single-name 
+2026-10-06 09:25:20,530 INFO orchestrator | Bearish verdict: MRSH DECLINED — Signals conflict: fundamentals +0.42 (27.8% margin, +6.2% rev), MACD bull, and $36.6M fresh federal contract awards offset the insider selling and chain skew. N
+2026-10-06 09:25:20,535 WARNING orchestrator | Bearish verdict: SOXS ELIGIBLE but IGNORED — model returned no bearish_verdicts entry for an ELIGIBLE name (the schema requires one per listed name).
+2026-10-06 09:25:20,538 WARNING orchestrator | Bearish verdict: TJX ELIGIBLE but IGNORED — model returned no bearish_verdicts entry for an ELIGIBLE name (the schema requires one per listed name).
+2026-10-06 09:25:21,326 INFO options | STRIKE SNAP: HYG 2026-11-21 77P (OI ?, 0.3% OTM) -> 2026-11-20 78P (OI 219991, 1.0% ITM); unsnapped would be rejected: no two-sided quote
+2026-10-06 09:25:23,179 INFO earnings | Robinhood earnings calendar: 3120 name(s) reporting within 31d.
+2026-10-06 09:25:23,181 INFO risk | PER-UNDERLYING PREMIUM CAP: HYG debit budget clamped $9,000 -> $4,532 (open premium $462 of $4,994 cap).
+2026-10-06 09:25:23,183 INFO orchestrator | OPTION OptionStrategy.LONG_PUT HYG -> approved: 37 contract(s), $4,477 debit (cap $4,532). [STRIKE SNAP: model legs 2026-11-21 77P -> 2026-11-20 78P (spot 77.20 broker)] | Corroborated credit breakdown: HYG below its 200dma, RSI 34, MACD bear, bearish options flow (C/P -0
+2026-10-06 09:25:23,283 INFO alpaca | OPTION 1-leg order qty=37 limit=1.45 (order 9727e680-d685-48bb-aff9-2c93bc7b6482)
+2026-10-06 09:25:23,287 INFO ledger | Ledger: BUY HYG261120P00078000 qty=37 $4477
+2026-10-06 09:25:23,290 INFO orchestrator | BOOK BETA (post-exec): spy=1.06 qqq=0.78 iwm=0.80 invested=98.5% hedge=PSQ w=0.108 beta=-1.38 unhedged=1.21 (pre-exec spy=1.06 delta=+0.00)
+2026-10-06 09:25:23,292 INFO orchestrator | BEARISH FUNNEL: slate_bearish=8 [AGNC -2.60 ELIGIBLE (below its 200dma) -> declined: Bearish thesis is corroborated (composite -2.60, insider sel; MRSH -1.29 ELIGIBLE (below its 200dma) -> declined: Signals conflict: fundamentals +0.42 (27.8% margin, +6.2% re; HYG -0.99 ELIGIBLE (below its 200dma) -> put proposed; LQD -0.84 ELIGIBLE (below its 200dma) -> declined: Thin and mixed: bearish flow/chain and downtrend present but; CL -0.62 ELIGIBLE (below its 200dma) -> IGNORED; IWM -0.61 gate-blocked; SOXS -0.51 ELIGIBLE (below its 200dma) -> IGNORED; TJX -0.42 ELIGIBLE (below its 200dma) -> IGNORED] put_proposals=1 put_approved=1 ignored=3 auto_hedge=$107,445 PSQ(beta:1.06) proxy_put=none
+2026-10-06 09:25:23,354 INFO config | BOOK BETA CAP vs hedge arm line: cap 1.20 - (target 1.00 + band 0.15) = +0.05 (cap-bound buys land inside the arm zone)
+2026-10-06 09:25:23,356 INFO alpaca | Alpaca client ready (mode=paper).
+2026-10-06 09:25:25,215 INFO dashboard | Wrote dashboard with 48 trades -> dashboard.html
+2026-10-06 10:14:37,532 INFO ledger | Ledger: RESTATED OPTION BUY HYG261120P00078000 cost at fill 1.2600 (quote 1.2100): $4477.00 -> $4662.00 (+185.00) [order 9727e680-d685-48bb-aff9-2c93bc7b6482]
+2026-10-06 10:14:37,579 INFO orchestrator | Order 9727e680-d685-48bb-aff9-2c93bc7b6482 (HYG) FILLED (37/37) @ 1.2600 x 37 [ledger stamped].
+2026-10-06 10:14:39,312 INFO orchestrator | Market regime: SPY above 200dma (781 vs 718, today +0.8%), VIX 15.4, VIX3M 17.9 (contango) -> risk-on, size x1.00.
+2026-10-06 10:14:41,889 INFO orchestrator | BOOK BETA: spy=1.05 qqq=0.78 iwm=0.81 invested=98.9% hedge=PSQ w=0.108 beta=-1.38 unhedged=1.20 [options at debit notional x underlying beta: AGNC,CL,HYG,IWM,LQD]
+2026-10-06 10:14:41,899 INFO orchestrator | Auto-hedge: beta: book spy-beta 1.05 within 1.00 +/- 0.15 — holding $107247 PSQ.
+2026-10-06 10:14:42,570 INFO quiver | Quiver live/congresstrading -> 1000 row(s).
+2026-10-06 10:14:42,764 INFO screener | EDGAR Form-4 feed -> 59 filing(s) (scanning up to 100).
+2026-10-06 10:15:08,653 INFO screener | Options-flow most-actives pool -> 40 name(s).
+2026-10-06 10:15:35,891 INFO screener | Screener liquidity floor dropped 4/16 pre-cap: RXRX $4.59<$5, PACB $2.71<$5, MSTZ $2.25<$5, GRAB $3.17<$5
+2026-10-06 10:15:35,898 INFO screener | Discovered 12 candidate(s) from 3 source(s) (181 merged, 12 above min_score, capped to 18).
+2026-10-06 10:15:35,901 INFO screener |   candidate XLU [options_flow] score=+0.86 — Options flow: 76,086 call / 5,900 put vol (bullish call imbalance +0.86) on a most-active name.
+2026-10-06 10:15:35,904 INFO screener |   candidate BITO [options_flow] score=+0.62 — Options flow: 3,149 call / 736 put vol (bullish call imbalance +0.62) on a most-active name.
+2026-10-06 10:15:35,906 INFO screener |   candidate EWZ [options_flow] score=+0.50 — Options flow: 167,571 call / 55,914 put vol (bullish call imbalance +0.50) on a most-active name.
+2026-10-06 10:15:35,908 INFO screener |   candidate SNXX [options_flow] score=+0.45 — Options flow: 15,609 call / 5,908 put vol (bullish call imbalance +0.45) on a most-active name.
+2026-10-06 10:15:35,910 INFO screener |   candidate SOXS [options_flow] score=+0.43 — Options flow: 20,375 call / 8,096 put vol (bullish call imbalance +0.43) on a most-active name.
+2026-10-06 10:15:35,913 INFO screener |   candidate AEF [insider] score=+0.30 — Insider: 1 open-market buy filing(s), 2,000 sh (SEC Form 4, last filings feed).
+2026-10-06 10:15:35,916 INFO screener |   candidate NKE [congress+options_flow] score=+0.28 — Congress: 0 buy / 2 sell filings in last 60d (disclosures lag up to ~45d). | Options flow: 46,265 call / 19,943 put vol (bullish call imbalance +0.40) on a most-active name.
+2026-10-06 10:15:35,920 INFO screener |   candidate TJX [congress] score=-0.23 — Congress: 0 buy / 4 sell filings in last 60d (disclosures lag up to ~45d).
+2026-10-06 10:15:35,921 INFO screener |   candidate JPM [congress] score=-0.23 — Congress: 0 buy / 4 sell filings in last 60d (disclosures lag up to ~45d).
+2026-10-06 10:15:35,923 INFO screener |   candidate TDY [congress] score=-0.23 — Congress: 0 buy / 5 sell filings in last 60d (disclosures lag up to ~45d).
+2026-10-06 10:15:35,924 INFO screener |   candidate ITW [congress] score=-0.23 — Congress: 0 buy / 4 sell filings in last 60d (disclosures lag up to ~45d).
+2026-10-06 10:15:35,926 INFO screener |   candidate MRSH [congress] score=-0.23 — Congress: 0 buy / 4 sell filings in last 60d (disclosures lag up to ~45d).
+2026-10-06 10:15:51,504 INFO quiver | Quiver live/offexchange -> 5551 row(s).
+2026-10-06 10:15:52,210 INFO quiver | Quiver live/govcontractsall -> 20000 row(s).
+2026-10-06 10:15:56,656 INFO quiver | Quiver live/lobbying -> 20000 row(s).
+2026-10-06 10:16:30,619 INFO signals | options_chain: reading 25 of 29 symbols this cycle (cap).
+2026-10-06 10:16:38,625 INFO signals | Gathered signals for 29/29 symbols (+3 market signals).
+2026-10-06 10:16:38,729 INFO orchestrator | Composite index (29 scored, top: NOK +1.73, INTC +1.56, BRK.B +1.53, ONON +1.39, SMCI +1.23, EWZ +1.22, DBRG +1.11, BITO +0.83; bear tail: AGNC -2.70, MRSH -1.28, HYG -1.24, LQD -0.96, CL -0.73, NKE -0.72).
+2026-10-06 10:16:38,737 INFO orchestrator | Expectancy gate (off, report-only): would have armed against: options_flow -1.0%/trip x9, technical -1.2%/trip x9
+2026-10-06 10:16:41,527 INFO robinhood | Imported 1 Robinhood holding(s) for context (read-only).
+2026-10-06 10:16:41,531 INFO orchestrator | FEEDS: 3/3 healthy news=vader-fallback earnings=rh
+2026-10-06 10:16:41,534 INFO orchestrator | Buy-excluded from slate this cycle: HYG (topped up 0.9h ago (next ok in 4h))
+2026-10-06 10:17:29,762 INFO usage | decision call: 21360 in / 3146 out (cache r=6603 w=0) ~$0.1888 [claude-opus-4-8]
+2026-10-06 10:17:29,772 INFO decision | Claude returned 1 proposal(s), 4 bearish verdict(s).
+2026-10-06 10:17:29,778 INFO orchestrator | Bearish verdict: AGNC DECLINED — RSI 17 is deeply oversold — despite the strong bearish composite (-2.70), insider selling and chain -0.82, a put here buys into a stretched-to-the-downside tape
+2026-10-06 10:17:29,784 WARNING orchestrator | Bearish verdict: CL ELIGIBLE but IGNORED — model returned no bearish_verdicts entry for an ELIGIBLE name (the schema requires one per listed name).
+2026-10-06 10:17:29,786 INFO orchestrator | Bearish verdict: HYG DECLINED — Already hold a long_put opened today (0.9h ago, next ok in 4h) — at position cap, no room to add the same bearish expression.
+2026-10-06 10:17:29,789 INFO orchestrator | Bearish verdict: LQD DECLINED — ATM IV only 9% on a low-vol bond ETF — expected move too small for a long put to pay despite bearish flow (-0.58); credit-downside is already covered by the HYG
+2026-10-06 10:17:29,792 WARNING orchestrator | Bearish verdict: NKE ELIGIBLE but IGNORED — model returned no bearish_verdicts entry for an ELIGIBLE name (the schema requires one per listed name).
+2026-10-06 10:17:29,793 WARNING orchestrator | Bearish verdict: SOXS ELIGIBLE but IGNORED — model returned no bearish_verdicts entry for an ELIGIBLE name (the schema requires one per listed name).
+2026-10-06 10:17:30,399 INFO options | STRIKE SNAP: MRSH 2026-11-20 170P (OI 12, 1.1% OTM) none — no OI-qualified put strike within 5.0% of the 170 strike (min OI 100, spread cap 10%, spot 171.81); model legs stand and the gate will judge them
+2026-10-06 10:17:32,475 INFO earnings | Robinhood earnings calendar: 3120 name(s) reporting within 31d.
+2026-10-06 10:17:32,476 INFO risk | REJECT buy MRSH: At max option positions (5 underlyings: AGNC, CL, HYG, IWM, LQD).
+2026-10-06 10:17:32,477 INFO orchestrator | OPTION OptionStrategy.LONG_PUT MRSH -> rejected: At max option positions (5 underlyings: AGNC, CL, HYG, IWM, LQD). | Corroborated bearish setup on a name below its 200dma: open-market insider SELLING 44,166 sh (inside
+2026-10-06 10:17:32,478 INFO orchestrator | BOOK BETA (post-exec): spy=1.05 qqq=0.78 iwm=0.81 invested=98.9% hedge=PSQ w=0.108 beta=-1.38 unhedged=1.20 (pre-exec spy=1.05 delta=+0.00)
+2026-10-06 10:17:32,479 INFO orchestrator | BEARISH FUNNEL: slate_bearish=8 [AGNC -2.70 ELIGIBLE (below its 200dma) -> declined: RSI 17 is deeply oversold — despite the strong bearish compo; MRSH -1.28 ELIGIBLE (below its 200dma) -> put proposed; HYG -1.24 ELIGIBLE (below its 200dma) -> declined: Already hold a long_put opened today (0.9h ago, next ok in 4; LQD -0.96 ELIGIBLE (below its 200dma) -> declined: ATM IV only 9% on a low-vol bond ETF — expected move too sma; CL -0.73 ELIGIBLE (below its 200dma) -> IGNORED; NKE -0.72 ELIGIBLE (below its 200dma) -> IGNORED; IWM -0.48 gate-blocked; SOXS -0.42 ELIGIBLE (below its 200dma) -> IGNORED] put_proposals=1 put_approved=0 ignored=3 auto_hedge=$107,247 PSQ(beta:1.05) proxy_put=none
+2026-10-06 10:17:32,531 INFO config | BOOK BETA CAP vs hedge arm line: cap 1.20 - (target 1.00 + band 0.15) = +0.05 (cap-bound buys land inside the arm zone)
+2026-10-06 10:17:32,532 INFO alpaca | Alpaca client ready (mode=paper).
+2026-10-06 10:17:34,452 INFO dashboard | Wrote dashboard with 48 trades -> dashboard.html
+2026-10-06 11:06:48,059 INFO orchestrator | Market regime: SPY above 200dma (781 vs 718, today +0.8%), VIX 15.2, VIX3M 17.8 (contango) -> risk-on, size x1.00.
+2026-10-06 11:06:50,908 INFO orchestrator | BOOK BETA: spy=1.04 qqq=0.78 iwm=0.80 invested=98.9% hedge=PSQ w=0.108 beta=-1.38 unhedged=1.19 [options at debit notional x underlying beta: AGNC,CL,HYG,IWM,LQD]
+2026-10-06 11:06:50,921 INFO orchestrator | Auto-hedge: beta: book spy-beta 1.04 within 1.00 +/- 0.15 — holding $107403 PSQ.
+2026-10-06 11:06:51,554 INFO quiver | Quiver live/congresstrading -> 1000 row(s).
+2026-10-06 11:06:52,273 INFO screener | EDGAR Form-4 feed -> 56 filing(s) (scanning up to 100).
+2026-10-06 11:07:17,890 INFO screener | Options-flow most-actives pool -> 40 name(s).
+2026-10-06 11:07:38,582 INFO screener | Screener liquidity floor dropped 6/17 pre-cap: RXRX $4.62<$5, NVD $3.24<$5, BBD $4.49<$5, MSTZ $2.34<$5, PACB $2.67<$5, GRAB $3.18<$5
+2026-10-06 11:07:38,592 INFO screener | Discovered 11 candidate(s) from 3 source(s) (182 merged, 11 above min_score, capped to 18).
+2026-10-06 11:07:38,597 INFO screener |   candidate RWM [options_flow] score=+0.76 — Options flow: 139 call / 19 put vol (bullish call imbalance +0.76) on a most-active name.
+2026-10-06 11:07:38,602 INFO screener |   candidate BITO [options_flow] score=+0.63 — Options flow: 3,467 call / 780 put vol (bullish call imbalance +0.63) on a most-active name.
+2026-10-06 11:07:38,605 INFO screener |   candidate EWZ [options_flow] score=+0.47 — Options flow: 195,294 call / 71,406 put vol (bullish call imbalance +0.47) on a most-active name.
+2026-10-06 11:07:38,608 INFO screener |   candidate SOXS [options_flow] score=+0.38 — Options flow: 21,875 call / 9,817 put vol (bullish call imbalance +0.38) on a most-active name.
+2026-10-06 11:07:38,611 INFO screener |   candidate NU [options_flow] score=+0.34 — Options flow: 56,965 call / 28,028 put vol (bullish call imbalance +0.34) on a most-active name.
+2026-10-06 11:07:38,613 INFO screener |   candidate NKE [congress+options_flow] score=+0.30 — Congress: 0 buy / 2 sell filings in last 60d (disclosures lag up to ~45d). | Options flow: 60,645 call / 25,202 put vol (bullish call imbalance +0.41) on a most-active name.
+2026-10-06 11:07:38,616 INFO screener |   candidate TJX [congress] score=-0.23 — Congress: 0 buy / 4 sell filings in last 60d (disclosures lag up to ~45d).
+2026-10-06 11:07:38,618 INFO screener |   candidate JPM [congress] score=-0.23 — Congress: 0 buy / 4 sell filings in last 60d (disclosures lag up to ~45d).
+2026-10-06 11:07:38,620 INFO screener |   candidate TDY [congress] score=-0.23 — Congress: 0 buy / 5 sell filings in last 60d (disclosures lag up to ~45d).
+2026-10-06 11:07:38,621 INFO screener |   candidate ITW [congress] score=-0.23 — Congress: 0 buy / 4 sell filings in last 60d (disclosures lag up to ~45d).
+2026-10-06 11:07:38,623 INFO screener |   candidate MRSH [congress] score=-0.23 — Congress: 0 buy / 4 sell filings in last 60d (disclosures lag up to ~45d).
+2026-10-06 11:07:53,774 INFO quiver | Quiver live/offexchange -> 5551 row(s).
+2026-10-06 11:07:54,350 INFO quiver | Quiver live/govcontractsall -> 20000 row(s).
+2026-10-06 11:07:58,190 INFO quiver | Quiver live/lobbying -> 20000 row(s).
+2026-10-06 11:08:29,645 INFO signals | options_chain: reading 25 of 28 symbols this cycle (cap).
+2026-10-06 11:08:37,836 INFO signals | Gathered signals for 28/28 symbols (+3 market signals).
+2026-10-06 11:08:37,913 INFO orchestrator | Composite index (28 scored, top: NOK +1.63, INTC +1.56, ONON +1.46, SMCI +1.21, EWZ +1.18, BRK.B +1.14, DBRG +1.11, RWM +1.03; bear tail: AGNC -2.45, MRSH -1.29, HYG -1.24, LQD -1.01, CL -0.84, NKE -0.71).
+2026-10-06 11:08:37,919 INFO orchestrator | Expectancy gate (off, report-only): would have armed against: options_flow -1.0%/trip x9, technical -1.2%/trip x9
+2026-10-06 11:08:40,204 INFO robinhood | Imported 1 Robinhood holding(s) for context (read-only).
+2026-10-06 11:08:40,205 INFO orchestrator | FEEDS: 3/3 healthy news=vader-fallback earnings=rh
+2026-10-06 11:08:40,209 INFO orchestrator | Buy-excluded from slate this cycle: HYG (topped up 1.7h ago (next ok in 4h))
+2026-10-06 11:09:10,929 INFO usage | decision call: 21234 in / 1922 out (cache r=6603 w=0) ~$0.1575 [claude-opus-4-8]
+2026-10-06 11:09:10,936 INFO decision | Claude returned 0 proposal(s), 4 bearish verdict(s).
+2026-10-06 11:09:10,941 INFO orchestrator | Bearish verdict: AGNC DECLINED — Thesis is bearish (composite -2.45, insider selling 20k, puts bid skew +12.3) but RSI 15 is extreme oversold with high mean-reversion/bounce risk on a put debit
+2026-10-06 11:09:10,945 WARNING orchestrator | Bearish verdict: CL ELIGIBLE but IGNORED — model returned no bearish_verdicts entry for an ELIGIBLE name (the schema requires one per listed name).
+2026-10-06 11:09:10,949 INFO orchestrator | Bearish verdict: HYG DECLINED — Already holding a long_put opened today (topped up 1.7h ago, next ok in 4h) — position already expresses the bearish credit thesis; no capacity to add.
+2026-10-06 11:09:10,952 INFO orchestrator | Bearish verdict: LQD DECLINED — Bearish flow (-0.64 C/P) and downtrend noted, but ATM IV is only 9% (premium thin/illiquid) and the account is at max 5 option underlyings, so a new put would a
+2026-10-06 11:09:10,955 INFO orchestrator | Bearish verdict: MRSH DECLINED — Already attempted and rejected this cycle (at max option positions, 5 underlyings). Thesis also only partially corroborated: MACD bull and RSI 43 are not a clea
+2026-10-06 11:09:10,957 WARNING orchestrator | Bearish verdict: NKE ELIGIBLE but IGNORED — model returned no bearish_verdicts entry for an ELIGIBLE name (the schema requires one per listed name).
+2026-10-06 11:09:10,959 WARNING orchestrator | Bearish verdict: SOXS ELIGIBLE but IGNORED — model returned no bearish_verdicts entry for an ELIGIBLE name (the schema requires one per listed name).
+2026-10-06 11:09:11,007 INFO orchestrator | No actionable proposals this cycle.
+2026-10-06 11:09:11,010 INFO orchestrator | BOOK BETA (post-exec): spy=1.04 qqq=0.78 iwm=0.80 invested=98.9% hedge=PSQ w=0.108 beta=-1.38 unhedged=1.19 (pre-exec spy=1.04 delta=+0.00)
+2026-10-06 11:09:11,013 INFO orchestrator | BEARISH FUNNEL: slate_bearish=7 [AGNC -2.45 ELIGIBLE (below its 200dma) -> declined: Thesis is bearish (composite -2.45, insider selling 20k, put; MRSH -1.29 ELIGIBLE (below its 200dma) -> declined: Already attempted and rejected this cycle (at max option pos; HYG -1.24 ELIGIBLE (below its 200dma) -> declined: Already holding a long_put opened today (topped up 1.7h ago,; LQD -1.01 ELIGIBLE (below its 200dma) -> declined: Bearish flow (-0.64 C/P) and downtrend noted, but ATM IV is; CL -0.84 ELIGIBLE (below its 200dma) -> IGNORED; NKE -0.71 ELIGIBLE (below its 200dma) -> IGNORED; SOXS -0.44 ELIGIBLE (below its 200dma) -> IGNORED] put_proposals=0 put_approved=0 ignored=3 auto_hedge=$107,403 PSQ(beta:1.04) proxy_put=none
+2026-10-06 11:09:11,086 INFO config | BOOK BETA CAP vs hedge arm line: cap 1.20 - (target 1.00 + band 0.15) = +0.05 (cap-bound buys land inside the arm zone)
+2026-10-06 11:09:11,089 INFO alpaca | Alpaca client ready (mode=paper).
+2026-10-06 11:09:13,198 INFO dashboard | Wrote dashboard with 48 trades -> dashboard.html
+2026-10-06 11:58:54,383 INFO orchestrator | Market regime: SPY above 200dma (780 vs 718, today +0.7%), VIX 15.0, VIX3M 17.6 (contango) -> risk-on, size x1.00.
+2026-10-06 11:58:56,869 INFO orchestrator | BOOK BETA: spy=1.05 qqq=0.78 iwm=0.80 invested=98.9% hedge=PSQ w=0.108 beta=-1.38 unhedged=1.20 [options at debit notional x underlying beta: AGNC,CL,HYG,IWM,LQD]
+2026-10-06 11:58:56,877 INFO orchestrator | Auto-hedge: beta: book spy-beta 1.05 within 1.00 +/- 0.15 — holding $107491 PSQ.
+2026-10-06 11:58:57,233 INFO quiver | Quiver live/congresstrading -> 1000 row(s).
+2026-10-06 11:58:57,664 INFO screener | EDGAR Form-4 feed -> 63 filing(s) (scanning up to 100).
+2026-10-06 11:59:20,008 INFO screener | Options-flow most-actives pool -> 40 name(s).
+2026-10-06 11:59:41,035 INFO screener | Screener liquidity floor dropped 6/18 pre-cap: NVD $3.27<$5, RXRX $4.57<$5, BBD $4.53<$5, MSTZ $2.35<$5, PACB $2.69<$5, GRAB $3.17<$5
+2026-10-06 11:59:41,046 INFO screener | Discovered 12 candidate(s) from 3 source(s) (183 merged, 12 above min_score, capped to 18).
+2026-10-06 11:59:41,049 INFO screener |   candidate XLU [options_flow] score=+0.87 — Options flow: 150,547 call / 10,332 put vol (bullish call imbalance +0.87) on a most-active name.
+2026-10-06 11:59:41,055 INFO screener |   candidate RWM [options_flow] score=+0.77 — Options flow: 143 call / 19 put vol (bullish call imbalance +0.77) on a most-active name.
+2026-10-06 11:59:41,059 INFO screener |   candidate BITO [options_flow] score=+0.61 — Options flow: 3,408 call / 821 put vol (bullish call imbalance +0.61) on a most-active name.
+2026-10-06 11:59:41,062 INFO screener |   candidate SOXS [options_flow] score=+0.44 — Options flow: 27,370 call / 10,752 put vol (bullish call imbalance +0.44) on a most-active name.
+2026-10-06 11:59:41,064 INFO screener |   candidate TSLL [options_flow] score=+0.40 — Options flow: 26,410 call / 11,462 put vol (bullish call imbalance +0.40) on a most-active name.
+2026-10-06 11:59:41,067 INFO screener |   candidate NU [options_flow] score=+0.35 — Options flow: 65,219 call / 31,503 put vol (bullish call imbalance +0.35) on a most-active name.
+2026-10-06 11:59:41,069 INFO screener |   candidate NKE [congress+options_flow] score=+0.30 — Congress: 0 buy / 2 sell filings in last 60d (disclosures lag up to ~45d). | Options flow: 67,723 call / 27,946 put vol (bullish call imbalance +0.42) on a most-active name.
+2026-10-06 11:59:41,072 INFO screener |   candidate TJX [congress] score=-0.23 — Congress: 0 buy / 4 sell filings in last 60d (disclosures lag up to ~45d).
+2026-10-06 11:59:41,074 INFO screener |   candidate JPM [congress] score=-0.23 — Congress: 0 buy / 4 sell filings in last 60d (disclosures lag up to ~45d).
+2026-10-06 11:59:41,077 INFO screener |   candidate TDY [congress] score=-0.23 — Congress: 0 buy / 5 sell filings in last 60d (disclosures lag up to ~45d).
+2026-10-06 11:59:41,078 INFO screener |   candidate ITW [congress] score=-0.23 — Congress: 0 buy / 4 sell filings in last 60d (disclosures lag up to ~45d).
+2026-10-06 11:59:41,080 INFO screener |   candidate MRSH [congress] score=-0.23 — Congress: 0 buy / 4 sell filings in last 60d (disclosures lag up to ~45d).
+2026-10-06 11:59:54,651 INFO quiver | Quiver live/offexchange -> 5551 row(s).
+2026-10-06 11:59:55,200 INFO quiver | Quiver live/govcontractsall -> 20000 row(s).
+2026-10-06 11:59:56,396 INFO quiver | Quiver live/lobbying -> 20000 row(s).
+2026-10-06 12:00:31,121 INFO signals | options_chain: reading 25 of 29 symbols this cycle (cap).
+2026-10-06 12:00:40,329 INFO signals | Gathered signals for 29/29 symbols (+3 market signals).
+2026-10-06 12:00:40,463 INFO orchestrator | Composite index (29 scored, top: ONON +1.59, NOK +1.50, INTC +1.49, BRK.B +1.41, SMCI +1.20, DBRG +1.11, RWM +1.04, BITO +1.02; bear tail: AGNC -2.43, MRSH -1.29, HYG -1.24, LQD -1.02, CL -0.65, NKE -0.64).
+2026-10-06 12:00:40,476 INFO orchestrator | Expectancy gate (off, report-only): would have armed against: options_flow -1.0%/trip x8, technical -1.2%/trip x8
+2026-10-06 12:00:42,979 INFO robinhood | Imported 1 Robinhood holding(s) for context (read-only).
+2026-10-06 12:00:42,982 INFO orchestrator | FEEDS: 3/3 healthy news=vader-fallback earnings=rh
+2026-10-06 12:00:42,986 INFO orchestrator | Buy-excluded from slate this cycle: HYG (topped up 2.6h ago (next ok in 4h))
+2026-10-06 12:01:16,717 INFO usage | decision call: 21618 in / 2036 out (cache r=6603 w=0) ~$0.1623 [claude-opus-4-8]
+2026-10-06 12:01:16,725 INFO decision | Claude returned 0 proposal(s), 4 bearish verdict(s).
+2026-10-06 12:01:16,728 INFO orchestrator | Bearish verdict: AGNC DECLINED — Thesis is genuinely corroborated (composite -2.43, below 200dma, RSI 15, insider open-market selling 20k/0 bought, chain put/call OI 2.16, skew +9.6pts), but th
+2026-10-06 12:01:16,730 WARNING orchestrator | Bearish verdict: CL ELIGIBLE but IGNORED — model returned no bearish_verdicts entry for an ELIGIBLE name (the schema requires one per listed name).
+2026-10-06 12:01:16,731 INFO orchestrator | Bearish verdict: HYG DECLINED — Already holding a HYG long_put opened today (1x, $4,477 debit, conv 0.60) expressing this exact bearish credit thesis; topped up 2.6h ago and excluded from furt
+2026-10-06 12:01:16,733 INFO orchestrator | Bearish verdict: LQD DECLINED — Bearish lean present (composite -1.02, downtrend px<50<200, put flow -0.64) but ATM IV is only 9% and chain is just -0.24 (neutral-ish OI 0.80); investment-grad
+2026-10-06 12:01:16,734 INFO orchestrator | Bearish verdict: MRSH DECLINED — Already attempted a long_put today and it was auto-rejected for being at max option positions (5 underlyings). Thesis is only moderately bearish anyway (MACD bu
+2026-10-06 12:01:16,735 WARNING orchestrator | Bearish verdict: NKE ELIGIBLE but IGNORED — model returned no bearish_verdicts entry for an ELIGIBLE name (the schema requires one per listed name).
+2026-10-06 12:01:16,736 WARNING orchestrator | Bearish verdict: SOXS ELIGIBLE but IGNORED — model returned no bearish_verdicts entry for an ELIGIBLE name (the schema requires one per listed name).
+2026-10-06 12:01:16,783 INFO orchestrator | No actionable proposals this cycle.
+2026-10-06 12:01:16,786 INFO orchestrator | BOOK BETA (post-exec): spy=1.05 qqq=0.78 iwm=0.80 invested=98.9% hedge=PSQ w=0.108 beta=-1.38 unhedged=1.20 (pre-exec spy=1.05 delta=+0.00)
+2026-10-06 12:01:16,788 INFO orchestrator | BEARISH FUNNEL: slate_bearish=7 [AGNC -2.43 ELIGIBLE (below its 200dma) -> declined: Thesis is genuinely corroborated (composite -2.43, below 200; MRSH -1.29 ELIGIBLE (below its 200dma) -> declined: Already attempted a long_put today and it was auto-rejected; HYG -1.24 ELIGIBLE (below its 200dma) -> declined: Already holding a HYG long_put opened today (1x, $4,477 debi; LQD -1.02 ELIGIBLE (below its 200dma) -> declined: Bearish lean present (composite -1.02, downtrend px<50<200,; CL -0.65 ELIGIBLE (below its 200dma) -> IGNORED; NKE -0.64 ELIGIBLE (below its 200dma) -> IGNORED; SOXS -0.51 ELIGIBLE (below its 200dma) -> IGNORED] put_proposals=0 put_approved=0 ignored=3 auto_hedge=$107,491 PSQ(beta:1.05) proxy_put=none
+2026-10-06 12:01:16,858 INFO config | BOOK BETA CAP vs hedge arm line: cap 1.20 - (target 1.00 + band 0.15) = +0.05 (cap-bound buys land inside the arm zone)
+2026-10-06 12:01:16,861 INFO alpaca | Alpaca client ready (mode=paper).
+2026-10-06 12:01:18,908 INFO dashboard | Wrote dashboard with 48 trades -> dashboard.html
+2026-10-06 12:51:02,596 INFO orchestrator | Market regime: SPY above 200dma (780 vs 718, today +0.7%), VIX 15.1, VIX3M 17.7 (contango) -> risk-on, size x1.00.
+2026-10-06 12:51:05,796 INFO orchestrator | BOOK BETA: spy=1.05 qqq=0.78 iwm=0.80 invested=98.9% hedge=PSQ w=0.108 beta=-1.38 unhedged=1.20 [options at debit notional x underlying beta: AGNC,CL,HYG,IWM,LQD]
+2026-10-06 12:51:05,811 INFO orchestrator | Auto-hedge: beta: book spy-beta 1.05 within 1.00 +/- 0.15 — holding $107492 PSQ.
+2026-10-06 12:51:06,283 INFO quiver | Quiver live/congresstrading -> 1000 row(s).
+2026-10-06 12:51:06,795 INFO screener | EDGAR Form-4 feed -> 61 filing(s) (scanning up to 100).
+2026-10-06 12:51:30,005 INFO screener | Options-flow most-actives pool -> 40 name(s).
+2026-10-06 12:51:52,800 INFO screener | Screener liquidity floor dropped 6/21 pre-cap: NVD $3.28<$5, RXRX $4.54<$5, BBD $4.55<$5, MSTZ $2.35<$5, PACB $2.71<$5, GRAB $3.15<$5
+2026-10-06 12:51:52,807 INFO screener | Discovered 15 candidate(s) from 3 source(s) (186 merged, 15 above min_score, capped to 18).
+2026-10-06 12:51:52,810 INFO screener |   candidate XLU [options_flow] score=+0.85 — Options flow: 170,129 call / 13,978 put vol (bullish call imbalance +0.85) on a most-active name.
+2026-10-06 12:51:52,814 INFO screener |   candidate RWM [options_flow] score=+0.77 — Options flow: 143 call / 19 put vol (bullish call imbalance +0.77) on a most-active name.
+2026-10-06 12:51:52,818 INFO screener |   candidate SQQQ [options_flow] score=+0.73 — Options flow: 45,615 call / 7,154 put vol (bullish call imbalance +0.73) on a most-active name.
+2026-10-06 12:51:52,825 INFO screener |   candidate BITO [options_flow] score=+0.62 — Options flow: 3,554 call / 837 put vol (bullish call imbalance +0.62) on a most-active name.
+2026-10-06 12:51:52,826 INFO screener |   candidate SOXS [options_flow] score=+0.50 — Options flow: 33,595 call / 11,146 put vol (bullish call imbalance +0.50) on a most-active name.
+2026-10-06 12:51:52,831 INFO screener |   candidate TSLL [options_flow] score=+0.36 — Options flow: 29,679 call / 13,838 put vol (bullish call imbalance +0.36) on a most-active name.
+2026-10-06 12:51:52,833 INFO screener |   candidate NU [options_flow] score=+0.32 — Options flow: 72,408 call / 37,171 put vol (bullish call imbalance +0.32) on a most-active name.
+2026-10-06 12:51:52,835 INFO screener |   candidate EWZ [options_flow] score=+0.31 — Options flow: 228,910 call / 120,571 put vol (bullish call imbalance +0.31) on a most-active name.
+2026-10-06 12:51:52,837 INFO screener |   candidate MRVL [options_flow] score=+0.31 — Options flow: 204,832 call / 108,185 put vol (bullish call imbalance +0.31) on a most-active name.
+2026-10-06 12:51:52,840 INFO screener |   candidate NKE [congress+options_flow] score=+0.28 — Congress: 0 buy / 2 sell filings in last 60d (disclosures lag up to ~45d). | Options flow: 74,918 call / 32,455 put vol (bullish call imbalance +0.40) on a most-active name.
+2026-10-06 12:51:52,842 INFO screener |   candidate TJX [congress] score=-0.23 — Congress: 0 buy / 4 sell filings in last 60d (disclosures lag up to ~45d).
+2026-10-06 12:51:52,843 INFO screener |   candidate JPM [congress] score=-0.23 — Congress: 0 buy / 4 sell filings in last 60d (disclosures lag up to ~45d).
+2026-10-06 12:51:52,845 INFO screener |   candidate TDY [congress] score=-0.23 — Congress: 0 buy / 5 sell filings in last 60d (disclosures lag up to ~45d).
+2026-10-06 12:51:52,846 INFO screener |   candidate ITW [congress] score=-0.23 — Congress: 0 buy / 4 sell filings in last 60d (disclosures lag up to ~45d).
+2026-10-06 12:51:52,848 INFO screener |   candidate MRSH [congress] score=-0.23 — Congress: 0 buy / 4 sell filings in last 60d (disclosures lag up to ~45d).
+2026-10-06 12:52:09,476 INFO quiver | Quiver live/offexchange -> 5551 row(s).
+2026-10-06 12:52:10,257 INFO quiver | Quiver live/govcontractsall -> 20000 row(s).
+2026-10-06 12:52:11,371 INFO quiver | Quiver live/lobbying -> 20000 row(s).
+2026-10-06 12:52:49,024 INFO signals | options_chain: reading 25 of 32 symbols this cycle (cap).
+2026-10-06 12:52:57,157 INFO signals | Gathered signals for 32/32 symbols (+3 market signals).
+2026-10-06 12:52:57,239 INFO orchestrator | Composite index (32 scored, top: INTC +1.57, MRVL +1.55, ONON +1.54, BRK.B +1.38, NOK +1.37, DBRG +1.11, EWZ +1.04, RWM +1.04; bear tail: AGNC -2.45, HYG -1.23, LQD -0.97, MRSH -0.85, CL -0.76, NKE -0.73).
+2026-10-06 12:52:57,245 INFO orchestrator | Expectancy gate (off, report-only): would have armed against: options_flow -1.0%/trip x8, technical -1.2%/trip x8
+2026-10-06 12:52:59,583 INFO robinhood | Imported 1 Robinhood holding(s) for context (read-only).
+2026-10-06 12:52:59,584 INFO orchestrator | FEEDS: 3/3 healthy news=vader-fallback earnings=rh
+2026-10-06 12:52:59,586 INFO orchestrator | Buy-excluded from slate this cycle: HYG (topped up 3.5h ago (next ok in 4h))
+2026-10-06 12:53:22,427 INFO usage | decision call: 23250 in / 1346 out (cache r=6603 w=0) ~$0.1532 [claude-opus-4-8]
+2026-10-06 12:53:22,433 INFO decision | Claude returned 0 proposal(s), 4 bearish verdict(s).
+2026-10-06 12:53:22,437 INFO orchestrator | Bearish verdict: AGNC DECLINED — At max option positions (5 underlyings) this cycle — a new put is auto-rejected. Separately, RSI 15 is deeply oversold with MACD bear but no fresh catalyst; bou
+2026-10-06 12:53:22,440 WARNING orchestrator | Bearish verdict: CL ELIGIBLE but IGNORED — model returned no bearish_verdicts entry for an ELIGIBLE name (the schema requires one per listed name).
+2026-10-06 12:53:22,447 INFO orchestrator | Bearish verdict: HYG DECLINED — Already holding a long_put (opened today, 1x $4,477 debit) expressing this exact bearish thesis; account is at max option positions so no additional structure c
+2026-10-06 12:53:22,450 INFO orchestrator | Bearish verdict: LQD DECLINED — At max option positions (5 underlyings) — a new put is auto-rejected. Thesis itself is only moderately corroborated (composite -0.97, put flow -0.63) but ATM IV
+2026-10-06 12:53:22,452 INFO orchestrator | Bearish verdict: MRSH DECLINED — Long_put already attempted and rejected today for 'At max option positions (5 underlyings)'; cannot add. Thesis is also mixed — bearish chain skew +17.5pts and 
+2026-10-06 12:53:22,454 WARNING orchestrator | Bearish verdict: NKE ELIGIBLE but IGNORED — model returned no bearish_verdicts entry for an ELIGIBLE name (the schema requires one per listed name).
+2026-10-06 12:53:22,566 INFO orchestrator | No actionable proposals this cycle.
+2026-10-06 12:53:22,570 INFO orchestrator | BOOK BETA (post-exec): spy=1.05 qqq=0.78 iwm=0.80 invested=98.9% hedge=PSQ w=0.108 beta=-1.38 unhedged=1.20 (pre-exec spy=1.05 delta=+0.00)
+2026-10-06 12:53:22,574 INFO orchestrator | BEARISH FUNNEL: slate_bearish=6 [AGNC -2.45 ELIGIBLE (below its 200dma) -> declined: At max option positions (5 underlyings) this cycle — a new p; HYG -1.23 ELIGIBLE (below its 200dma) -> declined: Already holding a long_put (opened today, 1x $4,477 debit) e; LQD -0.97 ELIGIBLE (below its 200dma) -> declined: At max option positions (5 underlyings) — a new put is auto-; MRSH -0.85 ELIGIBLE (below its 200dma) -> declined: Long_put already attempted and rejected today for 'At max op; CL -0.76 ELIGIBLE (below its 200dma) -> IGNORED; NKE -0.73 ELIGIBLE (below its 200dma) -> IGNORED] put_proposals=0 put_approved=0 ignored=2 auto_hedge=$107,492 PSQ(beta:1.05) proxy_put=none
+2026-10-06 12:53:22,652 INFO config | BOOK BETA CAP vs hedge arm line: cap 1.20 - (target 1.00 + band 0.15) = +0.05 (cap-bound buys land inside the arm zone)
+2026-10-06 12:53:22,657 INFO alpaca | Alpaca client ready (mode=paper).
+2026-10-06 12:53:24,484 INFO dashboard | Wrote dashboard with 48 trades -> dashboard.html
+2026-10-06 13:43:06,701 INFO orchestrator | Market regime: SPY above 200dma (780 vs 718, today +0.7%), VIX 15.1, VIX3M 17.6 (contango) -> risk-on, size x1.00.
+2026-10-06 13:43:09,881 INFO orchestrator | BOOK BETA: spy=1.05 qqq=0.78 iwm=0.79 invested=98.9% hedge=PSQ w=0.108 beta=-1.38 unhedged=1.20 [options at debit notional x underlying beta: AGNC,CL,HYG,IWM,LQD]
+2026-10-06 13:43:09,894 INFO orchestrator | Auto-hedge: beta: book spy-beta 1.05 within 1.00 +/- 0.15 — holding $107558 PSQ.
+2026-10-06 13:43:10,245 INFO quiver | Quiver live/congresstrading -> 1000 row(s).
+2026-10-06 13:43:10,488 INFO screener | EDGAR Form-4 feed -> 58 filing(s) (scanning up to 100).
+2026-10-06 13:43:32,210 INFO screener | Options-flow most-actives pool -> 40 name(s).
+2026-10-06 13:43:53,778 INFO screener | Screener liquidity floor dropped 5/21 pre-cap: NVD $3.28<$5, BBD $4.57<$5, RXRX $4.58<$5, MSTZ $2.36<$5, PACB $2.71<$5
+2026-10-06 13:43:53,792 INFO screener | Discovered 16 candidate(s) from 3 source(s) (186 merged, 16 above min_score, capped to 18).
+2026-10-06 13:43:53,797 INFO screener |   candidate XLU [options_flow] score=+0.83 — Options flow: 179,030 call / 16,229 put vol (bullish call imbalance +0.83) on a most-active name.
+2026-10-06 13:43:53,803 INFO screener |   candidate RWM [options_flow] score=+0.75 — Options flow: 135 call / 19 put vol (bullish call imbalance +0.75) on a most-active name.
+2026-10-06 13:43:53,805 INFO screener |   candidate BITO [options_flow] score=+0.64 — Options flow: 3,816 call / 833 put vol (bullish call imbalance +0.64) on a most-active name.
+2026-10-06 13:43:53,808 INFO screener |   candidate ONDS [options_flow] score=+0.61 — Options flow: 34,150 call / 8,294 put vol (bullish call imbalance +0.61) on a most-active name.
+2026-10-06 13:43:53,811 INFO screener |   candidate SOXS [options_flow] score=+0.54 — Options flow: 38,179 call / 11,498 put vol (bullish call imbalance +0.54) on a most-active name.
+2026-10-06 13:43:53,815 INFO screener |   candidate MDT [congress+options_flow] score=-0.41 — Congress: 0 buy / 1 sell filings in last 60d (disclosures lag up to ~45d). | Options flow: 4,353 call / 9,092 put vol (bearish put imbalance -0.35) on a most-active name.
+2026-10-06 13:43:53,823 INFO screener |   candidate TSLL [options_flow] score=+0.37 — Options flow: 32,420 call / 14,882 put vol (bullish call imbalance +0.37) on a most-active name.
+2026-10-06 13:43:53,826 INFO screener |   candidate NU [options_flow] score=+0.34 — Options flow: 80,832 call / 39,703 put vol (bullish call imbalance +0.34) on a most-active name.
+2026-10-06 13:43:53,828 INFO screener |   candidate EWZ [options_flow] score=+0.32 — Options flow: 258,305 call / 132,756 put vol (bullish call imbalance +0.32) on a most-active name.
+2026-10-06 13:43:53,830 INFO screener |   candidate MRVL [options_flow] score=+0.30 — Options flow: 218,822 call / 116,642 put vol (bullish call imbalance +0.30) on a most-active name.
+2026-10-06 13:43:53,833 INFO screener |   candidate SAH [insider] score=+0.30 — Insider: 1 open-market buy filing(s), 21,645 sh (SEC Form 4, last filings feed).
+2026-10-06 13:43:53,834 INFO screener |   candidate TJX [congress] score=-0.23 — Congress: 0 buy / 4 sell filings in last 60d (disclosures lag up to ~45d).
+2026-10-06 13:43:53,836 INFO screener |   candidate JPM [congress] score=-0.23 — Congress: 0 buy / 4 sell filings in last 60d (disclosures lag up to ~45d).
+2026-10-06 13:43:53,837 INFO screener |   candidate TDY [congress] score=-0.23 — Congress: 0 buy / 5 sell filings in last 60d (disclosures lag up to ~45d).
+2026-10-06 13:43:53,839 INFO screener |   candidate ITW [congress] score=-0.23 — Congress: 0 buy / 4 sell filings in last 60d (disclosures lag up to ~45d).
+2026-10-06 13:43:53,840 INFO screener |   candidate MRSH [congress] score=-0.23 — Congress: 0 buy / 4 sell filings in last 60d (disclosures lag up to ~45d).
+2026-10-06 13:44:10,752 INFO quiver | Quiver live/offexchange -> 5551 row(s).
+2026-10-06 13:44:11,451 INFO quiver | Quiver live/govcontractsall -> 20000 row(s).
+2026-10-06 13:44:14,648 INFO quiver | Quiver live/lobbying -> 20000 row(s).
+2026-10-06 13:44:56,216 INFO signals | options_chain: reading 25 of 33 symbols this cycle (cap).
+2026-10-06 13:45:05,543 INFO signals | Gathered signals for 33/33 symbols (+3 market signals).
+2026-10-06 13:45:05,737 INFO orchestrator | Composite index (33 scored, top: INTC +1.64, ONON +1.58, MRVL +1.57, NOK +1.44, BRK.B +1.39, BITO +1.13, DBRG +1.11, EWZ +1.07; bear tail: AGNC -2.53, HYG -1.23, LQD -0.97, MRSH -0.85, CL -0.72).
+2026-10-06 13:45:05,743 INFO orchestrator | Expectancy gate (off, report-only): would have armed against: options_flow -1.0%/trip x8, technical -1.2%/trip x8
+2026-10-06 13:45:08,358 INFO robinhood | Imported 1 Robinhood holding(s) for context (read-only).
+2026-10-06 13:45:08,360 INFO orchestrator | FEEDS: 3/3 healthy news=vader-fallback earnings=rh
+2026-10-06 13:45:35,891 INFO usage | decision call: 23481 in / 1793 out (cache r=6603 w=0) ~$0.1655 [claude-opus-4-8]
+2026-10-06 13:45:35,928 INFO decision | Claude returned 0 proposal(s), 4 bearish verdict(s).
+2026-10-06 13:45:35,934 INFO orchestrator | Bearish verdict: AGNC DECLINED — At max option positions (5 underlyings already open; MRSH put was rejected today for this). Even if slottable, RSI 15 is deeply oversold with MACD bear exhauste
+2026-10-06 13:45:35,938 WARNING orchestrator | Bearish verdict: CL ELIGIBLE but IGNORED — model returned no bearish_verdicts entry for an ELIGIBLE name (the schema requires one per listed name).
+2026-10-06 13:45:35,939 INFO orchestrator | Bearish verdict: HYG DECLINED — Already holding a HYG long_put opened/topped-up 3.5h ago; next add not permitted until the 4h cooldown clears. Bearish thesis already expressed in the book.
+2026-10-06 13:45:35,940 INFO orchestrator | Bearish verdict: LQD DECLINED — At max option positions (5 underlyings). Separately, ATM IV is only 9% — an IG bond ETF put prices a negligible expected move, so the -0.97 composite and -0.63 
+2026-10-06 13:45:35,941 INFO orchestrator | Bearish verdict: MRSH DECLINED — At max option positions — MRSH 1x long_put was already rejected today for exactly this reason (5 underlyings). Cannot open an additional option underlying this 
+2026-10-06 13:45:35,984 INFO orchestrator | No actionable proposals this cycle.
+2026-10-06 13:45:35,985 INFO orchestrator | BOOK BETA (post-exec): spy=1.05 qqq=0.78 iwm=0.79 invested=98.9% hedge=PSQ w=0.108 beta=-1.38 unhedged=1.20 (pre-exec spy=1.05 delta=+0.00)
+2026-10-06 13:45:35,986 INFO orchestrator | BEARISH FUNNEL: slate_bearish=5 [AGNC -2.53 ELIGIBLE (below its 200dma) -> declined: At max option positions (5 underlyings already open; MRSH pu; HYG -1.23 ELIGIBLE (below its 200dma) -> declined: Already holding a HYG long_put opened/topped-up 3.5h ago; ne; LQD -0.97 ELIGIBLE (below its 200dma) -> declined: At max option positions (5 underlyings). Separately, ATM IV; MRSH -0.85 ELIGIBLE (below its 200dma) -> declined: At max option positions — MRSH 1x long_put was already rejec; CL -0.72 ELIGIBLE (below its 200dma) -> IGNORED] put_proposals=0 put_approved=0 ignored=1 auto_hedge=$107,558 PSQ(beta:1.05) proxy_put=none
+2026-10-06 13:45:36,048 INFO config | BOOK BETA CAP vs hedge arm line: cap 1.20 - (target 1.00 + band 0.15) = +0.05 (cap-bound buys land inside the arm zone)
+2026-10-06 13:45:36,050 INFO alpaca | Alpaca client ready (mode=paper).
+2026-10-06 13:45:38,080 INFO dashboard | Wrote dashboard with 48 trades -> dashboard.html
+2026-10-06 14:35:20,660 INFO orchestrator | Market regime: SPY above 200dma (780 vs 718, today +0.6%), VIX 15.1, VIX3M 17.6 (contango) -> risk-on, size x1.00.
+2026-10-06 14:35:23,786 INFO orchestrator | BOOK BETA: spy=1.05 qqq=0.78 iwm=0.79 invested=98.9% hedge=PSQ w=0.108 beta=-1.38 unhedged=1.20 [options at debit notional x underlying beta: AGNC,CL,HYG,IWM,LQD]
+2026-10-06 14:35:23,797 INFO orchestrator | Auto-hedge: beta: book spy-beta 1.05 within 1.00 +/- 0.15 — holding $107536 PSQ.
+2026-10-06 14:35:24,078 INFO quiver | Quiver live/congresstrading -> 1000 row(s).
+2026-10-06 14:35:24,365 INFO screener | EDGAR Form-4 feed -> 62 filing(s) (scanning up to 100).
+2026-10-06 14:35:51,883 INFO screener | Options-flow most-actives pool -> 40 name(s).
+2026-10-06 14:36:14,982 INFO screener | Screener liquidity floor dropped 5/20 pre-cap: BBD $4.50<$5, NVD $3.30<$5, RXRX $4.58<$5, MSTZ $2.36<$5, PACB $2.71<$5
+2026-10-06 14:36:14,991 INFO screener | Discovered 15 candidate(s) from 3 source(s) (185 merged, 15 above min_score, capped to 18).
+2026-10-06 14:36:14,994 INFO screener |   candidate RWM [options_flow] score=+0.89 — Options flow: 336 call / 19 put vol (bullish call imbalance +0.89) on a most-active name.
+2026-10-06 14:36:14,997 INFO screener |   candidate XLU [options_flow] score=+0.81 — Options flow: 180,426 call / 19,338 put vol (bullish call imbalance +0.81) on a most-active name.
+2026-10-06 14:36:15,001 INFO screener |   candidate BITO [options_flow] score=+0.65 — Options flow: 3,932 call / 832 put vol (bullish call imbalance +0.65) on a most-active name.
+2026-10-06 14:36:15,004 INFO screener |   candidate ONDS [options_flow] score=+0.61 — Options flow: 37,148 call / 9,028 put vol (bullish call imbalance +0.61) on a most-active name.
+2026-10-06 14:36:15,006 INFO screener |   candidate SOXS [options_flow] score=+0.54 — Options flow: 39,144 call / 11,757 put vol (bullish call imbalance +0.54) on a most-active name.
+2026-10-06 14:36:15,008 INFO screener |   candidate TSLL [options_flow] score=+0.38 — Options flow: 35,742 call / 15,980 put vol (bullish call imbalance +0.38) on a most-active name.
+2026-10-06 14:36:15,010 INFO screener |   candidate NU [options_flow] score=+0.34 — Options flow: 83,622 call / 40,774 put vol (bullish call imbalance +0.34) on a most-active name.
+2026-10-06 14:36:15,013 INFO screener |   candidate EWZ [options_flow] score=+0.31 — Options flow: 259,586 call / 135,429 put vol (bullish call imbalance +0.31) on a most-active name.
+2026-10-06 14:36:15,016 INFO screener |   candidate MRVL [options_flow] score=+0.30 — Options flow: 230,326 call / 123,782 put vol (bullish call imbalance +0.30) on a most-active name.
+2026-10-06 14:36:15,018 INFO screener |   candidate TJX [congress] score=-0.23 — Congress: 0 buy / 4 sell filings in last 60d (disclosures lag up to ~45d).
+2026-10-06 14:36:15,020 INFO screener |   candidate JPM [congress] score=-0.23 — Congress: 0 buy / 4 sell filings in last 60d (disclosures lag up to ~45d).
+2026-10-06 14:36:15,021 INFO screener |   candidate TDY [congress] score=-0.23 — Congress: 0 buy / 5 sell filings in last 60d (disclosures lag up to ~45d).
+2026-10-06 14:36:15,023 INFO screener |   candidate ITW [congress] score=-0.23 — Congress: 0 buy / 4 sell filings in last 60d (disclosures lag up to ~45d).
+2026-10-06 14:36:15,024 INFO screener |   candidate MRSH [congress] score=-0.23 — Congress: 0 buy / 4 sell filings in last 60d (disclosures lag up to ~45d).
+2026-10-06 14:36:15,026 INFO screener |   candidate NKE [congress+options_flow] score=+0.21 — Congress: 0 buy / 2 sell filings in last 60d (disclosures lag up to ~45d). | Options flow: 84,603 call / 43,176 put vol (bullish call imbalance +0.32) on a most-active name.
+2026-10-06 14:36:29,422 INFO quiver | Quiver live/offexchange -> 5551 row(s).
+2026-10-06 14:36:31,669 INFO quiver | Quiver live/govcontractsall -> 20000 row(s).
+2026-10-06 14:36:34,884 INFO quiver | Quiver live/lobbying -> 20000 row(s).
+2026-10-06 14:38:14,402 INFO signals | options_chain: reading 25 of 32 symbols this cycle (cap).
+2026-10-06 14:38:21,603 INFO signals | Gathered signals for 32/32 symbols (+3 market signals).
+2026-10-06 14:38:21,732 INFO orchestrator | Composite index (32 scored, top: INTC +1.68, MRVL +1.60, ONON +1.57, NOK +1.55, BRK.B +1.38, DBRG +1.11, EWZ +1.07, DVN +1.02; bear tail: AGNC -2.53, HYG -1.24, LQD -0.99, MRSH -0.82, CL -0.78, NKE -0.77).
+2026-10-06 14:38:21,749 INFO orchestrator | Expectancy gate (off, report-only): would have armed against: options_flow -1.0%/trip x8, technical -1.2%/trip x8
+2026-10-06 14:38:24,248 INFO robinhood | Imported 1 Robinhood holding(s) for context (read-only).
+2026-10-06 14:38:24,250 INFO orchestrator | FEEDS: 3/3 healthy news=vader-fallback earnings=rh
+2026-10-06 14:39:10,339 INFO usage | decision call: 23381 in / 3004 out (cache r=6603 w=0) ~$0.1953 [claude-opus-4-8]
+2026-10-06 14:39:10,347 INFO decision | Claude returned 0 proposal(s), 4 bearish verdict(s).
+2026-10-06 14:39:10,353 INFO orchestrator | Bearish verdict: AGNC DECLINED — At max option positions (5 underlyings) today — a new put underlying is auto-rejected; and RSI 16 is washed-out extreme-oversold, so puts risk a mean-reversion 
+2026-10-06 14:39:10,358 WARNING orchestrator | Bearish verdict: CL ELIGIBLE but IGNORED — model returned no bearish_verdicts entry for an ELIGIBLE name (the schema requires one per listed name).
+2026-10-06 14:39:10,360 INFO orchestrator | Bearish verdict: HYG DECLINED — Already hold a HYG long_put opened/topped-up 3.5h ago; name is in the excluded list (next top-up ok in ~4h) — no new/add position possible this cycle.
+2026-10-06 14:39:10,363 INFO orchestrator | Bearish verdict: LQD DECLINED — At max option positions (5 underlyings) blocks a new put underlying; separately LQD is a low-vol investment-grade bond ETF (ATM IV 9%) — too slow/small a move t
+2026-10-06 14:39:10,365 INFO orchestrator | Bearish verdict: MRSH DECLINED — At max option positions (5 underlyings) — MRSH long_put was already rejected today for this exact reason; also technical RSI 43 / MACD bull is mixed, not a clea
+2026-10-06 14:39:10,367 WARNING orchestrator | Bearish verdict: NKE ELIGIBLE but IGNORED — model returned no bearish_verdicts entry for an ELIGIBLE name (the schema requires one per listed name).
+2026-10-06 14:39:10,416 INFO orchestrator | No actionable proposals this cycle.
+2026-10-06 14:39:10,418 INFO orchestrator | BOOK BETA (post-exec): spy=1.05 qqq=0.78 iwm=0.79 invested=98.9% hedge=PSQ w=0.108 beta=-1.38 unhedged=1.20 (pre-exec spy=1.05 delta=+0.00)
+2026-10-06 14:39:10,421 INFO orchestrator | BEARISH FUNNEL: slate_bearish=7 [AGNC -2.53 ELIGIBLE (below its 200dma) -> declined: At max option positions (5 underlyings) today — a new put un; HYG -1.24 ELIGIBLE (below its 200dma) -> declined: Already hold a HYG long_put opened/topped-up 3.5h ago; name; LQD -0.99 ELIGIBLE (below its 200dma) -> declined: At max option positions (5 underlyings) blocks a new put und; MRSH -0.82 ELIGIBLE (below its 200dma) -> declined: At max option positions (5 underlyings) — MRSH long_put was; CL -0.78 ELIGIBLE (below its 200dma) -> IGNORED; NKE -0.77 ELIGIBLE (below its 200dma) -> IGNORED; IWM -0.41 gate-blocked] put_proposals=0 put_approved=0 ignored=2 auto_hedge=$107,536 PSQ(beta:1.05) proxy_put=none
+2026-10-06 14:39:10,493 INFO config | BOOK BETA CAP vs hedge arm line: cap 1.20 - (target 1.00 + band 0.15) = +0.05 (cap-bound buys land inside the arm zone)
+2026-10-06 14:39:10,497 INFO alpaca | Alpaca client ready (mode=paper).
+2026-10-06 14:39:12,390 INFO dashboard | Wrote dashboard with 48 trades -> dashboard.html
+2026-10-06 14:54:09,499 CRITICAL orchestrator | On BATTERY during market hours — clamshell/battery sleep will blind the bot (caffeinate cannot prevent it). Plug in AC or move to the always-on host (ops/).
+2026-10-06 14:54:10,928 INFO notify | CRITICAL alert emailed to srikanthpusapati1@gmail.com: Bot on battery during market hours
+2026-10-06 15:27:23,459 INFO orchestrator | Market closed; skipping decision cycle.
+2026-10-06 15:27:23,893 INFO status | Equity close row 2026-10-06 day_pl self-consistent: -166.00 = equity 993727.57 - prev 2026-10-05 equity 993893.57; broker_day_pl 177600.93 (last_equity restatement -177766.93).
+2026-10-06 15:27:23,918 INFO orchestrator | Equity close row stamped for 2026-10-06 (basis=close).
+2026-10-06 15:27:23,929 INFO orchestrator | Running nightly post-mortem for 2026-10-06 …
+2026-10-06 15:27:23,981 INFO alpaca | Alpaca client ready (mode=paper).
+2026-10-06 15:27:26,047 INFO postmortem | Postmortem day attribution (close-to-close): 18 name(s); Day WINNER by close-to-close: NOK +3,283 USD; Day LOSER by close-to-close: INTC -2,889 USD
+2026-10-06 15:27:38,432 INFO usage | postmortem call: 2791 in / 540 out (cache r=0 w=0) ~$0.0275 [claude-opus-4-8]
+2026-10-06 15:27:38,443 INFO postmortem | Post-mortem written to state/lessons/2026-10-06.md
+2026-10-06 15:27:38,445 INFO postmortem | Post-mortem found no notable patterns for 2026-10-06.
+2026-10-06 15:27:38,458 INFO orchestrator | API spend today: $1.46 across 9 calls (182,951 in / 18,247 out tokens).
+2026-10-06 15:27:38,578 INFO config | BOOK BETA CAP vs hedge arm line: cap 1.20 - (target 1.00 + band 0.15) = +0.05 (cap-bound buys land inside the arm zone)
+2026-10-06 15:27:38,581 INFO alpaca | Alpaca client ready (mode=paper).
+2026-10-06 15:27:40,489 INFO dashboard | Wrote dashboard with 48 trades -> dashboard.html
+2026-10-06 16:19:52,057 INFO orchestrator | Market closed; skipping decision cycle.
+2026-10-06 17:12:00,882 INFO orchestrator | Market closed; skipping decision cycle.
+2026-10-06 18:04:14,274 INFO orchestrator | Market closed; skipping decision cycle.
+2026-10-06 18:56:28,185 INFO orchestrator | Market closed; skipping decision cycle.
+2026-10-06 19:48:42,226 INFO orchestrator | Market closed; skipping decision cycle.
+2026-10-06 20:40:55,614 INFO orchestrator | Market closed; skipping decision cycle.
+2026-10-06 21:33:09,334 INFO orchestrator | Market closed; skipping decision cycle.
+2026-10-06 22:25:22,894 INFO orchestrator | Market closed; skipping decision cycle.
+2026-10-06 23:17:31,268 INFO orchestrator | Session calendar refreshed: 15 session(s) 2026-09-27..2026-10-17 -> state/session_calendar.json.
+2026-10-06 23:17:31,382 INFO orchestrator | Market closed; skipping decision cycle.
