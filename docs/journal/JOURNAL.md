@@ -32,6 +32,7 @@ run-8 change-set). Not touched: `investment_strategy/`, `.env`, `tests/` (run-7 
 code-level cleanup is a run-8 item.
 Plan: opens TODO.md C-8 "code hygiene after the freeze"; closes "repo cleanup".
 
+<<<<<<< HEAD
 ## 2026-10-26 15:10 CT — run-7 verdict taken six days late: FAIL
 Facts: the pinned v3 command (`--start 2026-09-22 --end 2026-10-20`, CSVs from yfinance) printed
 **VERDICT: FAIL** — rule 2 expectancy (N=30, mean −$855, t −1.90 vs 1.70, PF 0.39, WR 20%, ex-top-3
@@ -70,3 +71,15 @@ with a veto — the draft's variant needed a second strike-picker. New scripts: 
 pre-registration), `flatten_only.py`; C-1 `ops/in_session_check.sh` + plist. Suite: see the PR.
 Action: PR `feature/run8-changeset` → `main`; the operator merges, then runs §0 of RUN8_SWITCH.md.
 Plan: closes TODO B-1..B-8, C-1..C-7, C-9, N10–N12, X3, X4 (draft); opens the run-8 switch list.
+=======
+## 2026-09-30 18:05 CT — PR #1 merged; branches reduced to main + feature/preview
+Facts: owner merged PR #1 (`feature/preview` → `main`, 8e1c901) on the new repo under their own account;
+live tree pulled (frozen tree `2a6ec147` unchanged, bot pid 24288). The old repository no longer resolves
+on GitHub; the empty duplicate clone under `~/PersonalProjects` (0 commits, 0 files) deleted.
+`feature/run6-changeset`, `feature/run7-aplus`, `docs/run6-amendment4-freeze-disclosure` verified as
+ancestors of `main` and deleted on the remote and locally; `feature/preview` fast-forwarded to `main`.
+Cause: owner's instruction — keep `main` and `feature/preview` only; merge into preview, into main when done.
+Action: branch policy written into README (two permanent branches; next-window code on a short-lived
+`feature/runN-changeset` so preview stays mergeable); TODO N1 done, N6 dropped (nothing left to archive).
+Plan: closes N1, N6; opens nothing.
+>>>>>>> feature/preview

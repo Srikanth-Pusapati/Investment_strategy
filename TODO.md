@@ -1,14 +1,22 @@
 # TODO — the plan
 
+<<<<<<< HEAD
 Updated 2026-10-26. One line per item; `[ ]` open, `[~]` in progress, `[x]` done (kept two weeks, then pruned).
 History and reasons live in [`docs/journal/JOURNAL.md`](docs/journal/JOURNAL.md). **Run-7 closed FAIL on Oct 20**
 ([`runs/pre-final-test-run-7/RUN_SUMMARY.md`](runs/pre-final-test-run-7/RUN_SUMMARY.md)); the bot was stopped Oct 26 and the
 account flattens at the Oct 27 open. The run-8 change-set is built ([`CHANGESET_DRAFT.md`](runs/pre-final-test-run-8/CHANGESET_DRAFT.md),
 revision at the close) and switches in via [`docs/RUN8_SWITCH.md`](docs/RUN8_SWITCH.md). **Freeze** resumes at the switch: no change to
 `investment_strategy/` or `.env` through the run-8 close (session 21 ≈ Wed Nov 25; Dec 3 if extended).
+=======
+Updated 2026-09-30 (evening). One line per item; `[ ]` open, `[~]` in progress, `[x]` done (kept two weeks, then pruned).
+History and reasons live in [`docs/journal/JOURNAL.md`](docs/journal/JOURNAL.md). **Freeze:** no change to
+`investment_strategy/` or `.env` until the run-7 close (Tue Oct 20; Oct 27 if extended). Detail for the run-8
+items is in [`runs/pre-final-test-run-8/CHANGESET_DRAFT.md`](runs/pre-final-test-run-8/CHANGESET_DRAFT.md).
+>>>>>>> feature/preview
 
 ## Now — the run-8 switch, in order
 
+<<<<<<< HEAD
 - [ ] S1 **Merge the PR** `feature/run8-changeset` → `main` on GitHub (operator)
 - [ ] S2 **Tue Oct 27 ~09:40 ET:** `tail -5 logs/flatten_only.log` must end `account is flat`; on `INCOMPLETE`, rerun `nohup .venv/bin/python scripts/flatten_only.py >> logs/flatten_only.log 2>&1 &` during RTH or close the leftover by hand (operator or session)
 - [ ] S3 **Account:** keep `PA3BGBBR2NB5` flat (~$977k) or create a fresh $1M paper account and swap `ALPACA_API_KEY`/`ALPACA_SECRET_KEY` in `.env` (operator)
@@ -23,6 +31,18 @@ revision at the close) and switches in via [`docs/RUN8_SWITCH.md`](docs/RUN8_SWI
 - [ ] N7 Personal-data review before any public flip (e-mail in dated logs, paper account IDs, `docs/ga/`) (operator)
 - [ ] N8 **Power:** charger attached through the window; always-on host (`ops/Dockerfile`) is the real fix — run-7 logged 32 battery CRITICALs and 9 in-hours dark gaps (operator)
 - [ ] N9 Off-machine backup target for `ops/backup_state.sh` (operator)
+=======
+- [ ] N2 **Review sessions 5–6 (Sep 28–29)**: the battery night + dead-man relaunch, −$6,228 day, book 98% invested, the 09:26 CT 503 — done when a journal entry exists and any new run-8 item is on this list
+- [ ] N3 Add `"includeCoAuthoredBy": false` to `~/.claude/settings.json` (operator; the session's edit was refused)
+- [ ] N4 `gh auth login` for `Srikanth-Pusapati` with SSH so PRs open in your name; until then PRs go via the compare URL (operator)
+- [ ] N5 Check `ANTHROPIC_API_KEY` at `runs/pre-final-test-run-4/analysis/config.json:84` **in the old repo**; rotate if live (operator; the file is gone from this repo's history)
+- [ ] N7 Personal-data review before any public flip: your e-mail in the dated logs, paper account IDs, `docs/ga/` notes (operator)
+- [ ] N8 **Power**: 94 W charger stays attached through Oct 20; the real fix is an always-on host (`ops/Dockerfile`) — 4 battery incidents so far in run-7 (operator)
+- [ ] N9 Off-machine backup target for `ops/backup_state.sh` (`BACKUP_DIR` on iCloud/Dropbox, or an rclone remote) — done when a nightly tarball lands off this disk
+- [ ] N10 `ops/away_mode.md` steps 77/86 still say the fallback pushes `feature/preview` while the live tree is on `main` — fix the wording (docs, allowed in the freeze)
+- [ ] N11 **Ship C-1 now** (ops only, no fingerprint): launchd job runs `scripts/run7_morning_check.py` at 09:55 and 15:35 ET, appends to `logs/morning_check.log`, pages on FAIL — the Sep 25 feeds breach went unseen for a day without it
+- [ ] N12 **Ship C-7 now** (scripts only): morning check / preflight WARN when the Robinhood token has < 24 h left (it prints the hours, never warns)
+>>>>>>> feature/preview
 
 ## Routines through the run-8 close
 
@@ -73,9 +93,19 @@ revision at the close) and switches in via [`docs/RUN8_SWITCH.md`](docs/RUN8_SWI
 
 ## Done (last two weeks)
 
+<<<<<<< HEAD
 - [x] 2026-10-26 Run-7 verdict FAIL (five of seven counted rules) taken and filed; stop + flatten armed; run-8 change-set built with tests (B-1..B-8, N-1, C-1..C-5, C-7, C-9), contract v4 drafted, RUN8_SWITCH.md, `run8_switch.sh`, `run8_morning_check.py`, `flatten_only.py`, C-1 in-session check; N10 wording fixed; Oct 1–25 logs committed
 - [x] 2026-10-26 X1/X3/X5 of the run-7 close list (verdict, change-set revision, kill-criterion input); X2 n/a (N = 30); X4 drafted (pre-registration at the switch)
 - [x] 2026-09-30 Repo cleanup; `fix_branches.sh` run by the operator — remote == mirror; N1 merged, N4 (`gh auth` as Srikanth-Pusapati) done
 - [x] 2026-09-29 Live tree re-pointed to `Srikanth-Pusapati/Investment_strategy`; bot restarted (pid 24288)
 - [x] 2026-09-26 Session-4 backtrack; Amendment 1 accepted by merge; run-8 change-set draft; Robinhood login restored
 - [x] 2026-09-21 Run-7 live on account PA3BGBBR2NB5 at $1,000,000; contract v3 pre-registered
+=======
+- [x] 2026-09-30 PR #1 merged by the owner; live tree pulled; old repo already gone from GitHub; empty duplicate clone deleted; three fully-merged branches deleted — remote is `main` + `feature/preview` only (branch policy in README)
+- [x] 2026-09-30 Repo cleanup: plan split from journal (`TODO.md`, `docs/journal/`), 72 duplicates removed, `graphify-out/` untracked, README rewritten past Safety; `fix_branches.sh` run by the operator — remote == mirror, 0 trailer/identity hits; staging mirror deleted
+- [x] 2026-09-29 Live tree re-pointed to `Srikanth-Pusapati/Investment_strategy` in place; bot restarted (pid 24288); 5 branches pushed with the rewritten history (tree ids unchanged)
+- [x] 2026-09-27 `docs/ARCHITECTURE.md`; LICENSE in the author's name; commit-SHA map for the move
+- [x] 2026-09-26 Session-4 backtrack; Amendment 1 (Sep 25 feeds breach) accepted by merge; run-8 change-set draft; Robinhood login restored
+- [x] 2026-09-23 "Shutdown" diagnosed as a 1% battery hibernate; Sep 21–22 logs read end to end
+- [x] 2026-09-21 Run-7 live on account PA3BGBBR2NB5 at $1,000,000; contract v3 pre-registered; freeze to Oct 20
+>>>>>>> feature/preview
