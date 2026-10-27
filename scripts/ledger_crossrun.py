@@ -8,6 +8,10 @@ state/ files for run-7; writes one markdown report (argv[1]) and one reconstruct
 (argv[2]). Trip = sell row with non-null realized_pl (the checker definition); satellite = exit_reason
 outside the system set. Entry attributes for runs 4-6 are FIFO-reconstructed (see the report's
 caveats). Written 2026-10-27 for docs/MODEL_DIRECTION.md section 2b. Stdlib only.
+
+Run it from the LIVE tree: runs/pre-final-test-run-4/state/ and state/ are git-ignored and exist on disk
+only (a worktree lacks them). Sections (a)-(b) of runs/LEDGER_CROSSRUN_2026-10-27.md are this script's
+output verbatim (verified 2026-10-27); sections (c) ten facts and (d) caveats were written by hand on top.
 """
 import json, math, collections, statistics, sys, os
 from datetime import datetime, timedelta, timezone
