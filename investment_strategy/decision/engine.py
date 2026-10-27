@@ -267,6 +267,97 @@ class DecisionEngine:
         )
         return None
 
+    def decide_bearish_fallback(
+        self, bundle: SignalBundle, account: AccountSnapshot,
+        eligibility_reason: str, price: float | None = None,
+        regime_label: str = "", regime_reason: str = "",
+        curated: str = "", max_premium_usd: float | None = None,
+    ) -> TradeProposal | None:
+        """Run-8 B-4 (BEARISH_IGNORED_FALLBACK=proxy_put): same-cycle,
+        single-symbol follow-up for a put-ELIGIBLE bearish name the main
+        call returned NO bearish_verdicts entry for (the schema owes one per
+        eligible name; run-7 logged 1-30 such misses per session, every
+        session, after two prompt fixes). The model is asked ONCE, with the
+        name's evidence, to either return exactly one defined-risk BEARISH
+        structure (long_put / bear_put_spread) or HOLD with a reason —
+        silence, HOLD, a call, equity, a parse failure or an API error all
+        mean NO trade (fail-quiet; the fallback is a bonus path, never a
+        cycle blocker). Whatever comes back still runs the full option gate
+        stack in the orchestrator. Reuses the cached stable block."""
+        lines = [
+            "## BEARISH FALLBACK — single-symbol follow-up (trusted)",
+            f"The deterministic put gate found {bundle.symbol} ELIGIBLE this "
+            f"cycle ({self._safe(eligibility_reason)[:160]}) and your "
+            "bearish_verdicts carried NO entry for it — the schema requires a "
+            "put proposal or an explicit decline per eligible name. Decide ONE of:",
+            "- A BUY with instrument=\"option\": exactly one defined-risk BEARISH "
+            "structure (long_put or bear_put_spread), expiry 4-8 weeks out, "
+            "strikes at/near the money"
+            + (f" (latest price ${price:,.2f})" if price else "")
+            + ", both legs on ONE expiry"
+            + (f", max_premium_usd <= {max_premium_usd:,.0f}" if max_premium_usd else "")
+            + " — ONLY if the bearish thesis genuinely clears a high-conviction "
+            "bar on the evidence below.",
+            "- action=\"hold\" with a one-line reason naming the missing evidence: "
+            "if it does not. Do NOT propose equity or calls here.",
+        ]
+        if regime_label:
+            lines.append(f"## Market regime: {regime_label}")
+            if regime_reason:
+                lines.append(regime_reason)
+        lines.append("<market_data>")
+        lines.append(f"### {bundle.symbol}")
+        for sg in bundle.signals:
+            score = f" score={sg.score:+.2f}" if sg.score is not None else ""
+            lines.append(f"- [{sg.kind.value}]{score} {self._safe(sg.summary)[:240]}")
+        lines.append("</market_data>")
+        lines.append(f"Return at most ONE proposal, for {bundle.symbol} only.")
+        try:
+            resp = self.client.messages.create(
+                model=self.model,
+                max_tokens=8000,
+                thinking={"type": "adaptive"},
+                system=SYSTEM_PROMPT,
+                output_config={
+                    "effort": self.cfg.decision_effort,
+                    "format": {"type": "json_schema", "schema": PROPOSALS_SCHEMA},
+                },
+                messages=[{
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "text",
+                            "text": self._render_stable(curated),
+                            "cache_control": {"type": "ephemeral", "ttl": "1h"},
+                        },
+                        {"type": "text", "text": "\n".join(lines)},
+                    ],
+                }],
+            )
+        except anthropic.APIError as e:
+            log.warning("Bearish-fallback call for %s failed: %s", bundle.symbol, e)
+            return None
+        record_usage(resp, self.model, "bearish_fallback")
+        if resp.stop_reason in ("refusal", "max_tokens"):
+            log.warning(
+                "Bearish-fallback for %s unusable (stop_reason=%s).",
+                bundle.symbol, resp.stop_reason,
+            )
+            return None
+        text = next((b.text for b in resp.content if b.type == "text"), "")
+        for p in self._parse(text)[0]:
+            if (
+                p.symbol == bundle.symbol
+                and p.action.value == "buy"
+                and getattr(p.instrument, "value", str(p.instrument)) == "option"
+                and p.option_strategy is not None
+                and p.option_strategy.value in ("long_put", "bear_put_spread")
+                and p.option_legs
+                and all(l.right.lower().startswith("p") for l in p.option_legs)
+            ):
+                return p
+        return None
+
     # -- prompt rendering --------------------------------------------------- #
     def _render_stable(self, curated: str = "") -> str:
         """The cache-eligible prefix: content that's byte-identical across a

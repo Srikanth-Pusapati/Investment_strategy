@@ -644,9 +644,27 @@ class RiskManager:
         # EXACTLY at the printed bar passes (raw floats rejected it: run-6
         # lost 37 of 77 risk-judged BUYs here, 12 of them re-proposing the
         # entry number the prompt showed without ever stating the +0.05 rule).
-        if (
+        # Run-8 B-1 (TOPUP_AUTHORITY=events_only): a top-up is approved on a
+        # deterministic EVENT since the symbol's last buy — composite up,
+        # price up, or a key-signal family cited now that was not cited then
+        # — never on the model's restated conviction (run-7: +0.05/+0.06 per
+        # top-up, DBRG 0.60->0.77 on a falling composite). The conviction
+        # delta is recorded, not gating. 'legacy' keeps the gate below.
+        topup_events: list[str] = []
+        topup_note = ""
+        _held_pos = account.position_for(proposal.symbol)
+        _authority = str(
+            getattr(self.limits, "topup_authority", "legacy") or "legacy"
+        ).strip().lower()
+        if _held_pos is not None and _authority == "events_only":
+            _ok, topup_events, topup_note = self._topup_authority(
+                proposal, price, composite_score, entry_families,
+            )
+            if not _ok:
+                return self._reject(proposal, topup_note)
+        elif (
             self.limits.topup_min_conviction_delta > 0
-            and account.position_for(proposal.symbol) is not None
+            and _held_pos is not None
         ):
             prev = self.state.last_buy_conviction(proposal.symbol)
             if prev is not None:
@@ -843,6 +861,37 @@ class RiskManager:
                 f"(held ${existing_val:,.0f} + pending ${pending_buy_notional:,.0f}).",
             )
         target_notional = min(target_notional, room)
+
+        # 2c) Run-8 B-1 (TOPUP_MAX_MULTIPLE_OF_HELD): one top-up lot may not
+        #     exceed this multiple of what is already held (run-7: a single
+        #     lot 4x its starter). 0 = off.
+        _mult_cap = float(getattr(self.limits, "topup_max_multiple_of_held", 0.0) or 0.0)
+        if (
+            existing is not None and _mult_cap > 0 and existing_val > 0
+            and target_notional > existing_val * _mult_cap
+        ):
+            _lot_cap = existing_val * _mult_cap
+            log.info(
+                "TOPUP AUTHORITY: %s lot clamped $%s -> $%s (%gx held $%s).",
+                proposal.symbol, f"{target_notional:,.0f}", f"{_lot_cap:,.0f}",
+                _mult_cap, f"{existing_val:,.0f}",
+            )
+            topup_note += (
+                f" Top-up lot clamped to {_mult_cap:g}x held (${_lot_cap:,.0f})."
+            )
+            target_notional = _lot_cap
+
+        # 2d) Run-8 B-2 (MAX_TOP3_SATELLITE_PCT): the three largest satellite
+        #     weights together stay under the cap (run-7: 38% of equity in
+        #     three names, DBRG 18% > the 15% core). Resize to the headroom,
+        #     reject when the headroom is under the min order. 0 = off.
+        bucket_note = ""
+        if float(getattr(self.limits, "max_top3_satellite_pct", 0.0) or 0.0) > 0:
+            target_notional, bucket_note, _bucket_reject = self._top3_bucket_clamp(
+                proposal.symbol, account, equity, existing_val, target_notional,
+            )
+            if _bucket_reject:
+                return self._reject(proposal, _bucket_reject)
 
         # 2e) Daily per-symbol ceiling clamp (dollar leg computed above — the
         #     exhausted case already rejected; here we just cap the remainder).
@@ -1065,8 +1114,130 @@ class RiskManager:
                 + overext_note
                 + starter_note
                 + corro_note
+                + topup_note
+                + bucket_note
             ),
+            topup_events=list(topup_events),
         )
+
+    # -- run-8 B-1 / B-2 helpers -------------------------------------------- #
+    def _topup_authority(
+        self, proposal: TradeProposal, price: float,
+        composite_score: float | None, entry_families: set[str] | None,
+    ) -> tuple[bool, list[str], str]:
+        """Judge a TOP-UP under TOPUP_AUTHORITY=events_only. Returns
+        (allowed, events, note-or-reject-text). Events, any one of which
+        allows the add, read off the last buy's stamp (PortfolioState.
+        last_buy_meta_for): composite up by >= topup_min_composite_delta,
+        price >= last fill x (1 + topup_min_gain_pct/100), or a cited
+        key-signal family the last buy did not cite (counted only when the
+        last buy stamped at least one family, so an unstamped prior cannot
+        mint events). No stamp at all (a name bought before run-8) fails
+        open ONCE — the buy itself lays the stamp. The model's conviction
+        delta is reported on every outcome, never judged."""
+        sym = proposal.symbol
+        reader = getattr(self.state, "last_buy_meta_for", None)
+        meta = reader(sym) if callable(reader) else None
+        if not meta:
+            log.info(
+                "TOPUP AUTHORITY: %s allowed — no prior buy stamp (first "
+                "stamped lot; the next add needs an event).", sym,
+            )
+            return True, [], " Top-up authority: no prior stamp — first stamped lot."
+        d_comp = float(getattr(self.limits, "topup_min_composite_delta", 0.25) or 0.0)
+        gain = float(getattr(self.limits, "topup_min_gain_pct", 2.0) or 0.0)
+        pc = meta.get("composite")
+        pp = meta.get("price")
+        pconv = meta.get("conviction")
+        events: list[str] = []
+        if composite_score is not None and pc is not None and (composite_score - pc) >= d_comp:
+            events.append(f"composite_up:{pc:+.2f}->{composite_score:+.2f}")
+        if price and pp and pp > 0 and gain > 0 and price >= pp * (1.0 + gain / 100.0):
+            events.append(f"price_gain:{(price / pp - 1.0) * 100.0:+.1f}%")
+        now_f = {str(f) for f in (entry_families or ())}
+        prior_f = {str(f) for f in (meta.get("families") or [])}
+        new_f = sorted(now_f - prior_f)
+        if new_f and prior_f:
+            events.append("new_family:" + ",".join(new_f))
+        conv_txt = (
+            f"conviction delta {proposal.conviction - float(pconv):+.2f} recorded"
+            if pconv is not None else "conviction delta n/a"
+        )
+        _f = lambda v: "n/a" if v is None else f"{v:+.2f}"      # noqa: E731
+        _d = lambda v: "n/a" if not v else f"${v:,.2f}"          # noqa: E731
+        if not events:
+            return False, [], (
+                "TOPUP AUTHORITY: " + (
+                    f"{sym} rejected (no event since last buy #{meta.get('n') or '?'}: "
+                    f"composite {_f(pc)} -> {_f(composite_score)} (< +{d_comp:g}), "
+                    f"price {_d(pp)} -> {_d(price)} (< +{gain:g}%), families "
+                    f"unchanged; {conv_txt})."
+                )
+            )
+        log.info(
+            "TOPUP AUTHORITY: %s allowed on event(s) %s (%s).",
+            sym, ", ".join(events), conv_txt,
+        )
+        return True, events, f" Top-up authority: {', '.join(events)}; {conv_txt}."
+
+    def _top3_bucket_clamp(
+        self, symbol: str, account: AccountSnapshot, equity: float,
+        existing_val: float, target_notional: float,
+    ) -> tuple[float, str, str]:
+        """MAX_TOP3_SATELLITE_PCT: the sum of the three largest SATELLITE
+        weights (equity rows that are not system-managed — RiskLimits.
+        slot_exempt_symbols — and not options) after this buy must stay
+        under the cap. Returns (notional, note, reject_text): the notional
+        is resized to the headroom, or reject_text is set when the headroom
+        is under the min order. A buy that does not enter the top-3 after
+        the add is never constrained (it leaves the top-3 sum unchanged)."""
+        cap_pct = float(getattr(self.limits, "max_top3_satellite_pct", 0.0) or 0.0)
+        if cap_pct <= 0 or equity <= 0:
+            return target_notional, "", ""
+        cap_usd = equity * cap_pct / 100.0
+        exempt = {
+            str(x).upper()
+            for x in (getattr(self.limits, "slot_exempt_symbols", ()) or ())
+        }
+        sats: dict[str, float] = {}
+        for p in account.positions:
+            if getattr(p, "is_option", False) or p.symbol.upper() in exempt:
+                continue
+            if p.market_value > 0:
+                sats[p.symbol] = sats.get(p.symbol, 0.0) + float(p.market_value)
+        others = sorted((v for s_, v in sats.items() if s_ != symbol), reverse=True)
+        new_val = existing_val + target_notional
+        third = others[2] if len(others) >= 3 else 0.0
+        if new_val <= third:
+            return target_notional, "", ""          # not in the top-3 after the add
+        top2 = sum(others[:2])
+        new_sum = top2 + new_val
+        if new_sum <= cap_usd:
+            return target_notional, "", ""
+        cur_sum = max(top2 + existing_val, sum(others[:3]))
+        room = cap_usd - top2 - existing_val
+        min_order = max(
+            self.limits.min_order_usd, equity * (self.limits.min_order_pct / 100.0),
+        )
+        if room < min_order:
+            return 0.0, "", (
+                "BUCKET CAP: " + (
+                    f"top-3 satellites {cur_sum / equity * 100:.1f}% + "
+                    f"${target_notional:,.0f} {symbol} -> {new_sum / equity * 100:.1f}% "
+                    f"> {cap_pct:g}% — rejected (headroom ${max(0.0, room):,.0f} "
+                    f"< min order ${min_order:,.0f})."
+                )
+            )
+        log.info(
+            "BUCKET CAP: %s top-3 satellites %.1f%% + $%s -> %.1f%% > %g%% — "
+            "resized to $%s.",
+            symbol, cur_sum / equity * 100, f"{target_notional:,.0f}",
+            new_sum / equity * 100, cap_pct, f"{room:,.0f}",
+        )
+        return room, (
+            f" Bucket cap: top-3 satellites would reach {new_sum / equity * 100:.1f}% "
+            f"> {cap_pct:g}% — resized to ${room:,.0f}."
+        ), ""
 
     # -- shared anti-chase / overextension read ------------------------------ #
     def _overextension_read(
@@ -1321,6 +1492,25 @@ class RiskManager:
         if not ok:
             return self._reject(proposal, why)
         if est_premium_per_contract <= 0:
+            # Run-8 B-6: a leg the options feed has NO quote for (unlisted or
+            # past-dated expiry, a strike the feed omits) estimates to 0 and
+            # used to be refused as a "net credit" — the honest cause is the
+            # missing NBBO (run-7: IWM Nov-21 weekly 10x, STE 9x, LH 3x,
+            # each burning a proposal slot). leg_liquidity leaves
+            # rel_spread_pct None exactly when no two-sided quote came back.
+            _noq = [
+                str(l.get("symbol", "?")) for l in (leg_liquidity or [])
+                if l.get("rel_spread_pct") is None
+            ]
+            if _noq:
+                return self._reject(
+                    proposal,
+                    "no NBBO on feed for " + ", ".join(_noq)
+                    + " — the options feed has no two-sided quote for the "
+                    "contract (unlisted/past-dated expiry, or a strike the "
+                    "STRIKE SNAP found no OI-qualified alternative for within "
+                    "5%); not a net credit.",
+                )
             # A debit means net premium PAID; <=0 means a net credit, i.e. a
             # short-premium structure whose max loss is NOT the debit. Refuse.
             return self._reject(
@@ -1464,6 +1654,41 @@ class RiskManager:
                 proposal.symbol, contracts, max_ct,
             )
             contracts = max_ct
+        # Run-8 B-7b (OPTION_OI_PER_CONTRACT): every leg's open interest must
+        # cover the lot at this ratio — contracts <= thinnest-leg OI / ratio
+        # (a 50-lot needs OI >= 1,000 at 20). Run-7: the HYG 78.5P 50-lot
+        # cleared the flat OI-100 floor and could not be marked for 13
+        # sessions. Deploying fewer contracts is always safe. 0 = off.
+        lot_note = ""
+        _oi_per = float(getattr(self.limits, "option_oi_per_contract", 0.0) or 0.0)
+        if _oi_per > 0 and leg_liquidity:
+            _ois = [
+                float(l["oi"]) for l in leg_liquidity
+                if l.get("oi") is not None
+            ]
+            if _ois:
+                _thin = min(_ois)
+                _lot_cap = int(_thin // _oi_per)
+                if _lot_cap < 1:
+                    return self._reject(
+                        proposal,
+                        "OPTION LOT CAP: " + (
+                            f"{proposal.symbol} thinnest leg OI {_thin:.0f} < "
+                            f"{_oi_per:g} per contract — not even one contract "
+                            "clears the lot-scaled open-interest floor."
+                        ),
+                    )
+                if contracts > _lot_cap:
+                    log.info(
+                        "OPTION LOT CAP: %s %d -> %d contracts (thinnest leg OI "
+                        "%.0f / %g per contract).",
+                        proposal.symbol, contracts, _lot_cap, _thin, _oi_per,
+                    )
+                    lot_note = (
+                        f" Lot cap: {contracts} -> {_lot_cap} contracts "
+                        f"(thinnest leg OI {_thin:.0f} / {_oi_per:g})."
+                    )
+                    contracts = _lot_cap
         spent = contracts * per_contract_cost
         return RiskDecision(
             proposal=proposal,
@@ -1472,7 +1697,7 @@ class RiskManager:
             approved_notional=spent,
             reason=(
                 f"{contracts} contract(s), ${spent:,.0f} debit "
-                f"(cap ${cap:,.0f})." + chase_note
+                f"(cap ${cap:,.0f})." + chase_note + lot_note
             ),
         )
 
@@ -1696,6 +1921,14 @@ class RiskManager:
             return True, ""
         min_oi = getattr(self.limits, "min_option_open_interest", 100.0)
         max_spread = getattr(self.limits, "max_option_spread_pct", 10.0)
+        # Run-8 B-7a: the ENTRY cap can never be looser than the watchdog's
+        # exit-mark cap (OPTION_EXIT_MAX_SPREAD_PCT) — a leg admitted wider
+        # than the exit cap is unmarkable from its first tick, and the
+        # premium stop is then blind (run-7 HYG 78.5P: 13 sessions of
+        # 'premium mark unreliable'). Same (ask-bid)/mid formula both sides.
+        _exit_cap = getattr(self.limits, "option_exit_max_spread_pct", 10.0)
+        if max_spread and max_spread > 0 and _exit_cap and _exit_cap > 0:
+            max_spread = min(float(max_spread), float(_exit_cap))
         for liq in leg_liquidity:
             sym = liq.get("symbol", "?")
             oi = liq.get("oi")

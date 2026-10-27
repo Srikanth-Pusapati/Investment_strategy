@@ -28,11 +28,18 @@ from ..ledger import TradeLedger, TradeRecord
 from ..models import AccountSnapshot, Position
 from ..notify import Alerter
 from ..risk import trail_geometry
+from ..session_calendar import FALLBACK_CLOSE, FALLBACK_OPEN
+from ..session_calendar import active as _active_session_calendar
 from ..state import PortfolioState
 
 log = logging.getLogger("watchdog")
 
 _ET = ZoneInfo("America/New_York")
+
+#: Cap on the per-(structure, ET date) once-only note sets (N-1 queued-exit
+#: notes, B-7c first-fallback warnings): past this many entries the set is
+#: pruned to today's date, so a long-lived process can't grow them forever.
+_OPT_NOTE_CAP = 64
 
 #: Open-mute override threshold: inside the first OPTION_STOP_OPEN_MUTE_MIN
 #: minutes after the 09:30 ET open, a premium stop only fires if the UNDERLYING
@@ -107,6 +114,19 @@ class Watchdog:
         #: _check_option_positions (HL 2026-08: -67.6% "stop" 14s after the
         #: open off a junk one-sided auction quote, underlying UP).
         self._opt_breach: dict[tuple[str, str], tuple[str, int]] = {}
+        #: B-7c OPTION_MARK_FALLBACK=conservative: consecutive absurd-spread
+        #: exit-mark ticks per (underlying, expiry). Only ever written in
+        #: conservative mode; reset by a sane two-sided NBBO or the structure
+        #: leaving the book (run-7 HYG 78P: 977-3,055 vetoed ticks/day).
+        self._opt_absurd: dict[tuple[str, str], int] = {}
+        #: B-7c: (underlying, expiry, ET date) already WARNED about this
+        #: session — later fallback ticks for it log at INFO. Bounded.
+        self._opt_fallback_warned: set[tuple[str, str, str]] = set()
+        #: N-1 OPTION_EXITS_RTH_ONLY: (underlying, expiry, ET date) -> the
+        #: reason already logged as "OPTION EXIT QUEUED (closed market)" — one
+        #: INFO per structure per closed session instead of one CRITICAL per
+        #: 30s tick (Oct 26 2026: 113 pre-market IWM pages). Bounded.
+        self._opt_exit_queued: dict[tuple[str, str, str], str] = {}
         #: lazy OptionHistoricalDataClient for exit-mark NBBO sanity reads —
         #: built on first use only (tests and options-off books never pay it).
         self._option_data = None
@@ -759,15 +779,37 @@ class Watchdog:
         if not option_rows:
             if self._opt_breach:
                 self._opt_breach.clear()
+            if self._opt_absurd:
+                self._opt_absurd.clear()
             return
         stop = getattr(self.cfg.risk, "option_stop_loss_pct", 50.0)
         take = getattr(self.cfg.risk, "option_take_profit_pct", 100.0)
         close_dte = getattr(self.cfg.risk, "option_close_dte", 3.0)
+        # N-1 OPTION_EXITS_RTH_ONLY: Alpaca rejects option MARKET orders
+        # outside the regular session (42210000), so with the knob ON a breach
+        # met pre/post-market is noted once and closed at the open instead of
+        # retried + paged every tick. One clock/calendar read per tick, no
+        # broker call. Off (code default) = legacy: closes attempted 24/7.
+        closed_market = False
+        if getattr(self.cfg.risk, "option_exits_rth_only", False):
+            closed_market = not self._in_regular_session()
+        # B-7c OPTION_MARK_FALLBACK: 'conservative' marks a structure at
+        # liquidation (long legs at bid, short legs at ask) once its NBBO has
+        # been absurdly wide for OPTION_MARK_FALLBACK_TICKS consecutive ticks,
+        # so the premium stop can work a market nobody is quoting sanely.
+        # 'off' (code default) = legacy: an absurd spread skips the tick.
+        conservative = str(
+            getattr(self.cfg.risk, "option_mark_fallback", "off")
+        ).strip().lower() == "conservative"
         groups = self._option_groups(option_rows)
-        # Drop confirmation streaks for structures no longer on the book.
+        # Drop confirmation streaks (and absurd-spread counts) for structures
+        # no longer on the book.
         for stale in set(self._opt_breach) - set(groups):
             del self._opt_breach[stale]
+        for stale in set(self._opt_absurd) - set(groups):
+            del self._opt_absurd[stale]
         for (under, expiry), group in groups.items():
+            key = (under, expiry)
             # Net premium PAID: long legs debit, short legs (negative qty)
             # credit. The risk gate only approves net-debit structures, so this
             # is positive for anything we opened ourselves.
@@ -775,12 +817,36 @@ class Watchdog:
             pl = sum(p.unrealized_pl for p in group)
             pl_pct = (pl / basis * 100.0) if basis > 1e-9 else 0.0
             dte = self._days_to_expiry(expiry)
-            breach = None
-            if stop > 0 and basis > 1e-9 and pl_pct <= -stop:
-                breach = ("stop", f"premium stop -{stop:.0f}% (now {pl_pct:+.1f}%)")
-            elif take > 0 and basis > 1e-9 and pl_pct >= take:
-                breach = ("take", f"premium take +{take:.0f}% (now {pl_pct:+.1f}%)")
-            elif (under, expiry) in self._opt_breach:
+            breach = self._premium_breach(stop, take, basis, pl_pct)
+            expiry_hit = (
+                f"{dte:.0f} DTE <= {close_dte:.0f} — closing before expiry"
+                if close_dte > 0 and dte is not None and dte <= close_dte
+                else None
+            )
+            if closed_market:
+                # N-1: nothing can fill until the open — no close, no page,
+                # and the breach/absurd counters are left exactly as they are.
+                queued = breach[1] if breach is not None else expiry_hit
+                if queued is not None:
+                    self._note_option_exit_queued(under, expiry, queued)
+                continue
+            quotes = None
+            mark_fallback = False
+            if conservative and (
+                breach is not None or key in self._opt_breach
+                or key in self._opt_absurd
+            ):
+                # Read the exit-mark NBBO on the same ticks the legacy path
+                # does (a breach, or a live streak) plus any structure already
+                # counting absurd ticks — a quiet in-bounds book costs no
+                # extra read. The quotes are reused below, never re-read.
+                quotes = self._group_quotes(group)
+                fb = self._conservative_mark(under, expiry, group, quotes, basis)
+                if fb is not None:
+                    pl, pl_pct = fb
+                    mark_fallback = True
+                    breach = self._premium_breach(stop, take, basis, pl_pct)
+            if breach is None and key in self._opt_breach:
                 # Back inside the thresholds on a fresh mark. Only a mark
                 # backed by a sane two-sided NBBO may reset the streak — the
                 # same veto breach ticks get. Without it, a junk one-sided
@@ -788,8 +854,12 @@ class Watchdog:
                 # tick into 'all clear' (the invariant in
                 # _confirm_premium_breach, read from the other side), and an
                 # oscillating junk NBBO defers the options' only hard exit
-                # indefinitely while a real collapse bleeds.
-                unreliable = self._group_mark_unreliable(group)
+                # indefinitely while a real collapse bleeds. The B-7c
+                # liquidation mark counts as sane: it IS the two-sided NBBO.
+                unreliable = (
+                    None if mark_fallback
+                    else self._group_mark_unreliable(group, quotes)
+                )
                 if unreliable is not None:
                     _r, _c = self._opt_breach[(under, expiry)]
                     log.warning(
@@ -808,11 +878,12 @@ class Watchdog:
                     del self._opt_breach[(under, expiry)]
             if breach is not None and self._confirm_premium_breach(
                 under, expiry, group, breach[0], pl_pct,
+                mark_fallback=mark_fallback, quotes=quotes,
             ):
                 reason, hit = breach
-            elif close_dte > 0 and dte is not None and dte <= close_dte:
+            elif expiry_hit is not None:
                 reason = "option_expiry"
-                hit = f"{dte:.0f} DTE <= {close_dte:.0f} — closing before expiry"
+                hit = expiry_hit
             else:
                 continue
             log.info(
@@ -821,21 +892,162 @@ class Watchdog:
             )
             self._exit_option_group(group, reason, under=under, pl_pct=pl_pct, pl=pl)
 
+    @staticmethod
+    def _premium_breach(
+        stop: float, take: float, basis: float, pl_pct: float,
+    ) -> tuple[str, str] | None:
+        """(reason, text) when `pl_pct` of a net-debit structure breaches the
+        premium stop or take, else None. Pure."""
+        if stop > 0 and basis > 1e-9 and pl_pct <= -stop:
+            return "stop", f"premium stop -{stop:.0f}% (now {pl_pct:+.1f}%)"
+        if take > 0 and basis > 1e-9 and pl_pct >= take:
+            return "take", f"premium take +{take:.0f}% (now {pl_pct:+.1f}%)"
+        return None
+
+    # -- N-1 OPTION_EXITS_RTH_ONLY: session gate ------------------------------ #
+    @staticmethod
+    def _now_et() -> datetime:
+        """Wall clock in ET (tests pin it)."""
+        return datetime.now(timezone.utc).astimezone(_ET)
+
+    def _et_day(self) -> str:
+        """Today's ET date (ISO) for the once-per-session note keys."""
+        try:
+            return self._now_et().date().isoformat()
+        except Exception:  # noqa: BLE001 — a broken clock must not raise here
+            return datetime.now(timezone.utc).astimezone(_ET).date().isoformat()
+
+    def _in_regular_session(self, now_et: datetime | None = None) -> bool:
+        """True when the exchange is in its REGULAR session at `now_et`
+        (default: now). Pure clock math — the orchestrator's cached session
+        calendar (holidays, early closes) when one is registered, else weekday
+        09:30-16:00 ET — so the 30s safety loop makes no broker call. A read
+        that fails reads as 'in session': an exit is then ATTEMPTED rather
+        than parked (fail toward protection)."""
+        try:
+            if now_et is None:
+                now_et = self._now_et()
+            if now_et.tzinfo is not None:
+                now_et = now_et.astimezone(_ET)
+            cal = _active_session_calendar()
+            if cal is not None:
+                times = cal.session_times(now_et.date())
+                if times is None:
+                    return False            # holiday / weekend per the exchange
+                open_t, close_t = times
+            elif now_et.weekday() >= 5:
+                return False
+            else:
+                open_t, close_t = FALLBACK_OPEN, FALLBACK_CLOSE
+            return open_t <= now_et.time() <= close_t
+        except Exception as e:  # noqa: BLE001 — never break the safety loop
+            log.debug("regular-session clock read failed (%s); treating as open.", e)
+            return True
+
+    def _note_option_exit_queued(self, under: str, expiry: str, why: str) -> None:
+        """Log ONCE per (structure, ET date) that a breach met outside the
+        regular session will be closed at the open (N-1)."""
+        key = (under, expiry, self._et_day())
+        if key in self._opt_exit_queued:
+            return
+        if len(self._opt_exit_queued) > _OPT_NOTE_CAP:
+            self._opt_exit_queued = {
+                k: v for k, v in self._opt_exit_queued.items() if k[2] == key[2]
+            }
+        self._opt_exit_queued[key] = why
+        log.info(
+            "OPTION EXIT QUEUED (closed market): %s %s %s — will close at the open",
+            under, expiry, why,
+        )
+
+    # -- B-7c OPTION_MARK_FALLBACK=conservative ------------------------------- #
+    def _group_quotes(
+        self, group: list[Position],
+    ) -> dict[str, tuple[float, float] | None]:
+        """One NBBO read per leg (None = unreadable), reused across the tick."""
+        return {p.symbol: self._leg_quote(p.symbol) for p in group}
+
+    def _conservative_mark(
+        self, under: str, expiry: str, group: list[Position],
+        quotes: dict[str, tuple[float, float] | None], basis: float,
+    ) -> tuple[float, float] | None:
+        """(pl, pl_pct) at LIQUIDATION — long legs at bid, short legs at ask —
+        when the fallback mark is in force this tick, else None (the legacy
+        veto applies). Maintains the consecutive absurd-spread counter: a sane
+        two-sided NBBO resets it, a one-sided quote neither counts nor resets
+        (and is never marked — there is no market to liquidate into), an
+        absurd spread counts; at OPTION_MARK_FALLBACK_TICKS the structure is
+        marked, provided EVERY leg has a two-sided quote. Logs 'OPTION MARK
+        FALLBACK:' at WARNING on the first tick per (structure, ET date) and
+        INFO after."""
+        key = (under, expiry)
+        try:
+            issue = self._group_mark_issue(group, quotes)
+            if issue is None:
+                self._opt_absurd.pop(key, None)     # real market back: trusted
+                return None
+            kind, why = issue
+            if kind != "absurd":
+                return None
+            n = self._opt_absurd.get(key, 0) + 1
+            self._opt_absurd[key] = n
+            need = max(1, int(getattr(self.cfg.risk, "option_mark_fallback_ticks", 10)))
+            if n < need or basis <= 1e-9:
+                return None
+            value = 0.0
+            for p in group:
+                q = quotes.get(p.symbol)
+                if q is None or q[0] <= 0 or q[1] <= 0:
+                    return None          # a leg with no two-sided market: no mark
+                mark = q[0] if p.qty > 0 else q[1]
+                value += mark * p.qty * 100.0
+            pl = value - basis
+            pl_pct = pl / basis * 100.0
+            day = self._et_day()
+            first = (under, expiry, day) not in self._opt_fallback_warned
+            if first:
+                if len(self._opt_fallback_warned) > _OPT_NOTE_CAP:
+                    self._opt_fallback_warned = {
+                        k for k in self._opt_fallback_warned if k[2] == day
+                    }
+                self._opt_fallback_warned.add((under, expiry, day))
+            log.log(
+                logging.WARNING if first else logging.INFO,
+                "OPTION MARK FALLBACK: %s %s conservative mark $%s "
+                "(long@bid/short@ask) -> %+.1f%% after %d absurd-spread ticks (%s)",
+                under, expiry, f"{value:,.0f}", pl_pct, n, why,
+            )
+            return pl, pl_pct
+        except Exception as e:  # noqa: BLE001 — never break the safety loop
+            log.debug("conservative mark failed for %s %s: %s", under, expiry, e)
+            return None
+
     def _confirm_premium_breach(
         self, under: str, expiry: str, group: list[Position],
-        reason: str, pl_pct: float,
+        reason: str, pl_pct: float, *,
+        mark_fallback: bool = False,
+        quotes: dict[str, tuple[float, float] | None] | None = None,
     ) -> bool:
         """True when this premium stop/take breach is CONFIRMED enough to
         close: seen on OPTION_STOP_CONFIRM_TICKS consecutive ticks, each backed
         by a sane two-sided NBBO, and (for stops) outside the open-auction mute
         window. An unreliable quote neither counts NOR resets the streak — a
         venue that stops publishing a real market must not launder a prior
-        valid breach tick into 'all clear'."""
+        valid breach tick into 'all clear'.
+
+        `mark_fallback` (B-7c): the conservative liquidation mark is in force
+        — its absurd spread is WHY the mark exists, so it must not re-veto the
+        tick; a one-sided quote (no market at all) still does. `quotes` are
+        this tick's already-read NBBOs (None = read them here, legacy)."""
         confirm = max(1, int(getattr(self.cfg.risk, "option_stop_confirm_ticks", 2)))
         prior_reason, count = self._opt_breach.get((under, expiry), (reason, 0))
         if prior_reason != reason:
             count = 0  # stop->take flip (or vice versa) is a fresh streak
-        why = self._group_mark_unreliable(group)
+        if mark_fallback:
+            issue = self._group_mark_issue(group, quotes)
+            why = issue[1] if issue is not None and issue[0] == "one_sided" else None
+        else:
+            why = self._group_mark_unreliable(group, quotes)
         if why is not None:
             log.warning(
                 "Option %s %s premium mark unreliable (%s), skipping tick — "
@@ -859,27 +1071,45 @@ class Watchdog:
             return False
         return True
 
-    def _group_mark_unreliable(self, group: list[Position]) -> str | None:
+    def _group_mark_unreliable(
+        self, group: list[Position],
+        quotes: dict[str, tuple[float, float] | None] | None = None,
+    ) -> str | None:
         """Why the structure's exit mark can't be trusted this tick, or None
         when it can. A leg with a readable NBBO must be two-sided (bid AND ask
         > 0) and no wider than OPTION_EXIT_MAX_SPREAD_PCT — the HL/T junk
         quotes were exactly one-sided. A leg whose quote can't be READ at all
         (feed down, no reader) does NOT veto the tick: this loop is the
         options' only protection, and a dead quote feed must never disable the
-        premium stop outright."""
+        premium stop outright. `quotes` = this tick's already-read NBBOs
+        (None = read them here)."""
+        issue = self._group_mark_issue(group, quotes)
+        return None if issue is None else issue[1]
+
+    def _group_mark_issue(
+        self, group: list[Position],
+        quotes: dict[str, tuple[float, float] | None] | None = None,
+    ) -> tuple[str, str] | None:
+        """(kind, why) for the first leg whose NBBO vetoes the exit mark —
+        kind 'one_sided' or 'absurd' — or None (see _group_mark_unreliable,
+        which is this with the kind dropped)."""
         max_spread = getattr(self.cfg.risk, "option_exit_max_spread_pct", 10.0)
         for p in group:
-            q = self._leg_quote(p.symbol)
+            q = self._leg_quote(p.symbol) if quotes is None else quotes.get(p.symbol)
             if q is None:
                 continue  # unknown != bad; fail toward protection
             bid, ask = q
             if bid <= 0 or ask <= 0:
-                return f"one-sided quote on {p.symbol}: bid={bid:.2f} ask={ask:.2f}"
+                return (
+                    "one_sided",
+                    f"one-sided quote on {p.symbol}: bid={bid:.2f} ask={ask:.2f}",
+                )
             spread_pct = (ask - bid) / ((ask + bid) / 2.0) * 100.0
             if max_spread > 0 and spread_pct > max_spread:
                 return (
+                    "absurd",
                     f"absurd {spread_pct:.0f}% spread on {p.symbol} "
-                    f"(> {max_spread:.0f}% cap): bid={bid:.2f} ask={ask:.2f}"
+                    f"(> {max_spread:.0f}% cap): bid={bid:.2f} ask={ask:.2f}",
                 )
         return None
 

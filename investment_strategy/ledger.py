@@ -341,6 +341,22 @@ class TradeRecord(BaseModel):
     entry_stop_pct: Optional[float] = None
     entry_key_signals: list[str] = Field(default_factory=list)
     lots_n: Optional[int] = None
+    # Run-8 C-5: minutes after the session open at DECISION time (buy rows),
+    # so the open-window cohort (B-3) is a ledger query, not a log join.
+    entry_minute: Optional[int] = None
+    # Run-8 C-4 (B-1 audit): what the LAST buy of this name looked like when
+    # a TOP-UP was approved — its conviction / composite / fill price — the
+    # lot number this buy is (1 = starter), and the deterministic events the
+    # authority gate approved it on (empty under TOPUP_AUTHORITY=legacy).
+    prior_conviction: Optional[float] = None
+    prior_composite: Optional[float] = None
+    prior_fill_price: Optional[float] = None
+    topup_n: Optional[int] = None
+    topup_events: list[str] = Field(default_factory=list)
+    # Run-8 B-5: the entry limit buffer tier the option BUY went out on
+    # (1 = every leg <= 5% wide with OI >= 1,000 -> tight buffer; 2 = legacy
+    # 20%); the fill restatement logs 'OPTION ENTRY SLIP:' with it.
+    entry_limit_tier: Optional[int] = None
     # Option BUY rows (critic #13): cost_usd AS FIRST RECORDED (the proposal's
     # estimated debit) when set_fill restated cost_usd at the broker's fill —
     # the HD put of 2026-09-02 was ledgered at $3,213 (32.13 x 100) and filled
@@ -358,8 +374,16 @@ class TradeRecord(BaseModel):
         submitted_cost: Optional[float] = None,
         composite_score: Optional[float] = None,
         tape: Optional[EntryTape] = None,
+        entry_minute: Optional[int] = None,
+        prior_meta: Optional[dict] = None,
     ) -> "TradeRecord":
-        """`submitted_qty`/`submitted_cost` are what actually went to the broker
+        """`entry_minute` (run-8 C-5) is minutes after the open at decision
+        time; `prior_meta` (run-8 C-4) is PortfolioState.last_buy_meta_for()
+        of the name BEFORE this buy — None for a starter — and stamps the
+        prior_* fields plus topup_n = prior n + 1; the approved events ride
+        on decision.topup_events (B-1).
+
+        `submitted_qty`/`submitted_cost` are what actually went to the broker
         when it differs from the decision (whole-share flooring drops the
         sub-share remainder) — the ledger must reflect the order, not the
         intent, or the divergence is invisible to fill reconciliation.
@@ -387,6 +411,12 @@ class TradeRecord(BaseModel):
             verdict=decision.verdict.value, risk_note=decision.reason,
             order_id=order_id,
             composite_score=composite_score,
+            entry_minute=entry_minute,
+            prior_conviction=(prior_meta or {}).get("conviction"),
+            prior_composite=(prior_meta or {}).get("composite"),
+            prior_fill_price=(prior_meta or {}).get("price"),
+            topup_n=(int(prior_meta.get("n") or 0) + 1) if prior_meta else 1,
+            topup_events=list(getattr(decision, "topup_events", None) or []),
             **(
                 {
                     "spy_intraday_ret_at_decision": tape.spy_intraday_ret_at_decision,
@@ -403,6 +433,7 @@ class TradeRecord(BaseModel):
     def from_option(
         cls, decision: RiskDecision, premium: float, order_id: Optional[str],
         entry_signals: Optional[list[str]] = None,
+        entry_limit_tier: Optional[int] = None,
     ) -> "TradeRecord":
         p = decision.proposal
         # OCC ledgering (Aug-23): resolve every leg's OCC symbol from the
@@ -433,7 +464,7 @@ class TradeRecord(BaseModel):
             verdict=decision.verdict.value, risk_note=decision.reason,
             option_strategy=p.option_strategy.value if p.option_strategy else None,
             underlying=p.symbol, occ_symbols=occs, occ_sides=sides,
-            order_id=order_id,
+            order_id=order_id, entry_limit_tier=entry_limit_tier,
         )
 
     @classmethod
@@ -919,6 +950,7 @@ class TradeLedger:
                                 opt_restated.append((
                                     obj.get("symbol"), float(obj.get("cost_usd") or 0.0),
                                     upd["cost_usd"], float(obj.get("entry_price") or 0.0),
+                                    obj.get("entry_limit_tier"),
                                 ))
                                 obj.update(upd)
                             else:
@@ -953,7 +985,15 @@ class TradeLedger:
                     "Ledger: fill %.4f stamped on SELL %s WITHOUT restatement "
                     "(%s) [order %s]", fill_px, sym, why, order_id,
                 )
-            for sym, old_cost, new_cost, quote_px in opt_restated:
+            for sym, old_cost, new_cost, quote_px, tier in opt_restated:
+                # Run-8 B-5: entry slippage vs the decision estimate, by tier
+                # (run-7: HYG 50-lot +12.7% inside the 20% buffer).
+                if quote_px and quote_px > 0:
+                    log.info(
+                        "OPTION ENTRY SLIP: %s est %.4f fill %.4f (%+.1f%%) tier=%s",
+                        sym, quote_px, fill_px, (fill_px / quote_px - 1.0) * 100.0,
+                        tier if tier is not None else "n/a",
+                    )
                 if abs(new_cost - old_cost) < 0.005:
                     log.info(
                         "Ledger: fill %.4f matches recorded premium on OPTION BUY "

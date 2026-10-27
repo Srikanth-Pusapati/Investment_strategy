@@ -163,6 +163,10 @@ class RiskDecision(BaseModel):
     take_profit_pct: float = 0.0
     reason: str = ""                   # why resized/rejected — for audit log
     decided_at: datetime = Field(default_factory=_now)
+    # Run-8 B-1: the deterministic events a TOP-UP was approved on under
+    # TOPUP_AUTHORITY=events_only (empty for fresh buys, legacy mode, and
+    # rejects) — stamped on the ledger row as `topup_events` (C-4).
+    topup_events: list[str] = Field(default_factory=list)
 
 
 # --------------------------------------------------------------------------- #

@@ -307,6 +307,14 @@ class Orchestrator:
         # can fire a decision AT the bell instead of at the next hourly tick
         # (2026-07-13: a tick 17s before the open slept through the first hour).
         self._next_open_utc: datetime | None = None
+        # Run-8 B-3: open-window re-check stash (UTC) + the deferred entries
+        # {symbol: {price, at, date, cycle, conviction}} awaiting their result
+        # line; B-6 put no-quote cooldowns {symbol: cycles left}; B-8
+        # premium-cap slate exclusions {symbol: ET date}.
+        self._recheck_at_utc: datetime | None = None
+        self._deferred_entries: dict[str, dict] = {}
+        self._put_noquote_cooldown: dict[str, int] = {}
+        self._premium_cap_excluded: dict[str, str] = {}
         # Whether the last cycle found the market open. Gates the dashboard
         # refresh: rebuilding the HTML every hour overnight burns an AlpacaClient
         # + full price sweep for byte-identical output. True initially so the
@@ -839,6 +847,11 @@ class Orchestrator:
         if (self._next_open_utc is not None
                 and datetime.now(timezone.utc) >= self._next_open_utc):
             self._next_open_utc = None
+        # Run-8 B-3: the open-window re-check fires once; a consumed stash is
+        # cleared the same way as the bell stash.
+        if (getattr(self, "_recheck_at_utc", None) is not None
+                and datetime.now(timezone.utc) >= self._recheck_at_utc):
+            self._recheck_at_utc = None
 
     def _await_network_settle(self, gap_s: float) -> None:
         """After a resume-from-sleep, wait up to wake_settle_seconds for the
@@ -897,6 +910,11 @@ class Orchestrator:
 
     def _decision_due(self) -> bool:
         if (time.time() - self._last_decision_at) >= self.cfg.decision_interval_s:
+            return True
+        # Run-8 B-3: a deferred open-window entry re-runs the cycle at
+        # open + ENTRY_OPEN_DELAY_MIN instead of waiting for the hourly grid.
+        _recheck = getattr(self, "_recheck_at_utc", None)
+        if _recheck is not None and datetime.now(timezone.utc) >= _recheck:
             return True
         # The hourly grid rarely lands on the bell: when the last closed-market
         # tick stashed the next session open, fire at that moment too instead
@@ -977,6 +995,21 @@ class Orchestrator:
                 return  # already ran today
             if not self.journal.has_records_today():
                 return  # no decisions today (e.g. weekend restart)
+            # Run-8 C-9: a restart after the day's post-mortem already ran
+            # loses the in-state latch (fresh_cycle / reset) but the lesson
+            # file is on disk — do not re-run and overwrite it.
+            try:
+                from .postmortem import _LESSONS_DIR
+                _done_file = _LESSONS_DIR / f"{day}.md"
+                if _done_file.exists():
+                    log.info(
+                        "Nightly post-mortem for %s already on disk (%s) — not "
+                        "re-run after a restart.", day, _done_file,
+                    )
+                    self.state.set_postmortem_done(day)
+                    return
+            except Exception as e:  # noqa: BLE001 — the guard is best-effort
+                log.debug("post-mortem on-disk check failed: %s", e)
             log.info("Running nightly post-mortem for %s …", day)
             from .postmortem import run_postmortem
             result = run_postmortem(self.cfg, self.ledger, self.journal, day,
@@ -1063,6 +1096,11 @@ class Orchestrator:
         # anything stamped with an older seq — notably the falling-names map —
         # is a STALE read from a previous cycle.
         self._cycle_seq = getattr(self, "_cycle_seq", 0) + 1
+        # Run-8 B-6: put no-quote cooldowns count down once per decision cycle.
+        if getattr(self, "_put_noquote_cooldown", None):
+            self._put_noquote_cooldown = {
+                s_: n - 1 for s_, n in self._put_noquote_cooldown.items() if n - 1 > 0
+            }
         # Fresh Quiver data this cycle, but pulled once and shared by the signal
         # and screener layers (both read the same cached live feeds).
         self.quiver.new_cycle()
@@ -1391,6 +1429,9 @@ class Orchestrator:
                     0.0, buy_excluded.get(prop.symbol, "excluded from slate"),
                     prop.rationale[:120] if prop.rationale else "",
                 )
+        # Run-8 B-3: fresh equity entries proposed inside the open window are
+        # deferred to a re-check at open + ENTRY_OPEN_DELAY_MIN (0 = off).
+        proposals = self._defer_open_window_entries(proposals, account)
         # Post-LLM close fence: signal gathering + the LLM span minutes, so the
         # bell can ring mid-cycle. Executing proposals after the close places
         # after-hours orders (Jul 20: 5 proposals returned 41 min past close).
@@ -1418,9 +1459,16 @@ class Orchestrator:
             proposals, account, signal_kinds, tech_ctx=tech_ctx,
             composites=composites, bundles=bundles,
         )
+        # Run-8 B-4: one scoped follow-up for the most bearish ELIGIBLE name
+        # the model returned no verdict for (BEARISH_IGNORED_FALLBACK).
+        self._run_bearish_ignored_fallback(
+            account, signal_kinds, tech_ctx, bundles, composites,
+        )
         # 4a-17: the book's beta AFTER execution, beside the pre-exec line
         # the hedge sized against (ordering gap made countable; no action).
         self._log_post_exec_beta(account)
+        # Run-8 B-3: what the names deferred at the open did by the re-check.
+        self._log_deferred_results(account)
         # Bearish funnel (Jul 30 review): the put path was dormant for 388
         # straight trades and nothing surfaced it. One line per cycle makes
         # downside-conviction leakage visible — see _log_bear_funnel for the
@@ -1529,6 +1577,7 @@ class Orchestrator:
             }
             rh_dead = RobinhoodReader.auth_dead()
             dead: list[str] = []
+            cached_tokens: list[str] = []
             for src in sources:
                 scr = by_name.get(src)
                 if scr is None:
@@ -1542,6 +1591,11 @@ class Orchestrator:
                     why = getattr(scr, "degraded", None) if degraded_modes else None
                     if why:
                         dead.append(f"{src} UNHEALTHY ({why})")
+                    elif degraded_modes and getattr(scr, "cached_age_h", None) is not None:
+                        # Run-8 C-2: the pull failed but a fresh-enough
+                        # snapshot served the cycle — pre-declared degraded
+                        # mode, reported as a token, not a breach.
+                        cached_tokens.append(f"{src}=cached({float(scr.cached_age_h):.0f}h)")
                     continue
                 if src in ("robinhood", "robinhood_scans") and rh_dead:
                     dead.append(f"{src} DEAD (oauth)")
@@ -1552,6 +1606,8 @@ class Orchestrator:
             ) else ""
             if degraded_modes:
                 suffix += self._earnings_source_token()
+            if cached_tokens:
+                suffix += " " + " ".join(cached_tokens)
             total = len(sources)
             if not dead:
                 return f"FEEDS: {total}/{total} healthy{suffix}"
@@ -2950,11 +3006,19 @@ class Orchestrator:
                     "ELIGIBLE name (the schema requires one per listed name)"
                 )
                 self._bear_verdict_stage[s] = "IGNORED"
-                self._journal_decision(
-                    s, "hold", "option", 0.0, 0.0, "put_ignored", 0.0, why, "",
+                # Run-8 C-4: the raw verdict keys and the eligible list ride
+                # on the warning and the journal row, so a miss can be read
+                # as 'returned under another key' vs 'skipped' vs 'truncated'.
+                _audit = (
+                    f"verdicts returned for: {','.join(sorted(verdicts)) or '-'}; "
+                    f"eligible: {','.join(eligible)}"
                 )
-                log.warning("Bearish verdict: %s ELIGIBLE but IGNORED — %s.",
-                            s, why)
+                self._journal_decision(
+                    s, "hold", "option", 0.0, 0.0, "put_ignored", 0.0,
+                    f"{why} [{_audit}]", "",
+                )
+                log.warning("Bearish verdict: %s ELIGIBLE but IGNORED — %s. [%s]",
+                            s, why, _audit)
 
     # BEARISH FUNNEL line bounds: gate-blocked / off-slate names are capped at
     # the top N by score; ELIGIBLE names are NEVER capped (see _log_bear_funnel).
@@ -3062,6 +3126,13 @@ class Orchestrator:
         structurally. `_bearish_lean` still reads discovery."""
         bar = self.cfg.screener.bearish_reserve_bar or 0.4
         out: list[str] = []
+        # Run-8 B-6 / B-8: names resting on a put no-quote cooldown or shut
+        # out by the per-underlying premium cap today leave the bearish slate
+        # — the prompt stops asking for puts the gate cannot fill.
+        today = self._et_now().date().isoformat()
+        cooldown = getattr(self, "_put_noquote_cooldown", {}) or {}
+        cap_excl = getattr(self, "_premium_cap_excluded", {}) or {}
+        excluded: list[str] = []
         for b in bundles:
             comp = composites.get(b.symbol)
             if comp is None:
@@ -3073,8 +3144,19 @@ class Orchestrator:
                     eligible = self._bearish_lean(b)
                 except Exception:  # noqa: BLE001 — a precheck, never a blocker
                     eligible = False
-            if eligible:
-                out.append(b.symbol)
+            if not eligible:
+                continue
+            if cooldown.get(b.symbol, 0) > 0:
+                excluded.append(
+                    f"{b.symbol} (PUT NO-QUOTE: cooldown {cooldown[b.symbol]} cycles)"
+                )
+                continue
+            if cap_excl.get(b.symbol) == today:
+                excluded.append(f"{b.symbol} (option premium cap)")
+                continue
+            out.append(b.symbol)
+        if excluded:
+            log.info("Bearish-slate excluded this cycle: %s", ", ".join(excluded))
         return out
 
     def _bearish_lean(self, bundle) -> bool:
@@ -3407,6 +3489,212 @@ class Orchestrator:
         )
 
     # -- falling-tape core defense (Jul 29) --------------------------------- #
+    # -- run-8 B-3: open-window entry deferral ------------------------------- #
+    def _session_open_et(self) -> datetime | None:
+        """Today's session open as a tz-aware ET datetime (the exchange
+        calendar when loaded, else 09:30), or None on a non-session day."""
+        try:
+            from . import session_calendar as _sc
+            now_et = self._et_now()
+            cal = _sc.active()
+            if cal is not None:
+                times = cal.session_times(now_et.date())
+                if times is None:
+                    return None
+                return datetime.combine(now_et.date(), times[0], tzinfo=now_et.tzinfo)
+            if now_et.weekday() >= 5:
+                return None
+            return now_et.replace(hour=9, minute=30, second=0, microsecond=0)
+        except Exception as e:  # noqa: BLE001 — best-effort clock read
+            log.debug("session open read failed: %s", e)
+            return None
+
+    def _minutes_since_open(self) -> int | None:
+        """Whole minutes since today's session open (negative before it), or
+        None when the open cannot be read / not a session day (run-8 C-5)."""
+        open_et = self._session_open_et()
+        if open_et is None:
+            return None
+        return int((self._et_now() - open_et).total_seconds() // 60)
+
+    def _defer_open_window_entries(self, proposals: list, account) -> list:
+        """ENTRY_OPEN_DELAY_MIN (run-8 B-3): fresh EQUITY buys — not held,
+        not system-managed, not options, not sells — proposed while the
+        session is younger than the delay are dropped from this cycle,
+        journaled as 'deferred', and the loop re-runs a decision cycle at
+        open + delay with fresh quotes (the same anti-chase / overextension
+        gates re-judge whatever the model proposes then). Run-7: 12 of 12
+        entries placed in the first 15 minutes lost ($-17,135, 0% win rate)
+        vs a 38% win rate for 15-60 minute entries. 0 = off."""
+        delay = float(getattr(self.cfg, "entry_open_delay_min", 0.0) or 0.0)
+        if delay <= 0 or not proposals:
+            return proposals
+        mins = self._minutes_since_open()
+        if mins is None or mins >= delay:
+            return proposals
+        open_et = self._session_open_et()
+        if open_et is None:
+            return proposals
+        system = self._system_managed_symbols()
+        today = self._et_now().date().isoformat()
+        recheck_et = open_et + timedelta(minutes=delay)
+        kept: list = []
+        deferred = 0
+        for prop in proposals:
+            is_fresh_equity_buy = (
+                prop.action is Action.BUY
+                and prop.instrument is not Instrument.OPTION
+                and account.position_for(prop.symbol) is None
+                and prop.symbol not in system
+            )
+            if not is_fresh_equity_buy:
+                kept.append(prop)
+                continue
+            px = None
+            try:
+                px = self.broker.latest_price(prop.symbol)
+            except Exception:  # noqa: BLE001 — a price for the result line only
+                px = None
+            self._deferred_entries[prop.symbol] = {
+                "price": px, "at": self._et_now().strftime("%H:%M"),
+                "date": today, "cycle": getattr(self, "_cycle_seq", 0),
+                "conviction": prop.conviction,
+            }
+            deferred += 1
+            log.info(
+                "ENTRY DEFERRED (open window): %s %s at %s (%.0f min after the "
+                "open < %g) -> re-check %s",
+                prop.symbol, f"${px:,.2f}" if px else "px n/a",
+                self._et_now().strftime("%H:%M"), mins, delay,
+                recheck_et.strftime("%H:%M"),
+            )
+            self._journal_decision(
+                prop.symbol, prop.action.value, "equity", prop.conviction,
+                prop.target_weight_pct, "deferred", 0.0,
+                f"ENTRY DEFERRED (open window): re-check {recheck_et.strftime('%H:%M')} ET",
+                prop.rationale[:120] if prop.rationale else "",
+            )
+        if deferred:
+            self._recheck_at_utc = recheck_et.astimezone(timezone.utc)
+        return kept
+
+    def _log_deferred_results(self, account) -> None:
+        """One 'ENTRY DEFERRED RESULT:' line per name deferred by an EARLIER
+        cycle today: the 09:33 -> re-check price move (the cost or saving of
+        waiting) and whether the re-check bought it. Stale (other-day)
+        entries are dropped silently."""
+        pending = getattr(self, "_deferred_entries", None)
+        if not pending:
+            return
+        today = self._et_now().date().isoformat()
+        cycle = getattr(self, "_cycle_seq", 0)
+        for sym, info in list(pending.items()):
+            if info.get("date") != today:
+                pending.pop(sym, None)
+                continue
+            if info.get("cycle") == cycle:
+                continue      # deferred THIS cycle — its result comes next cycle
+            px0 = info.get("price")
+            px1 = None
+            try:
+                px1 = self.broker.latest_price(sym)
+            except Exception:  # noqa: BLE001
+                px1 = None
+            move = (
+                f"{(px1 / px0 - 1.0) * 100.0:+.2f}%"
+                if px0 and px1 else "move n/a"
+            )
+            bought = account.position_for(sym) is not None
+            log.info(
+                "ENTRY DEFERRED RESULT: %s %s %s -> %s %s (%s) %s",
+                sym, info.get("at", "?"), f"${px0:,.2f}" if px0 else "px n/a",
+                self._et_now().strftime("%H:%M"), f"${px1:,.2f}" if px1 else "px n/a",
+                move, "bought" if bought else "dropped",
+            )
+            pending.pop(sym, None)
+
+    # -- run-8 B-4: bearish IGNORED fallback --------------------------------- #
+    def _run_bearish_ignored_fallback(
+        self, account, signal_kinds, tech_ctx: dict[str, dict],
+        bundles: list | None, composites: dict[str, float] | None,
+    ) -> None:
+        """BEARISH_IGNORED_FALLBACK=proxy_put: for the single most bearish
+        ELIGIBLE name the model returned no verdict for this cycle, ask ONE
+        scoped follow-up (engine.decide_bearish_fallback) — a defined-risk
+        put structure or HOLD; silence = no trade — and run whatever comes
+        back through the normal _handle_option gate stack (which includes
+        the proxy-put liquidity fallback). Capped at one call per cycle and
+        two fallback attempts per name per day. 'log_only' (default) =
+        run-7 behaviour."""
+        mode = str(getattr(self.cfg, "bearish_ignored_fallback", "log_only") or "log_only")
+        if mode != "proxy_put" or self.options is None or not bundles:
+            return
+        stages = getattr(self, "_bear_verdict_stage", {}) or {}
+        ignored = [s_ for s_, st in stages.items() if st == "IGNORED"]
+        if not ignored:
+            return
+        if not self.broker.is_market_open():
+            return
+        comps = composites or {}
+        sym = min(ignored, key=lambda s_: comps.get(s_, 0.0))
+        attempts = 0
+        try:
+            for rec in self.journal.today():
+                if rec.symbol == sym and rec.reason.startswith("BEARISH FALLBACK"):
+                    attempts += 1
+        except Exception:  # noqa: BLE001
+            attempts = 0
+        if attempts >= 2:
+            log.info(
+                "BEARISH FALLBACK: %s IGNORED -> skipped (%d fallback attempt(s) "
+                "already today, daily cap 2).", sym, attempts,
+            )
+            return
+        bundle = next((b for b in bundles if b.symbol == sym), None)
+        if bundle is None:
+            return
+        why = (getattr(self, "_bear_eligibility", {}).get(sym) or (True, ""))[1]
+        try:
+            price = self.broker.latest_price(sym)
+        except Exception:  # noqa: BLE001
+            price = None
+        self._stamp_liveness()
+        decider = getattr(self.engine, "decide_bearish_fallback", None)
+        if not callable(decider):
+            return
+        try:
+            opt = decider(
+                bundle, account, why or "composite below the bearish bar",
+                price=price, regime_label=self._regime_label, regime_reason="",
+                curated=self._curated_lessons(),
+            )
+        except Exception as e:  # noqa: BLE001 — a bonus path, never a blocker
+            log.warning("BEARISH FALLBACK: %s IGNORED -> error (%s).", sym, e)
+            return
+        if opt is None:
+            log.info(
+                "BEARISH FALLBACK: %s IGNORED -> deterministic follow-up -> "
+                "veto:none/hold (no trade).", sym,
+            )
+            self._journal_decision(
+                sym, "hold", "option", 0.0, 0.0, "rejected", 0.0,
+                "BEARISH FALLBACK declined (model HOLD / no put returned)", "",
+            )
+            return
+        _strat = getattr(opt.option_strategy, "value", opt.option_strategy)
+        log.info(
+            "BEARISH FALLBACK: %s IGNORED -> deterministic follow-up -> %s "
+            "proposed (%s legs) -> gate stack.",
+            sym, _strat, len(opt.option_legs or []),
+        )
+        self._journal_decision(
+            sym, "buy", "option", opt.conviction, opt.target_weight_pct,
+            "proposed", 0.0, f"BEARISH FALLBACK {_strat} -> gate stack", "",
+        )
+        self._handle_option(
+            opt, account, signal_kinds.get(sym, []), tech=tech_ctx.get(sym),
+        )
+
     @staticmethod
     def _et_now() -> datetime:
         """Wall clock in exchange time — the ET session is the unit the
@@ -5467,11 +5755,19 @@ class Orchestrator:
                     tape = self._entry_tape(
                         proposal.symbol, decision, vol, tech, sub.notional,
                     )
+                    # Run-8 C-4/C-5: the prior lot's stamp (None for a
+                    # starter) and the minute after the open ride on the row.
+                    _meta_reader = getattr(self.state, "last_buy_meta_for", None)
+                    _prior_meta = (
+                        _meta_reader(proposal.symbol) if callable(_meta_reader) else None
+                    )
                     self.ledger.record(TradeRecord.from_equity(
                         decision, price, sub.order_id,
                         entry_signals=signal_kinds or [],
                         submitted_qty=sub.qty, submitted_cost=sub.notional,
-                        composite_score=composite, tape=tape))
+                        composite_score=composite, tape=tape,
+                        entry_minute=self._minutes_since_open(),
+                        prior_meta=_prior_meta))
                     self._pending_oids.append((sub.order_id, proposal.symbol))
                     # Persist at submit (mirror the watchdog) — crash-safe fill-check.
                     self.state.add_pending_order(sub.order_id, proposal.symbol)
@@ -5480,8 +5776,13 @@ class Orchestrator:
                     self.state.register_entry(proposal.symbol)
                     # Stamp EVERY buy for the top-up spacing guard (churn guard)
                     # and record conviction for the top-up evidence gate (B4).
+                    # Run-8 B-1: the stamp the NEXT top-up is judged against
+                    # (composite, price, cited families, approved events).
                     self.state.register_buy(
                         proposal.symbol, conviction=proposal.conviction,
+                        composite=composite, price=price,
+                        families=sorted(fams) if fams else None,
+                        events=list(getattr(decision, "topup_events", None) or []),
                     )
                     # Daily concentration accumulator: count $ against the
                     # per-symbol daily ceiling (concentration guard A1).
@@ -5793,6 +6094,30 @@ class Orchestrator:
                 f"{proposal.symbol} for {proxy_for} -> {decision.verdict.value}"
             )
         if decision.verdict == RiskVerdict.REJECTED:
+            _reason = decision.reason or ""
+            # Run-8 B-6: a put that died on a quote-less leg rests for
+            # PUT_NOQUOTE_COOLDOWN_CYCLES decision cycles (0 = off) instead
+            # of re-proposing the same dead contract every hour.
+            _cool = int(getattr(_cfg, "put_noquote_cooldown_cycles", 0) or 0)
+            if is_put_play and _cool > 0 and _reason.startswith("no NBBO on feed"):
+                self._put_noquote_cooldown[proposal.symbol] = _cool
+                log.info(
+                    "PUT NO-QUOTE: %s cooldown %d cycles (%s).",
+                    proposal.symbol, _cool, _reason[:120],
+                )
+            # Run-8 B-8: an underlying the per-underlying premium cap shut
+            # out leaves the bearish slate for the rest of the ET day.
+            if (
+                bool(getattr(_cfg, "premium_cap_slate_exclude", False))
+                and "PER-UNDERLYING PREMIUM CAP" in _reason
+            ):
+                self._premium_cap_excluded[proposal.symbol] = (
+                    self._et_now().date().isoformat()
+                )
+                log.info(
+                    "Bearish-slate exclusion armed: %s (option premium cap) for "
+                    "the rest of today.", proposal.symbol,
+                )
             # Put-liquidity fallback (Aug 14): a model-proposed put that died
             # ONLY on its own chain's liquidity re-expresses on the liquid
             # proxy ETF. Trigger on the liquidity reasons alone — every other
@@ -5805,14 +6130,29 @@ class Orchestrator:
                 self._propose_proxy_put(proposal, account, signal_kinds)
             return
         legs = self.options.build_legs(proposal)
+        # Run-8 B-5: a structure whose EVERY leg quotes <= 5% wide with
+        # OI >= 1,000 is tier 1 and takes the tighter entry limit buffer
+        # (OPTION_ENTRY_TIER1_BUFFER_PCT); anything else keeps the 20%
+        # legacy buffer (tier 2). 0 = off (every structure tier 2).
+        _t1_pct = float(getattr(getattr(_cfg, "risk", None),
+                                "option_entry_tier1_buffer_pct", 0.0) or 0.0)
+        _tier = 2
+        if _t1_pct > 0 and liquidity and all(
+            l.get("rel_spread_pct") is not None and l["rel_spread_pct"] <= 5.0
+            and l.get("oi") is not None and l["oi"] >= 1000
+            for l in liquidity
+        ):
+            _tier = 1
+        _buf_kw = {"limit_buffer_pct": _t1_pct} if _tier == 1 else {}
         with self._trade_lock:
             oid = self.broker.submit_option_legs(
                 legs, qty=int(decision.approved_qty),
-                est_premium_per_share=premium,
+                est_premium_per_share=premium, **_buf_kw,
             )
         if oid:
             self.ledger.record(TradeRecord.from_option(
-                decision, premium, oid, entry_signals=signal_kinds or []))
+                decision, premium, oid, entry_signals=signal_kinds or [],
+                entry_limit_tier=_tier))
             self._pending_oids.append((oid, proposal.symbol))
             # Persist at submit (mirror the watchdog) — crash-safe fill-check.
             self.state.add_pending_order(oid, proposal.symbol)

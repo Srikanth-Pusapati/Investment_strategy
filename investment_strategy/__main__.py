@@ -42,6 +42,30 @@ class _TruncateFilter(logging.Filter):
         return True
 
 
+class _YFinanceNoiseFilter(logging.Filter):
+    """Demote yfinance's own ERROR-level chatter to DEBUG — never drop it.
+
+    yfinance logs `$HYG: possibly delisted; no price data found (period=1y)`,
+    `No fundamentals data found for symbol: HYG` and the underlying `404 Client
+    Error` at ERROR from its own logger on every transient Yahoo miss (Oct 9
+    2026: 31 lines in a 3-minute blip; ETFs have no fundamentals at all). Our
+    own code already handles the empty frame, so these are not errors of ours,
+    yet they inflate the day's ERROR count the morning check grades. The record
+    keeps its text and is still written — at DEBUG (run-8 C-3)."""
+
+    NOISE = ("possibly delisted", "No fundamentals data found", "404 Client Error")
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        try:
+            msg = record.getMessage()
+        except Exception:
+            return True
+        if record.levelno > logging.DEBUG and any(s in msg for s in self.NOISE):
+            record.levelno = logging.DEBUG
+            record.levelname = logging.getLevelName(logging.DEBUG)
+        return True
+
+
 def dated_log_name(default_name: str) -> str:
     """TimedRotatingFileHandler namer: turn the default rotated name
     (`logs/bot.log.2026-07-06`) into a per-day, repo-friendly label
@@ -96,6 +120,9 @@ def _setup_logging() -> None:
     # yfinance echoes the upstream HTML error page on a 5xx; truncate it so one
     # provider hiccup can't bury the day's real warnings.
     logging.getLogger("yfinance").addFilter(_TruncateFilter())
+    # ...and its "possibly delisted" / "No fundamentals" / 404 lines are DEBUG
+    # for us, not ERROR (C-3) — kept in the log, out of the severity count.
+    logging.getLogger("yfinance").addFilter(_YFinanceNoiseFilter())
 
 
 def _prevent_sleep() -> None:

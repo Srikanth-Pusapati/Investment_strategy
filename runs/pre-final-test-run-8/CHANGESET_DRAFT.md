@@ -205,3 +205,58 @@ handshake happens on the operator's schedule. `rh=dead` stays pre-declared; this
   building or the sleeve stays model-proposed.
 - Does IGNORED persist at ~4/session (B-4) or vanish (as on Sep 25)?
 - Does EDGAR stall again (C-2 priority)?
+
+---
+
+## Revision at the run-7 close — Mon 2026-10-26 (this is the change-set that ships)
+
+Run-7 closed **FAIL** (`../pre-final-test-run-7/RUN_SUMMARY.md`: expectancy −$855/trip at t −1.90,
+alpha −0.10%/day, β 0.27 vs 1.0, capture −2.5% up / 45.1% down; drawdown and sell-validity passed).
+Contract v3's decision rule: one diagnostic (the RUN_SUMMARY) + ONE change-set (this) + a fresh
+window (run-8, contract v4 `EVAL_CONTRACT.md`). Built on `feature/run8-changeset` in an isolated
+worktree; every item has a failing test first, a knob OFF in code / ON in `docs/RUN8_SWITCH.md`
+section 1c, a log handle pinned in `tests/test_contract_handles.py`, and a removal metric in the
+contract's "Recorded metrics" table.
+
+### Section E answered (the questions this draft left open)
+
+| question | answer from the full window |
+|---|---|
+| Does the open-print cohort keep losing (B-3)? | **Yes — 0 for 12** (−$17,135, mean −$1,428) vs 38% WR for 15–60 min entries. `[V]` now, was `[H, n=6]`. |
+| Do the top-up lots end positive or negative (B-1/B-2)? | Negative: the one 3-lot name (INTC) lost $7,474, a quarter of the window's realized loss; the 2-lot name lost $703. Starters alone: 17% WR, −$873 mean. |
+| Does the credit-ETF put sleeve make money on a real down tape? | Options net +$3,801 over 6 window trips (HYG +$4,450, IWM proxy +$2,402, AGNC +$1,850; LQD −$2,541, NU −$2,750). The sleeve is the only positive sleeve — but its **protection failed**: HYG 78/79P unmarkable for 13 sessions (977–3,055 `premium mark unreliable` ticks/day), premium stop never evaluated, −65% unrealized at the close. B-7c is therefore the highest-priority option item; B-4 stays worth building (the sleeve fills and pays when it fires). |
+| Does IGNORED persist (B-4)? | Yes: 1–30 name-cycles per session, every session Oct 1–26 (30/25/23/19 on Oct 1–6; 18 on Oct 15). |
+| Does EDGAR stall again (C-2)? | Twice (Oct 13, Oct 16), one cycle each — under the bar; C-2 ships anyway as the pre-declared mode. |
+
+### Items shipped (status at the PR)
+
+| # | item | where | handle | tests |
+|---|---|---|---|---|
+| B-1 | `TOPUP_AUTHORITY=events_only`, `TOPUP_MAX_MULTIPLE_OF_HELD=1.0` (+ `TOPUP_MIN_COMPOSITE_DELTA`, `TOPUP_MIN_GAIN_PCT`) | `risk.py` `_topup_authority`; `state.py` `last_buy_meta`; `models.RiskDecision.topup_events` | `TOPUP AUTHORITY:` | test_run8_changeset |
+| B-2 | `MAX_SYMBOL_EXPOSURE_PCT` 18 → 12 (.env), `MAX_TOP3_SATELLITE_PCT=30` | `risk.py` `_top3_bucket_clamp` | `BUCKET CAP:` | test_run8_changeset |
+| B-3 | `ENTRY_OPEN_DELAY_MIN=15` | `orchestrator.py` `_defer_open_window_entries`, `_log_deferred_results`, `_decision_due` re-check stash | `ENTRY DEFERRED (open window):` / `ENTRY DEFERRED RESULT:` | test_run8_orchestrator |
+| B-4 | `BEARISH_IGNORED_FALLBACK=proxy_put` — **variant**: the deterministic proposal is the model's own scoped follow-up (`engine.decide_bearish_fallback`: put structure or HOLD; silence = no trade), capped at 1 call/cycle and 2/name/day, then the full gate stack + proxy fallback. The draft's "build the contract deterministically, model vetoes" form would have needed a second strike-picker; the follow-up reuses the tested S-3/S-4 path and keeps the model accountable for the IGNORED name. | `orchestrator.py` `_run_bearish_ignored_fallback`; `decision/engine.py` | `BEARISH FALLBACK:` | test_run8_orchestrator, test_run8_engine |
+| B-5 | `OPTION_ENTRY_TIER1_BUFFER_PCT=5` (tier 1 = every leg ≤ 5% wide, OI ≥ 1,000) | `alpaca_client.submit_option_legs(limit_buffer_pct=)`; `orchestrator._handle_option`; ledger `entry_limit_tier` + slip line | `OPTION ENTRY SLIP:` | test_run8_watchdog, test_run8_orchestrator |
+| B-6 | honest `no NBBO on feed for <OCC>` reject + `PUT_NOQUOTE_COOLDOWN_CYCLES=8` | `risk.evaluate_option`; `orchestrator._handle_option` / `_bear_precheck_names` | `PUT NO-QUOTE:` / `Bearish-slate excluded this cycle:` | test_run8_changeset, test_run8_orchestrator |
+| B-7a | entry spread cap = min(entry cap, `OPTION_EXIT_MAX_SPREAD_PCT`) | `risk._legs_liquid` | (reject text) | test_run8_changeset |
+| B-7b | `OPTION_OI_PER_CONTRACT=20` (contracts ≤ thinnest OI / 20) | `risk.evaluate_option` | `OPTION LOT CAP:` | test_run8_changeset |
+| B-7c | `OPTION_MARK_FALLBACK=conservative`, `OPTION_MARK_FALLBACK_TICKS=10` — liquidation mark (long@bid / short@ask) after 10 absurd-spread ticks; one-sided quotes still skip | `watchdog.py` `_conservative_mark`, `_group_mark_issue` | `OPTION MARK FALLBACK:` | test_run8_watchdog |
+| B-8 | `PREMIUM_CAP_SLATE_EXCLUDE=on` | `orchestrator._handle_option` / `_bear_precheck_names` | `(option premium cap)` | test_run8_orchestrator |
+| **N-1 (new)** | `OPTION_EXITS_RTH_ONLY=on` — option stop/take/expiry closes only in the regular session; outside it ONE queued line, no page. Oct 26: 113 pre-market rejects (Alpaca 42210000), each a CRITICAL. | `watchdog.py` `_in_regular_session`, `_note_option_exit_queued` | `OPTION EXIT QUEUED` | test_run8_watchdog |
+| C-1 | in-session check automated (09:55 / 15:35 ET, pages on FAIL) | `ops/in_session_check.sh`, `ops/launchd/com.investment-strategy.session-check.plist` | `logs/morning_check.log` | (shell `sh -n`, `plutil`) |
+| C-2 | EDGAR retry ×2 + `INSIDER_CACHE_MAX_AGE_H=24` snapshot → `insider=cached(<h>h)` | `screener/insider_feed.py`; `orchestrator._feed_health_line` | `INSIDER CACHED:` / FEEDS token | test_run8_feeds, test_run8_orchestrator |
+| C-3 | yfinance "possibly delisted" / "No fundamentals" / 404 at DEBUG | `__main__.py` `_YFinanceNoiseFilter` | — | test_run8_feeds |
+| C-4 | `prior_conviction`/`prior_composite`/`prior_fill_price`/`topup_n`/`topup_events` on buy rows; IGNORED audit text | `ledger.py`, `orchestrator._reconcile_bear_verdicts` | `[verdicts returned for: …; eligible: …]` | test_run8_orchestrator |
+| C-5 | `entry_minute` on buy rows | `ledger.from_equity`; `orchestrator._minutes_since_open` | — | test_run8_orchestrator |
+| C-6 | contract v4 text | `EVAL_CONTRACT.md` | — | test_contract_handles |
+| C-7 | Robinhood token < 24 h WARN | `scripts/run8_morning_check.py` | `WARN robinhood: token expires in` | test_run8_morning_check |
+| C-9 | closed-day restart does not re-run the post-mortem | `orchestrator._maybe_run_postmortem` | `already on disk` | test_run8_orchestrator |
+| ops | `scripts/run8_switch.sh` (same flat account accepted; live tree on `main`), `scripts/flatten_only.py` (flatten, no relaunch) | scripts | — | `sh -n` |
+
+**Not shipped / deliberately left:** C-8 code hygiene (orchestrator split) — after run-8; the
+strategy-level question the kill criterion asks (shrink the satellite sleeve?) is NOT pre-empted here:
+run-8 keeps the satellite sleeve so the pooled ex-top-3 test can be run on two windows as designed.
+
+### Classification (drives pooling)
+Every B item and N-1 change the fingerprint → run-8 is a fresh pool. C items are measurement/ops.
+`TOPUP_MIN_CONVICTION_DELTA` stays pinned (0.05) but is inert under `events_only`.

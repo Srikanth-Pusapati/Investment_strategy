@@ -604,6 +604,7 @@ class AlpacaClient:
     def submit_option_legs(
         self, legs: list[OptionLegRequest], qty: int = 1,
         est_premium_per_share: float | None = None,
+        limit_buffer_pct: float | None = None,
     ) -> Optional[str]:
         """Submit a single- or multi-leg options ENTRY order (DAY).
 
@@ -612,14 +613,24 @@ class AlpacaClient:
         ENTRY_LIMIT_BUFFER_PCT above for why this replaced a plain market
         order). Falls back to a market order only when no estimate is
         available. Caller is responsible for building OCC-symbol legs that
-        form a defined-risk play."""
+        form a defined-risk play.
+
+        `limit_buffer_pct` (run-8 B-5, OPTION_ENTRY_TIER1_BUFFER_PCT): when
+        given and > 0 it replaces ENTRY_LIMIT_BUFFER_PCT for THIS order — the
+        caller passes it for a tier-1 structure (every leg tight and deep,
+        where 20% of headroom is an invitation: run-7 HYG filled +12.7% over
+        the estimate inside it). The ENTRY_LIMIT_MIN_BUFFER $ floor still
+        applies. None / 0 = the legacy 20%."""
         if not self.cfg.can_open_orders:
             log.warning("Option order blocked: new orders disabled (kill switch).")
             return None
+        buffer_pct = self.ENTRY_LIMIT_BUFFER_PCT
+        if limit_buffer_pct is not None and limit_buffer_pct > 0:
+            buffer_pct = float(limit_buffer_pct)
         limit_price = None
         if est_premium_per_share is not None and est_premium_per_share > 0:
             buffer = max(
-                est_premium_per_share * self.ENTRY_LIMIT_BUFFER_PCT / 100.0,
+                est_premium_per_share * buffer_pct / 100.0,
                 self.ENTRY_LIMIT_MIN_BUFFER,
             )
             limit_price = round(est_premium_per_share + buffer, 2)
@@ -653,8 +664,10 @@ class AlpacaClient:
             log.error("submit_option_legs failed: %s", e)
             return None
         log.info(
-            "OPTION %d-leg order qty=%d limit=%s (order %s)",
-            len(legs), qty, limit_price, placed.id,
+            "OPTION %d-leg order qty=%d limit=%s buffer=%s (order %s)",
+            len(legs), qty, limit_price,
+            f"{buffer_pct:g}%" if limit_price is not None else "n/a",
+            placed.id,
         )
         return str(placed.id)
 

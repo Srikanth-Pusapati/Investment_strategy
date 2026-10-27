@@ -42,3 +42,70 @@ Cause: owner's instruction — keep `main` and `feature/preview` only; merge int
 Action: branch policy written into README (two permanent branches; next-window code on a short-lived
 `feature/runN-changeset` so preview stays mergeable); TODO N1 done, N6 dropped (nothing left to archive).
 Plan: closes N1, N6; opens nothing.
+
+## 2026-10-26 15:10 CT — run-7 verdict taken six days late: FAIL
+Facts: the pinned v3 command (`--start 2026-09-22 --end 2026-10-20`, CSVs from yfinance) printed
+**VERDICT: FAIL** — rule 2 expectancy (N=30, mean −$855, t −1.90 vs 1.70, PF 0.39, WR 20%, ex-top-3
+−$1,422), rule 4 alpha (−0.103%/day), rule 5a/5b beta (ex-ante 0.73; OLS 0.27, CI [−0.13, 0.66]),
+rule 7 capture (up −2.5% / down 45.1%); rules 6 (DD −3.20%) and 8 (0 unsanctioned) pass. Book
+$1,000,000 → $976,827 (−2.32%) vs SPY −0.58%, QQQ −3.22%. Saved as
+`runs/pre-final-test-run-7/CHECKER_2026-10-20_close.txt`; diagnostic in `RUN_SUMMARY.md`.
+Cause: nobody ran the verdict on Oct 20; the bot kept trading the frozen fingerprint to Oct 26.
+Backfill: two unjournaled restarts in the window — Oct 8 09:42 CT (battery sleep mid-session,
+`On BATTERY during market hours` page) and Oct 9 07:38 CT (14-min gap, manual) — plus 32 battery
+CRITICALs and 9 in-hours dark gaps over the run; Robinhood auth dead since Oct 13 15:16 CT.
+Action: none on the window (it is closed); the operator asked for a stop and a rebuild.
+Plan: closes TODO X1/X5; opens the run-8 switch items.
+
+## 2026-10-26 15:31 CT — run-7 bot stopped; account flattens at the Oct 27 open
+Facts: deadman and claude-daily launchd agents disabled + booted out (nothing may relaunch the
+stopped bot); kill switch ENGAGED (`state/KILL`); SIGTERM to pid 13607 (zombie until the panel
+reaps it; no bot process). `scripts/flatten_only.py` launched detached (pid 31829,
+`logs/flatten_only.log`): waits for 09:31 ET Tue Oct 27, cancels every order, closes every
+position short-legs-first (the Oct 26 pre-market showed Alpaca rejects option market orders
+outside RTH, code 42210000, 113×), and does NOT relaunch. Positions at the stop: 7 equities
+($635k), 6 option legs (HYG 78/79P, AAL 12P, ROK 440P, IWM 277/263 spread), 12 open orders.
+Action: operator decision ("stop the run, close old options spreads, fix the model for run-8").
+Plan: TODO "Run-8 switch" N-items; re-arm the supervisors at the switch (`docs/RUN8_SWITCH.md` §0.5).
+
+## 2026-10-26 22:30 CT — run-8 change-set built on feature/run8-changeset (worktree)
+Facts: B-1..B-8, N-1 (new: option exits RTH-only), C-1..C-5, C-7, C-9 implemented with failing
+tests first, knobs OFF in code / ON in `docs/RUN8_SWITCH.md` §1c, handles pinned in
+`tests/test_contract_handles.py` against contract v4 (`runs/pre-final-test-run-8/EVAL_CONTRACT.md`,
+rules = v3 unchanged, dates pinned for an Oct 28 day 1 → Nov 25 session 21). Ledger evidence
+that shaped the set: open-window entries 0/12 (−$17,135), the 3-lot INTC −$7,474, no
+composite/conviction/family bucket positive, 977–3,055 unmarkable option ticks/day Oct 8–20.
+B-4 ships as a scoped model follow-up (put or HOLD; silence = no trade), not a code-built contract
+with a veto — the draft's variant needed a second strike-picker. New scripts: `run8_switch.sh`
+(same flat account accepted; live tree on `main`), `run8_morning_check.py` (FROZEN_TREE pinned at
+pre-registration), `flatten_only.py`; C-1 `ops/in_session_check.sh` + plist. Suite: see the PR.
+Action: PR `feature/run8-changeset` → `main`; the operator merges, then runs §0 of RUN8_SWITCH.md.
+Plan: closes TODO B-1..B-8, C-1..C-7, C-9, N10–N12, X3, X4 (draft); opens the run-8 switch list.
+
+## 2026-10-27 12:30 CT — account flat; PR #2 re-pointed at feature/preview; direction report written
+Facts: the detached waiter (`scripts/flatten_only.py`, pid 31829) ran at 09:31 ET — 15 orders cancelled, every
+position closed short-legs-first, `account is flat` at 09:33:34 ET, equity $977,048.52, 0 positions, 0 orders;
+the bot stayed down (kill switch on, deadman and claude-daily unloaded). Owner could not merge PR #2 in their
+flow: it had been opened against `main`, but the README branch policy routes every change through
+`feature/preview` (short-lived `feature/runN-changeset` → `feature/preview`; `feature/preview` → `main` at the
+switch). `feature/preview` was one commit ahead of `main` (4212cf6) and conflicted with the branch in TODO.md and
+this file. Merged `feature/preview` into `feature/run8-changeset` (c6153ea; that commit shipped the conflict
+markers because the resolver did not run — fixed in 6f3d432), PR #2 base changed to `feature/preview`, now
+MERGEABLE/CLEAN. GitHub itself reported no blocker (owner is ADMIN, no branch protection). Repository is PUBLIC
+(`isPrivate: false`); verified the scrubbed history carries no key values (every key line in the historical
+`.env.example` is empty); TODO N7 stands.
+Cause: owner's instruction — do not start run-8 today; first a written direction: how the model is to be
+improved, with a clear vision, committed to the repo.
+Action: `docs/MODEL_DIRECTION.md` — scorecard of the seven windows, what is proven (system, mechanical exits,
+`events_only`, hedge/defense), what is a proven liability (open-print entries, top-ups, bullish options, blind
+option protection, beta drift from satellite count), what is unproven (signal IC, conviction calibration, the
+put sleeve), why the current approach cannot reach profitable on its own, the vision (sleeves that earn their
+allocation; the model as analyst/event specialist/veto, never sizer), the target shape by sleeve, the roadmap
+(Phase 0 switch + a core-plus-defense control arm on a second paper account; Phase 1 run-8 with offline research
+R-1..R-5; Phase 2 decision tree; Phase 3 live pilot Jan 2027 earliest), process rules, risks, and five owner
+decisions; §2b is an independent cross-run recompute of the four ledgers (`scripts/ledger_crossrun.py` →
+`runs/LEDGER_CROSSRUN_2026-10-27.md`: ex-top-3 mean negative in all four runs, pooled 5–7 N=68 mean −$144,
+LB −$820). Linked from README. Attribution trailers: the owner's rule (none) applies from this commit on;
+cb6b2b7 keeps its trailer (amend blocked).
+Plan: opens TODO D1–D5 (owner decisions) and R-1..R-7 (research + measurement track, mapped onto L7/L8); S1 re-worded;
+run-8 switch (S3–S9) waits on D1/D2.

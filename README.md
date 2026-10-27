@@ -153,6 +153,7 @@ it by accident.
 |---|---|
 | know what to do next | [`TODO.md`](TODO.md) — the plan: one line per item, always current |
 | understand the design and why each decision was made | [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) |
+| see where the strategy stands after seven windows and where it is going (vision, diagnosis, roadmap) | [`docs/MODEL_DIRECTION.md`](docs/MODEL_DIRECTION.md) |
 | look up a config knob | [`docs/env-variable-reference.md`](docs/env-variable-reference.md) |
 | switch trial windows or check readiness | [`docs/RUN7_SWITCH.md`](docs/RUN7_SWITCH.md), `scripts/run7_morning_check.py` |
 | see how a window was judged | [`runs/`](runs/README.md) — one folder per window with its pre-registered contract and checker output |
