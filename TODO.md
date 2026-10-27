@@ -1,16 +1,15 @@
 # TODO — the plan
 
-Updated 2026-10-26. One line per item; `[ ]` open, `[~]` in progress, `[x]` done (kept two weeks, then pruned).
+Updated 2026-10-27. One line per item; `[ ]` open, `[~]` in progress, `[x]` done (kept two weeks, then pruned).
 History and reasons live in [`docs/journal/JOURNAL.md`](docs/journal/JOURNAL.md). **Run-7 closed FAIL on Oct 20**
 ([`runs/pre-final-test-run-7/RUN_SUMMARY.md`](runs/pre-final-test-run-7/RUN_SUMMARY.md)); the bot was stopped Oct 26 and the
 account flattens at the Oct 27 open. The run-8 change-set is built ([`CHANGESET_DRAFT.md`](runs/pre-final-test-run-8/CHANGESET_DRAFT.md),
-revision at the close) and switches in via [`docs/RUN8_SWITCH.md`](docs/RUN8_SWITCH.md). **Freeze** resumes at the switch: no change to
+revision at the close) and switches in via [`docs/RUN8_SWITCH.md`](docs/RUN8_SWITCH.md). **The switch waits on D1/D2 below** (owner, Oct 27: direction first — [`docs/MODEL_DIRECTION.md`](docs/MODEL_DIRECTION.md)). **Freeze** resumes at the switch: no change to
 `investment_strategy/` or `.env` through the run-8 close (session 21 ≈ Wed Nov 25; Dec 3 if extended).
 
 ## Now — the run-8 switch, in order
 
 - [ ] S1 **Merge PR #2** `feature/run8-changeset` → `feature/preview` on GitHub (operator); `feature/preview` → `main` is a second PR opened at the switch (S6), so `main` stays the run-7 tree until then
-- [ ] S2 **Tue Oct 27 ~09:40 ET:** `tail -5 logs/flatten_only.log` must end `account is flat`; on `INCOMPLETE`, rerun `nohup .venv/bin/python scripts/flatten_only.py >> logs/flatten_only.log 2>&1 &` during RTH or close the leftover by hand (operator or session)
 - [ ] S3 **Account:** keep `PA3BGBBR2NB5` flat (~$977k) or create a fresh $1M paper account and swap `ALPACA_API_KEY`/`ALPACA_SECRET_KEY` in `.env` (operator)
 - [ ] S4 **`.env`:** paste `docs/RUN8_SWITCH.md` §1c; change the existing `MAX_SYMBOL_EXPOSURE_PCT=18.0` to `12.0`; the §1c grep must count 12 (operator)
 - [ ] S5 **Robinhood:** `.venv/bin/python -m investment_strategy.portfolio.robinhood_auth login` — auth dead since Oct 13 (operator)
@@ -42,6 +41,12 @@ revision at the close) and switches in via [`docs/RUN8_SWITCH.md`](docs/RUN8_SWI
 
 ## Later / research (after run-8 is pre-registered)
 
+- [ ] R-1 Signal IC program on the pooled ledger + every `signal_history` snapshot (1/3/5/10 d forward excess return by family and cohort, date-clustered) — decision rule for run-9 written before the numbers are read (subsumes L7/L8)
+- [ ] R-2 Satellite-budget replay: run-6/7 ledgers through the exit stack at satellite budgets 0 / 25 / 50% with the core as beta carrier → return, drawdown, capture, β per budget
+- [ ] R-3 Decision-eval set from `decisions/*.jsonl` (Jul 7 →) joined to realized forward returns, so a prompt or model change is scored offline before it ships
+- [ ] R-4 Conviction calibration (Brier, reliability table) per run and pooled — decides whether conviction may size anything in run-9
+- [ ] R-5 Always-on host (`ops/Dockerfile` on a VPS or Mac mini; deadman/panel/launchd move with it) — removes the battery class (N8's real fix)
+- [ ] R-6 Control-arm config for a second paper account: test that `MAX_OPEN_POSITIONS=0` rejects every fresh-name BUY while core fill, PSQ hedge and put proposals pass; second checkout with its own `state/` and `.env`
 - [ ] L1 P1 hedge integrity: judge unwind on UNHEDGED beta; band ≥ the falling step (zones must not overlap)
 - [ ] L2 P2 gap/cluster risk: reproduce the Sep 14 cluster numbers offline first, then a correlated-bucket cap and gap-history haircut behind a knob
 - [ ] L3 P3 core execution: register the core with the watchdog's hard-exit path; one-step cancel-and-close for exits blocked by a resting order
@@ -63,6 +68,11 @@ revision at the close) and switches in via [`docs/RUN8_SWITCH.md`](docs/RUN8_SWI
 
 ## Decide (leftovers with two readings — pick one, then move or delete the line)
 
+- [ ] D1 **Run-8 scope** (`docs/MODEL_DIRECTION.md` §9): as built (recommended) — with or without the core-plus-defense control arm on a second paper account — or shrink the satellite sleeve now (pre-empts the kill test)
+- [ ] D2 **Account:** keep `PA3BGBBR2NB5` flat at ~$977k, or a fresh $1M (cleaner day-0 row)
+- [ ] D3 **Repository visibility:** it is PUBLIC today; keep, or flip private until N7 is done (`gh repo edit Srikanth-Pusapati/Investment_strategy --visibility private --accept-visibility-change-consequences`)
+- [ ] D4 **Always-on host:** approve a small VPS / plugged-in Mac mini for R-5, or accept battery risk for one more window
+- [ ] D5 **Live-pilot bar:** confirm two consecutive PASS windows + pooled N ≥ 60 + a shape that passed as the standing rule
 - Run-6 Amendment 4 was drafted, never registered: register it for the record, or leave run-6 as the reference sample it already is
 - Sep 16 audit findings are unverified `[A]`: re-run the verify phase once, or keep treating them as hypotheses
 - Old paper account PA3B09IK4MGS still holds positions with resting stops: flatten it, or leave it abandoned
@@ -72,6 +82,7 @@ revision at the close) and switches in via [`docs/RUN8_SWITCH.md`](docs/RUN8_SWI
 
 ## Done (last two weeks)
 
+- [x] 2026-10-27 Account flat at 09:33 ET ($977,048.52, 0 positions/orders; S2); `feature/preview` merged into the branch, PR #2 re-pointed at `feature/preview` (MERGEABLE); `docs/MODEL_DIRECTION.md` written and linked from README
 - [x] 2026-10-26 Run-7 verdict FAIL (five of seven counted rules) taken and filed; stop + flatten armed; run-8 change-set built with tests (B-1..B-8, N-1, C-1..C-5, C-7, C-9), contract v4 drafted, RUN8_SWITCH.md, `run8_switch.sh`, `run8_morning_check.py`, `flatten_only.py`, C-1 in-session check; N10 wording fixed; Oct 1–25 logs committed
 - [x] 2026-10-26 X1/X3/X5 of the run-7 close list (verdict, change-set revision, kill-criterion input); X2 n/a (N = 30); X4 drafted (pre-registration at the switch)
 - [x] 2026-09-30 Repo cleanup; `fix_branches.sh` run by the operator — remote == mirror; N1 merged, N4 (`gh auth` as Srikanth-Pusapati) done

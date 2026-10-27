@@ -81,3 +81,29 @@ with a veto — the draft's variant needed a second strike-picker. New scripts: 
 pre-registration), `flatten_only.py`; C-1 `ops/in_session_check.sh` + plist. Suite: see the PR.
 Action: PR `feature/run8-changeset` → `main`; the operator merges, then runs §0 of RUN8_SWITCH.md.
 Plan: closes TODO B-1..B-8, C-1..C-7, C-9, N10–N12, X3, X4 (draft); opens the run-8 switch list.
+
+## 2026-10-27 12:30 CT — account flat; PR #2 re-pointed at feature/preview; direction report written
+Facts: the detached waiter (`scripts/flatten_only.py`, pid 31829) ran at 09:31 ET — 15 orders cancelled, every
+position closed short-legs-first, `account is flat` at 09:33:34 ET, equity $977,048.52, 0 positions, 0 orders;
+the bot stayed down (kill switch on, deadman and claude-daily unloaded). Owner could not merge PR #2 in their
+flow: it had been opened against `main`, but the README branch policy routes every change through
+`feature/preview` (short-lived `feature/runN-changeset` → `feature/preview`; `feature/preview` → `main` at the
+switch). `feature/preview` was one commit ahead of `main` (4212cf6) and conflicted with the branch in TODO.md and
+this file. Merged `feature/preview` into `feature/run8-changeset` (c6153ea; that commit shipped the conflict
+markers because the resolver did not run — fixed in 6f3d432), PR #2 base changed to `feature/preview`, now
+MERGEABLE/CLEAN. GitHub itself reported no blocker (owner is ADMIN, no branch protection). Repository is PUBLIC
+(`isPrivate: false`); verified the scrubbed history carries no key values (every key line in the historical
+`.env.example` is empty); TODO N7 stands.
+Cause: owner's instruction — do not start run-8 today; first a written direction: how the model is to be
+improved, with a clear vision, committed to the repo.
+Action: `docs/MODEL_DIRECTION.md` — scorecard of the seven windows, what is proven (system, mechanical exits,
+`events_only`, hedge/defense), what is a proven liability (open-print entries, top-ups, bullish options, blind
+option protection, beta drift from satellite count), what is unproven (signal IC, conviction calibration, the
+put sleeve), why the current approach cannot reach profitable on its own, the vision (sleeves that earn their
+allocation; the model as analyst/event specialist/veto, never sizer), the target shape by sleeve, the roadmap
+(Phase 0 switch + a core-plus-defense control arm on a second paper account; Phase 1 run-8 with offline research
+R-1..R-5; Phase 2 decision tree; Phase 3 live pilot Jan 2027 earliest), process rules, risks, and five owner
+decisions. Linked from README. Attribution trailers: the owner's rule (none) applies from this commit on;
+cb6b2b7 keeps its trailer (amend blocked).
+Plan: opens TODO D1–D5 (owner decisions) and R-1..R-5 (research track, mapped onto L7/L8); S1 re-worded;
+run-8 switch (S3–S9) waits on D1/D2.
