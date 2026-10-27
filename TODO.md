@@ -47,6 +47,7 @@ revision at the close) and switches in via [`docs/RUN8_SWITCH.md`](docs/RUN8_SWI
 - [ ] R-4 Conviction calibration (Brier, reliability table) per run and pooled — decides whether conviction may size anything in run-9
 - [ ] R-5 Always-on host (`ops/Dockerfile` on a VPS or Mac mini; deadman/panel/launchd move with it) — removes the battery class (N8's real fix)
 - [ ] R-6 Control-arm config for a second paper account: test that `MAX_OPEN_POSITIONS=0` rejects every fresh-name BUY while core fill, PSQ hedge and put proposals pass; second checkout with its own `state/` and `.env`
+- [ ] R-7 Measurement: reconcile ledger realized P&L vs `equity_history` `realized_pl` ($0.4k–2.5k apart per run; run-7 −$29,580 vs −$32,079) and the run-4 Aug 17 `external` option rows booked at 0.0 (`runs/LEDGER_CROSSRUN_2026-10-27.md` caveats)
 - [ ] L1 P1 hedge integrity: judge unwind on UNHEDGED beta; band ≥ the falling step (zones must not overlap)
 - [ ] L2 P2 gap/cluster risk: reproduce the Sep 14 cluster numbers offline first, then a correlated-bucket cap and gap-history haircut behind a knob
 - [ ] L3 P3 core execution: register the core with the watchdog's hard-exit path; one-step cancel-and-close for exits blocked by a resting order

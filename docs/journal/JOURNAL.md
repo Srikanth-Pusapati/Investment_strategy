@@ -103,7 +103,9 @@ put sleeve), why the current approach cannot reach profitable on its own, the vi
 allocation; the model as analyst/event specialist/veto, never sizer), the target shape by sleeve, the roadmap
 (Phase 0 switch + a core-plus-defense control arm on a second paper account; Phase 1 run-8 with offline research
 R-1..R-5; Phase 2 decision tree; Phase 3 live pilot Jan 2027 earliest), process rules, risks, and five owner
-decisions. Linked from README. Attribution trailers: the owner's rule (none) applies from this commit on;
+decisions; §2b is an independent cross-run recompute of the four ledgers (`scripts/ledger_crossrun.py` →
+`runs/LEDGER_CROSSRUN_2026-10-27.md`: ex-top-3 mean negative in all four runs, pooled 5–7 N=68 mean −$144,
+LB −$820). Linked from README. Attribution trailers: the owner's rule (none) applies from this commit on;
 cb6b2b7 keeps its trailer (amend blocked).
-Plan: opens TODO D1–D5 (owner decisions) and R-1..R-5 (research track, mapped onto L7/L8); S1 re-worded;
+Plan: opens TODO D1–D5 (owner decisions) and R-1..R-7 (research + measurement track, mapped onto L7/L8); S1 re-worded;
 run-8 switch (S3–S9) waits on D1/D2.
